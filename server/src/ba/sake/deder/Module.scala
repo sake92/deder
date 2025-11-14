@@ -1,4 +1,4 @@
-package bla
+package ba.sake.deder
 
 // just plain data, read from build.pkl
 trait Module {

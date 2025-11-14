@@ -1,4 +1,4 @@
-package bla
+package ba.sake.deder
 
 case class TaskBuilder[T, Deps <: Tuple](
     name: String,
