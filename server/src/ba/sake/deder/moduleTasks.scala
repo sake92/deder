@@ -11,31 +11,55 @@ object ModuleTasksRegistry {
 
 class JavaModuleTasks(module: JavaModule) {
 
-  val compile = TaskBuilder
+  val sourcesTask = TaskBuilder
+    .make[Seq[String]](
+      name = "sources",
+      transitive = false
+    )
+    .build { _ =>
+      println(s"[module ${module.id}] Resolving sources... " + Instant.now())
+      Thread.sleep(2000)
+      Seq("File1.java", "File2.java")
+    }
+
+  val javacOptionsTask = TaskBuilder
+    .make[Seq[String]](
+      name = "javacOptions",
+      transitive = false
+    )
+    .build { _ =>
+      println(s"[module ${module.id}] Resolving javacOptions... " + Instant.now())
+      Seq("-deprecation")
+    }
+
+  val compileTask = TaskBuilder
     .make[Seq[String]](
       name = "compile",
       transitive = true
     )
-    .build { _ =>
-      println(s"[module ${module.id}] Compiling java... " + Instant.now())
-      /*if module.id.startsWith("c") then
-        Thread.sleep(2000)
-        throw RuntimeException("ughhhh")
-      else*/
+    .dependsOn(sourcesTask)
+    .dependsOn(javacOptionsTask)
+    .build { ctx =>
+      val sources = ctx.depResults._1
+      val javacOptions = ctx.depResults._2
+      println(s"[module ${module.id}] Compiling java with javac ${sources}... " + Instant.now())
       Thread.sleep(1000)
       Seq("file1.class", "file2.class")
     }
 
-  val run = TaskBuilder
-    .make(name = "run")
-    .dependsOn(compile)
+  val runTask = TaskBuilder
+    .make[String](name = "run")
+    .dependsOn(compileTask)
     .build { ctx =>
       val classfiles = ctx.depResults._1
       println(s"[module ${module.id}] Running java -cp ${classfiles.mkString(" ")}")
+      "runRes"
     }
 
   val all: Seq[Task[?, ?]] = Seq(
-    compile,
-    run
+    sourcesTask,
+    javacOptionsTask,
+    compileTask,
+    runTask
   )
 }

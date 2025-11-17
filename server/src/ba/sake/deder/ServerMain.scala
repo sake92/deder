@@ -24,6 +24,7 @@ import scala.jdk.FunctionConverters.*
   val c = JavaModule("c", Seq("d"))
   val d = JavaModule("d", Seq.empty)
   val allModules = Seq(a, b, c, d)
+  // TODO check unique module ids
 
   // these come from CLI/BSP
   val moduleId = "a"
@@ -148,21 +149,21 @@ import scala.jdk.FunctionConverters.*
   /////////////
   def executeTasks(stages: Seq[Seq[TaskInstance]]): Unit = {
     println("Starting execution... " + Instant.now())
-    var taskResults = Map.empty[String, Any]
-    for tasks <- stages do {
-      val taskExecutions = for task <- tasks yield { () =>
-        val allTaskDeps = tasksGraph.outgoingEdgesOf(task).asScala.toSeq
+    var taskResults = Map.empty[String, TaskResult[?]]
+    for taskInstances <- stages do {
+      val taskExecutions = for taskInstance <- taskInstances yield { () =>
+        val allTaskDeps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
         val (depResultOpts, transitiveResultOpts) = allTaskDeps.map { depEdge =>
           val d = tasksGraph.getEdgeTarget(depEdge)
           val depRes = taskResults(d.id)
-          if d.module == task.module then Some(depRes) -> None
+          if d.module == taskInstance.module then Some(depRes) -> None
           else None -> Some(depRes)
         }.unzip
         val depResults = depResultOpts.flatten
         val transitiveResults = transitiveResultOpts.flatten
-        println(s"Executing ${task.id} with args: ${depResults}")
-        val taskRes = task.task.executeUnsafe(task.module, depResults, transitiveResults)
-        task.id -> taskRes
+        println(s"Executing ${taskInstance.id} with args: ${depResults}")
+        val taskRes = taskInstance.task.executeUnsafe(taskInstance.module, depResults, transitiveResults)
+        taskInstance.id -> taskRes
       }
       val results = ox.par(taskExecutions)
       taskResults ++= results
