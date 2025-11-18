@@ -1,6 +1,7 @@
 package ba.sake.deder
 
 import java.time.Instant
+import ba.sake.tupson.JsonRW
 
 object ModuleTasksRegistry {
   def getByModule(module: Module): Seq[Task[?, ?]] = module match {
@@ -11,15 +12,16 @@ object ModuleTasksRegistry {
 
 class JavaModuleTasks(module: JavaModule) {
 
+ 
+
   val sourcesTask = TaskBuilder
-    .make[Seq[String]](
+    .make[DederPath](
       name = "sources",
       transitive = false
     )
     .build { _ =>
       println(s"[module ${module.id}] Resolving sources... " + Instant.now())
-      Thread.sleep(2000)
-      Seq("File1.java", "File2.java")
+      DederPath("d/src")
     }
 
   val javacOptionsTask = TaskBuilder
@@ -27,7 +29,7 @@ class JavaModuleTasks(module: JavaModule) {
       name = "javacOptions",
       transitive = false
     )
-    .build { _ =>
+    .build { ctx =>
       println(s"[module ${module.id}] Resolving javacOptions... " + Instant.now())
       Seq("-deprecation")
     }

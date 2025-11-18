@@ -161,7 +161,7 @@ import scala.jdk.FunctionConverters.*
         }.unzip
         val depResults = depResultOpts.flatten
         val transitiveResults = transitiveResultOpts.flatten
-        println(s"Executing ${taskInstance.id} with args: ${depResults}")
+        //println(s"Executing ${taskInstance.id} with args: ${depResults}")
         val taskRes = taskInstance.task.executeUnsafe(taskInstance.module, depResults, transitiveResults)
         taskInstance.id -> taskRes
       }
