@@ -12,8 +12,6 @@ object ModuleTasksRegistry {
 
 class JavaModuleTasks(module: JavaModule) {
 
- 
-
   val sourcesTask = TaskBuilder
     .make[DederPath](
       name = "sources",
