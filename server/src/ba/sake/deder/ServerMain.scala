@@ -1,5 +1,8 @@
 package ba.sake.deder
 
+import ba.sake.deder.deps.DependencyResolver
+import ba.sake.deder.zinc.ZincCompiler
+import coursier.parse.DependencyParser
 import org.jgrapht.*
 import org.jgrapht.alg.cycle.CycleDetector
 import org.jgrapht.graph.*
@@ -17,6 +20,12 @@ import scala.jdk.FunctionConverters.*
 @main def serverMain() = {
 
   if getMajorJavaVersion() < 21 then abort("Must use JDK >= 21")
+
+  val compilerBridgeJar = DependencyResolver.fetchOne(
+    DependencyParser.dependency(s"org.scala-sbt:compiler-bridge_2.13:1.11.0", "2.13").toOption.get
+  )
+  val zincCompiler = ZincCompiler(compilerBridgeJar)
+  val tasksRegistry = TasksRegistry(zincCompiler)
 
   // parsed from build.yaml/json/whatever
   val a = JavaModule("a", Seq("b", "c"))
@@ -55,10 +64,11 @@ import scala.jdk.FunctionConverters.*
 
   // make Tasks graph
   val tasksPerModule = allModules.map { module =>
-    val taskInstances =
-      ModuleTasksRegistry.getByModule(module).map(t => TaskInstance(module, t))
+    val taskInstances = tasksRegistry.resolve(module.tpe).map(t => TaskInstance(module, t))
+    println(taskInstances)
     module.id -> taskInstances
   }.toMap
+
   def buildTasksGraph(modules: Seq[Module]): SimpleDirectedGraph[TaskInstance, DefaultEdge] = {
     val graph = new SimpleDirectedGraph[TaskInstance, DefaultEdge](classOf[DefaultEdge])
     for module <- modules do {
@@ -97,6 +107,7 @@ import scala.jdk.FunctionConverters.*
   //////////
   def buildExecSubgraph(moduleId: String, taskName: String): AsSubgraph[TaskInstance, DefaultEdge] = {
     val execTasksSet = Set.newBuilder[TaskInstance]
+
     def go(moduleId: String, taskName: String): Unit = {
       val taskToExecute = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
         abort(s"Task not found ${moduleId}.${taskName}")
@@ -108,6 +119,7 @@ import scala.jdk.FunctionConverters.*
       }
       execTasksSet.addOne(taskToExecute)
     }
+
     go(moduleId, taskName)
     new AsSubgraph(tasksGraph, execTasksSet.result().asJava)
   }
@@ -124,6 +136,7 @@ import scala.jdk.FunctionConverters.*
     }
     var stages = Map.empty[Int, Seq[TaskInstance]]
     var maxDepth = 0
+
     def go(task: TaskInstance, depth: Int): Unit = {
       if depth > maxDepth then maxDepth = depth
       stages = stages.updatedWith(depth) {
@@ -136,10 +149,12 @@ import scala.jdk.FunctionConverters.*
         go(d, depth + 1)
       }
     }
+
     go(taskToExecute, 0)
     val res = for i <- 0 to maxDepth yield stages(i)
     res.toSeq
   }
+
   val taskExecStages = buildTaskExecStages(moduleId, taskName).reverse
   println("Exec stages:")
   println(taskExecStages.map(_.map(_.id)))
@@ -161,7 +176,7 @@ import scala.jdk.FunctionConverters.*
         }.unzip
         val depResults = depResultOpts.flatten
         val transitiveResults = transitiveResultOpts.flatten
-        //println(s"Executing ${taskInstance.id} with args: ${depResults}")
+        // println(s"Executing ${taskInstance.id} with args: ${depResults}")
         val taskRes = taskInstance.task.executeUnsafe(taskInstance.module, depResults, transitiveResults)
         taskInstance.id -> taskRes
       }

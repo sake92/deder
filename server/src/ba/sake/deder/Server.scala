@@ -1,4 +1,8 @@
 package ba.sake.deder
 
-class Server {}
+class Server {
+  def start() = {
+    
+  }
+}
 

@@ -3,18 +3,19 @@ package ba.sake.deder
 import scala.util.control.Breaks.{break, breakable}
 import ba.sake.tupson.{given, *}
 
-case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple](
+case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     name: String,
     taskDeps: Deps,
     // if it triggers upstream modules task with same name
-    transitive: Boolean = false,
-    cached: Boolean = true
+    transitive: Boolean,
+    cached: Boolean,
+    supportedModuleTypes: Set[ModuleType]
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: Task[T2, ?]): TaskBuilder[T, Task[T2, ?] *: Deps] =
-    val newdeps = t *: taskDeps
-    TaskBuilder(name, t *: taskDeps, transitive, cached)
+    TaskBuilder(name, t *: taskDeps, transitive, cached, supportedModuleTypes)
+
   def build(execute: TaskExecContext[Deps] => T): Task[T, Deps] =
-    Task(name, taskDeps, execute, transitive, cached)
+    Task(name, taskDeps, execute, transitive, cached, supportedModuleTypes)
 }
 
 object TaskBuilder {
@@ -22,8 +23,9 @@ object TaskBuilder {
       name: String,
       // if it triggers upstream modules task with same name
       transitive: Boolean = false,
-      cached: Boolean = true
-  ): TaskBuilder[T, EmptyTuple] = TaskBuilder(name, EmptyTuple, transitive, cached)
+      cached: Boolean = true,
+      supportedModuleTypes: Set[ModuleType] = Set.empty
+  ): TaskBuilder[T, EmptyTuple] = TaskBuilder(name, EmptyTuple, transitive, cached, supportedModuleTypes)
 }
 
 //
@@ -45,16 +47,22 @@ case class TaskExecContext[Deps <: Tuple](
     transitiveResults: Seq[?] // results from dependent modules
 )(using ev: TaskDeps[Deps] =:= true)
 
-case class Task[T : JsonRW: Hashable, Deps <: Tuple](
+case class Task[T: JsonRW: Hashable, Deps <: Tuple](
     name: String,
     taskDeps: Deps,
     execute: TaskExecContext[Deps] => T,
     // if it triggers upstream modules task with same name
     // the only way to reference a task across modules
-    transitive: Boolean = false,
-    cached: Boolean = true
+    transitive: Boolean,
+    cached: Boolean,
+    supportedModuleTypes: Set[ModuleType]
 )(using ev: TaskDeps[Deps] =:= true) {
-  def executeUnsafe(module: Module, depResults: Seq[TaskResult[?]], transitiveResults: Seq[TaskResult[?]]): TaskResult[T] = {
+
+  def executeUnsafe(
+      module: Module,
+      depResults: Seq[TaskResult[?]],
+      transitiveResults: Seq[TaskResult[?]]
+  ): TaskResult[T] = {
     val metadataFile = os.pwd / "out_deder" / module.id / name / "metadata.json"
 
     val allDepResults = depResults ++ transitiveResults
@@ -70,7 +78,6 @@ case class Task[T : JsonRW: Hashable, Deps <: Tuple](
       taskResult
     }
 
-    
     if os.exists(metadataFile) then {
       val cachedTaskResult = os.read(metadataFile).parseJson[TaskResult[T]]
       val hasDeps = allDepResults.nonEmpty
@@ -90,5 +97,6 @@ case class TaskInstance(
     task: Task[?, ?]
 ) {
   def moduleId: String = module.id
+
   def id: String = s"${moduleId}.${task.name}"
 }

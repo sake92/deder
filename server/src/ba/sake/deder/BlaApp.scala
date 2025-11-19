@@ -17,10 +17,12 @@ import coursier.parse.DependencyParser
 
   val zincCacheFile = os.pwd / "out_deder/zinc/inc_compile.zip"
 
-
   val sources = os.walk(os.pwd / "d/src/scala", skip = p => {
-    os.isFile(p) && p.ext != "scala"
+    if os.isDir(p) then false
+    else if os.isFile(p) then p.ext != "scala" && p.ext != "java"
+    else true
   })
+  println(sources)
   val classesDir = os.pwd / "out_deder/zinc/classes"
 
   val scalacOptions = Seq.empty[String]
@@ -28,6 +30,7 @@ import coursier.parse.DependencyParser
 
   val zincCompiler = ZincCompiler(compilerBridgeJar)
   for i <- 0 to 10 do {
+    println("#" * 50)
     val start = Instant.now()
     zincCompiler.compile(
       scalaVersion,
