@@ -1,6 +1,7 @@
 package ba.sake.deder
 
 import scala.util.control.Breaks.{break, breakable}
+import scala.Tuple.:*
 import ba.sake.tupson.{given, *}
 
 case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
@@ -11,8 +12,8 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     cached: Boolean,
     supportedModuleTypes: Set[ModuleType]
 )(using ev: TaskDeps[Deps] =:= true) {
-  def dependsOn[T2](t: Task[T2, ?]): TaskBuilder[T, Task[T2, ?] *: Deps] =
-    TaskBuilder(name, t *: taskDeps, transitive, cached, supportedModuleTypes)
+  def dependsOn[T2](t: Task[T2, ?]): TaskBuilder[T, Deps :* Task[T2, ?]] =
+    TaskBuilder(name, taskDeps :* t, transitive, cached, supportedModuleTypes)
 
   def build(execute: TaskExecContext[Deps] => T): Task[T, Deps] =
     Task(name, taskDeps, execute, transitive, cached, supportedModuleTypes)
@@ -28,11 +29,11 @@ object TaskBuilder {
   ): TaskBuilder[T, EmptyTuple] = TaskBuilder(name, EmptyTuple, transitive, cached, supportedModuleTypes)
 }
 
-//
+// why did I add this?? :DDDD
 // type TaskDeps = Task[?, ?]
 type TaskDeps[T <: Tuple] <: Boolean = T match {
   case EmptyTuple      => true
-  case Task[?, ?] *: t => TaskDeps[t]
+  case t :* Task[?, ?] => TaskDeps[t]
   case _               => false
 }
 
@@ -40,6 +41,13 @@ type TaskDepResults[T <: Tuple] <: Tuple = T match {
   case EmptyTuple         => EmptyTuple
   case Task[t, ?] *: rest => t *: TaskDepResults[rest]
 }
+
+/*
+type TaskDepResults[T <: Tuple] <: Tuple = T match {
+  case EmptyTuple         => EmptyTuple
+  case Task[t, ?] *: rest => t *: TaskDepResults[rest]
+}
+*/
 
 case class TaskExecContext[Deps <: Tuple](
     module: Module,
@@ -63,7 +71,7 @@ case class Task[T: JsonRW: Hashable, Deps <: Tuple](
       depResults: Seq[TaskResult[?]],
       transitiveResults: Seq[TaskResult[?]]
   ): TaskResult[T] = {
-    val metadataFile = os.pwd / "out_deder" / module.id / name / "metadata.json"
+    val metadataFile = os.pwd / ".deder/out" / module.id / name / "metadata.json"
 
     val allDepResults = depResults ++ transitiveResults
     val inputsHash = HashUtils.hashStr(allDepResults.map(_.outputHash).mkString("-"))

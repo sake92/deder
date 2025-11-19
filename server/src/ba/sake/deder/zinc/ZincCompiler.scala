@@ -105,9 +105,9 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
 
     override def info(msg: Supplier[String]): Unit = println(s"[info] ${msg.get()}")
 
-    override def debug(msg: Supplier[String]): Unit = println(s"[debug] ${msg.get()}")
+    override def debug(msg: Supplier[String]): Unit = ()// println(s"[debug] ${msg.get()}")
 
-    override def trace(exception: Supplier[Throwable]): Unit = println(s"[trace] ${exception.get()}")
+    override def trace(exception: Supplier[Throwable]): Unit = ()//println(s"[trace] ${exception.get()}")
   }
 
   private def getSetup(cacheFile: Path): Setup = {

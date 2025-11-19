@@ -9,6 +9,8 @@ trait Module {
 
 case class JavaModule(
     id: String,
+    sources: Seq[DederPath],
+    javacOptions: Seq[String],
     moduleDeps: Seq[String]
 ) extends Module {
   def tpe: ModuleType = ModuleType.Java

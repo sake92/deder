@@ -28,10 +28,10 @@ import scala.jdk.FunctionConverters.*
   val tasksRegistry = TasksRegistry(zincCompiler)
 
   // parsed from build.yaml/json/whatever
-  val a = JavaModule("a", Seq("b", "c"))
-  val b = JavaModule("b", Seq("d"))
-  val c = JavaModule("c", Seq("d"))
-  val d = JavaModule("d", Seq.empty)
+  val a = JavaModule("a", Seq(DederPath("examples/multi/a/src/scala")), Seq(), Seq("b", "c"))
+  val b = JavaModule("b", Seq(DederPath("examples/multi/b/src/scala")), Seq(), Seq("d"))
+  val c = JavaModule("c", Seq(DederPath("examples/multi/c/src/scala")), Seq(), Seq("d"))
+  val d = JavaModule("d", Seq(DederPath("examples/multi/d/src/scala")), Seq(), Seq.empty)
   val allModules = Seq(a, b, c, d)
   // TODO check unique module ids
 
