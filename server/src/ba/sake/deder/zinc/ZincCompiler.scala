@@ -7,7 +7,7 @@ import java.util.Optional
 import java.util.function.Supplier
 import sbt.internal.inc.{FileAnalysisStore, PlainVirtualFileConverter, ZincUtil}
 import xsbti.compile.analysis.ReadWriteMappers
-import xsbti.compile.{AnalysisContents, ClasspathOptionsUtil, CompileAnalysis, CompileOptions, CompileOrder, CompileProgress, CompilerCache, DefinesClass, GlobalsCache, IncOptions, PerClasspathEntryLookup, Setup}
+import xsbti.compile.{AnalysisContents, ClasspathOptionsUtil, CompileAnalysis, CompileOptions, CompileOrder, CompileProgress, CompilerCache, DefinesClass, GlobalsCache, IncOptions, PerClasspathEntryLookup, PreviousResult, Setup}
 
 import java.nio.file.Path
 
@@ -53,15 +53,6 @@ object ZincCompiler {
       /*_order =*/ CompileOrder.Mixed
     )
     val zincCacheFile = os.pwd / "out_deder/zinc/inc_compile.zip"
-    val setup = getSetup(zincCacheFile.toNIO)
-    val previousResult = xsbti.compile.PreviousResult.of(Optional.empty(), Optional.empty())
-    val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
-
-    val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
-    val newResult = incrementalCompiler.compile(
-      inputs,
-      new DederZincLogger
-    )
 
     val analysisStore = ConsistentFileAnalysisStore.binary(
       file = zincCacheFile.toIO,
@@ -70,6 +61,25 @@ object ZincCompiler {
       // No need to utilize more than 8 cores to serialize a small file
       parallelism = math.min(Runtime.getRuntime.availableProcessors(), 8)
     )
+    val previousResult = locally {
+      val previous = analysisStore.get()
+      PreviousResult.of(
+        previous.map(_.getAnalysis),
+        previous.map(_.getMiniSetup)
+      )
+    }
+
+    val setup = getSetup(zincCacheFile.toNIO)
+    val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
+
+    // TODO make this long running process
+    val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
+    val newResult = incrementalCompiler.compile(
+      inputs,
+      new DederZincLogger
+    )
+
+
     analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
 
     println(s"compile finished: " + newResult)
