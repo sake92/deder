@@ -14,9 +14,9 @@ object server extends ScalaModule {
         mvn"ba.sake::tupson:0.18.0",
         mvn"com.lihaoyi::os-lib:0.11.6",
         mvn"commons-codec:commons-codec:1.20.0",
-
         mvn"org.scala-sbt:zinc_2.13:1.11.0",
-        mvn"org.scala-sbt:compiler-interface:1.11.0"
+        mvn"org.scala-sbt:compiler-interface:1.11.0",
+        mvn"io.get-coursier::coursier:2.1.25-M19".withDottyCompat(scalaVersion()),
     )
 
     def scalacOptions = super.scalacOptions() ++ Seq("-Yretain-trees")

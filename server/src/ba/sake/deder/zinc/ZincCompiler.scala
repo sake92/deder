@@ -8,51 +8,64 @@ import java.util.function.Supplier
 import sbt.internal.inc.{FileAnalysisStore, PlainVirtualFileConverter, ZincUtil}
 import xsbti.compile.analysis.ReadWriteMappers
 import xsbti.compile.{AnalysisContents, ClasspathOptionsUtil, CompileAnalysis, CompileOptions, CompileOrder, CompileProgress, CompilerCache, DefinesClass, GlobalsCache, IncOptions, PerClasspathEntryLookup, PreviousResult, Setup}
-
+import sbt.internal.inc.ScalaInstance
 import java.nio.file.Path
 
 object ZincCompiler {
-  def compile(): Unit = {
+  def apply(compilerBridgeJar: os.Path): ZincCompiler =
+    new ZincCompiler(compilerBridgeJar
+    )
+}
+
+class ZincCompiler(compilerBridgeJar: os.Path) {
+
+  private val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
+
+  def compile(
+               scalaVersion: String,
+               scalaCompilerJar: os.Path,
+               scalaLibraryJars: Seq[os.Path],
+               scalaReflectJar: Option[os.Path],
+               zincCacheFile: os.Path,
+               sources: Seq[os.Path],
+               classesDir: os.Path,
+               scalacOptions: Seq[String],
+               javacOptions: Seq[String]
+             ): Unit = {
 
     val classloader = this.getClass.getClassLoader
-    val scalaCompilerJar = os.pwd / "scala-compiler-2.13.17.jar"
-    val scalaLibraryJar = os.pwd / "scala-library-2.13.17.jar"
-    val scalaReflectJar = os.pwd / "scala-reflect-2.13.17.jar"
-    val scalaInstance = new sbt.internal.inc.ScalaInstance(
-      version = "2.13.17",
+
+    val scalaInstance = new ScalaInstance(
+      version = scalaVersion,
       loader = classloader,
       loaderCompilerOnly = classloader,
       loaderLibraryOnly = classloader,
-      libraryJars = Array(scalaLibraryJar.toIO),
-      compilerJars = Array(scalaCompilerJar.toIO, scalaReflectJar.toIO),
-      allJars = Array(scalaLibraryJar.toIO, scalaCompilerJar.toIO, scalaReflectJar.toIO),
-      explicitActual = Some("2.13.17")
+      libraryJars = scalaLibraryJars.map(_.toIO).toArray,
+      compilerJars = (Array(scalaCompilerJar) ++ scalaReflectJar).map(_.toIO),
+      allJars = (Array(scalaCompilerJar) ++ scalaLibraryJars ++ scalaReflectJar).map(_.toIO),
+      explicitActual = Some(scalaVersion)
     )
 
     val classpathOptions = ClasspathOptionsUtil.auto()
-    val compilerBridgeJar = (os.pwd / "compiler-bridge_2.13-1.11.0.jar").toIO
-    val scalaCompiler = ZincUtil.scalaCompiler(scalaInstance, compilerBridgeJar, classpathOptions)
+    val scalaCompiler = ZincUtil.scalaCompiler(scalaInstance, compilerBridgeJar.toIO, classpathOptions)
     val compilers = ZincUtil.compilers(scalaInstance, classpathOptions, javaHome = None, scalac = scalaCompiler)
 
     val converter = PlainVirtualFileConverter.converter
-    val scalaFiles = os.walk(os.pwd / "d/src/scala", skip = p => {
-      os.isFile(p) && p.ext != "scala"
-    })
-    val sources = scalaFiles.toArray.map(p => converter.toVirtualFile(p.toNIO))
-    val classpath = Array(scalaLibraryJar).map(f => converter.toVirtualFile(f.toNIO))
-    val classesDir = (os.pwd / "out_deder/zinc/classes").toNIO
+
+    val sourcesVFs = sources.map(s => converter.toVirtualFile(s.toNIO)).toArray
+    val classpath = scalaLibraryJars.map(f => converter.toVirtualFile(f.toNIO)).toArray
 
     val compileOptions = CompileOptions.of(
       /*_classpath =*/ classpath,
-      /*_sources =*/ sources,
-      /*_classesDirectory =*/ classesDir,
-      /*_scalacOptions =*/ Array.empty[String],
-      /*_javacOptions =*/ Array.empty[String],
+      /*_sources =*/ sourcesVFs,
+      /*_classesDirectory =*/ classesDir.toNIO,
+      /*_scalacOptions =*/ scalacOptions.toArray,
+      /*_javacOptions =*/ javacOptions.toArray,
       /*_maxErrors =*/ 100,
       /*_sourcePositionMapper =*/ null,
       /*_order =*/ CompileOrder.Mixed
     )
-    val zincCacheFile = os.pwd / "out_deder/zinc/inc_compile.zip"
+
 
     val analysisStore = ConsistentFileAnalysisStore.binary(
       file = zincCacheFile.toIO,
@@ -72,8 +85,6 @@ object ZincCompiler {
     val setup = getSetup(zincCacheFile.toNIO)
     val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
 
-    // TODO make this long running process
-    val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
     val newResult = incrementalCompiler.compile(
       inputs,
       new DederZincLogger
