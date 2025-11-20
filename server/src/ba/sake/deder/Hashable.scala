@@ -1,7 +1,6 @@
 package ba.sake.deder
 
 import java.nio.ByteBuffer
-import ba.sake.tupson.JsonRW
 
 trait Hashable[T] {
   def hashStr(value: T): String
@@ -40,29 +39,4 @@ object Hashable {
       HashUtils.hashStr(combinedHash)
     }
   }
-}
-
-// project-root relative path
-case class DederPath(path: os.SubPath)
-
-object DederPath {
-  given Hashable[DederPath] with {
-    def hashStr(value: DederPath): String =
-      val finalPath = DederGlobals.projectRootDir / value.path
-      if os.exists(finalPath) then Hashable[os.Path].hashStr(finalPath)
-      else throw RuntimeException(s"Path does not exist: ${finalPath}")
-  }
-
-  import ba.sake.tupson.{*, given}
-  import org.typelevel.jawn.ast.JValue
-
-  given JsonRW[DederPath] with {
-    def parse(path: String, jValue: JValue): DederPath =
-      val str = JsonRW[String].parse(path, jValue)
-      DederPath(os.SubPath(str.split("/").toIndexedSeq))
-
-    def write(value: DederPath): JValue =
-      JsonRW[String].write(value.path.toString)
-  }
-
 }

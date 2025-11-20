@@ -1,6 +1,6 @@
 package ba.sake.deder
 
-import ba.sake.tupson.{given, *}
+import ba.sake.tupson.JsonRW
 import org.typelevel.jawn.ast.*
 
 case class TaskResult[T](
@@ -18,6 +18,7 @@ object TaskResult {
           val inputsHash = JsonRW[String].parse(path, o("inputsHash"))
           val outputHash = JsonRW[String].parse(path, o("outputHash"))
           TaskResult(value, inputsHash, outputHash)
+        case other => sys.error(s"Cannot parse TaskResult from $other")
       }
 
     def write(value: TaskResult[T]): JValue =

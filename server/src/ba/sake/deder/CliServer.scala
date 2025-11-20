@@ -1,5 +1,5 @@
 package ba.sake.deder
 
-class Server {
+class CliServer {
   def start() = {}
 }

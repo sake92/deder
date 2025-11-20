@@ -12,4 +12,6 @@ class TasksRegistry(zincCompiler: ZincCompiler) {
       t.supportedModuleTypes(moduleType)
     }
   }
+  
+  // TODO dynamic tasks added by plugins, at runtime or just restart server??
 }

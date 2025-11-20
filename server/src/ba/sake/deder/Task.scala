@@ -32,8 +32,7 @@ object TaskBuilder {
   ): TaskBuilder[T, EmptyTuple] = TaskBuilder(name, EmptyTuple, transitive, cached, supportedModuleTypes)
 }
 
-// why did I add this?? :DDDD
-// type TaskDeps = Task[?, ?]
+// this is to make sure that Deps are Task-s and not arbitrary types
 type TaskDeps[T <: Tuple] <: Boolean = T match {
   case EmptyTuple      => true
   case t :* Task[?, ?] => TaskDeps[t]

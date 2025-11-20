@@ -32,10 +32,6 @@ import scala.jdk.FunctionConverters.*
   val projectConfig = configParser.parse(configFile)
   val allModules = projectConfig.modules.asScala.toSeq
 
-  // these come from CLI/BSP
-  // val moduleId = "d"
-  // val taskName = "compile"
-
   val compilerBridgeJar = DependencyResolver.fetchOne(
     DependencyParser.dependency(s"org.scala-sbt:compiler-bridge_2.13:1.11.0", "2.13").toOption.get
   )
