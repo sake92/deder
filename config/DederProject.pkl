@@ -5,10 +5,23 @@ modules: Listing<DederModule>
 abstract class DederModule {
   id: String
   moduleDeps: Listing<DederModule>
+  type: ModuleType
 }
 
+typealias ModuleType = "java" | "scala"
+
+
 class JavaModule extends DederModule {
+  type: ModuleType = "java"
+  sources: Listing<String> = new { "src" }
+  resources: Listing<String> = new { "resources" }
+  javacOptions: Listing<String> = new { }
 }
 
 class ScalaModule extends DederModule {
+  type: ModuleType = "scala"
+  sources: Listing<String> = new { "src" }
+  resources: Listing<String> = new { "resources" }
+  javacOptions: Listing<String> = new { }
+  scalacOptions: Listing<String> = new { }
 }
