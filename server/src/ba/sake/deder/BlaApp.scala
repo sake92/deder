@@ -1,5 +1,7 @@
 package ba.sake.deder
 
+import ba.sake.deder.config.ConfigParser
+
 import java.time.{Duration, Instant}
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
@@ -7,8 +9,12 @@ import coursier.parse.DependencyParser
 
 @main def blaApp() = {
 
+  val configParser = ConfigParser()
+  configParser.parse()
+
 
   // TODO handle scala 3
+  /*
   val scalaVersion = "2.13.17"
   val scalaCompilerJar = DependencyResolver.fetchOne(DependencyParser.dependency(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion).toOption.get)
   val scalaLibraryJar = DependencyResolver.fetchOne(DependencyParser.dependency(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion).toOption.get)
@@ -46,5 +52,5 @@ import coursier.parse.DependencyParser
     val end = Instant.now()
     println(s"Compiled in ${Duration.between(start, end)}")
   }
-
+*/
 }

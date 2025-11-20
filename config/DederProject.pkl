@@ -1,0 +1,14 @@
+module ba.sake.deder.config.DederProject
+
+modules: Listing<DederModule>
+
+abstract class DederModule {
+  id: String
+  moduleDeps: Listing<DederModule>
+}
+
+class JavaModule extends DederModule {
+}
+
+class ScalaModule extends DederModule {
+}

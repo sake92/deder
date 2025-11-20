@@ -16,8 +16,15 @@ object server extends ScalaModule {
         mvn"commons-codec:commons-codec:1.20.0",
         mvn"org.scala-sbt:zinc_2.13:1.11.0",
         mvn"org.scala-sbt:compiler-interface:1.11.0",
-        mvn"io.get-coursier::coursier:2.1.25-M19".withDottyCompat(scalaVersion()),
+        mvn"io.get-coursier::coursier:2.1.25-M19".withDottyCompat(scalaVersion())
     )
+    def moduleDeps = Seq(config)
 
     def scalacOptions = super.scalacOptions() ++ Seq("-Yretain-trees")
+}
+
+object config extends JavaModule {
+  def mvnDeps = Seq(
+    mvn"org.pkl-lang:pkl-config-java:0.30.0"
+  )
 }
