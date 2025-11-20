@@ -1,24 +1,28 @@
 package ba.sake.deder
 
+import ba.sake.deder.config.DederProject.{JavaModule, ModuleType, ScalaModule}
 import ba.sake.deder.deps.DependencyResolver
 
 import java.time.Instant
+import scala.jdk.CollectionConverters.*
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.zinc.ZincCompiler
 import coursier.parse.DependencyParser
 
 class CoreTasks(zincCompiler: ZincCompiler) {
 
+  // source dirs
   val sourcesTask = TaskBuilder
     .make[Seq[DederPath]](
       name = "sources",
       transitive = false,
-      supportedModuleTypes = Set(ModuleType.Scala, ModuleType.Java)
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
     .build { ctx =>
       ctx.module match {
-        case m: JavaModule => m.sources
-        case _             => ???
+        case m: JavaModule  => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.dir}/${s}")))
+        case m: ScalaModule => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.dir}/${s}")))
+        case _              => ???
       }
     }
 
@@ -26,12 +30,13 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .make[Seq[String]](
       name = "javacOptions",
       transitive = false,
-      supportedModuleTypes = Set(ModuleType.Scala, ModuleType.Java)
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
     .build { ctx =>
       ctx.module match {
-        case m: JavaModule => m.javacOptions
-        case _             => ???
+        case m: JavaModule  => m.javacOptions.asScala.toSeq
+        case m: ScalaModule => m.javacOptions.asScala.toSeq
+        case _              => ???
       }
     }
 
@@ -39,7 +44,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .make[Seq[String]](
       name = "compile",
       transitive = true,
-      supportedModuleTypes = Set(ModuleType.Scala, ModuleType.Java)
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
     .dependsOn(sourcesTask)
     .dependsOn(javacOptionsTask)
@@ -47,19 +52,20 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val sourceDirs = ctx.depResults._1
       val sourceFiles = sourceDirs.flatMap { sourceDir =>
         os.walk(
-          os.pwd / sourceDir.path,
+          DederGlobals.projectRootDir / sourceDir.path,
           skip = p => {
             if os.isDir(p) then false
-            else if os.isFile(p) then p.ext != "scala" && p.ext != "java"
+            else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
             else true
           }
         )
-      }
+      }.filter(os.isFile)
       val javacOptions = ctx.depResults._2
       val scalacOptions = javacOptions
       val scalaVersion = ctx.module match {
-        case m: JavaModule => "2.13.17"
-        case _             => ???
+        case m: JavaModule  => "2.13.17" // dummy default scala version
+        case m: ScalaModule => m.scalaVersion
+        case _              => ???
       }
       val scalaCompilerJar = DependencyResolver.fetchOne(
         DependencyParser.dependency(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion).toOption.get
@@ -67,12 +73,13 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val scalaLibraryJar = DependencyResolver.fetchOne(
         DependencyParser.dependency(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion).toOption.get
       )
-      println(scalaLibraryJar)
+      // println(scalaLibraryJar)
       val scalaReflectJar = DependencyResolver.fetchOne(
         DependencyParser.dependency(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion).toOption.get
       ) // TODO only for scala 2
-      val zincCacheFile = os.pwd / os.RelPath(s".deder/out/${ctx.module.id}/compile/inc_compile.zip")
-      val classesDir = os.pwd / os.RelPath(s".deder/out/${ctx.module.id}/compile/classes")
+      val zincCacheFile =
+        DederGlobals.projectRootDir / os.RelPath(s".deder/out/${ctx.module.id}/compile/inc_compile.zip")
+      val classesDir = DederGlobals.projectRootDir / os.RelPath(s".deder/out/${ctx.module.id}/compile/classes")
       zincCompiler.compile(
         scalaVersion,
         scalaCompilerJar,
@@ -90,7 +97,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
   val runTask = TaskBuilder
     .make[String](
       name = "run",
-      supportedModuleTypes = Set(ModuleType.Scala, ModuleType.Java)
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
     .dependsOn(compileTask)
     .build { ctx =>

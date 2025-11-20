@@ -1,5 +1,6 @@
 package ba.sake.deder
 
+import ba.sake.deder.config.DederProject.ModuleType
 import ba.sake.deder.zinc.ZincCompiler
 
 class TasksRegistry(zincCompiler: ZincCompiler) {

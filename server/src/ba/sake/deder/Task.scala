@@ -1,8 +1,11 @@
 package ba.sake.deder
 
+import ba.sake.deder.config.DederProject
+import ba.sake.deder.config.DederProject.{DederModule, ModuleType}
+
 import scala.util.control.Breaks.{break, breakable}
 import scala.Tuple.:*
-import ba.sake.tupson.{given, *}
+import ba.sake.tupson.{*, given}
 
 case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     name: String,
@@ -42,15 +45,9 @@ type TaskDepResults[T <: Tuple] <: Tuple = T match {
   case Task[t, ?] *: rest => t *: TaskDepResults[rest]
 }
 
-/*
-type TaskDepResults[T <: Tuple] <: Tuple = T match {
-  case EmptyTuple         => EmptyTuple
-  case Task[t, ?] *: rest => t *: TaskDepResults[rest]
-}
-*/
-
 case class TaskExecContext[Deps <: Tuple](
-    module: Module,
+    project: DederProject,
+    module: DederModule,
     depResults: TaskDepResults[Deps],
     transitiveResults: Seq[?] // results from dependent modules
 )(using ev: TaskDeps[Deps] =:= true)
@@ -67,11 +64,12 @@ case class Task[T: JsonRW: Hashable, Deps <: Tuple](
 )(using ev: TaskDeps[Deps] =:= true) {
 
   def executeUnsafe(
-      module: Module,
+                    project: DederProject,
+      module: DederModule,
       depResults: Seq[TaskResult[?]],
       transitiveResults: Seq[TaskResult[?]]
   ): TaskResult[T] = {
-    val metadataFile = os.pwd / ".deder/out" / module.id / name / "metadata.json"
+    val metadataFile = DederGlobals.projectRootDir / ".deder/out" / module.id / name / "metadata.json"
 
     val allDepResults = depResults ++ transitiveResults
     val inputsHash = HashUtils.hashStr(allDepResults.map(_.outputHash).mkString("-"))
@@ -79,7 +77,7 @@ case class Task[T: JsonRW: Hashable, Deps <: Tuple](
     def computeTaskResult(): TaskResult[T] = {
       val depResultsUnsafe = Tuple.fromArray(depResults.map(_.value).toArray).asInstanceOf[TaskDepResults[Deps]]
       val transitiveResultsUnsafe = transitiveResults.map(_.value).asInstanceOf[Seq[T]]
-      val res = execute(TaskExecContext(module, depResultsUnsafe, transitiveResultsUnsafe))
+      val res = execute(TaskExecContext(project, module, depResultsUnsafe, transitiveResultsUnsafe))
       val outputHash = Hashable[T].hashStr(res)
       val taskResult = TaskResult(res, inputsHash, outputHash)
       os.write.over(metadataFile, taskResult.toJson, createFolders = true)
@@ -101,7 +99,7 @@ case class Task[T: JsonRW: Hashable, Deps <: Tuple](
 
 // dynamic, for each module
 case class TaskInstance(
-    module: Module,
+    module: DederModule,
     task: Task[?, ?]
 ) {
   def moduleId: String = module.id

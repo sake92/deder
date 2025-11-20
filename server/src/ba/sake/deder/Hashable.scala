@@ -42,17 +42,13 @@ object Hashable {
   }
 }
 
-// project root-relative path
-// TODO how to encode root path..? env var? #yolo
-case class DederPath(path: os.SubPath) {
-  def root: os.Path = os.pwd // TODO env var
-}
+// project-root relative path
+case class DederPath(path: os.SubPath)
 
 object DederPath {
   given Hashable[DederPath] with {
     def hashStr(value: DederPath): String =
-      // TODO encode root path too
-      val finalPath = os.pwd / value.path
+      val finalPath = DederGlobals.projectRootDir / value.path
       if os.exists(finalPath) then
         Hashable[os.Path].hashStr(finalPath)
       else

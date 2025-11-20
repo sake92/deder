@@ -6,13 +6,9 @@ import ba.sake.deder.config.DederProject
 
 class ConfigParser {
 
-  def parse() = {
-
-    val configFile=  os.pwd / "examples/multi/deder.pkl"
+  def parse(configFile: os.Path): DederProject = {
     val evaluator = ConfigEvaluator.preconfigured
     val config = evaluator.evaluate(ModuleSource.file(configFile.toIO))
-    
-    val project = config.as(classOf[DederProject])
-    println(project)
+    config.as(classOf[DederProject])
   }
 }

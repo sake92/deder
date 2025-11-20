@@ -6,6 +6,7 @@ abstract class DederModule {
   id: String
   moduleDeps: Listing<DederModule>
   type: ModuleType
+  dir: String = id // module root directory
 }
 
 typealias ModuleType = "java" | "scala"
@@ -20,6 +21,7 @@ class JavaModule extends DederModule {
 
 class ScalaModule extends DederModule {
   type: ModuleType = "scala"
+  scalaVersion: String
   sources: Listing<String> = new { "src" }
   resources: Listing<String> = new { "resources" }
   javacOptions: Listing<String> = new { }

@@ -1,5 +1,7 @@
 package ba.sake.deder
 
+import ba.sake.deder.config.ConfigParser
+import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
 import coursier.parse.DependencyParser
@@ -17,9 +19,23 @@ import java.time.Instant
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FunctionConverters.*
 
-@main def serverMain() = {
+@main def serverMain(moduleId: String, taskName: String) = {
 
   if getMajorJavaVersion() < 21 then abort("Must use JDK >= 21")
+
+  val projectRoot = os.pwd / "examples/multi"
+  System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
+
+  // TODO check unique module ids
+  val configParser = ConfigParser()
+  val configFile=  DederGlobals.projectRootDir / "deder.pkl"
+  val projectConfig = configParser.parse(configFile)
+  val allModules = projectConfig.modules.asScala.toSeq
+
+  // these come from CLI/BSP
+  //val moduleId = "d"
+  //val taskName = "compile"
+
 
   val compilerBridgeJar = DependencyResolver.fetchOne(
     DependencyParser.dependency(s"org.scala-sbt:compiler-bridge_2.13:1.11.0", "2.13").toOption.get
@@ -27,28 +43,16 @@ import scala.jdk.FunctionConverters.*
   val zincCompiler = ZincCompiler(compilerBridgeJar)
   val tasksRegistry = TasksRegistry(zincCompiler)
 
-  // parsed from build.yaml/json/whatever
-  val a = JavaModule("a", Seq(DederPath("examples/multi/a/src/scala")), Seq(), Seq("b", "c"))
-  val b = JavaModule("b", Seq(DederPath("examples/multi/b/src/scala")), Seq(), Seq("d"))
-  val c = JavaModule("c", Seq(DederPath("examples/multi/c/src/scala")), Seq(), Seq("d"))
-  val d = JavaModule("d", Seq(DederPath("examples/multi/d/src/scala")), Seq(), Seq.empty)
-  val allModules = Seq(a, b, c, d)
-  // TODO check unique module ids
-
-  // these come from CLI/BSP
-  val moduleId = "a"
-  val taskName = "run"
-
-  def buildModulesGraph(modules: Seq[Module]): SimpleDirectedGraph[Module, DefaultEdge] = {
-    val graph = new SimpleDirectedGraph[Module, DefaultEdge](classOf[DefaultEdge])
+  def buildModulesGraph(modules: Seq[DederModule]): SimpleDirectedGraph[DederModule, DefaultEdge] = {
+    val graph = new SimpleDirectedGraph[DederModule, DefaultEdge](classOf[DefaultEdge])
     val modulesMap = modules.map(m => m.id -> m).toMap
     modules.foreach(graph.addVertex)
     modules.foreach { m =>
-      m.moduleDeps.foreach { moduleDepId =>
-        val moduleDep = modulesMap.getOrElse(
-          moduleDepId,
-          abort(s"Module referenced by '${m.id}' not found: '${moduleDepId}'")
-        )
+      m.moduleDeps.asScala.foreach { moduleDep =>
+        /*val moduleDep = modulesMap.getOrElse(
+          moduleDep.id,
+          abort(s"Module referenced by '${m.id}' not found: '${moduleDep.id}'")
+        )*/
         // TODO check module type??
         // need to allow java<->scala deps both way
         graph.addEdge(m, moduleDep)
@@ -59,17 +63,17 @@ import scala.jdk.FunctionConverters.*
 
   val modulesGraph = buildModulesGraph(allModules)
   checkNoCycles(modulesGraph, _.id)
-  println("Modules graph:")
-  println(generateDOT(modulesGraph, v => v.id, v => Map("label" -> v.id)))
+ // println("Modules graph:")
+  //println(generateDOT(modulesGraph, v => v.id, v => Map("label" -> v.id)))
 
   // make Tasks graph
   val tasksPerModule = allModules.map { module =>
-    val taskInstances = tasksRegistry.resolve(module.tpe).map(t => TaskInstance(module, t))
-    println(taskInstances)
+    val taskInstances = tasksRegistry.resolve(module.`type`).map(t => TaskInstance(module, t))
+   // println(taskInstances)
     module.id -> taskInstances
   }.toMap
 
-  def buildTasksGraph(modules: Seq[Module]): SimpleDirectedGraph[TaskInstance, DefaultEdge] = {
+  def buildTasksGraph(modules: Seq[DederModule]): SimpleDirectedGraph[TaskInstance, DefaultEdge] = {
     val graph = new SimpleDirectedGraph[TaskInstance, DefaultEdge](classOf[DefaultEdge])
     for module <- modules do {
       val tasks = tasksPerModule(module.id)
@@ -86,8 +90,8 @@ import scala.jdk.FunctionConverters.*
         }
         // if this task triggers a task in depending module, e.g. compile->compile
         if task.task.transitive then
-          module.moduleDeps.foreach { moduleDepId =>
-            tasksPerModule(moduleDepId).find(_.task.name == task.task.name).foreach { moduleDepTask =>
+          module.moduleDeps.asScala.foreach { moduleDep =>
+            tasksPerModule(moduleDep.id).find(_.task.name == task.task.name).foreach { moduleDepTask =>
               graph.addVertex(moduleDepTask) // add if not already
               graph.addEdge(task, moduleDepTask)
             }
@@ -99,8 +103,8 @@ import scala.jdk.FunctionConverters.*
 
   val tasksGraph = buildTasksGraph(allModules)
   checkNoCycles(tasksGraph, _.id)
-  println("Tasks graph:")
-  println(generateDOT(tasksGraph, v => v.id, v => Map("label" -> v.id)))
+ // println("Tasks graph:")
+ // println(generateDOT(tasksGraph, v => v.id, v => Map("label" -> v.id)))
 
   //////////
   // plan //
@@ -126,8 +130,8 @@ import scala.jdk.FunctionConverters.*
 
   val execSubgraph = buildExecSubgraph(moduleId, taskName)
   checkNoCycles(execSubgraph, _.id)
-  println("Exec subgraph:")
-  println(generateDOT(execSubgraph, v => v.id, v => Map("label" -> v.id)))
+ // println("Exec subgraph:")
+ // println(generateDOT(execSubgraph, v => v.id, v => Map("label" -> v.id)))
 
   // build independent exec stages (~toposort)
   def buildTaskExecStages(moduleId: String, taskName: String): Seq[Seq[TaskInstance]] = {
@@ -156,14 +160,14 @@ import scala.jdk.FunctionConverters.*
   }
 
   val taskExecStages = buildTaskExecStages(moduleId, taskName).reverse
-  println("Exec stages:")
-  println(taskExecStages.map(_.map(_.id)))
+//  println("Exec stages:")
+ // println(taskExecStages.map(_.map(_.id)))
 
   /////////////
   // execute //
   /////////////
   def executeTasks(stages: Seq[Seq[TaskInstance]]): Unit = {
-    println("Starting execution... " + Instant.now())
+   // println("Starting execution... " + Instant.now())
     var taskResults = Map.empty[String, TaskResult[?]]
     for taskInstances <- stages do {
       val taskExecutions = for taskInstance <- taskInstances yield { () =>
@@ -177,13 +181,13 @@ import scala.jdk.FunctionConverters.*
         val depResults = depResultOpts.flatten
         val transitiveResults = transitiveResultOpts.flatten
         // println(s"Executing ${taskInstance.id} with args: ${depResults}")
-        val taskRes = taskInstance.task.executeUnsafe(taskInstance.module, depResults, transitiveResults)
+        val taskRes = taskInstance.task.executeUnsafe(projectConfig, taskInstance.module, depResults, transitiveResults)
         taskInstance.id -> taskRes
       }
       val results = ox.par(taskExecutions)
       taskResults ++= results
     }
-    println("Execution finished successfully. " + Instant.now())
+   // println("Execution finished successfully. " + Instant.now())
   }
 
   executeTasks(taskExecStages)
