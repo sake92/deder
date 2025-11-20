@@ -10,9 +10,9 @@ object DependencyResolver {
       .withDependencies(dependencies)
       .run()
 
-    files.map(f=> os.Path(f.toPath))
+    files.map(f => os.Path(f.toPath))
   }
 
-  def fetchOne(dependency: Dependency): os.Path = 
+  def fetchOne(dependency: Dependency): os.Path =
     fetch(dependency).head
 }

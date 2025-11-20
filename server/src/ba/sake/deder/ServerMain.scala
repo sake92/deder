@@ -28,14 +28,13 @@ import scala.jdk.FunctionConverters.*
 
   // TODO check unique module ids
   val configParser = ConfigParser()
-  val configFile=  DederGlobals.projectRootDir / "deder.pkl"
+  val configFile = DederGlobals.projectRootDir / "deder.pkl"
   val projectConfig = configParser.parse(configFile)
   val allModules = projectConfig.modules.asScala.toSeq
 
   // these come from CLI/BSP
-  //val moduleId = "d"
-  //val taskName = "compile"
-
+  // val moduleId = "d"
+  // val taskName = "compile"
 
   val compilerBridgeJar = DependencyResolver.fetchOne(
     DependencyParser.dependency(s"org.scala-sbt:compiler-bridge_2.13:1.11.0", "2.13").toOption.get
@@ -63,13 +62,13 @@ import scala.jdk.FunctionConverters.*
 
   val modulesGraph = buildModulesGraph(allModules)
   checkNoCycles(modulesGraph, _.id)
- // println("Modules graph:")
-  //println(generateDOT(modulesGraph, v => v.id, v => Map("label" -> v.id)))
+  // println("Modules graph:")
+  // println(generateDOT(modulesGraph, v => v.id, v => Map("label" -> v.id)))
 
   // make Tasks graph
   val tasksPerModule = allModules.map { module =>
     val taskInstances = tasksRegistry.resolve(module.`type`).map(t => TaskInstance(module, t))
-   // println(taskInstances)
+    // println(taskInstances)
     module.id -> taskInstances
   }.toMap
 
@@ -103,8 +102,8 @@ import scala.jdk.FunctionConverters.*
 
   val tasksGraph = buildTasksGraph(allModules)
   checkNoCycles(tasksGraph, _.id)
- // println("Tasks graph:")
- // println(generateDOT(tasksGraph, v => v.id, v => Map("label" -> v.id)))
+  // println("Tasks graph:")
+  // println(generateDOT(tasksGraph, v => v.id, v => Map("label" -> v.id)))
 
   //////////
   // plan //
@@ -130,8 +129,8 @@ import scala.jdk.FunctionConverters.*
 
   val execSubgraph = buildExecSubgraph(moduleId, taskName)
   checkNoCycles(execSubgraph, _.id)
- // println("Exec subgraph:")
- // println(generateDOT(execSubgraph, v => v.id, v => Map("label" -> v.id)))
+  // println("Exec subgraph:")
+  // println(generateDOT(execSubgraph, v => v.id, v => Map("label" -> v.id)))
 
   // build independent exec stages (~toposort)
   def buildTaskExecStages(moduleId: String, taskName: String): Seq[Seq[TaskInstance]] = {
@@ -161,13 +160,13 @@ import scala.jdk.FunctionConverters.*
 
   val taskExecStages = buildTaskExecStages(moduleId, taskName).reverse
 //  println("Exec stages:")
- // println(taskExecStages.map(_.map(_.id)))
+  // println(taskExecStages.map(_.map(_.id)))
 
   /////////////
   // execute //
   /////////////
   def executeTasks(stages: Seq[Seq[TaskInstance]]): Unit = {
-   // println("Starting execution... " + Instant.now())
+    // println("Starting execution... " + Instant.now())
     var taskResults = Map.empty[String, TaskResult[?]]
     for taskInstances <- stages do {
       val taskExecutions = for taskInstance <- taskInstances yield { () =>
@@ -187,7 +186,7 @@ import scala.jdk.FunctionConverters.*
       val results = ox.par(taskExecutions)
       taskResults ++= results
     }
-   // println("Execution finished successfully. " + Instant.now())
+    // println("Execution finished successfully. " + Instant.now())
   }
 
   executeTasks(taskExecStages)

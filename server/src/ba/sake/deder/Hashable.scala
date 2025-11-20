@@ -49,10 +49,8 @@ object DederPath {
   given Hashable[DederPath] with {
     def hashStr(value: DederPath): String =
       val finalPath = DederGlobals.projectRootDir / value.path
-      if os.exists(finalPath) then
-        Hashable[os.Path].hashStr(finalPath)
-      else
-        throw RuntimeException(s"Path does not exist: ${finalPath}")
+      if os.exists(finalPath) then Hashable[os.Path].hashStr(finalPath)
+      else throw RuntimeException(s"Path does not exist: ${finalPath}")
   }
 
   import ba.sake.tupson.{*, given}

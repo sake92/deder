@@ -7,14 +7,27 @@ import java.util.Optional
 import java.util.function.Supplier
 import sbt.internal.inc.{FileAnalysisStore, PlainVirtualFileConverter, ZincUtil}
 import xsbti.compile.analysis.ReadWriteMappers
-import xsbti.compile.{AnalysisContents, ClasspathOptionsUtil, CompileAnalysis, CompileOptions, CompileOrder, CompileProgress, CompilerCache, DefinesClass, GlobalsCache, IncOptions, PerClasspathEntryLookup, PreviousResult, Setup}
+import xsbti.compile.{
+  AnalysisContents,
+  ClasspathOptionsUtil,
+  CompileAnalysis,
+  CompileOptions,
+  CompileOrder,
+  CompileProgress,
+  CompilerCache,
+  DefinesClass,
+  GlobalsCache,
+  IncOptions,
+  PerClasspathEntryLookup,
+  PreviousResult,
+  Setup
+}
 import sbt.internal.inc.ScalaInstance
 import java.nio.file.Path
 
 object ZincCompiler {
   def apply(compilerBridgeJar: os.Path): ZincCompiler =
-    new ZincCompiler(compilerBridgeJar
-    )
+    new ZincCompiler(compilerBridgeJar)
 }
 
 class ZincCompiler(compilerBridgeJar: os.Path) {
@@ -22,16 +35,16 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
   private val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
 
   def compile(
-               scalaVersion: String,
-               scalaCompilerJar: os.Path,
-               scalaLibraryJars: Seq[os.Path],
-               scalaReflectJar: Option[os.Path],
-               zincCacheFile: os.Path,
-               sources: Seq[os.Path],
-               classesDir: os.Path,
-               scalacOptions: Seq[String],
-               javacOptions: Seq[String]
-             ): Unit = {
+      scalaVersion: String,
+      scalaCompilerJar: os.Path,
+      scalaLibraryJars: Seq[os.Path],
+      scalaReflectJar: Option[os.Path],
+      zincCacheFile: os.Path,
+      sources: Seq[os.Path],
+      classesDir: os.Path,
+      scalacOptions: Seq[String],
+      javacOptions: Seq[String]
+  ): Unit = {
 
     val classloader = this.getClass.getClassLoader
 
@@ -66,7 +79,6 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       /*_order =*/ CompileOrder.Mixed
     )
 
-
     val analysisStore = ConsistentFileAnalysisStore.binary(
       file = zincCacheFile.toIO,
       mappers = ReadWriteMappers.getEmptyMappers,
@@ -90,11 +102,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       new DederZincLogger
     )
 
-
     analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
-
-    println(s"compile finished: " + newResult)
-
   }
 
   class DederZincLogger extends xsbti.Logger {
@@ -105,14 +113,15 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
 
     override def info(msg: Supplier[String]): Unit = println(s"[info] ${msg.get()}")
 
-    override def debug(msg: Supplier[String]): Unit = ()// println(s"[debug] ${msg.get()}")
+    override def debug(msg: Supplier[String]): Unit = () // println(s"[debug] ${msg.get()}")
 
-    override def trace(exception: Supplier[Throwable]): Unit = ()//println(s"[trace] ${exception.get()}")
+    override def trace(exception: Supplier[Throwable]): Unit = () // println(s"[trace] ${exception.get()}")
   }
 
   private def getSetup(cacheFile: Path): Setup = {
     val perClasspathEntryLookup: PerClasspathEntryLookup = new PerClasspathEntryLookup {
-      override def analysis(x$0: xsbti.VirtualFile): java.util.Optional[CompileAnalysis] = Optional.empty[CompileAnalysis]
+      override def analysis(x$0: xsbti.VirtualFile): java.util.Optional[CompileAnalysis] =
+        Optional.empty[CompileAnalysis]
 
       override def definesClass(x$0: xsbti.VirtualFile): DefinesClass = (className: String) => true
     }

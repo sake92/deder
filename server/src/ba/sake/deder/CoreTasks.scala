@@ -50,16 +50,18 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(javacOptionsTask)
     .build { ctx =>
       val sourceDirs = ctx.depResults._1
-      val sourceFiles = sourceDirs.flatMap { sourceDir =>
-        os.walk(
-          DederGlobals.projectRootDir / sourceDir.path,
-          skip = p => {
-            if os.isDir(p) then false
-            else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
-            else true
-          }
-        )
-      }.filter(os.isFile)
+      val sourceFiles = sourceDirs
+        .flatMap { sourceDir =>
+          os.walk(
+            DederGlobals.projectRootDir / sourceDir.path,
+            skip = p => {
+              if os.isDir(p) then false
+              else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
+              else true
+            }
+          )
+        }
+        .filter(os.isFile)
       val javacOptions = ctx.depResults._2
       val scalacOptions = javacOptions
       val scalaVersion = ctx.module match {

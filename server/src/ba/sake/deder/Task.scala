@@ -64,7 +64,7 @@ case class Task[T: JsonRW: Hashable, Deps <: Tuple](
 )(using ev: TaskDeps[Deps] =:= true) {
 
   def executeUnsafe(
-                    project: DederProject,
+      project: DederProject,
       module: DederModule,
       depResults: Seq[TaskResult[?]],
       transitiveResults: Seq[TaskResult[?]]
