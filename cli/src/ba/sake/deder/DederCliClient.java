@@ -13,7 +13,7 @@ import java.nio.file.Path;
 
 public class DederCliClient {
 
-    private ObjectMapper jsonMapper = new ObjectMapper();
+    private final ObjectMapper jsonMapper = new ObjectMapper();
 
     public static void main(String[] args) throws IOException {
         var client = new DederCliClient();
