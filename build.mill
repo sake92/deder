@@ -31,3 +31,6 @@ object config extends JavaModule {
     mvn"org.pkl-lang:pkl-config-java:0.30.0"
   )
 }
+
+object cli extends JavaModule {
+}

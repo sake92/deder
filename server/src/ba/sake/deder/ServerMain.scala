@@ -19,12 +19,15 @@ import java.time.Instant
 import scala.jdk.CollectionConverters.*
 import scala.jdk.FunctionConverters.*
 
-@main def serverMain(moduleId: String, taskName: String) = {
+@main def serverMain(moduleId: String, taskName: String): Unit = {
 
   if getMajorJavaVersion() < 21 then abort("Must use JDK >= 21")
 
   val projectRoot = os.pwd / "examples/multi"
   System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
+
+  val cliServer = DederCliServer((projectRoot / ".deder/cli.sock").toNIO)
+  cliServer.start()
 
   // TODO check unique module ids
   val configParser = ConfigParser()
