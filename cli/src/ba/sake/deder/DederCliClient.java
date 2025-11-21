@@ -1,5 +1,8 @@
 package ba.sake.deder;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
@@ -9,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
 public class DederCliClient {
+
+    private ObjectMapper jsonMapper = new ObjectMapper();
 
     public static void main(String[] args) throws IOException {
         var client = new DederCliClient();
@@ -22,14 +27,28 @@ public class DederCliClient {
         try (var channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
             channel.connect(address);
             System.out.println("Connected with server!");
+            // newline delimited JSON messages
             var buf = ByteBuffer.allocate(1024);
+            var messageOS = new ByteArrayOutputStream(1024);
             while (channel.read(buf) != -1) {
-                var message = new String(buf.array(), 0, buf.limit(), StandardCharsets.UTF_8);
-                System.out.print("READ: " + message);
+                buf.flip();
+                while (buf.hasRemaining()) {
+                    byte c = buf.get();
+                    if (c == '\n') {
+                        var messageJson = messageOS.toString(StandardCharsets.UTF_8);
+                        PrintText message = jsonMapper.readValue(messageJson, PrintText.class);
+                        System.out.println("GOT FULL MESSAGE: " + message);
+                        messageOS = new ByteArrayOutputStream(1024);
+                    } else {
+                        messageOS.write(c);
+                    }
+                }
                 buf.clear();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("Server disconnected"); // channel.read == -1
         }
     }
+}
+
+record PrintText(String text) {
 }

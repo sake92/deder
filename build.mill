@@ -33,4 +33,7 @@ object config extends JavaModule {
 }
 
 object cli extends JavaModule {
+  def mvnDeps = Seq(
+    mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
+  )
 }

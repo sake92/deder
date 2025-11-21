@@ -45,9 +45,11 @@ class DederCliServer(socketPath: Path) {
     new Thread(() => {
       try {
         while true do {
-          val buf = ByteBuffer.wrap(s"Hello client ${clientId}!\n".getBytes(StandardCharsets.UTF_8))
+          // newline delimited JSON messages
+          val message = """ { "text" : "Hello world!" } """ + '\n'
+          val buf = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8))
           clientChannel.write(buf)
-          Thread.sleep(1000)
+          Thread.sleep(3000)
         }
       } catch {
         case e: IOException =>
