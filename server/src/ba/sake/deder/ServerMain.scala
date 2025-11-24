@@ -1,12 +1,6 @@
 package ba.sake.deder
 
-import ba.sake.deder.config.ConfigParser
-import ba.sake.deder.deps.DependencyResolver
-import ba.sake.deder.zinc.ZincCompiler
-import coursier.parse.DependencyParser
-import scala.jdk.CollectionConverters.*
-
-@main def serverMain(moduleId: String, taskName: String): Unit = {
+@main def serverMain(): Unit = {
 
   if getMajorJavaVersion() < 21 then abort("Must use JDK >= 21")
 
@@ -14,12 +8,14 @@ import scala.jdk.CollectionConverters.*
   System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
   val projectState = DederProjectState()
-  projectState.execute("d", "compile")
 
- // val cliServer = DederCliServer((projectRoot / ".deder/cli.sock").toNIO)
-  // cliServer.start()
-
-
+  val cliServer = DederCliServer((projectRoot / ".deder/cli.sock").toNIO, projectState)
+  val cliServerThread = new Thread(
+    () => cliServer.start(),
+    "DederCliServer"
+  )
+  cliServerThread.start()
+  cliServerThread.join()
 
 }
 
