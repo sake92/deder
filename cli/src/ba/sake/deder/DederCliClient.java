@@ -1,5 +1,6 @@
 package ba.sake.deder;
 
+import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -74,8 +75,11 @@ public class DederCliClient {
                 byte c = buf.get();
                 if (c == '\n') {
                     var messageJson = messageOS.toString(StandardCharsets.UTF_8);
-                    var message = jsonMapper.readValue(messageJson, ServerMessage.PrintText.class);
-                    System.out.println(message.text());
+                    var message = jsonMapper.readValue(messageJson, ServerMessage.class);
+                    switch (message) {
+                        case ServerMessage.PrintText(var text) -> System.out.println(text);
+                        case ServerMessage.Exit(int exitCode) -> System.exit(exitCode); // TODO cleanup
+                    }
                     messageOS = new ByteArrayOutputStream(1024);
                 } else {
                     messageOS.write(c);
@@ -94,8 +98,15 @@ sealed interface ClientMessage {
 }
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
+
+@JsonSubTypes({
+        @JsonSubTypes.Type(value = ServerMessage.PrintText.class, name = "PrintText"),
+        @JsonSubTypes.Type(value = ServerMessage.Exit.class, name = "Exit"),
+})
 sealed interface ServerMessage {
-    @JsonTypeName("PrintText")
     record PrintText(String text) implements ServerMessage {
+    }
+
+    record Exit(int exitCode) implements ServerMessage {
     }
 }

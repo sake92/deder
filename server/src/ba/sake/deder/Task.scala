@@ -71,7 +71,7 @@ case class Task[T: {JsonRW, Hashable}, Deps <: Tuple](
       serverNotificationsLogger: ServerNotificationsLogger
   ): TaskResult[T] = {
     serverNotificationsLogger.add(
-      ServerNotification.make(ServerNotification.Level.DEBUG, s"Executing ${name}", Some(module.id))
+      ServerNotification.message(ServerNotification.Level.DEBUG, s"Executing ${name}", Some(module.id))
     )
     
     val metadataFile = DederGlobals.projectRootDir / ".deder/out" / module.id / name / "metadata.json"
@@ -81,7 +81,7 @@ case class Task[T: {JsonRW, Hashable}, Deps <: Tuple](
 
     def computeTaskResult(): TaskResult[T] = {
       serverNotificationsLogger.add(
-        ServerNotification.make(ServerNotification.Level.DEBUG, s"Computing new result for ${name}", Some(module.id))
+        ServerNotification.message(ServerNotification.Level.DEBUG, s"Computing new result for ${name}", Some(module.id))
       )
       val depResultsUnsafe = Tuple.fromArray(depResults.map(_.value).toArray).asInstanceOf[TaskDepResults[Deps]]
       val transitiveResultsUnsafe = transitiveResults.map(_.value).asInstanceOf[Seq[T]]
@@ -90,7 +90,7 @@ case class Task[T: {JsonRW, Hashable}, Deps <: Tuple](
       val taskResult = TaskResult(res, inputsHash, outputHash)
       os.write.over(metadataFile, taskResult.toJson, createFolders = true)
       serverNotificationsLogger.add(
-        ServerNotification.make(ServerNotification.Level.DEBUG, s"Computed new result for ${name}", Some(module.id))
+        ServerNotification.message(ServerNotification.Level.DEBUG, s"Computed new result for ${name}", Some(module.id))
       )
       taskResult
     }
@@ -100,7 +100,7 @@ case class Task[T: {JsonRW, Hashable}, Deps <: Tuple](
       val hasDeps = allDepResults.nonEmpty
       if cached && hasDeps && inputsHash == cachedTaskResult.inputsHash then
         serverNotificationsLogger.add(
-          ServerNotification.make(ServerNotification.Level.DEBUG, s"Using cached result for ${name}", Some(module.id))
+          ServerNotification.message(ServerNotification.Level.DEBUG, s"Using cached result for ${name}", Some(module.id))
         )
         cachedTaskResult
       else computeTaskResult()

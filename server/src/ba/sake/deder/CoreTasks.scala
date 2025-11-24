@@ -6,7 +6,7 @@ import ba.sake.deder.deps.DependencyResolver
 import java.time.Instant
 import scala.jdk.CollectionConverters.*
 import ba.sake.tupson.JsonRW
-import ba.sake.deder.zinc.ZincCompiler
+import ba.sake.deder.zinc.{DederZincLogger, ZincCompiler}
 import coursier.parse.DependencyParser
 
 class CoreTasks(zincCompiler: ZincCompiler) {
@@ -82,6 +82,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val zincCacheFile =
         DederGlobals.projectRootDir / os.RelPath(s".deder/out/${ctx.module.id}/compile/inc_compile.zip")
       val classesDir = DederGlobals.projectRootDir / os.RelPath(s".deder/out/${ctx.module.id}/compile/classes")
+      val zincLogger = new DederZincLogger(ctx.notifications)
       zincCompiler.compile(
         scalaVersion,
         scalaCompilerJar,
@@ -91,7 +92,8 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         sourceFiles,
         classesDir,
         scalacOptions,
-        javacOptions
+        javacOptions,
+        zincLogger
       )
       Seq("file1.class", "file2.class")
     }

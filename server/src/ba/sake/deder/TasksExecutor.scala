@@ -30,5 +30,6 @@ class TasksExecutor(
       val results = ox.par(taskExecutions)
       taskResults ++= results
     }
+    serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
   }
 }

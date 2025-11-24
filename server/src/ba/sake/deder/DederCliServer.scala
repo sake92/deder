@@ -30,7 +30,7 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
         clientId += 1
         val currentClientId = clientId
         println(s"Client #$currentClientId connected")
-        val serverMessages = new LinkedBlockingQueue[ServerMessage]()
+        val serverMessages = new LinkedBlockingQueue[CliServerMessage]()
         val clientReadThread = new Thread(() => clientRead(clientChannel, currentClientId, serverMessages))
         val clientWriteThread = new Thread(() => clientWrite(clientChannel, currentClientId, serverMessages))
         clientReadThread.start()
@@ -48,7 +48,7 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
   private def clientRead(
       clientChannel: SocketChannel,
       clientId: Int,
-      serverMessages: BlockingQueue[ServerMessage]
+      serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
     // newline delimited JSON messages
     val buf = ByteBuffer.allocate(1024)
@@ -59,14 +59,19 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
         val c = buf.get()
         if c == '\n' then {
           val messageJson = messageOS.toString(StandardCharsets.UTF_8)
-          val message = messageJson.parseJson[ClientMessage]
+          val message = messageJson.parseJson[CliClientMessage]
           message match {
-            case m: ClientMessage.Run =>
-              val logCallback: ServerNotification => Unit = n => {
-                val modulePrefix = n.moduleId.map(id => s"${id}:").getOrElse("")
-                serverMessages.put(
-                  ServerMessage.PrintText(s"[${modulePrefix}${n.level.toString.toLowerCase}}] ${n.message}")
-                )
+            case m: CliClientMessage.Run =>
+              val logCallback: ServerNotification => Unit = {
+                case m: ServerNotification.Message =>
+                  val modulePrefix = m.moduleId.map(id => s"${id}:").getOrElse("")
+                  serverMessages.put(
+                    CliServerMessage.PrintText(s"[${modulePrefix}${m.level.toString.toLowerCase}] ${m.message}")
+                  )
+                case ServerNotification.RequestFinished(success) =>
+                  serverMessages.put(
+                    CliServerMessage.Exit(if success then 0 else -1)
+                  )
               }
               projectState.execute(m.args(0), m.args(1), logCallback)
           }
@@ -83,7 +88,7 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
   private def clientWrite(
       clientChannel: SocketChannel,
       clientId: Int,
-      serverMessages: BlockingQueue[ServerMessage]
+      serverMessages: BlockingQueue[CliServerMessage]
   ): Unit =
     try {
       while true do {
@@ -99,11 +104,12 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
 
 }
 
-enum ClientMessage derives JsonRW {
+enum CliClientMessage derives JsonRW {
   case Run(args: Seq[String])
 }
 
 // TODO add log level so that client can filter
-enum ServerMessage derives JsonRW {
+enum CliServerMessage derives JsonRW {
   case PrintText(text: String)
+  case Exit(exitCode: Int)
 }

@@ -43,7 +43,8 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       sources: Seq[os.Path],
       classesDir: os.Path,
       scalacOptions: Seq[String],
-      javacOptions: Seq[String]
+      javacOptions: Seq[String],
+      zincLogger: xsbti.Logger
   ): Unit = {
 
     val classloader = this.getClass.getClassLoader
@@ -99,23 +100,10 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
 
     val newResult = incrementalCompiler.compile(
       inputs,
-      new DederZincLogger
+      zincLogger
     )
 
     analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
-  }
-
-  class DederZincLogger extends xsbti.Logger {
-
-    override def error(msg: Supplier[String]): Unit = println(s"[error] ${msg.get()}")
-
-    override def warn(msg: Supplier[String]): Unit = println(s"[warn] ${msg.get()}")
-
-    override def info(msg: Supplier[String]): Unit = println(s"[info] ${msg.get()}")
-
-    override def debug(msg: Supplier[String]): Unit = () // println(s"[debug] ${msg.get()}")
-
-    override def trace(exception: Supplier[Throwable]): Unit = () // println(s"[trace] ${exception.get()}")
   }
 
   private def getSetup(cacheFile: Path): Setup = {
