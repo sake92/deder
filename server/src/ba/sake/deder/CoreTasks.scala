@@ -15,8 +15,8 @@ class CoreTasks(zincCompiler: ZincCompiler) {
   val sourcesTask = TaskBuilder
     .make[Seq[DederPath]](
       name = "sources",
-      transitive = false,
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
+      transitive = false,
       cached = false
     )
     .build { ctx =>
@@ -30,8 +30,8 @@ class CoreTasks(zincCompiler: ZincCompiler) {
   val javacOptionsTask = TaskBuilder
     .make[Seq[String]](
       name = "javacOptions",
-      transitive = false,
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
+      transitive = false
     )
     .build { ctx =>
       ctx.module match {
@@ -44,8 +44,9 @@ class CoreTasks(zincCompiler: ZincCompiler) {
   val compileTask = TaskBuilder
     .make[Seq[String]](
       name = "compile",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
       transitive = true,
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+      cached = false // zinc handles it
     )
     .dependsOn(sourcesTask)
     .dependsOn(javacOptionsTask)
@@ -75,7 +76,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       )
       val scalaLibraryJar = DependencyResolver.fetchOne(
         DependencyParser.dependency(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion).toOption.get
-      )// TODO scala3-library
+      ) // TODO scala3-library
       val scalaReflectJar = DependencyResolver.fetchOne(
         DependencyParser.dependency(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion).toOption.get
       ) // TODO only for scala 2
@@ -101,7 +102,9 @@ class CoreTasks(zincCompiler: ZincCompiler) {
   val runTask = TaskBuilder
     .make[String](
       name = "run",
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
+      transitive = false,
+      cached = false
     )
     .dependsOn(compileTask)
     .build { ctx =>

@@ -1,5 +1,7 @@
 package ba.sake.deder
 
+import ba.sake.deder.ServerNotification.Level
+
 import java.io.{ByteArrayOutputStream, IOException}
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
@@ -62,17 +64,8 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
           val message = messageJson.parseJson[CliClientMessage]
           message match {
             case m: CliClientMessage.Run =>
-              val logCallback: ServerNotification => Unit = {
-                case m: ServerNotification.Message =>
-                  val modulePrefix = m.moduleId.map(id => s"${id}:").getOrElse("")
-                  serverMessages.put(
-                    CliServerMessage.PrintText(s"[${modulePrefix}${m.level.toString.toLowerCase}] ${m.message}")
-                  )
-                case ServerNotification.RequestFinished(success) =>
-                  serverMessages.put(
-                    CliServerMessage.Exit(if success then 0 else -1)
-                  )
-              }
+              val logCallback: ServerNotification => Unit = sn =>
+                serverMessages.put(CliServerMessage.fromServerNotification(sn))
               projectState.execute(m.args(0), m.args(1), logCallback)
           }
           messageOS = new ByteArrayOutputStream(1024)
@@ -110,6 +103,26 @@ enum CliClientMessage derives JsonRW {
 
 // TODO add log level so that client can filter
 enum CliServerMessage derives JsonRW {
-  case PrintText(text: String)
+  case PrintText(text: String, level: CliServerMessage.Level)
   case Exit(exitCode: Int)
+}
+
+object CliServerMessage {
+  def fromServerNotification(sn: ServerNotification): CliServerMessage = sn match {
+    case m: ServerNotification.Message =>
+      val level = m.level match {
+        case ServerNotification.Level.ERROR   => Level.ERROR
+        case ServerNotification.Level.WARNING => Level.WARNING
+        case ServerNotification.Level.INFO    => Level.INFO
+        case ServerNotification.Level.DEBUG   => Level.DEBUG
+      }
+      val modulePrefix = m.moduleId.map(id => s"${id}:").getOrElse("")
+      CliServerMessage.PrintText(s"[${modulePrefix}${m.level.toString.toLowerCase}] ${m.message}", level)
+    case ServerNotification.RequestFinished(success) =>
+      CliServerMessage.Exit(if success then 0 else -1)
+  }
+
+  enum Level derives JsonRW:
+    case ERROR, WARNING, INFO, DEBUG
+
 }

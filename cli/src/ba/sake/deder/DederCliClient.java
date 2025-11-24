@@ -27,10 +27,10 @@ public class DederCliClient {
     public void start(String[] args) throws IOException {
         var socketPath = Path.of(".deder/cli.sock");
         var address = UnixDomainSocketAddress.of(socketPath);
-        System.out.println("Connecting to server...");
+        //System.out.println("Connecting to server...");
         try (var channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
             channel.connect(address);
-            System.out.println("Connected with server!");
+            //System.out.println("Connected with server!");
             Thread serverWriteThread = new Thread(() -> {
                 try {
                     serverWrite(channel, args);
@@ -49,7 +49,7 @@ public class DederCliClient {
             serverReadThread.start();
             serverWriteThread.join();
             serverReadThread.join();
-            System.out.println("Server disconnected"); // channel.read == -1
+            //System.out.println("Server disconnected"); // channel.read == -1
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -77,7 +77,11 @@ public class DederCliClient {
                     var messageJson = messageOS.toString(StandardCharsets.UTF_8);
                     var message = jsonMapper.readValue(messageJson, ServerMessage.class);
                     switch (message) {
-                        case ServerMessage.PrintText(var text) -> System.out.println(text);
+                        case ServerMessage.PrintText(var text, var level) -> {
+                            if (level != ServerMessage.Level.DEBUG) {
+                                System.out.println(text);
+                            }
+                        }
                         case ServerMessage.Exit(int exitCode) -> System.exit(exitCode); // TODO cleanup
                     }
                     messageOS = new ByteArrayOutputStream(1024);
@@ -104,9 +108,13 @@ sealed interface ClientMessage {
         @JsonSubTypes.Type(value = ServerMessage.Exit.class, name = "Exit"),
 })
 sealed interface ServerMessage {
-    record PrintText(String text) implements ServerMessage {
+    record PrintText(String text, Level level) implements ServerMessage {
     }
 
     record Exit(int exitCode) implements ServerMessage {
+    }
+
+    enum Level {
+        ERROR, WARNING, INFO, DEBUG;
     }
 }

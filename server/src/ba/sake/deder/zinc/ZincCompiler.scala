@@ -95,18 +95,21 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       )
     }
 
-    val setup = getSetup(zincCacheFile.toNIO)
+    val reporter = xsbti.ReporterUtil.getReporter(zincLogger, xsbti.ReporterUtil.getDefaultReporterConfig)
+    val setup = getSetup(zincCacheFile.toNIO, reporter)
     val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
 
-    val newResult = incrementalCompiler.compile(
-      inputs,
-      zincLogger
-    )
-
-    analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
+    try {
+      val newResult = incrementalCompiler.compile(inputs, zincLogger)
+      analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
+    } catch {
+      case e: xsbti.CompileFailed =>
+      // println("Noooooooooooooooooooooooooooooooooo")
+      // e.printStackTrace()
+    }
   }
 
-  private def getSetup(cacheFile: Path): Setup = {
+  private def getSetup(cacheFile: Path, reporter: xsbti.Reporter): Setup = {
     val perClasspathEntryLookup: PerClasspathEntryLookup = new PerClasspathEntryLookup {
       override def analysis(x$0: xsbti.VirtualFile): java.util.Optional[CompileAnalysis] =
         Optional.empty[CompileAnalysis]
@@ -117,7 +120,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     val skip: Boolean = false
     val cache: GlobalsCache = CompilerCache.getDefault
     val incOptions: IncOptions = IncOptions.of()
-    val reporter = xsbti.ReporterUtil.getDefault(xsbti.ReporterUtil.getDefaultReporterConfig)
+
     val compileProgress = new CompileProgress {
       // TODO
     }
