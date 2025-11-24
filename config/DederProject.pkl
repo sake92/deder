@@ -6,7 +6,7 @@ abstract class DederModule {
   id: String
   moduleDeps: Listing<DederModule>
   type: ModuleType
-  dir: String = id // module root directory
+  root: String = id // module root directory, relative to project root
 }
 
 typealias ModuleType = "java" | "scala"

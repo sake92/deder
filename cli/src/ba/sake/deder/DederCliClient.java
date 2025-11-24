@@ -75,7 +75,7 @@ public class DederCliClient {
                 if (c == '\n') {
                     var messageJson = messageOS.toString(StandardCharsets.UTF_8);
                     var message = jsonMapper.readValue(messageJson, ServerMessage.PrintText.class);
-                    System.out.println("GOT FULL MESSAGE: " + message);
+                    System.out.println(message.text());
                     messageOS = new ByteArrayOutputStream(1024);
                 } else {
                     messageOS.write(c);

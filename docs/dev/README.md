@@ -51,6 +51,7 @@ https://medium.com/@jdxcode/12-factor-cli-apps-dd3c227a0e46
 ## Caching / minimality
 - if inputs hash hasnt changed, dont do it
 - Blake3 algo for file hashing
+- use $COURSIER_CACHE/mylib/... instead of full paths
 
 
 ---

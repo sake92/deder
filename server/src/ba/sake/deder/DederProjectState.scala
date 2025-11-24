@@ -9,7 +9,7 @@ import coursier.parse.DependencyParser
 
 class DederProjectState() {
 
-  def execute(moduleId: String, taskName: String)/*: TaskResult[?]*/ = {
+  def execute(moduleId: String, taskName: String, logCallback: ServerNotification => Unit)/*: TaskResult[?]*/ = {
     val configParser = ConfigParser()
     val configFile = DederGlobals.projectRootDir / "deder.pkl"
     val projectConfig = configParser.parse(configFile)
@@ -40,6 +40,6 @@ class DederProjectState() {
 
     println("#" * 50)
      */
-    tasksExecutor.execute(tasksExecStages)
+    tasksExecutor.execute(tasksExecStages, logCallback)
   }
 }

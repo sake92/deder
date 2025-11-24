@@ -1,7 +1,5 @@
 package ba.sake.deder
 
-import ba.sake.tupson.{*, given}
-
 import java.io.{ByteArrayOutputStream, IOException}
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
@@ -9,7 +7,8 @@ import java.nio.channels.{ServerSocketChannel, SocketChannel}
 import java.nio.file.{Files, Path}
 import java.nio.charset.StandardCharsets
 import java.nio.ByteBuffer
-import scala.util.Using
+import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
+import ba.sake.tupson.{*, given}
 
 class DederCliServer(socketPath: Path, projectState: DederProjectState) {
 
@@ -31,9 +30,9 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
         clientId += 1
         val currentClientId = clientId
         println(s"Client #$currentClientId connected")
-        // Handle each client in a separate virtual thread
-        val clientReadThread = new Thread(() => clientRead(clientChannel, currentClientId))
-        val clientWriteThread = new Thread(() => clientWrite(clientChannel, currentClientId))
+        val serverMessages = new LinkedBlockingQueue[ServerMessage]()
+        val clientReadThread = new Thread(() => clientRead(clientChannel, currentClientId, serverMessages))
+        val clientWriteThread = new Thread(() => clientWrite(clientChannel, currentClientId, serverMessages))
         clientReadThread.start()
         clientWriteThread.start()
       }
@@ -46,7 +45,11 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
 
   // in theory there can be many client messages,
   // but for now it is just one..
-  private def clientRead(clientChannel: SocketChannel, clientId: Int): Unit = {
+  private def clientRead(
+      clientChannel: SocketChannel,
+      clientId: Int,
+      serverMessages: BlockingQueue[ServerMessage]
+  ): Unit = {
     // newline delimited JSON messages
     val buf = ByteBuffer.allocate(1024)
     var messageOS = new ByteArrayOutputStream(1024)
@@ -57,11 +60,15 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
         if c == '\n' then {
           val messageJson = messageOS.toString(StandardCharsets.UTF_8)
           val message = messageJson.parseJson[ClientMessage]
-          println(s"GOT FULL MESSAGE from $clientId: " + message)
           message match {
             case m: ClientMessage.Run =>
-              println(s"Running ${m.args.mkString(" ")}")
-              projectState.execute(m.args(0), m.args(1))
+              val logCallback: ServerNotification => Unit = n => {
+                val modulePrefix = n.moduleId.map(id => s"${id}:").getOrElse("")
+                serverMessages.put(
+                  ServerMessage.PrintText(s"[${modulePrefix}${n.level.toString.toLowerCase}}] ${n.message}")
+                )
+              }
+              projectState.execute(m.args(0), m.args(1), logCallback)
           }
           messageOS = new ByteArrayOutputStream(1024)
         } else {
@@ -73,14 +80,17 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
   }
 
   // TODO virtual thread ??
-  private def clientWrite(clientChannel: SocketChannel, clientId: Int): Unit =
+  private def clientWrite(
+      clientChannel: SocketChannel,
+      clientId: Int,
+      serverMessages: BlockingQueue[ServerMessage]
+  ): Unit =
     try {
       while true do {
         // newline delimited JSON messages
-        val message = ServerMessage.PrintText(s"Hello client $clientId")
+        val message = serverMessages.take()
         val buf = ByteBuffer.wrap((message.toJson + '\n').getBytes(StandardCharsets.UTF_8))
         clientChannel.write(buf)
-        Thread.sleep(3000)
       }
     } catch {
       case e: IOException =>
@@ -93,6 +103,7 @@ enum ClientMessage derives JsonRW {
   case Run(args: Seq[String])
 }
 
+// TODO add log level so that client can filter
 enum ServerMessage derives JsonRW {
   case PrintText(text: String)
 }

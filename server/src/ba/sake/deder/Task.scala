@@ -7,7 +7,7 @@ import scala.util.control.Breaks.{break, breakable}
 import scala.Tuple.:*
 import ba.sake.tupson.{*, given}
 
-case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
+case class TaskBuilder[T: {JsonRW, Hashable}, Deps <: Tuple] private(
     name: String,
     taskDeps: Deps,
     // if it triggers upstream modules task with same name
@@ -48,10 +48,11 @@ case class TaskExecContext[Deps <: Tuple](
     project: DederProject,
     module: DederModule,
     depResults: TaskDepResults[Deps],
-    transitiveResults: Seq[?] // results from dependent modules
+    transitiveResults: Seq[?], // results from dependent modules
+    notifications: ServerNotificationsLogger
 )(using ev: TaskDeps[Deps] =:= true)
 
-case class Task[T: JsonRW: Hashable, Deps <: Tuple](
+case class Task[T: {JsonRW, Hashable}, Deps <: Tuple](
     name: String,
     taskDeps: Deps,
     execute: TaskExecContext[Deps] => T,
@@ -66,20 +67,31 @@ case class Task[T: JsonRW: Hashable, Deps <: Tuple](
       project: DederProject,
       module: DederModule,
       depResults: Seq[TaskResult[?]],
-      transitiveResults: Seq[TaskResult[?]]
+      transitiveResults: Seq[TaskResult[?]],
+      serverNotificationsLogger: ServerNotificationsLogger
   ): TaskResult[T] = {
+    serverNotificationsLogger.add(
+      ServerNotification.make(ServerNotification.Level.DEBUG, s"Executing ${name}", Some(module.id))
+    )
+    
     val metadataFile = DederGlobals.projectRootDir / ".deder/out" / module.id / name / "metadata.json"
 
     val allDepResults = depResults ++ transitiveResults
     val inputsHash = HashUtils.hashStr(allDepResults.map(_.outputHash).mkString("-"))
 
     def computeTaskResult(): TaskResult[T] = {
+      serverNotificationsLogger.add(
+        ServerNotification.make(ServerNotification.Level.DEBUG, s"Computing new result for ${name}", Some(module.id))
+      )
       val depResultsUnsafe = Tuple.fromArray(depResults.map(_.value).toArray).asInstanceOf[TaskDepResults[Deps]]
       val transitiveResultsUnsafe = transitiveResults.map(_.value).asInstanceOf[Seq[T]]
-      val res = execute(TaskExecContext(project, module, depResultsUnsafe, transitiveResultsUnsafe))
+      val res = execute(TaskExecContext(project, module, depResultsUnsafe, transitiveResultsUnsafe, serverNotificationsLogger))
       val outputHash = Hashable[T].hashStr(res)
       val taskResult = TaskResult(res, inputsHash, outputHash)
       os.write.over(metadataFile, taskResult.toJson, createFolders = true)
+      serverNotificationsLogger.add(
+        ServerNotification.make(ServerNotification.Level.DEBUG, s"Computed new result for ${name}", Some(module.id))
+      )
       taskResult
     }
 
@@ -87,7 +99,9 @@ case class Task[T: JsonRW: Hashable, Deps <: Tuple](
       val cachedTaskResult = os.read(metadataFile).parseJson[TaskResult[T]]
       val hasDeps = allDepResults.nonEmpty
       if cached && hasDeps && inputsHash == cachedTaskResult.inputsHash then
-        println(s"[module ${module.id}] [task ${name}] Using cached result.")
+        serverNotificationsLogger.add(
+          ServerNotification.make(ServerNotification.Level.DEBUG, s"Using cached result for ${name}", Some(module.id))
+        )
         cachedTaskResult
       else computeTaskResult()
     } else {

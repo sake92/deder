@@ -16,12 +16,13 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .make[Seq[DederPath]](
       name = "sources",
       transitive = false,
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
+      cached = false
     )
     .build { ctx =>
       ctx.module match {
-        case m: JavaModule  => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.dir}/${s}")))
-        case m: ScalaModule => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.dir}/${s}")))
+        case m: JavaModule  => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
+        case m: ScalaModule => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
         case _              => ???
       }
     }
@@ -74,8 +75,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       )
       val scalaLibraryJar = DependencyResolver.fetchOne(
         DependencyParser.dependency(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion).toOption.get
-      )
-      // println(scalaLibraryJar)
+      )// TODO scala3-library
       val scalaReflectJar = DependencyResolver.fetchOne(
         DependencyParser.dependency(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion).toOption.get
       ) // TODO only for scala 2
@@ -104,7 +104,6 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(compileTask)
     .build { ctx =>
       val classfiles = ctx.depResults._1
-      println(s"[module ${ctx.module.id}] Running java -cp ${classfiles.mkString(" ")}")
       "runRes"
     }
 

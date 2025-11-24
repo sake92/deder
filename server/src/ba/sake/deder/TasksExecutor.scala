@@ -9,8 +9,8 @@ class TasksExecutor(
     tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge]
 ) {
 
-  def execute(stages: Seq[Seq[TaskInstance]]): Unit = {
-    // println("Starting execution... " + Instant.now())
+  def execute(stages: Seq[Seq[TaskInstance]], logCallback: ServerNotification => Unit): Unit = {
+    val serverNotificationsLogger = ServerNotificationsLogger(logCallback)
     var taskResults = Map.empty[String, TaskResult[?]]
     for taskInstances <- stages do {
       val taskExecutions = for taskInstance <- taskInstances yield { () =>
@@ -23,13 +23,12 @@ class TasksExecutor(
         }.unzip
         val depResults = depResultOpts.flatten
         val transitiveResults = transitiveResultOpts.flatten
-        // println(s"Executing ${taskInstance.id} with args: ${depResults}")
-        val taskRes = taskInstance.task.executeUnsafe(projectConfig, taskInstance.module, depResults, transitiveResults)
+        val taskRes = taskInstance.task
+          .executeUnsafe(projectConfig, taskInstance.module, depResults, transitiveResults, serverNotificationsLogger)
         taskInstance.id -> taskRes
       }
       val results = ox.par(taskExecutions)
       taskResults ++= results
     }
-    // println("Execution finished successfully. " + Instant.now())
   }
 }
