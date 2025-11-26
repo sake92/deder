@@ -5,16 +5,19 @@ import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import org.jgrapht.graph.{DefaultEdge, SimpleDirectedGraph}
 
+import java.util.concurrent.{Callable, ExecutorService}
+
 class TasksExecutor(
     projectConfig: DederProject,
-    tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge]
+    tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge],
+    tasksExecutorTP: ExecutorService
 ) {
 
   def execute(stages: Seq[Seq[TaskInstance]], logCallback: ServerNotification => Unit): Unit = {
     val serverNotificationsLogger = ServerNotificationsLogger(logCallback)
     var taskResults = Map.empty[String, TaskResult[?]]
     for taskInstances <- stages do {
-      val taskExecutions = for taskInstance <- taskInstances yield { () =>
+      val taskExecutions: Seq[Callable[(String, TaskResult[?])]] = for taskInstance <- taskInstances yield { () =>
         val allTaskDeps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
         val (depResultOpts, transitiveResultOpts) = allTaskDeps.map { depEdge =>
           val d = tasksGraph.getEdgeTarget(depEdge)
@@ -28,7 +31,8 @@ class TasksExecutor(
           .executeUnsafe(projectConfig, taskInstance.module, depResults, transitiveResults, serverNotificationsLogger)
         taskInstance.id -> taskRes
       }
-      val results = ox.par(taskExecutions)
+      val futures = taskExecutions.map(tasksExecutorTP.submit)
+      val results = futures.map(_.get())
       taskResults ++= results
     }
     serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))

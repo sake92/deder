@@ -6,8 +6,10 @@ import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
 import coursier.parse.DependencyParser
 
+import java.util.concurrent.ExecutorService
 
-class DederProjectState() {
+
+class DederProjectState(tasksExecutorTP: ExecutorService) {
 
   def execute(moduleId: String, taskName: String, logCallback: ServerNotification => Unit)/*: TaskResult[?]*/ = {
     val configParser = ConfigParser()
@@ -26,7 +28,7 @@ class DederProjectState() {
     val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
     val tasksExecSubgraph = executionPlanner.execSubgraph(moduleId, taskName)
     val tasksExecStages = executionPlanner.execStages(moduleId, taskName)
-    val tasksExecutor = TasksExecutor(projectConfig, tasksResolver.tasksGraph)
+    val tasksExecutor = TasksExecutor(projectConfig, tasksResolver.tasksGraph, tasksExecutorTP)
 
     /*
     println("Modules graph:")

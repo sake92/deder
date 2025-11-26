@@ -1,8 +1,6 @@
 package ba.sake.deder.deps
 
-import ba.sake.deder.DederGlobals
 import coursier.{Fetch, Resolve}
-import coursier.cache.{Cache, FileCache}
 import coursier.core.Dependency
 
 object DependencyResolver {

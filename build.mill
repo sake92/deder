@@ -11,7 +11,6 @@ object server extends ScalaModule {
   def mvnDeps = Seq(
     mvn"org.jgrapht:jgrapht-core:1.5.2",
     mvn"org.jgrapht:jgrapht-io:1.5.2",
-    mvn"com.softwaremill.ox::core:1.0.0",
     mvn"ba.sake::tupson:0.18.0",
     mvn"com.lihaoyi::os-lib:0.11.6",
     mvn"commons-codec:commons-codec:1.20.0",

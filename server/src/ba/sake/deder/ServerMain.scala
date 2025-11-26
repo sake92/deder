@@ -1,13 +1,16 @@
 package ba.sake.deder
 
+import java.util.concurrent.Executors
+
 @main def serverMain(): Unit = {
 
-  if getMajorJavaVersion() < 21 then abort("Must use JDK >= 21")
+  if getMajorJavaVersion() < 17 then abort("Must use JDK >= 17")
 
   val projectRoot = os.pwd / "examples/multi"
   System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
-  val projectState = DederProjectState()
+  val tasksExecutorTP = Executors.newFixedThreadPool(10)
+  val projectState = DederProjectState(tasksExecutorTP)
 
   val cliServer = DederCliServer((projectRoot / ".deder/cli.sock").toNIO, projectState)
   val cliServerThread = new Thread(
