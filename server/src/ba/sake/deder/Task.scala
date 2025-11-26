@@ -7,29 +7,50 @@ import scala.util.control.Breaks.{break, breakable}
 import scala.Tuple.:*
 import ba.sake.tupson.{*, given}
 
-case class TaskBuilder[T: {JsonRW, Hashable}, Deps <: Tuple] private(
+case class TaskBuilder[T, Deps <: Tuple] private (
     name: String,
     taskDeps: Deps,
     // if it triggers upstream modules task with same name
     transitive: Boolean,
-    cached: Boolean,
     supportedModuleTypes: Set[ModuleType]
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: Task[T2, ?]): TaskBuilder[T, Deps :* Task[T2, ?]] =
-    TaskBuilder(name, taskDeps :* t, transitive, cached, supportedModuleTypes)
+    TaskBuilder(name, taskDeps :* t, transitive, supportedModuleTypes)
 
   def build(execute: TaskExecContext[Deps] => T): Task[T, Deps] =
-    Task(name, taskDeps, execute, transitive, cached, supportedModuleTypes)
+    TaskImpl(name, execute, taskDeps, transitive, supportedModuleTypes)
 }
 
 object TaskBuilder {
+  def make[T](
+      name: String,
+      // if it triggers upstream modules task with same name
+      transitive: Boolean = false,
+      supportedModuleTypes: Set[ModuleType] = Set.empty
+  ): TaskBuilder[T, EmptyTuple] = TaskBuilder(name, EmptyTuple, transitive, supportedModuleTypes)
+}
+
+case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
+    name: String,
+    taskDeps: Deps,
+    // if it triggers upstream modules task with same name
+    transitive: Boolean,
+    supportedModuleTypes: Set[ModuleType]
+)(using ev: TaskDeps[Deps] =:= true) {
+  def dependsOn[T2](t: Task[T2, ?]): CachedTaskBuilder[T, Deps :* Task[T2, ?]] =
+    CachedTaskBuilder(name, taskDeps :* t, transitive, supportedModuleTypes)
+
+  def build(execute: TaskExecContext[Deps] => T): Task[T, Deps] =
+    CachedTask(name, execute, taskDeps, transitive, supportedModuleTypes)
+}
+
+object CachedTaskBuilder {
   def make[T: JsonRW: Hashable](
       name: String,
       // if it triggers upstream modules task with same name
       transitive: Boolean = false,
-      cached: Boolean = true,
       supportedModuleTypes: Set[ModuleType] = Set.empty
-  ): TaskBuilder[T, EmptyTuple] = TaskBuilder(name, EmptyTuple, transitive, cached, supportedModuleTypes)
+  ): CachedTaskBuilder[T, EmptyTuple] = CachedTaskBuilder(name, EmptyTuple, transitive, supportedModuleTypes)
 }
 
 // this is to make sure that Deps are Task-s and not arbitrary types
@@ -52,18 +73,32 @@ case class TaskExecContext[Deps <: Tuple](
     notifications: ServerNotificationsLogger
 )(using ev: TaskDeps[Deps] =:= true)
 
-case class Task[T: {JsonRW, Hashable}, Deps <: Tuple](
+sealed trait Task[T, Deps <: Tuple](using ev: TaskDeps[Deps] =:= true) {
+  def name: String
+  def supportedModuleTypes: Set[ModuleType]
+  def transitive: Boolean
+  def taskDeps: Deps
+  def execute: TaskExecContext[Deps] => T
+  private[deder] def executeUnsafe(
+      project: DederProject,
+      module: DederModule,
+      depResults: Seq[TaskResult[?]],
+      transitiveResults: Seq[TaskResult[?]],
+      serverNotificationsLogger: ServerNotificationsLogger
+  ): TaskResult[T]
+}
+
+case class TaskImpl[T, Deps <: Tuple](
     name: String,
-    taskDeps: Deps,
     execute: TaskExecContext[Deps] => T,
+    taskDeps: Deps = EmptyTuple,
     // if it triggers upstream modules task with same name
     // the only way to reference a task across modules
-    transitive: Boolean,
-    cached: Boolean,
-    supportedModuleTypes: Set[ModuleType]
-)(using ev: TaskDeps[Deps] =:= true) {
-
-  def executeUnsafe(
+    transitive: Boolean = false,
+    supportedModuleTypes: Set[ModuleType] = Set.empty
+)(using ev: TaskDeps[Deps] =:= true)
+    extends Task[T, Deps](using ev) {
+  override private[deder] def executeUnsafe(
       project: DederProject,
       module: DederModule,
       depResults: Seq[TaskResult[?]],
@@ -73,24 +108,58 @@ case class Task[T: {JsonRW, Hashable}, Deps <: Tuple](
     serverNotificationsLogger.add(
       ServerNotification.message(ServerNotification.Level.DEBUG, s"Executing ${name}", Some(module.id))
     )
-    
+    val depResultsUnsafe = Tuple.fromArray(depResults.map(_.value).toArray).asInstanceOf[TaskDepResults[Deps]]
+    val transitiveResultsUnsafe = transitiveResults.map(_.value).asInstanceOf[Seq[T]]
+    val res = execute(
+      TaskExecContext(project, module, depResultsUnsafe, transitiveResultsUnsafe, serverNotificationsLogger)
+    )
+    val taskResult = TaskResult(res, "", "")
+    serverNotificationsLogger.add(
+      ServerNotification.message(ServerNotification.Level.DEBUG, s"Computed result for ${name}", Some(module.id))
+    )
+    taskResult
+  }
+}
+
+case class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
+    name: String,
+    execute: TaskExecContext[Deps] => T,
+    taskDeps: Deps = EmptyTuple,
+    // if it triggers upstream modules task with same name
+    // the only way to reference a task across modules
+    transitive: Boolean = false,
+    supportedModuleTypes: Set[ModuleType] = Set.empty
+)(using ev: TaskDeps[Deps] =:= true)
+    extends Task[T, Deps](using ev) {
+
+  private[deder] override def executeUnsafe(
+      project: DederProject,
+      module: DederModule,
+      depResults: Seq[TaskResult[?]],
+      transitiveResults: Seq[TaskResult[?]],
+      serverNotificationsLogger: ServerNotificationsLogger
+  ): TaskResult[T] = {
+
+    serverNotificationsLogger.add(
+      ServerNotification.message(ServerNotification.Level.DEBUG, s"Executing ${name}", Some(module.id))
+    )
+
     val metadataFile = DederGlobals.projectRootDir / ".deder/out" / module.id / name / "metadata.json"
 
     val allDepResults = depResults ++ transitiveResults
     val inputsHash = HashUtils.hashStr(allDepResults.map(_.outputHash).mkString("-"))
 
     def computeTaskResult(): TaskResult[T] = {
-      serverNotificationsLogger.add(
-        ServerNotification.message(ServerNotification.Level.DEBUG, s"Computing new result for ${name}", Some(module.id))
-      )
       val depResultsUnsafe = Tuple.fromArray(depResults.map(_.value).toArray).asInstanceOf[TaskDepResults[Deps]]
       val transitiveResultsUnsafe = transitiveResults.map(_.value).asInstanceOf[Seq[T]]
-      val res = execute(TaskExecContext(project, module, depResultsUnsafe, transitiveResultsUnsafe, serverNotificationsLogger))
+      val res = execute(
+        TaskExecContext(project, module, depResultsUnsafe, transitiveResultsUnsafe, serverNotificationsLogger)
+      )
       val outputHash = Hashable[T].hashStr(res)
       val taskResult = TaskResult(res, inputsHash, outputHash)
       os.write.over(metadataFile, taskResult.toJson, createFolders = true)
       serverNotificationsLogger.add(
-        ServerNotification.message(ServerNotification.Level.DEBUG, s"Computed new result for ${name}", Some(module.id))
+        ServerNotification.message(ServerNotification.Level.DEBUG, s"Computed result for ${name}", Some(module.id))
       )
       taskResult
     }
@@ -98,9 +167,13 @@ case class Task[T: {JsonRW, Hashable}, Deps <: Tuple](
     if os.exists(metadataFile) then {
       val cachedTaskResult = os.read(metadataFile).parseJson[TaskResult[T]]
       val hasDeps = allDepResults.nonEmpty
-      if cached && hasDeps && inputsHash == cachedTaskResult.inputsHash then
+      if hasDeps && inputsHash == cachedTaskResult.inputsHash then
         serverNotificationsLogger.add(
-          ServerNotification.message(ServerNotification.Level.DEBUG, s"Using cached result for ${name}", Some(module.id))
+          ServerNotification.message(
+            ServerNotification.Level.DEBUG,
+            s"Using cached result for ${name}",
+            Some(module.id)
+          )
         )
         cachedTaskResult
       else computeTaskResult()

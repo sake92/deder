@@ -2,6 +2,7 @@ package ba.sake.deder
 
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.DederProject
+import ba.sake.deder.config.DederProject.DederModule
 import org.jgrapht.graph.{DefaultEdge, SimpleDirectedGraph}
 
 class TasksExecutor(

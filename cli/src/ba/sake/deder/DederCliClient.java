@@ -82,6 +82,16 @@ public class DederCliClient {
                                 System.out.println(text);
                             }
                         }
+                        case ServerMessage.RunSubprocess runSubprocess -> {
+                            ProcessBuilder processBuilder = new ProcessBuilder(runSubprocess.cmd());
+                            processBuilder.inheritIO();
+                            Process process = processBuilder.start();
+                            try {
+                                process.waitFor();
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
                         case ServerMessage.Exit(int exitCode) -> System.exit(exitCode); // TODO cleanup
                     }
                     messageOS = new ByteArrayOutputStream(1024);
@@ -105,10 +115,14 @@ sealed interface ClientMessage {
 
 @JsonSubTypes({
         @JsonSubTypes.Type(value = ServerMessage.PrintText.class, name = "PrintText"),
+        @JsonSubTypes.Type(value = ServerMessage.RunSubprocess.class, name = "RunSubprocess"),
         @JsonSubTypes.Type(value = ServerMessage.Exit.class, name = "Exit"),
 })
 sealed interface ServerMessage {
     record PrintText(String text, Level level) implements ServerMessage {
+    }
+
+    record RunSubprocess(String[] cmd)implements ServerMessage {
     }
 
     record Exit(int exitCode) implements ServerMessage {

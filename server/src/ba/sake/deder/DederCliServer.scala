@@ -104,6 +104,7 @@ enum CliClientMessage derives JsonRW {
 // TODO add log level so that client can filter
 enum CliServerMessage derives JsonRW {
   case PrintText(text: String, level: CliServerMessage.Level)
+  case RunSubprocess(cmd: Seq[String])
   case Exit(exitCode: Int)
 }
 
@@ -118,6 +119,8 @@ object CliServerMessage {
       }
       val modulePrefix = m.moduleId.map(id => s"${id}:").getOrElse("")
       CliServerMessage.PrintText(s"[${modulePrefix}${m.level.toString.toLowerCase}] ${m.message}", level)
+    case rs: ServerNotification.RunSubprocess =>
+      CliServerMessage.RunSubprocess(rs.cmd)
     case ServerNotification.RequestFinished(success) =>
       CliServerMessage.Exit(if success then 0 else -1)
   }

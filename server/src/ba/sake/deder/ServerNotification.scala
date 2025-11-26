@@ -1,16 +1,18 @@
 package ba.sake.deder
 
 import java.time.Instant
-import java.util.UUID
 
 enum ServerNotification {
   case Message(
-      id: UUID,
       level: ServerNotification.Level,
       timestamp: Instant,
       message: String,
       moduleId: Option[String]
   )
+  
+  // tell client to run this subprocess
+  case RunSubprocess(cmd: Seq[String])
+  
   // tell client to exit
   case RequestFinished(success: Boolean = true)
 }
@@ -18,7 +20,6 @@ enum ServerNotification {
 object ServerNotification {
   def message(level: ServerNotification.Level, message: String, moduleId: Option[String] = None): ServerNotification =
     ServerNotification.Message(
-      UUID.randomUUID(),
       level,
       Instant.now(),
       message,

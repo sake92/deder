@@ -4,12 +4,15 @@ import ba.sake.tupson.JsonRW
 import org.typelevel.jawn.ast.JValue
 
 // project-root relative path
-case class DederPath(path: os.SubPath)
+case class DederPath(path: os.SubPath) {
+  def absPath: os.Path =
+    DederGlobals.projectRootDir / path
+}
 
 object DederPath {
   given Hashable[DederPath] with {
     def hashStr(value: DederPath): String =
-      val finalPath = DederGlobals.projectRootDir / value.path
+      val finalPath = value.absPath
       if os.exists(finalPath) then Hashable[os.Path].hashStr(finalPath)
       else throw RuntimeException(s"Path does not exist: ${finalPath}")
   }
