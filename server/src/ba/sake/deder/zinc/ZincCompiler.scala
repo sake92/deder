@@ -39,6 +39,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       scalaCompilerJar: os.Path,
       scalaLibraryJars: Seq[os.Path],
       scalaReflectJar: Option[os.Path],
+      additionalCompileClasspath: Seq[os.Path],
       zincCacheFile: os.Path,
       sources: Seq[os.Path],
       classesDir: os.Path,
@@ -67,7 +68,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     val converter = PlainVirtualFileConverter.converter
 
     val sourcesVFs = sources.map(s => converter.toVirtualFile(s.toNIO)).toArray
-    val classpath = scalaLibraryJars.map(f => converter.toVirtualFile(f.toNIO)).toArray
+    val classpath = (scalaLibraryJars ++ additionalCompileClasspath).map(f => converter.toVirtualFile(f.toNIO)).toArray
 
     val compileOptions = CompileOptions.of(
       /*_classpath =*/ classpath,
@@ -99,14 +100,14 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     val setup = getSetup(zincCacheFile.toNIO, reporter)
     val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
 
-    try {
+    //try {
       val newResult = incrementalCompiler.compile(inputs, zincLogger)
       analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
-    } catch {
+    /*} catch {
       case e: xsbti.CompileFailed =>
       // println("Noooooooooooooooooooooooooooooooooo")
       // e.printStackTrace()
-    }
+    }*/
   }
 
   private def getSetup(cacheFile: Path, reporter: xsbti.Reporter): Setup = {

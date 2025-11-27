@@ -8,7 +8,6 @@ class ExecutionPlanner(
     tasksPerModule: Map[String, Seq[TaskInstance]]
 ) {
 
-
   // build independent exec stages (~toposort)
   def execStages(moduleId: String, taskName: String): Seq[Seq[TaskInstance]] = {
     val taskToExecute = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
@@ -23,8 +22,8 @@ class ExecutionPlanner(
         case Some(values) => Some(if values.exists(_.id == task.id) then values else values.appended(task))
         case None         => Some(Seq(task))
       }
-      val deps = tasksGraph.outgoingEdgesOf(task).asScala.toSeq
-      deps.foreach { depEdge =>
+      val depEdges = tasksGraph.outgoingEdgesOf(task).asScala.toSeq
+      depEdges.foreach { depEdge =>
         val d = tasksGraph.getEdgeTarget(depEdge)
         go(d, depth + 1)
       }
@@ -36,7 +35,7 @@ class ExecutionPlanner(
   }
 
   // this is just for debugging at the moment
-  def execSubgraph(moduleId: String, taskName: String): AsSubgraph[TaskInstance, DefaultEdge] = {
+  def getExecSubgraph(moduleId: String, taskName: String): AsSubgraph[TaskInstance, DefaultEdge] = {
     val execTasksSet = Set.newBuilder[TaskInstance]
 
     def go(moduleId: String, taskName: String): Unit = {

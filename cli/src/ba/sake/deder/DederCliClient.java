@@ -78,7 +78,7 @@ public class DederCliClient {
                     var message = jsonMapper.readValue(messageJson, ServerMessage.class);
                     switch (message) {
                         case ServerMessage.PrintText(var text, var level) -> {
-                            if (level != ServerMessage.Level.DEBUG) {
+                            if (level.ordinal() < ServerMessage.Level.DEBUG.ordinal()) {
                                 System.out.println(text);
                             }
                         }
@@ -122,13 +122,13 @@ sealed interface ServerMessage {
     record PrintText(String text, Level level) implements ServerMessage {
     }
 
-    record RunSubprocess(String[] cmd)implements ServerMessage {
+    record RunSubprocess(String[] cmd) implements ServerMessage {
     }
 
     record Exit(int exitCode) implements ServerMessage {
     }
 
     enum Level {
-        ERROR, WARNING, INFO, DEBUG;
+        ERROR, WARNING, INFO, DEBUG, TRACE;
     }
 }

@@ -46,7 +46,7 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
   }
 
   // in theory there can be many client messages,
-  // but for now it is just one..
+  // but for now it is just one: initial command to run
   private def clientRead(
       clientChannel: SocketChannel,
       clientId: Int,
@@ -116,6 +116,7 @@ object CliServerMessage {
         case ServerNotification.Level.WARNING => Level.WARNING
         case ServerNotification.Level.INFO    => Level.INFO
         case ServerNotification.Level.DEBUG   => Level.DEBUG
+        case ServerNotification.Level.TRACE   => Level.TRACE
       }
       val modulePrefix = m.moduleId.map(id => s"${id}:").getOrElse("")
       CliServerMessage.PrintText(s"[${modulePrefix}${m.level.toString.toLowerCase}] ${m.message}", level)
@@ -126,6 +127,6 @@ object CliServerMessage {
   }
 
   enum Level derives JsonRW:
-    case ERROR, WARNING, INFO, DEBUG
+    case ERROR, WARNING, INFO, DEBUG, TRACE
 
 }

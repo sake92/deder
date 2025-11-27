@@ -1,17 +1,15 @@
 package ba.sake.deder
 
+import java.util.concurrent.ExecutorService
 import scala.jdk.CollectionConverters.*
+import coursier.parse.DependencyParser
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
-import coursier.parse.DependencyParser
-
-import java.util.concurrent.ExecutorService
-
 
 class DederProjectState(tasksExecutorTP: ExecutorService) {
 
-  def execute(moduleId: String, taskName: String, logCallback: ServerNotification => Unit)/*: TaskResult[?]*/ = {
+  def execute(moduleId: String, taskName: String, logCallback: ServerNotification => Unit): Unit = {
     val configParser = ConfigParser()
     val configFile = DederGlobals.projectRootDir / "deder.pkl"
     val projectConfig = configParser.parse(configFile)
@@ -23,12 +21,12 @@ class DederProjectState(tasksExecutorTP: ExecutorService) {
     )
     val zincCompiler = ZincCompiler(compilerBridgeJar)
     val tasksRegistry = TasksRegistry(zincCompiler)
-
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
     val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
-    val tasksExecSubgraph = executionPlanner.execSubgraph(moduleId, taskName)
+    val tasksExecSubgraph = executionPlanner.getExecSubgraph(moduleId, taskName)
     val tasksExecStages = executionPlanner.execStages(moduleId, taskName)
-    val tasksExecutor = TasksExecutor(projectConfig, tasksResolver.tasksGraph, tasksExecutorTP)
+    val tasksExecutor =
+      TasksExecutor(projectConfig, tasksResolver.modulesGraph, tasksResolver.tasksGraph, tasksExecutorTP)
 
     /*
     println("Modules graph:")

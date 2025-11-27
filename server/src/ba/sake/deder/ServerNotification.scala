@@ -26,6 +26,6 @@ object ServerNotification {
       moduleId
     )
   enum Level:
-    case ERROR, WARNING, INFO, DEBUG
+    case ERROR, WARNING, INFO, DEBUG, TRACE
 
 }

@@ -1,16 +1,16 @@
 package ba.sake.deder
 
-import ba.sake.deder.config.DederProject.{JavaModule, ModuleType, ScalaModule}
+import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, ScalaModule}
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 
-import java.time.Instant
 import scala.jdk.CollectionConverters.*
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.zinc.{DederZincLogger, ZincCompiler}
 import coursier.parse.DependencyParser
 
 import java.io.File
+import Implicits.given
 
 class CoreTasks(zincCompiler: ZincCompiler) {
 
@@ -41,28 +41,6 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       }
     }
 
-  val runClasspathTask = TaskBuilder
-    .make[Seq[os.Path]](
-      name = "runClasspath",
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
-      // transitive = true
-    )
-    .build { ctx =>
-      // TODO deps and transitive deps
-      val allDeps = ctx.module match {
-        case m: JavaModule => Seq.empty
-        case m: ScalaModule =>
-          DependencyResolver.fetch(
-            DependencyParser.dependency(s"org.scala-lang:scala-library:${m.scalaVersion}", m.scalaVersion).toOption.get
-          )
-        case _ => Seq.empty
-      }
-
-      println(s"Resolved deps: " + allDeps)
-
-      allDeps
-    }
-
   val compileTask = TaskBuilder
     .make[DederPath](
       name = "compile",
@@ -72,11 +50,11 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(sourcesTask)
     .dependsOn(javacOptionsTask)
     .build { ctx =>
-      val sourceDirs = ctx.depResults._1
+      val sourceDirs = ctx.depResults._1: Seq[DederPath]
       val sourceFiles = sourceDirs
         .flatMap { sourceDir =>
           os.walk(
-            DederGlobals.projectRootDir / sourceDir.path,
+            sourceDir.absPath,
             skip = p => {
               if os.isDir(p) then false
               else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
@@ -105,11 +83,16 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         DederGlobals.projectRootDir / os.SubPath(s".deder/out/${ctx.module.id}/compile/inc_compile.zip")
       val classesDir = os.SubPath(s".deder/out/${ctx.module.id}/compile/classes")
       val zincLogger = new DederZincLogger(ctx.notifications)
+      // TODO go level by level
+
+      val additionalCompileClasspath = ctx.orderedTransitiveResults.map(_.absPath)
+      // println(s"Compile module: ${ctx.module.id} with additionalCompileClasspath: " + additionalCompileClasspath)
       zincCompiler.compile(
         scalaVersion,
         scalaCompilerJar,
         Seq(scalaLibraryJar),
         Some(scalaReflectJar),
+        additionalCompileClasspath,
         zincCacheFile,
         sourceFiles,
         DederGlobals.projectRootDir / classesDir,
@@ -120,20 +103,41 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       DederPath(classesDir)
     }
 
+  val runClasspathTask = TaskBuilder
+    .make[Seq[os.Path]](
+      name = "runClasspath",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
+      transitive = true
+    )
+    .dependsOn(compileTask)
+    .build { ctx =>
+      val classesDir: DederPath = ctx.depResults._1
+
+      val allDeps = ctx.module match {
+        case m: JavaModule => Seq.empty
+        case m: ScalaModule =>
+          DependencyResolver.fetch(
+            DependencyParser.dependency(s"org.scala-lang:scala-library:${m.scalaVersion}", m.scalaVersion).toOption.get
+          )
+        case _ => Seq.empty
+      }
+
+      // println(s"Resolved deps: " + allDeps)
+      // TODO should the maven deps be pushed to end?
+      // classdirs that are last in each module are pushed last in final classpath
+      (Seq(classesDir).map(_.absPath) ++ ctx.orderedTransitiveResults.flatten ++ allDeps).reverse.distinct.reverse
+    }
+
   val runTask = TaskBuilder
     .make[String](
       name = "run",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
-    .dependsOn(compileTask)
     .dependsOn(runClasspathTask)
     .build { ctx =>
-      val classesDir: DederPath = ctx.depResults._1
-      val classesDirAbs = DederGlobals.projectRootDir / classesDir.path
-      val runClasspath = ctx.depResults._2: Seq[os.Path]
-
-      val cp = Seq(classesDirAbs.toString) ++ runClasspath.map(_.toString)
-      val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), "Main")
+      val runClasspath = ctx.depResults._1: Seq[os.Path]
+      val cp = runClasspath.map(_.toString)
+      val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), "d.Main")
       println(s"Running command: " + cmd)
       ctx.notifications.add(ServerNotification.RunSubprocess(cmd))
       ""
@@ -142,8 +146,8 @@ class CoreTasks(zincCompiler: ZincCompiler) {
   val all: Seq[Task[?, ?]] = Seq(
     sourcesTask,
     javacOptionsTask,
-    runClasspathTask,
     compileTask,
+    runClasspathTask,
     runTask
   )
 }

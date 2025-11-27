@@ -26,6 +26,9 @@ class TasksResolver(
     GraphUtils.checkNoCycles(graph, _.id)
     graph
   }
+  
+  val modulesMap: Map[String, DederModule] =
+    allModules.map(m => m.id -> m).toMap
 
   val tasksPerModule: Map[String, Seq[TaskInstance]] = {
     // make Tasks graph
