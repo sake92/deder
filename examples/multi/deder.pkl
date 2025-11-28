@@ -4,17 +4,17 @@ local const baseModule = new ScalaModule {
   scalaVersion = "2.13.11"
 }
 
-local const a = (baseModule) { id = "a" }
+local const common = (baseModule) { id = "common" }
 
-local const b = (baseModule) { id = "b"; moduleDeps = new { a } }
+local const frontend = (baseModule) { id = "frontend"; moduleDeps = new { common } }
 
-local const c = (baseModule) { id = "c"; moduleDeps = new { a } }
+local const backend = (baseModule) { id = "backend"; moduleDeps = new { common } }
 
-local const d = (baseModule) { id = "d"; moduleDeps = new { b; c } }
+local const uber = (baseModule) { id = "uber"; moduleDeps = new { frontend; backend } }
 
 modules = new {
-  a
-  b
-  c
-  d
+  common
+  frontend
+  backend
+  uber
 }

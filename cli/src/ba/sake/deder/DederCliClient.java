@@ -25,7 +25,7 @@ public class DederCliClient {
     }
 
     public void start(String[] args) throws IOException {
-        var socketPath = Path.of(".deder/cli.sock");
+        var socketPath = Path.of(".deder/server.sock");
         var address = UnixDomainSocketAddress.of(socketPath);
         //System.out.println("Connecting to server...");
         try (var channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {

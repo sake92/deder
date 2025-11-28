@@ -136,7 +136,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .build { ctx =>
       val runClasspath = ctx.depResults._1: Seq[os.Path]
       val cp = runClasspath.map(_.toString)
-      val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), "d.Main")
+      val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), "uber.Main")
       println(s"Running command: " + cmd)
       ctx.notifications.add(ServerNotification.RunSubprocess(cmd))
       ""

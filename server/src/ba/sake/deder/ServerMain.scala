@@ -12,7 +12,7 @@ import java.util.concurrent.Executors
   val tasksExecutorTP = Executors.newFixedThreadPool(10)
   val projectState = DederProjectState(tasksExecutorTP)
 
-  val cliServer = DederCliServer((projectRoot / ".deder/cli.sock").toNIO, projectState)
+  val cliServer = DederCliServer(projectRoot / ".deder/server.sock", projectState)
   val cliServerThread = new Thread(
     () => cliServer.start(),
     "DederCliServer"

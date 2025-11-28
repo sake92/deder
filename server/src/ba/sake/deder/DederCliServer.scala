@@ -12,13 +12,14 @@ import java.nio.ByteBuffer
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
 import ba.sake.tupson.{*, given}
 
-class DederCliServer(socketPath: Path, projectState: DederProjectState) {
+class DederCliServer(socketPath: os.Path, projectState: DederProjectState) {
 
   def start(): Unit = {
-    println(s"Starting server on $socketPath")
-    Files.deleteIfExists(socketPath)
+   // println(s"Starting server with socket $socketPath")
+    os.makeDir.all(socketPath / os.up)
+    Files.deleteIfExists(socketPath.toNIO)
 
-    val address = UnixDomainSocketAddress.of(socketPath)
+    val address = UnixDomainSocketAddress.of(socketPath.toNIO)
     val serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
     serverChannel.bind(address)
 
@@ -40,7 +41,7 @@ class DederCliServer(socketPath: Path, projectState: DederProjectState) {
       }
     } finally {
       serverChannel.close()
-      Files.deleteIfExists(socketPath)
+      Files.deleteIfExists(socketPath.toNIO)
       println("Server shut down")
     }
   }
