@@ -4,7 +4,12 @@ local const baseModule = new ScalaModule {
   scalaVersion = "2.13.11"
 }
 
-local const common = (baseModule) { id = "common" }
+local const common = (baseModule) {
+  id = "common"
+  deps = new {
+    "org.jsoup:jsoup:1.21.2"
+  }
+}
 
 local const frontend = (baseModule) { id = "frontend"; moduleDeps = new { common } }
 

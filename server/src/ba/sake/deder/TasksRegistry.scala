@@ -9,9 +9,10 @@ class TasksRegistry(zincCompiler: ZincCompiler) {
 
   def resolve(moduleType: ModuleType): Seq[Task[?, ?]] = {
     coreTasks.all.filter { t =>
-      t.supportedModuleTypes(moduleType)
+      t.supportedModuleTypes.contains(moduleType)
     }
   }
+  // TODO ensure unique task names per module type
   
   // TODO dynamic tasks added by plugins, at runtime or just restart server??
 }

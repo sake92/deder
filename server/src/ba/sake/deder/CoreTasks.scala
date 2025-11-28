@@ -39,6 +39,35 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         case _              => ???
       }
     }
+  
+  val scalaVersionTask = TaskBuilder.make[String](
+    name = "scalaVersion",
+    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+  ).build { ctx =>
+    ctx.module match {
+      case m: JavaModule  => "2.13.17" // dummy default scala version
+      case m: ScalaModule => m.scalaVersion
+      case _              => ???
+    }
+  }
+  
+  val dependenciesTask = TaskBuilder
+    .make[Seq[os.Path]](
+      name = "dependencies",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
+      transitive = true
+    )
+    .dependsOn(scalaVersionTask)
+    .build { ctx =>
+      val scalaVersion = ctx.depResults._1
+      val tpDepDeclarations = ctx.module match {
+        case m: JavaModule => m.deps.asScala.toSeq
+        case m: ScalaModule => m.deps.asScala.toSeq
+        case _ => Seq.empty
+      }
+      val tpCoursierDeps = tpDepDeclarations.map(depDecl => DependencyParser.dependency(depDecl, scalaVersion).toOption.get)
+      (DependencyResolver.fetch(tpCoursierDeps *) ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
+    }
 
   val compileTask = TaskBuilder
     .make[DederPath](
@@ -46,10 +75,16 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
       transitive = true
     )
+    .dependsOn(scalaVersionTask)
     .dependsOn(sourcesTask)
     .dependsOn(javacOptionsTask)
+    .dependsOn(dependenciesTask)
     .build { ctx =>
-      val sourceDirs = ctx.depResults._1: Seq[DederPath]
+      val scalaVersion = ctx.depResults._1
+      val sourceDirs = ctx.depResults._2: Seq[DederPath]
+      val javacOptions = ctx.depResults._3
+      val dependencies = ctx.depResults._4: Seq[os.Path]
+      println(s"Module ${ctx.module.id} compiling with dependencies: ${dependencies}")
       val sourceFiles = sourceDirs
         .flatMap { sourceDir =>
           os.walk(
@@ -62,13 +97,8 @@ class CoreTasks(zincCompiler: ZincCompiler) {
           )
         }
         .filter(os.isFile)
-      val javacOptions = ctx.depResults._2
+      
       val scalacOptions = javacOptions
-      val scalaVersion = ctx.module match {
-        case m: JavaModule  => "2.13.17" // dummy default scala version
-        case m: ScalaModule => m.scalaVersion
-        case _              => ???
-      }
       val scalaCompilerJar = DependencyResolver.fetchOne(
         DependencyParser.dependency(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion).toOption.get
       )
@@ -83,9 +113,9 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val classesDir = os.SubPath(s".deder/out/${ctx.module.id}/compile/classes")
       val zincLogger = new DederZincLogger(ctx.notifications)
       // TODO go level by level
-
-      val additionalCompileClasspath = ctx.transitiveResults.flatten.map(_.absPath)
-      // println(s"Compile module: ${ctx.module.id} with additionalCompileClasspath: " + additionalCompileClasspath)
+      
+      val additionalCompileClasspath = ctx.transitiveResults.flatten.map(_.absPath) ++ dependencies
+      println(s"Compile module: ${ctx.module.id} with additionalCompileClasspath: " + additionalCompileClasspath)
       zincCompiler.compile(
         scalaVersion,
         scalaCompilerJar,
@@ -108,11 +138,13 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
       transitive = true
     )
+    .dependsOn(dependenciesTask)
     .dependsOn(compileTask)
     .build { ctx =>
-      val classesDir: DederPath = ctx.depResults._1
+      val dependencies:Seq[os.Path] = ctx.depResults._1
+      val classesDir: DederPath = ctx.depResults._2
 
-      val allDeps = ctx.module match {
+      val mandatoryDeps = ctx.module match {
         case m: JavaModule => Seq.empty
         case m: ScalaModule =>
           DependencyResolver.fetch(
@@ -122,9 +154,8 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       }
 
       // println(s"Resolved deps: " + allDeps)
-      // TODO should the maven deps be pushed to end?
       // classdirs that are last in each module are pushed last in final classpath
-      (Seq(classesDir).map(_.absPath) ++ ctx.transitiveResults.flatten.flatten ++ allDeps).reverse.distinct.reverse
+      (Seq(classesDir).map(_.absPath) ++ ctx.transitiveResults.flatten.flatten ++ mandatoryDeps ++ dependencies).reverse.distinct.reverse
     }
 
   val runTask = TaskBuilder
@@ -149,7 +180,9 @@ class CoreTasks(zincCompiler: ZincCompiler) {
 
   val all: Seq[Task[?, ?]] = Seq(
     sourcesTask,
+    scalaVersionTask,
     javacOptionsTask,
+    dependenciesTask,
     compileTask,
     runClasspathTask,
     runTask

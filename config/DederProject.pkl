@@ -18,6 +18,7 @@ class JavaModule extends DederModule {
   resources: Listing<String> = new { "resources" }
   javacOptions: Listing<String> = new { }
   mainClass: String? = null
+  deps: Listing<String> = new { } // maven/ivy deps
 }
 
 class ScalaModule extends DederModule {
@@ -28,4 +29,5 @@ class ScalaModule extends DederModule {
   javacOptions: Listing<String> = new { }
   scalacOptions: Listing<String> = new { }
   mainClass: String? = null
+  deps: Listing<String> = new { } // maven/ivy deps
 }

@@ -53,7 +53,7 @@ class TasksExecutor(
             if d.module != taskInstance.module then go(d, 0)
           }
           val transitiveResults = for i <- 0 to maxDepth yield transitiveResultsMap.getOrElse(i, Seq.empty)
-          transitiveResults.map(_.map(_._2))
+          transitiveResults.map(_.sortBy(_._1).map(_._2))
         }
 
         () => {
