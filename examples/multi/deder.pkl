@@ -10,7 +10,11 @@ local const frontend = (baseModule) { id = "frontend"; moduleDeps = new { common
 
 local const backend = (baseModule) { id = "backend"; moduleDeps = new { common } }
 
-local const uber = (baseModule) { id = "uber"; moduleDeps = new { frontend; backend } }
+local const uber = (baseModule) {
+  id = "uber";
+  moduleDeps = new { frontend; backend }
+  mainClass = "uber.Main"
+}
 
 modules = new {
   common
