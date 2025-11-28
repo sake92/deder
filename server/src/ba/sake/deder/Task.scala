@@ -71,10 +71,7 @@ case class TaskExecContext[T, Deps <: Tuple](
     depResults: TaskDepResults[Deps],
     transitiveResults: Seq[Seq[T]], // results from dependent modules
     notifications: ServerNotificationsLogger
-)(using ev: TaskDeps[Deps] =:= true) {
-  def orderedTransitiveResults(using Ordering[T]): Seq[T] =
-    transitiveResults.fold(Seq.empty)(_ ++ _)
-}
+)(using ev: TaskDeps[Deps] =:= true)
 
 sealed trait Task[T, Deps <: Tuple](using ev: TaskDeps[Deps] =:= true) {
   def name: String

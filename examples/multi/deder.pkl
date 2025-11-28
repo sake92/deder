@@ -1,0 +1,20 @@
+amends "../../config/DederProject.pkl"
+
+local const baseModule = new ScalaModule {
+  scalaVersion = "2.13.11"
+}
+
+local const a = (baseModule) { id = "a" }
+
+local const b = (baseModule) { id = "b"; moduleDeps = new { a } }
+
+local const c = (baseModule) { id = "c"; moduleDeps = new { a } }
+
+local const d = (baseModule) { id = "d"; moduleDeps = new { b; c } }
+
+modules = new {
+  a
+  b
+  c
+  d
+}

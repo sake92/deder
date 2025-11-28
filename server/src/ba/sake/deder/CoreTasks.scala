@@ -10,7 +10,6 @@ import ba.sake.deder.zinc.{DederZincLogger, ZincCompiler}
 import coursier.parse.DependencyParser
 
 import java.io.File
-import Implicits.given
 
 class CoreTasks(zincCompiler: ZincCompiler) {
 
@@ -85,7 +84,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val zincLogger = new DederZincLogger(ctx.notifications)
       // TODO go level by level
 
-      val additionalCompileClasspath = ctx.orderedTransitiveResults.map(_.absPath)
+      val additionalCompileClasspath = ctx.transitiveResults.flatten.map(_.absPath)
       // println(s"Compile module: ${ctx.module.id} with additionalCompileClasspath: " + additionalCompileClasspath)
       zincCompiler.compile(
         scalaVersion,
@@ -125,7 +124,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       // println(s"Resolved deps: " + allDeps)
       // TODO should the maven deps be pushed to end?
       // classdirs that are last in each module are pushed last in final classpath
-      (Seq(classesDir).map(_.absPath) ++ ctx.orderedTransitiveResults.flatten ++ allDeps).reverse.distinct.reverse
+      (Seq(classesDir).map(_.absPath) ++ ctx.transitiveResults.flatten.flatten ++ allDeps).reverse.distinct.reverse
     }
 
   val runTask = TaskBuilder
