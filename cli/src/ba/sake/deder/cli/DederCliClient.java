@@ -1,8 +1,5 @@
-package ba.sake.deder;
+package ba.sake.deder.cli;
 
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayOutputStream;
@@ -18,12 +15,6 @@ import java.nio.file.Path;
 public class DederCliClient {
 
     private final ObjectMapper jsonMapper = new ObjectMapper();
-
-    public static void main(String[] args) throws IOException {
-        // TODO pass in debug level
-        var client = new DederCliClient();
-        client.start(args);
-    }
 
     public void start(String[] args) throws IOException {
         var socketPath = Path.of(".deder/server.sock");
@@ -103,33 +94,5 @@ public class DederCliClient {
             buf.clear();
         }
     }
-}
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
-sealed interface ClientMessage {
-    @JsonTypeName("Run")
-    record Run(String[] args) implements ClientMessage {
-    }
-}
-
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
-
-@JsonSubTypes({
-        @JsonSubTypes.Type(value = ServerMessage.PrintText.class, name = "PrintText"),
-        @JsonSubTypes.Type(value = ServerMessage.RunSubprocess.class, name = "RunSubprocess"),
-        @JsonSubTypes.Type(value = ServerMessage.Exit.class, name = "Exit"),
-})
-sealed interface ServerMessage {
-    record PrintText(String text, Level level) implements ServerMessage {
-    }
-
-    record RunSubprocess(String[] cmd) implements ServerMessage {
-    }
-
-    record Exit(int exitCode) implements ServerMessage {
-    }
-
-    enum Level {
-        ERROR, WARNING, INFO, DEBUG, TRACE;
-    }
 }
