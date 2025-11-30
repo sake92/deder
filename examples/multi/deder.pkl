@@ -8,7 +8,7 @@ local const common = (baseModule) {
   id = "common"
   deps {
     "org.jsoup:jsoup:1.21.2"
-
+  }
 }
 
 local const frontend = (baseModule) {

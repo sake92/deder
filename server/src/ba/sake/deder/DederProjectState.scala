@@ -9,6 +9,8 @@ import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
 
+import scala.util.control.NonFatal
+
 class DederProjectState(tasksExecutorService: ExecutorService) {
 
   private val compilerBridgeJar = DependencyResolver.fetchOne(
@@ -48,7 +50,7 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
 
       tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
     } catch {
-      case de: DederException =>
+      case NonFatal(_) =>
         serverNotificationsLogger.add(RequestFinished(success = false))
     }
 }

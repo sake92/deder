@@ -31,8 +31,18 @@ object config extends JavaModule {
   )
 }
 
-object cli extends JavaModule {
+object cli extends JavaModule, NativeImageModule {
+  def finalMainClass = "ba.sake.deder.DederCliClient"
+
   def mvnDeps = Seq(
     mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
   )
+
+  def jvmId = "graalvm-community:24.0.1"
+  def jvmWorker = mill.api.ModuleRef(ZincWorkerGraalvm)
+  def nativeImageOptions = Seq("--no-fallback")
+}
+
+object ZincWorkerGraalvm extends JvmWorkerModule {
+  def jvmIndexVersion = "latest.release"
 }
