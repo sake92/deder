@@ -5,38 +5,54 @@ on:
     tags: ['v*']
 
 jobs:
-  build:
+  build-server:
     if: false # TODO make it work
-    strategy:
-      matrix:
-        os: [ubuntu-latest] # TODO, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: '24'
-          distribution: 'graalvm'
-
-      - name: Build native image
-        run: ./mill  graalvmnative # TODO
-
+      - name: Build Server JAR
+        run: |
+          ./mill -i server.assembly
+          cp out/server/assembly.dest/out.jar deder-server.jar
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: binary-${{ matrix.os }}
-          path: out/cli/native-image/*
+          name: deder-server.jar
+          path: deder-server.jar
 
-  release:
-    needs: build
+  # TODO maybe add cli JAR too?
+
+  build-cli-native-image:
+    if: false # TODO make it work
+    strategy:
+      matrix:
+        os:
+          - name: ubuntu-latest
+            ext: ""
+          - name: windows-latest
+            ext: ".exe"
+          # TODO macos-latest, windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build CLI native image
+        run: |
+          ./mill -i cli.nativeImage
+          cp out/cli/nativeImage.dest/native-executable${{ matrix.os.ext }} deder
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deder-cli-${{ matrix.os.name }}
+          path: deder${{ matrix.os.ext }}
+
+  release-cli:
+    if: false # TODO make it work
+    needs: build-cli-native-image
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-
       - name: Release with JReleaser
-        run: # TODO mvn jreleaser:full-release
+        run: echo "bla" # TODO mvn jreleaser:full-release
         env:
           JRELEASER_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
