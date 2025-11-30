@@ -20,6 +20,7 @@ public class DederCliClient {
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
     public static void main(String[] args) throws IOException {
+        // TODO pass in debug level
         var client = new DederCliClient();
         client.start(args);
     }

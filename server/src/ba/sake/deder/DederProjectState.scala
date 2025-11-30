@@ -1,5 +1,7 @@
 package ba.sake.deder
 
+import ba.sake.deder.ServerNotification.RequestFinished
+
 import java.util.concurrent.ExecutorService
 import scala.jdk.CollectionConverters.*
 import coursier.parse.DependencyParser
@@ -7,28 +9,31 @@ import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
 
-class DederProjectState(tasksExecutorTP: ExecutorService) {
+class DederProjectState(tasksExecutorService: ExecutorService) {
 
-  def execute(moduleId: String, taskName: String, logCallback: ServerNotification => Unit): Unit = {
-    val configParser = ConfigParser()
-    val configFile = DederGlobals.projectRootDir / "deder.pkl"
-    val projectConfig = configParser.parse(configFile)
-    val allModules = projectConfig.modules.asScala.toSeq
-    // TODO check unique module ids
+  private val compilerBridgeJar = DependencyResolver.fetchOne(
+    DependencyParser.dependency(s"org.scala-sbt:compiler-bridge_2.13:1.11.0", "2.13").toOption.get
+  )
+  // keep hot
+  private val zincCompiler = ZincCompiler(compilerBridgeJar)
 
-    val compilerBridgeJar = DependencyResolver.fetchOne(
-      DependencyParser.dependency(s"org.scala-sbt:compiler-bridge_2.13:1.11.0", "2.13").toOption.get
-    )
-    val zincCompiler = ZincCompiler(compilerBridgeJar)
-    val tasksRegistry = TasksRegistry(zincCompiler)
-    val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
-    val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
-    val tasksExecSubgraph = executionPlanner.getExecSubgraph(moduleId, taskName)
-    val tasksExecStages = executionPlanner.execStages(moduleId, taskName)
-    val tasksExecutor =
-      TasksExecutor(projectConfig, tasksResolver.modulesGraph, tasksResolver.tasksGraph, tasksExecutorTP)
+  def execute(moduleId: String, taskName: String, logCallback: ServerNotification => Unit): Unit =
+    val serverNotificationsLogger = ServerNotificationsLogger(logCallback)
+    try {
+      // TODO check unique module ids
 
-    /*
+      val configParser = ConfigParser(serverNotificationsLogger)
+      val configFile = DederGlobals.projectRootDir / "deder.pkl"
+      val projectConfig = configParser.parse(configFile)
+      val tasksRegistry = TasksRegistry(zincCompiler)
+      val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
+      val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
+      val tasksExecSubgraph = executionPlanner.getExecSubgraph(moduleId, taskName)
+      val tasksExecStages = executionPlanner.execStages(moduleId, taskName)
+      val tasksExecutor =
+        TasksExecutor(projectConfig, tasksResolver.modulesGraph, tasksResolver.tasksGraph, tasksExecutorService)
+
+      /*
     println("Modules graph:")
     println(GraphUtils.generateDOT(tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id)))
     println("Tasks graph:")
@@ -39,7 +44,11 @@ class DederProjectState(tasksExecutorTP: ExecutorService) {
     println(tasksExecStages.map(_.map(_.id)).mkString("\n"))
 
     println("#" * 50)
-     */
-    tasksExecutor.execute(tasksExecStages, logCallback)
-  }
+       */
+
+      tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
+    } catch {
+      case de: DederException =>
+        serverNotificationsLogger.add(RequestFinished(success = false))
+    }
 }

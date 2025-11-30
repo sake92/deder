@@ -50,7 +50,7 @@ class TasksResolver(
           val taskDepId = s"${module.id}.${taskDep.name}"
           val taskDepInstance = tasksMap.getOrElse(
             taskDepId,
-            abort(s"Task referenced by '${task.id}' not found: '${taskDepId}'")
+            throw DederException(s"Task referenced by '${task.id}' not found: '${taskDepId}'")
           )
           graph.addEdge(task, taskDepInstance)
         }

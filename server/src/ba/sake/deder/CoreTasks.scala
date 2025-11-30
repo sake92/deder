@@ -20,11 +20,13 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
     .build { ctx =>
-      ctx.module match {
+     val sources = ctx.module match {
         case m: JavaModule  => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
         case m: ScalaModule => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
         case _              => ???
       }
+     println(s"Module: ${ctx.module.id} sources: " + sources)
+     sources
     }
 
   val javacOptionsTask = CachedTaskBuilder
@@ -84,7 +86,6 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val sourceDirs = ctx.depResults._2: Seq[DederPath]
       val javacOptions = ctx.depResults._3
       val dependencies = ctx.depResults._4: Seq[os.Path]
-      println(s"Module ${ctx.module.id} compiling with dependencies: ${dependencies}")
       val sourceFiles = sourceDirs
         .flatMap { sourceDir =>
           os.walk(
@@ -115,7 +116,13 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       // TODO go level by level
       
       val additionalCompileClasspath = ctx.transitiveResults.flatten.map(_.absPath) ++ dependencies
-      println(s"Compile module: ${ctx.module.id} with additionalCompileClasspath: " + additionalCompileClasspath)
+      println(s"Compiling module: ${ctx.module.id} with " +
+        s"scalaVersion: ${scalaVersion} " +
+        s"sourceDirs: ${sourceDirs} " +
+        s"additionalCompileClasspath: ${additionalCompileClasspath} " +
+        s"scalacOptions: ${scalacOptions}" +
+        s"javacOptions: ${javacOptions}"
+      )
       zincCompiler.compile(
         scalaVersion,
         scalaCompilerJar,

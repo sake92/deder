@@ -12,9 +12,10 @@ import java.nio.ByteBuffer
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
 import ba.sake.tupson.{*, given}
 
-class DederCliServer(socketPath: os.Path, projectState: DederProjectState) {
+class DederCliServer(projectState: DederProjectState) {
 
   def start(): Unit = {
+    val socketPath = DederGlobals.projectRootDir / ".deder/server.sock"
    // println(s"Starting server with socket $socketPath")
     os.makeDir.all(socketPath / os.up)
     Files.deleteIfExists(socketPath.toNIO)
@@ -124,7 +125,7 @@ object CliServerMessage {
     case rs: ServerNotification.RunSubprocess =>
       CliServerMessage.RunSubprocess(rs.cmd)
     case ServerNotification.RequestFinished(success) =>
-      CliServerMessage.Exit(if success then 0 else -1)
+      CliServerMessage.Exit(if success then 0 else 1)
   }
 
   enum Level derives JsonRW:

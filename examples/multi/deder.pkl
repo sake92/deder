@@ -6,22 +6,28 @@ local const baseModule = new ScalaModule {
 
 local const common = (baseModule) {
   id = "common"
-  deps = new {
+  deps {
     "org.jsoup:jsoup:1.21.2"
-  }
+
 }
 
-local const frontend = (baseModule) { id = "frontend"; moduleDeps = new { common } }
+local const frontend = (baseModule) {
+  id = "frontend"
+  moduleDeps { common }
+}
 
-local const backend = (baseModule) { id = "backend"; moduleDeps = new { common } }
+local const backend = (baseModule) {
+  id = "backend"
+  moduleDeps { common }
+}
 
 local const uber = (baseModule) {
   id = "uber";
-  moduleDeps = new { frontend; backend }
+  moduleDeps { frontend; backend }
   mainClass = "uber.Main"
 }
 
-modules = new {
+modules {
   common
   frontend
   backend

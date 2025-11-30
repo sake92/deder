@@ -11,7 +11,7 @@ class ExecutionPlanner(
   // build independent exec stages (~toposort)
   def execStages(moduleId: String, taskName: String): Seq[Seq[TaskInstance]] = {
     val taskToExecute = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
-      abort(s"Task not found ${moduleId}.${taskName}")
+      throw DederException(s"Task not found ${moduleId}.${taskName}")
     }
     var stages = Map.empty[Int, Seq[TaskInstance]]
     var maxDepth = 0
@@ -40,7 +40,7 @@ class ExecutionPlanner(
 
     def go(moduleId: String, taskName: String): Unit = {
       val taskToExecute = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
-        abort(s"Task not found ${moduleId}.${taskName}")
+        throw DederException(s"Task not found ${moduleId}.${taskName}")
       }
       val deps = tasksGraph.outgoingEdgesOf(taskToExecute).asScala.toSeq
       deps.foreach { depEdge =>

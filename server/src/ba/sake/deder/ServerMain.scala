@@ -2,30 +2,27 @@ package ba.sake.deder
 
 import java.util.concurrent.Executors
 
-@main def serverMain(): Unit = {
+@main def serverMain(projectRootDir: String = "."): Unit = {
 
-  if getMajorJavaVersion() < 17 then abort("Must use JDK >= 17")
+  if getMajorJavaVersion < 17 then
+    throw DederException("Must run with Java 17+")
 
-  val projectRoot = os.pwd / "examples/multi"
+  val projectRoot = os.pwd / os.SubPath(projectRootDir)
   System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
-  val tasksExecutorTP = Executors.newFixedThreadPool(10)
-  val projectState = DederProjectState(tasksExecutorTP)
+  val tasksExecutorService = Executors.newFixedThreadPool(10)
+  val projectState = DederProjectState(tasksExecutorService)
 
-  val cliServer = DederCliServer(projectRoot / ".deder/server.sock", projectState)
+  val cliServer = DederCliServer(projectState)
   val cliServerThread = new Thread(
     () => cliServer.start(),
     "DederCliServer"
   )
   cliServerThread.start()
   cliServerThread.join()
-
 }
 
-def abort(message: String) =
-  throw new RuntimeException(message)
-
-def getMajorJavaVersion(): Int = {
+def getMajorJavaVersion: Int = {
   // Java 9+ versions are just the major number (e.g., "17")
   // Java 8- versions start with "1." (e.g., "1.8.0_202")
   val parts = scala.util.Properties.javaVersion.split('.')

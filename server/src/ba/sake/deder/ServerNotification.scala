@@ -14,7 +14,7 @@ enum ServerNotification {
   case RunSubprocess(cmd: Seq[String])
   
   // tell client to exit
-  case RequestFinished(success: Boolean = true)
+  case RequestFinished(success: Boolean)
 }
 
 object ServerNotification {

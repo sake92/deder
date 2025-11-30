@@ -13,7 +13,7 @@ object GraphUtils {
   def checkNoCycles[V, E](g: Graph[V, E], getName: V => String): Unit = {
     val cycleDetector = new CycleDetector[V, E](g)
     val cycles = cycleDetector.findCycles().asScala
-    if cycles.nonEmpty then abort(s"Cycle detected: ${cycles.map(getName).mkString("->")}")
+    if cycles.nonEmpty then throw DederException(s"Cycle detected: ${cycles.map(getName).mkString("->")}")
   }
 
   def generateDOT[V, E](

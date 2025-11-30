@@ -28,7 +28,7 @@ object Hashable {
         val combinedHash = childrenHashes.mkString("-")
         HashUtils.hashStr(combinedHash)
       } else {
-        throw RuntimeException(s"Cannot hash path: ${value}")
+        throw DederException(s"Cannot hash path: ${value}")
       }
     }
   }

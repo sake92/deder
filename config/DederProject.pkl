@@ -3,31 +3,48 @@ module ba.sake.deder.config.DederProject
 modules: Listing<DederModule>
 
 abstract class DederModule {
-  id: String
-  root: String = id // module root directory, relative to project root
+  /// Module id, used in CLI and referring from other modules
+  id: String(idValidation)
+
+  /// Module root directory, relative to project root
+  root: String(rootValidation) = id
+
+  /// Module dependencies
   moduleDeps: Listing<DederModule>
+
   type: ModuleType
+
+  hidden idValidation = (value) ->
+    if (value.isBlank) throw("Id must not be blank.")
+    else true
+
+  hidden rootValidation = (value) ->
+      if (value.isBlank) throw("Id must not be blank.")
+      else true
 }
 
+// TODO remove ??
 typealias ModuleType = "java" | "scala"
 
 
 class JavaModule extends DederModule {
   type: ModuleType = "java"
-  sources: Listing<String> = new { "src" }
-  resources: Listing<String> = new { "resources" }
-  javacOptions: Listing<String> = new { }
+  /// Source directories
+  sources: Listing<String> = new Listing { "src" }
+  resources: Listing<String> = new Listing { "resources" }
+  javacOptions: Listing<String> = new Listing { }
   mainClass: String? = null
-  deps: Listing<String> = new { } // maven/ivy deps
+  deps: Listing<String> = new Listing { } // maven/ivy deps
 }
 
 class ScalaModule extends DederModule {
   type: ModuleType = "scala"
   scalaVersion: String
-  sources: Listing<String> = new { "src" }
-  resources: Listing<String> = new { "resources" }
-  javacOptions: Listing<String> = new { }
-  scalacOptions: Listing<String> = new { }
+  /// Source directories
+  sources: Listing<String> = new Listing { "src" }
+  resources: Listing<String> = new Listing { "resources" }
+  javacOptions: Listing<String> = new Listing { }
+  scalacOptions: Listing<String> = new Listing { }
   mainClass: String? = null
-  deps: Listing<String> = new { } // maven/ivy deps
+  deps: Listing<String> = new Listing { } // maven/ivy deps
 }

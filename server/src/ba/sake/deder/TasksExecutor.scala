@@ -14,11 +14,10 @@ class TasksExecutor(
     projectConfig: DederProject,
     modulesGraph: SimpleDirectedGraph[DederModule, DefaultEdge],
     tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge],
-    tasksExecutorTP: ExecutorService
+    tasksExecutorService: ExecutorService
 ) {
 
-  def execute(stages: Seq[Seq[TaskInstance]], logCallback: ServerNotification => Unit): Unit = {
-    val serverNotificationsLogger = ServerNotificationsLogger(logCallback)
+  def execute(stages: Seq[Seq[TaskInstance]], serverNotificationsLogger: ServerNotificationsLogger): Unit = {
     var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
     for (taskInstances, stageIndex) <- stages.zipWithIndex do {
       val taskExecutions: Seq[Callable[(String, TaskResult[?])]] = for taskInstance <- taskInstances yield {
@@ -68,11 +67,10 @@ class TasksExecutor(
           taskInstance.id -> taskRes
         }
       }
-      val futures = taskExecutions.map(tasksExecutorTP.submit)
+      val futures = taskExecutions.map(tasksExecutorService.submit)
       val results = futures.map(_.get())
       taskResults ++= results
     }
-    // TODO propagate errors to client
     serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
   }
 }

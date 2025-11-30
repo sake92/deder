@@ -14,7 +14,7 @@ object DederPath {
     def hashStr(value: DederPath): String =
       val finalPath = value.absPath
       if os.exists(finalPath) then Hashable[os.Path].hashStr(finalPath)
-      else throw RuntimeException(s"Path does not exist: ${finalPath}")
+      else throw DederException(s"Path does not exist: ${finalPath}")
   }
 
   given JsonRW[DederPath] with {
