@@ -1,0 +1,44 @@
+[
+  {
+    "name": "com.fasterxml.jackson.core.JsonParser"
+  },
+  {
+    "name": "com.fasterxml.jackson.databind.ObjectMapper"
+  },
+  {
+    "name": "ba.sake.deder.ClientMessage",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.ClientMessage$Run",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.ServerMessage",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.ServerMessage$PrintText",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.ServerMessage$RunSubprocess",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.ServerMessage$Exit",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  }
+]
