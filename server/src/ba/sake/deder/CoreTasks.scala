@@ -25,7 +25,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         case m: ScalaModule => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
         case _              => ???
       }
-      //println(s"Module: ${ctx.module.id} sources: " + sources)
+      // println(s"Module: ${ctx.module.id} sources: " + sources)
       sources
     }
 
@@ -72,7 +72,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val coursierDeps = depDeclarations
         .map(depDecl => DependencyParser.parse(depDecl).toOption.get.applyParams(ScalaParameters(scalaVersion)))
         .map(_.toCs)
-      (DependencyResolver.fetch(coursierDeps*) ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
+      (DependencyResolver.fetch(coursierDeps, Some(ctx.notifications)) ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
     }
 
   val compileTask = TaskBuilder
@@ -176,12 +176,14 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         case m: JavaModule => Seq.empty
         case m: ScalaModule =>
           DependencyResolver.fetch(
-            DependencyParser
-              .parse(s"org.scala-lang:scala-library:${m.scalaVersion}")
-              .toOption
-              .get
-              .applyParams(ScalaParameters(m.scalaVersion))
-              .toCs
+            Seq(
+              DependencyParser
+                .parse(s"org.scala-lang:scala-library:${m.scalaVersion}")
+                .toOption
+                .get
+                .applyParams(ScalaParameters(m.scalaVersion))
+                .toCs
+            )
           )
         case _ => Seq.empty
       }

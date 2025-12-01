@@ -7,7 +7,7 @@ local const baseModule = new ScalaModule {
 local const common = (baseModule) {
   id = "common"
   deps {
-    "org.jsoup:jsoup:1.21.2"
+    "org.jsoup:jsoup:1.21.1"
   }
 }
 
