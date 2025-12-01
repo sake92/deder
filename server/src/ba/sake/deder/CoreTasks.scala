@@ -1,15 +1,15 @@
 package ba.sake.deder
 
+import java.io.File
+import scala.jdk.CollectionConverters.*
+import dependency.parser.DependencyParser
+import dependency.api.ops.*
+import dependency.ScalaParameters
+import ba.sake.tupson.JsonRW
+import ba.sake.deder.zinc.{DederZincLogger, ZincCompiler}
 import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, ScalaModule}
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
-
-import scala.jdk.CollectionConverters.*
-import ba.sake.tupson.JsonRW
-import ba.sake.deder.zinc.{DederZincLogger, ZincCompiler}
-import coursier.parse.DependencyParser
-
-import java.io.File
 
 class CoreTasks(zincCompiler: ZincCompiler) {
 
@@ -20,13 +20,13 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
     .build { ctx =>
-     val sources = ctx.module match {
+      val sources = ctx.module match {
         case m: JavaModule  => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
         case m: ScalaModule => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
         case _              => ???
       }
-     println(s"Module: ${ctx.module.id} sources: " + sources)
-     sources
+      println(s"Module: ${ctx.module.id} sources: " + sources)
+      sources
     }
 
   val javacOptionsTask = CachedTaskBuilder
@@ -41,18 +41,20 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         case _              => ???
       }
     }
-  
-  val scalaVersionTask = TaskBuilder.make[String](
-    name = "scalaVersion",
-    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
-  ).build { ctx =>
-    ctx.module match {
-      case m: JavaModule  => "2.13.17" // dummy default scala version
-      case m: ScalaModule => m.scalaVersion
-      case _              => ???
+
+  val scalaVersionTask = TaskBuilder
+    .make[String](
+      name = "scalaVersion",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+    )
+    .build { ctx =>
+      ctx.module match {
+        case m: JavaModule  => "2.13.17" // dummy default scala version
+        case m: ScalaModule => m.scalaVersion
+        case _              => ???
+      }
     }
-  }
-  
+
   val dependenciesTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "dependencies",
@@ -62,13 +64,15 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val scalaVersion = ctx.depResults._1
-      val tpDepDeclarations = ctx.module match {
-        case m: JavaModule => m.deps.asScala.toSeq
+      val depDeclarations = ctx.module match {
+        case m: JavaModule  => m.deps.asScala.toSeq
         case m: ScalaModule => m.deps.asScala.toSeq
-        case _ => Seq.empty
+        case _              => Seq.empty
       }
-      val tpCoursierDeps = tpDepDeclarations.map(depDecl => DependencyParser.dependency(depDecl, scalaVersion).toOption.get)
-      (DependencyResolver.fetch(tpCoursierDeps *) ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
+      val coursierDeps = depDeclarations
+        .map(depDecl => DependencyParser.parse(depDecl).toOption.get.applyParams(ScalaParameters(scalaVersion)))
+        .map(_.toCs)
+      (DependencyResolver.fetch(coursierDeps*) ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
     }
 
   val compileTask = TaskBuilder
@@ -98,30 +102,47 @@ class CoreTasks(zincCompiler: ZincCompiler) {
           )
         }
         .filter(os.isFile)
-      
+
       val scalacOptions = javacOptions
+
       val scalaCompilerJar = DependencyResolver.fetchOne(
-        DependencyParser.dependency(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion).toOption.get
+        DependencyParser
+          .parse(s"org.scala-lang:scala-compiler:${scalaVersion}")
+          .toOption
+          .get
+          .applyParams(ScalaParameters(scalaVersion))
+          .toCs
       )
       val scalaLibraryJar = DependencyResolver.fetchOne(
-        DependencyParser.dependency(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion).toOption.get
+        DependencyParser
+          .parse(s"org.scala-lang:scala-library:${scalaVersion}")
+          .toOption
+          .get
+          .applyParams(ScalaParameters(scalaVersion))
+          .toCs
       ) // TODO scala3-library
       val scalaReflectJar = DependencyResolver.fetchOne(
-        DependencyParser.dependency(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion).toOption.get
+        DependencyParser
+          .parse(s"org.scala-lang:scala-reflect:${scalaVersion}")
+          .toOption
+          .get
+          .applyParams(ScalaParameters(scalaVersion))
+          .toCs
       ) // TODO only for scala 2
       val zincCacheFile =
         DederGlobals.projectRootDir / os.SubPath(s".deder/out/${ctx.module.id}/compile/inc_compile.zip")
       val classesDir = os.SubPath(s".deder/out/${ctx.module.id}/compile/classes")
       val zincLogger = new DederZincLogger(ctx.notifications)
       // TODO go level by level
-      
+
       val additionalCompileClasspath = ctx.transitiveResults.flatten.map(_.absPath) ++ dependencies
-      println(s"Compiling module: ${ctx.module.id} with " +
-        s"scalaVersion: ${scalaVersion} " +
-        s"sourceDirs: ${sourceDirs} " +
-        s"additionalCompileClasspath: ${additionalCompileClasspath} " +
-        s"scalacOptions: ${scalacOptions}" +
-        s"javacOptions: ${javacOptions}"
+      println(
+        s"Compiling module: ${ctx.module.id} with " +
+          s"scalaVersion: ${scalaVersion} " +
+          s"sourceDirs: ${sourceDirs} " +
+          s"additionalCompileClasspath: ${additionalCompileClasspath} " +
+          s"scalacOptions: ${scalacOptions}" +
+          s"javacOptions: ${javacOptions}"
       )
       zincCompiler.compile(
         scalaVersion,
@@ -148,21 +169,28 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(dependenciesTask)
     .dependsOn(compileTask)
     .build { ctx =>
-      val dependencies:Seq[os.Path] = ctx.depResults._1
+      val dependencies: Seq[os.Path] = ctx.depResults._1
       val classesDir: DederPath = ctx.depResults._2
 
       val mandatoryDeps = ctx.module match {
         case m: JavaModule => Seq.empty
         case m: ScalaModule =>
           DependencyResolver.fetch(
-            DependencyParser.dependency(s"org.scala-lang:scala-library:${m.scalaVersion}", m.scalaVersion).toOption.get
+            DependencyParser
+              .parse(s"org.scala-lang:scala-library:${m.scalaVersion}")
+              .toOption
+              .get
+              .applyParams(ScalaParameters(m.scalaVersion))
+              .toCs
           )
         case _ => Seq.empty
       }
 
       // println(s"Resolved deps: " + allDeps)
       // classdirs that are last in each module are pushed last in final classpath
-      (Seq(classesDir).map(_.absPath) ++ ctx.transitiveResults.flatten.flatten ++ mandatoryDeps ++ dependencies).reverse.distinct.reverse
+      (Seq(classesDir).map(
+        _.absPath
+      ) ++ ctx.transitiveResults.flatten.flatten ++ mandatoryDeps ++ dependencies).reverse.distinct.reverse
     }
 
   val runTask = TaskBuilder

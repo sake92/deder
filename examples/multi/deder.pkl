@@ -24,6 +24,9 @@ local const backend = (baseModule) {
 local const uber = (baseModule) {
   id = "uber";
   moduleDeps { frontend; backend }
+  deps {
+    "com.lihaoyi::pprint:0.9.5"
+  }
   mainClass = "uber.Main"
 }
 

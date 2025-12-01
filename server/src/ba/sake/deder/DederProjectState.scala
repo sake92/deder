@@ -1,20 +1,28 @@
 package ba.sake.deder
 
-import ba.sake.deder.ServerNotification.RequestFinished
-
+import scala.util.control.NonFatal
 import java.util.concurrent.ExecutorService
 import scala.jdk.CollectionConverters.*
-import coursier.parse.DependencyParser
+import dependency.ScalaParameters
+import dependency.parser.DependencyParser
+import dependency.api.ops.*
+
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
-
-import scala.util.control.NonFatal
+import ba.sake.deder.ServerNotification.RequestFinished
 
 class DederProjectState(tasksExecutorService: ExecutorService) {
 
   private val compilerBridgeJar = DependencyResolver.fetchOne(
-    DependencyParser.dependency(s"org.scala-sbt:compiler-bridge_2.13:1.11.0", "2.13").toOption.get
+    DependencyParser
+      .parse("org.scala-sbt::compiler-bridge:1.11.0")
+      .toOption
+      .get
+      .applyParams(
+        ScalaParameters("2.13.17")
+      )
+      .toCs
   )
   // keep hot
   private val zincCompiler = ZincCompiler(compilerBridgeJar)

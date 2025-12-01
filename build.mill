@@ -16,7 +16,9 @@ object server extends ScalaModule {
     mvn"commons-codec:commons-codec:1.20.0",
     mvn"org.scala-sbt:zinc_2.13:1.11.0",
     mvn"org.scala-sbt:compiler-interface:1.11.0",
-    mvn"io.get-coursier::coursier:2.1.25-M19".withDottyCompat(scalaVersion())
+    mvn"io.get-coursier::dependency:0.3.2",
+    mvn"io.get-coursier::dependency-interface:0.3.2",
+    mvn"io.get-coursier:interface:1.0.25"
   )
   def moduleDeps = Seq(config)
 
