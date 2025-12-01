@@ -72,7 +72,10 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val coursierDeps = depDeclarations
         .map(depDecl => DependencyParser.parse(depDecl).toOption.get.applyParams(ScalaParameters(scalaVersion)))
         .map(_.toCs)
-      (DependencyResolver.fetch(coursierDeps, Some(ctx.notifications)) ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
+      (DependencyResolver.fetch(
+        coursierDeps,
+        Some(ctx.notifications)
+      ) ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
     }
 
   val compileTask = TaskBuilder
@@ -129,10 +132,9 @@ class CoreTasks(zincCompiler: ZincCompiler) {
           .applyParams(ScalaParameters(scalaVersion))
           .toCs
       ) // TODO only for scala 2
-      val zincCacheFile =
-        DederGlobals.projectRootDir / os.SubPath(s".deder/out/${ctx.module.id}/compile/inc_compile.zip")
-      val classesDir = os.SubPath(s".deder/out/${ctx.module.id}/compile/classes")
-      val zincLogger = new DederZincLogger(ctx.notifications)
+      val zincCacheFile = ctx.out / "inc_compile.zip"
+      val classesDir = ctx.out / "classes"
+      val zincLogger = new DederZincLogger(ctx.notifications, ctx.module.id)
       // TODO go level by level
 
       val additionalCompileClasspath = ctx.transitiveResults.flatten.map(_.absPath) ++ dependencies
@@ -152,7 +154,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         additionalCompileClasspath,
         zincCacheFile,
         sourceFiles,
-        DederGlobals.projectRootDir / classesDir,
+        classesDir,
         scalacOptions,
         javacOptions,
         zincLogger

@@ -70,7 +70,8 @@ case class TaskExecContext[T, Deps <: Tuple](
     module: DederModule,
     depResults: TaskDepResults[Deps],
     transitiveResults: Seq[Seq[T]], // results from dependent modules
-    notifications: ServerNotificationsLogger
+    notifications: ServerNotificationsLogger,
+    out: os.Path
 )(using ev: TaskDeps[Deps] =:= true)
 
 sealed trait Task[T, Deps <: Tuple](using ev: TaskDeps[Deps] =:= true) {
@@ -110,13 +111,15 @@ case class TaskImpl[T, Deps <: Tuple](
     )
     val depResultsUnsafe = Tuple.fromArray(depResults.map(_.value).toArray).asInstanceOf[TaskDepResults[Deps]]
     val transitiveResultsUnsafe = transitiveResults.asInstanceOf[Seq[Seq[TaskResult[T]]]]
+    val outDir = DederGlobals.projectRootDir / ".deder/out" / module.id / name
     val res = execute(
       TaskExecContext(
         project,
         module,
         depResultsUnsafe,
         transitiveResultsUnsafe.map(_.map(_.value)),
-        serverNotificationsLogger
+        serverNotificationsLogger,
+        outDir
       )
     )
     val taskResult = TaskResult(res, "", "" /*, transitiveResultsUnsafe*/ )
@@ -151,6 +154,7 @@ case class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     )
 
     val metadataFile = DederGlobals.projectRootDir / ".deder/out" / module.id / name / "metadata.json"
+    val outDir = DederGlobals.projectRootDir / ".deder/out" / module.id / name
 
     val allDepResults = depResults ++ transitiveResults.headOption.getOrElse(Seq.empty) // only first level for hashing
     val inputsHash = HashUtils.hashStr(allDepResults.map(_.outputHash).mkString("-"))
@@ -164,7 +168,8 @@ case class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
           module,
           depResultsUnsafe,
           transitiveResultsUnsafe.map(_.map(_.value)),
-          serverNotificationsLogger
+          serverNotificationsLogger,
+          outDir
         )
       )
       val outputHash = Hashable[T].hashStr(res)

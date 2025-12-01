@@ -4,21 +4,21 @@ import java.util.function.Supplier
 import ba.sake.deder.ServerNotification.Level
 import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
 
-class DederZincLogger(notifications: ServerNotificationsLogger) extends xsbti.Logger {
+class DederZincLogger(notifications: ServerNotificationsLogger, moduleId: String) extends xsbti.Logger {
 
   override def error(msg: Supplier[String]): Unit =
-    notifications.add(ServerNotification.message(Level.ERROR, msg.get()))
+    notifications.add(ServerNotification.message(Level.ERROR, msg.get(), Some(moduleId)))
 
   override def warn(msg: Supplier[String]): Unit =
-    notifications.add(ServerNotification.message(Level.WARNING, msg.get()))
+    notifications.add(ServerNotification.message(Level.WARNING, msg.get(), Some(moduleId)))
 
   override def info(msg: Supplier[String]): Unit =
-    notifications.add(ServerNotification.message(Level.INFO, msg.get()))
+    notifications.add(ServerNotification.message(Level.INFO, msg.get(), Some(moduleId) ))
 
   // too noisy.. so trace
   override def debug(msg: Supplier[String]): Unit =
-    notifications.add(ServerNotification.message(Level.TRACE, msg.get()))
+    notifications.add(ServerNotification.message(Level.TRACE, msg.get(), Some(moduleId)))
 
   override def trace(exception: Supplier[Throwable]): Unit =
-    notifications.add(ServerNotification.message(Level.TRACE, exception.get().getMessage))
+    notifications.add(ServerNotification.message(Level.TRACE, exception.get().getMessage, Some(moduleId)))
 }
