@@ -25,7 +25,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         case m: ScalaModule => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
         case _              => ???
       }
-      println(s"Module: ${ctx.module.id} sources: " + sources)
+      //println(s"Module: ${ctx.module.id} sources: " + sources)
       sources
     }
 

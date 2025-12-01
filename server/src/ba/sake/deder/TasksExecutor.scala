@@ -71,6 +71,5 @@ class TasksExecutor(
       val results = futures.map(_.get())
       taskResults ++= results
     }
-    serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
   }
 }

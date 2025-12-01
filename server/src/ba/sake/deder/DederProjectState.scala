@@ -10,7 +10,6 @@ import dependency.api.ops.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
-import ba.sake.deder.ServerNotification.RequestFinished
 
 class DederProjectState(tasksExecutorService: ExecutorService) {
 
@@ -57,8 +56,11 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
        */
 
       tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
+      serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
     } catch {
-      case NonFatal(_) =>
-        serverNotificationsLogger.add(RequestFinished(success = false))
+      case NonFatal(e) =>
+        serverNotificationsLogger.add(ServerNotification.message(ServerNotification.Level.ERROR, e.getMessage))
+        serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
+        e.printStackTrace()
     }
 }
