@@ -25,14 +25,11 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
     )
     ZincCompiler(compilerBridgeJar)
   }
+  private val tasksRegistry = TasksRegistry(zincCompiler)
+  private val configParser = ConfigParser()
+  private val configFile = DederGlobals.projectRootDir / "deder.pkl"
 
-  // TODO make it reload on deder.pkl change !
-  // TODO just a var, one server per project, noice!
-  private val projectE: Either[String, (DederProject, TasksResolver, ExecutionPlanner)] = locally {
-    // TODO check unique module ids
-    val tasksRegistry = TasksRegistry(zincCompiler)
-    val configParser = ConfigParser()
-    val configFile = DederGlobals.projectRootDir / "deder.pkl"
+  @volatile private var projectE: Either[String, (DederProject, TasksResolver, ExecutionPlanner)] = locally {
     val projectConfig = configParser.parse(configFile)
     projectConfig.map { config =>
       val tasksResolver = TasksResolver(config, tasksRegistry)
@@ -40,9 +37,20 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
     }
   }
 
+  private def refreshProjectState(): Unit = projectE.synchronized {
+    val newProjectConfig = configParser.parse(configFile)
+    if (newProjectConfig != projectE.map(_._1)) {
+      projectE = newProjectConfig.map { config =>
+        val tasksResolver = TasksResolver(config, tasksRegistry)
+        (config, tasksResolver, ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule))
+      }
+    }
+  }
+
   def execute(moduleId: String, taskName: String, logCallback: ServerNotification => Unit): Unit =
     val serverNotificationsLogger = ServerNotificationsLogger(logCallback)
     try {
+      refreshProjectState()
       projectE match {
         case Left(errorMessage) =>
           serverNotificationsLogger.add(
@@ -57,7 +65,6 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
             TasksExecutor(projectConfig, tasksResolver.modulesGraph, tasksResolver.tasksGraph, tasksExecutorService)
           val allTaskInstances = tasksExecStages.flatten.sortBy(_.id)
           allTaskInstances.foreach { taskInstance =>
-            println(s"Locking task: ${taskInstance.id}")
             taskInstance.lock.lock()
           }
           try {
@@ -65,7 +72,6 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
             serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
           } finally {
             allTaskInstances.reverse.foreach { taskInstance =>
-              println(s"Unlocking task: ${taskInstance.id}")
               taskInstance.lock.unlock()
             }
           }

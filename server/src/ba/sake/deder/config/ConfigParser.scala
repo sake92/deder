@@ -9,6 +9,7 @@ class ConfigParser() {
   def parse(configFile: os.Path): Either[String, DederProject] = try {
     val evaluator = ConfigEvaluator.preconfigured
     val config = evaluator.evaluate(ModuleSource.file(configFile.toIO))
+    // TODO check unique module ids
     Right(config.as(classOf[DederProject]))
   } catch {
     case pklException: PklException =>
