@@ -16,10 +16,8 @@
 - flatten the tasks graph
 - force order of taking the locks
 - if module A depends on B, then it has to lock B too !!!
-    - because if it needs to B.compile for example..
-    - first take ALL NEEDDED LOCKS!? only THEN do the tasks..
-- use lockInterruptibly()
-- try interrupt() if deadlock occurs, maybe
+    - because it needs to B.compile first
+    - first take all task locks, only then start the tasks..
 
 
 ----
@@ -51,7 +49,7 @@ https://medium.com/@jdxcode/12-factor-cli-apps-dd3c227a0e46
 ## Caching / minimality
 - if inputs hash hasnt changed, dont do it
 - Blake3 algo for file hashing
-- use $COURSIER_CACHE/mylib/... instead of full paths
+- use relative paths as much as possible
 
 
 ---

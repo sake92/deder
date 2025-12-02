@@ -3,7 +3,8 @@
 ## How does it work?
 
 ### Config parse
-The config is parsed by server into an object.
+The config is parsed by server into an object.  
+Reloaded if changed.
 
 ### Modules graph
 A graph of modules is formed from the config.
@@ -20,7 +21,7 @@ If you say `deder compile -m A` where A depends on B, then B must be compiled be
 
 In this stage, we have a complete DAG of tasks.
 
-### Plan graph, stages
+### Plan graph and execution stages
 Say we have 2 tasks: `compile` and `run`.  
 When we invoke `deder compile -m A` we need to execute `B.compile` and then `A.compile`.
 
@@ -44,5 +45,10 @@ Then we *feed those results to the next stage* and so on, until we reach our giv
 
 We need to be careful about error handling, we usually want to exit early and print a nice error message.
 
+What about concurrent execution?  
+Locking is done at task-instance level before starting execution.  
+All plan subgrah task-instances are locked first, and only then the execution starts.
 
+The task-instances are sorted by their ids, so that global ordering is achieved.
+This makes sure there are no deadlocks happening.
 
