@@ -9,8 +9,7 @@ import scala.util.Using
 
 @main def serverMain(projectRootDir: String = "."): Unit = {
 
-  if !Properties.isJavaAtLeast(17) then
-    throw DederException("Must run with Java 17+")
+  if !Properties.isJavaAtLeast(17) then throw DederException("Must run with Java 17+")
 
   val projectRoot = os.pwd / os.SubPath(projectRootDir)
   System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
@@ -21,17 +20,14 @@ import scala.util.Using
   val projectState = DederProjectState(tasksExecutorService)
 
   val cliServer = DederCliServer(projectState)
-  val cliServerThread = new Thread(
-    () => cliServer.start(),
-    "DederCliServer"
-  )
+  val cliServerThread = new Thread(() => cliServer.start(), "DederCliServer")
   cliServerThread.start()
   cliServerThread.join()
 }
 
 def acquireServerLock(projectRoot: os.Path): Unit = {
   val serverLockFile = projectRoot / ".deder/server.lock"
-  
+
   os.makeDir.all(serverLockFile / os.up)
 
   val lockFileHandle = new RandomAccessFile(serverLockFile.toIO, "rw")

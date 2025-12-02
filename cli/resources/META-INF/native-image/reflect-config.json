@@ -24,7 +24,13 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "ba.sake.deder.cli.ServerMessage$PrintText",
+    "name": "ba.sake.deder.cli.ServerMessage$Output",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.cli.ServerMessage$Log",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true

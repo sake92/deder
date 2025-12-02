@@ -56,6 +56,7 @@ class DederCliServer(projectState: DederProjectState) {
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
     // newline delimited JSON messages
+    // TODO Channels.newInputStream .. much much simpler
     val buf = ByteBuffer.allocate(1024)
     var messageOS = new ByteArrayOutputStream(1024)
     while clientChannel.read(buf) != -1 do {
