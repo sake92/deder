@@ -31,6 +31,7 @@ class ExecutionPlanner(
 
     go(taskToExecute, 0)
     val reversedStages = for i <- 0 to maxDepth yield stages(i)
+    // TODO sort by id, so ordering is consistent for locking tasks !!!
     reversedStages.reverse
   }
 

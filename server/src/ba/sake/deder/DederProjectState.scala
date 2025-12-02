@@ -1,7 +1,7 @@
 package ba.sake.deder
 
-import scala.util.control.NonFatal
 import java.util.concurrent.ExecutorService
+import scala.util.control.NonFatal
 import scala.jdk.CollectionConverters.*
 import dependency.ScalaParameters
 import dependency.parser.DependencyParser
@@ -13,34 +13,63 @@ import ba.sake.deder.zinc.ZincCompiler
 
 class DederProjectState(tasksExecutorService: ExecutorService) {
 
-  private val compilerBridgeJar = DependencyResolver.fetchOne(
-    DependencyParser
-      .parse("org.scala-sbt::compiler-bridge:1.11.0")
-      .toOption
-      .get
-      .applyParams(
-        ScalaParameters("2.13.17")
-      )
-      .toCs
-  )
   // keep hot
-  private val zincCompiler = ZincCompiler(compilerBridgeJar)
+  private val zincCompiler = locally {
+    val compilerBridgeJar = DependencyResolver.fetchOne(
+      DependencyParser
+        .parse("org.scala-sbt::compiler-bridge:1.11.0")
+        .toOption
+        .get
+        .applyParams(ScalaParameters("2.13.17"))
+        .toCs
+    )
+    ZincCompiler(compilerBridgeJar)
+  }
+
+  // TODO make it reload on deder.pkl change !
+  // TODO just a var, one server per project, noice!
+  private val projectE: Either[String, (DederProject, TasksResolver, ExecutionPlanner)] = locally {
+    // TODO check unique module ids
+    val tasksRegistry = TasksRegistry(zincCompiler)
+    val configParser = ConfigParser()
+    val configFile = DederGlobals.projectRootDir / "deder.pkl"
+    val projectConfig = configParser.parse(configFile)
+    projectConfig.map { config =>
+      val tasksResolver = TasksResolver(config, tasksRegistry)
+      (config, tasksResolver, ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule))
+    }
+  }
 
   def execute(moduleId: String, taskName: String, logCallback: ServerNotification => Unit): Unit =
     val serverNotificationsLogger = ServerNotificationsLogger(logCallback)
     try {
-      // TODO check unique module ids
+      projectE match {
+        case Left(errorMessage) =>
+          serverNotificationsLogger.add(
+            ServerNotification.message(ServerNotification.Level.ERROR, errorMessage)
+          )
+          serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
 
-      val configParser = ConfigParser(serverNotificationsLogger)
-      val configFile = DederGlobals.projectRootDir / "deder.pkl"
-      val projectConfig = configParser.parse(configFile)
-      val tasksRegistry = TasksRegistry(zincCompiler)
-      val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
-      val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
-      val tasksExecSubgraph = executionPlanner.getExecSubgraph(moduleId, taskName)
-      val tasksExecStages = executionPlanner.execStages(moduleId, taskName)
-      val tasksExecutor =
-        TasksExecutor(projectConfig, tasksResolver.modulesGraph, tasksResolver.tasksGraph, tasksExecutorService)
+        case Right((projectConfig, tasksResolver, executionPlanner)) =>
+          val tasksExecSubgraph = executionPlanner.getExecSubgraph(moduleId, taskName)
+          val tasksExecStages = executionPlanner.execStages(moduleId, taskName)
+          val tasksExecutor =
+            TasksExecutor(projectConfig, tasksResolver.modulesGraph, tasksResolver.tasksGraph, tasksExecutorService)
+          val allTaskInstances = tasksExecStages.flatten.sortBy(_.id)
+          allTaskInstances.foreach { taskInstance =>
+            println(s"Locking task: ${taskInstance.id}")
+            taskInstance.lock.lock()
+          }
+          try {
+            tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
+            serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
+          } finally {
+            allTaskInstances.reverse.foreach { taskInstance =>
+              println(s"Unlocking task: ${taskInstance.id}")
+              taskInstance.lock.unlock()
+            }
+          }
+      }
 
       /*
     println("Modules graph:")
@@ -55,11 +84,11 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
     println("#" * 50)
        */
 
-      tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
-      serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
     } catch {
       case NonFatal(e) =>
-        serverNotificationsLogger.add(ServerNotification.message(ServerNotification.Level.ERROR, e.getMessage, Some(moduleId)))
+        serverNotificationsLogger.add(
+          ServerNotification.message(ServerNotification.Level.ERROR, e.getMessage, Some(moduleId))
+        )
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         e.printStackTrace()
     }

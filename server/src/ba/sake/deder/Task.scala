@@ -6,6 +6,8 @@ import ba.sake.deder.config.DederProject.{DederModule, ModuleType}
 import scala.util.control.Breaks.{break, breakable}
 import scala.Tuple.:*
 import ba.sake.tupson.{*, given}
+import java.util.concurrent.locks.Lock
+import java.util.concurrent.locks.ReentrantLock
 
 case class TaskBuilder[T, Deps <: Tuple] private (
     name: String,
@@ -203,9 +205,15 @@ case class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
 // dynamic, for each module
 case class TaskInstance(
     module: DederModule,
-    task: Task[?, ?]
+    task: Task[?, ?],
+    lock: Lock
 ) {
   def moduleId: String = module.id
 
   def id: String = s"${moduleId}.${task.name}"
+}
+
+object TaskInstance {
+  def apply(module: DederModule, task: Task[?, ?]): TaskInstance =
+    TaskInstance(module, task, new ReentrantLock())
 }
