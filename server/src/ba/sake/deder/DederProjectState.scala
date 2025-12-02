@@ -56,7 +56,7 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
       projectE match {
         case Left(errorMessage) =>
           serverNotificationsLogger.add(
-            ServerNotification.message(ServerNotification.Level.ERROR, errorMessage)
+            ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)
           )
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
 
@@ -95,7 +95,7 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
     } catch {
       case NonFatal(e) =>
         serverNotificationsLogger.add(
-          ServerNotification.message(ServerNotification.Level.ERROR, e.getMessage, Some(moduleId))
+          ServerNotification.logError(e.getMessage, Some(moduleId))
         )
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         e.printStackTrace()

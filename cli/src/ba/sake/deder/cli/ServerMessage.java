@@ -5,13 +5,19 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
 @JsonSubTypes({
-        @JsonSubTypes.Type(value = ServerMessage.PrintText.class, name = "PrintText"),
+        @JsonSubTypes.Type(value = ServerMessage.Output.class, name = "Output"),
+        @JsonSubTypes.Type(value = ServerMessage.Log.class, name = "Log"),
         @JsonSubTypes.Type(value = ServerMessage.RunSubprocess.class, name = "RunSubprocess"),
         @JsonSubTypes.Type(value = ServerMessage.Exit.class, name = "Exit"),
 })
 sealed interface ServerMessage {
 
-    record PrintText(String text, Level level) implements ServerMessage {
+    // goes to stdout
+    record Output(String text) implements ServerMessage {
+    }
+
+    // goes to stderr
+    record Log(String text, Level level) implements ServerMessage {
     }
 
     record RunSubprocess(String[] cmd) implements ServerMessage {

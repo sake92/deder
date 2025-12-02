@@ -28,17 +28,17 @@ object DependencyResolver {
 
 class DederCoursierLogger(notifications: ServerNotificationsLogger) extends coursierapi.SimpleLogger {
   override def starting(url: String): Unit =
-    notifications.add(ServerNotification.message(ServerNotification.Level.INFO, s"Download started: $url"))
+    notifications.add(ServerNotification.log(ServerNotification.Level.INFO, s"Download started: $url"))
 
   override def progress(url: String, downloaded: Long): Unit = {
     notifications.add(
-      ServerNotification.message(ServerNotification.Level.INFO, s"Downloading: $url $downloaded / 100%")
+      ServerNotification.log(ServerNotification.Level.INFO, s"Downloading: $url $downloaded / 100%")
     )
   }
 
   override def done(url: String, success: Boolean): Unit = {
     val status = if success then "completed" else "failed"
-    notifications.add(ServerNotification.message(ServerNotification.Level.INFO, s"Download $status: $url"))
+    notifications.add(ServerNotification.log(ServerNotification.Level.INFO, s"Download $status: $url"))
   }
 
 }

@@ -12,9 +12,16 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
+// TODO handle color stuff https://clig.dev/#output
+
 public class DederCliClient {
 
     private final ObjectMapper jsonMapper = new ObjectMapper();
+
+    // TODO in BSP mode it would run forever, listening to server messages -> forwarding stdout
+    // and forwarding stdin to server
+
+    // TODO the server needs to know that it's a BSP client communication
 
     public void start(String[] args) throws IOException {
         var socketPath = Path.of(".deder/server.sock");
@@ -69,10 +76,11 @@ public class DederCliClient {
                     var messageJson = messageOS.toString(StandardCharsets.UTF_8);
                     var message = jsonMapper.readValue(messageJson, ServerMessage.class);
                     switch (message) {
-                        case ServerMessage.PrintText(var text, var level) -> {
-                            if (level.ordinal() < ServerMessage.Level.DEBUG.ordinal()) {
-                                System.out.println(text);
-                            }
+                        case ServerMessage.Output(var text) -> {
+                            System.out.println(text);
+                        }
+                        case ServerMessage.Log(var text, var level) -> {
+                            System.err.println(text);
                         }
                         case ServerMessage.RunSubprocess runSubprocess -> {
                             ProcessBuilder processBuilder = new ProcessBuilder(runSubprocess.cmd());

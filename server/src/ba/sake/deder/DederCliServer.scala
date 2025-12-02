@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.ByteBuffer
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
 import ba.sake.tupson.{*, given}
+import java.nio.channels.Channels
 
 class DederCliServer(projectState: DederProjectState) {
 
@@ -101,18 +102,21 @@ class DederCliServer(projectState: DederProjectState) {
 
 enum CliClientMessage derives JsonRW {
   case Run(args: Seq[String])
+  // TODO handle BSP messages
 }
 
-// TODO add log level so that client can filter
 enum CliServerMessage derives JsonRW {
-  case PrintText(text: String, level: CliServerMessage.Level)
+  case Output(text: String)
+  case Log(text: String, level: CliServerMessage.Level)
   case RunSubprocess(cmd: Seq[String])
   case Exit(exitCode: Int)
 }
 
 object CliServerMessage {
   def fromServerNotification(sn: ServerNotification): CliServerMessage = sn match {
-    case m: ServerNotification.Message =>
+    case m: ServerNotification.Output =>
+      CliServerMessage.Output(m.text)
+    case m: ServerNotification.Log =>
       val level = m.level match {
         case ServerNotification.Level.ERROR   => Level.ERROR
         case ServerNotification.Level.WARNING => Level.WARNING
@@ -121,12 +125,16 @@ object CliServerMessage {
         case ServerNotification.Level.TRACE   => Level.TRACE
       }
       val modulePrefix = m.moduleId.map(id => s"${id}:").getOrElse("")
-      CliServerMessage.PrintText(s"[${modulePrefix}${m.level.toString.toLowerCase}] ${m.message}", level)
+      CliServerMessage.Log(s"[${modulePrefix}${m.level.toString.toLowerCase}] ${m.message}", level)
     case rs: ServerNotification.RunSubprocess =>
       CliServerMessage.RunSubprocess(rs.cmd)
     case ServerNotification.RequestFinished(success) =>
       CliServerMessage.Exit(if success then 0 else 1)
   }
+
+  // all just goes to standard output
+  //def toBspMessage(sn: ServerNotification): CliServerMessage =
+  //  CliServerMessage.Output(sn.asBspMessage)
 
   enum Level derives JsonRW:
     case ERROR, WARNING, INFO, DEBUG, TRACE

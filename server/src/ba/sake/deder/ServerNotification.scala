@@ -3,7 +3,9 @@ package ba.sake.deder
 import java.time.Instant
 
 enum ServerNotification {
-  case Message(
+  case Output(text: String)
+  
+  case Log(
       level: ServerNotification.Level,
       timestamp: Instant,
       message: String,
@@ -18,13 +20,17 @@ enum ServerNotification {
 }
 
 object ServerNotification {
-  def message(level: ServerNotification.Level, message: String, moduleId: Option[String] = None): ServerNotification =
-    ServerNotification.Message(
+  def log(level: ServerNotification.Level, message: String, moduleId: Option[String] = None): ServerNotification =
+    ServerNotification.Log(
       level,
       Instant.now(),
       message,
       moduleId
     )
+
+  def logError(message: String, moduleId: Option[String] = None): ServerNotification =
+    log(ServerNotification.Level.ERROR, message, moduleId)
+
   enum Level:
     case ERROR, WARNING, INFO, DEBUG, TRACE
 
