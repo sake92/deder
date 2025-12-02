@@ -40,6 +40,8 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
   private def refreshProjectState(): Unit = projectE.synchronized {
     val newProjectConfig = configParser.parse(configFile)
     if (newProjectConfig != projectE.map(_._1)) {
+      // TODO make sure no requests are running
+      // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)
       projectE = newProjectConfig.map { config =>
         val tasksResolver = TasksResolver(config, tasksRegistry)
         (config, tasksResolver, ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule))
