@@ -21,14 +21,16 @@ public class DederBspProxyClient {
 			System.out.println("Connected with server!");
 			Thread serverWriteThread = new Thread(() -> {
 				try {
-					serverWrite(channel, args);
+					var os = Channels.newOutputStream(channel);
+					System.in.transferTo(os);
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
 				}
 			}, "DederBspClientWriteThread");
 			Thread serverReadThread = new Thread(() -> {
 				try {
-					serverRead(channel);
+					var is = Channels.newInputStream(channel);
+					is.transferTo(System.out);
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
 				}
@@ -42,15 +44,5 @@ public class DederBspProxyClient {
 			throw new RuntimeException(e);
 		}
 	}
-
-	void serverWrite(SocketChannel channel, String[] args) throws IOException {
-		var os = Channels.newOutputStream(channel);
-		System.in.transferTo(os);
-	}
-
-	void serverRead(SocketChannel channel) throws IOException {
-        var isReader = new BufferedReader(new InputStreamReader(Channels.newInputStream(channel), StandardCharsets.UTF_8));
-        
-    }
 
 }
