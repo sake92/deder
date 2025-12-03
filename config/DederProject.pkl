@@ -9,6 +9,9 @@ abstract class DederModule {
   /// Module root directory, relative to project root
   root: String(rootValidation) = id
 
+  /// Source directories
+  sources: Listing<String> = new Listing { "src" }
+
   /// Module dependencies
   moduleDeps: Listing<DederModule>
 
@@ -26,11 +29,8 @@ abstract class DederModule {
 // TODO remove ??
 typealias ModuleType = "java" | "scala"
 
-
 class JavaModule extends DederModule {
   type: ModuleType = "java"
-  /// Source directories
-  sources: Listing<String> = new Listing { "src" }
   resources: Listing<String> = new Listing { "resources" }
   javacOptions: Listing<String> = new Listing { }
   mainClass: String? = null
@@ -40,8 +40,6 @@ class JavaModule extends DederModule {
 class ScalaModule extends DederModule {
   type: ModuleType = "scala"
   scalaVersion: String
-  /// Source directories
-  sources: Listing<String> = new Listing { "src" }
   resources: Listing<String> = new Listing { "resources" }
   javacOptions: Listing<String> = new Listing { }
   scalacOptions: Listing<String> = new Listing { }

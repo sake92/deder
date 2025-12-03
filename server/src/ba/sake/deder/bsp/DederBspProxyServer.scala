@@ -23,9 +23,9 @@ class DederBspProxyServer(projectState: DederProjectState) {
     serverChannel.bind(address)
 
     try {
-      val localServer = new DederBspServer(projectState)
       while true do {
         val clientChannel = serverChannel.accept() // TODO finally close
+        val localServer = new DederBspServer(projectState, () => clientChannel.close())
         val os = Channels.newOutputStream(clientChannel)
         val is = Channels.newInputStream(clientChannel)
         val launcher = new Launcher.Builder[BuildClient]()
@@ -34,8 +34,11 @@ class DederBspProxyServer(projectState: DederProjectState) {
           .setLocalService(localServer)
           .setRemoteInterface(classOf[BuildClient])
           .create()
-        localServer.client = launcher.getRemoteProxy()
+        localServer.client = launcher.getRemoteProxy
         launcher.startListening().get() // listen until BSP session is over
+        if (clientChannel.isOpen) {
+          clientChannel.close()
+        }
       }
     } finally {
       serverChannel.close()

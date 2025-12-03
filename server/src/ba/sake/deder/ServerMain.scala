@@ -13,7 +13,7 @@ import ba.sake.deder.cli.DederCliServer
 
   if !Properties.isJavaAtLeast(17) then throw DederException("Must run with Java 17+")
 
-  val projectRoot = os.pwd / os.SubPath(projectRootDir)
+  val projectRoot = os.pwd / os.RelPath(projectRootDir)
   System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
   acquireServerLock(projectRoot)

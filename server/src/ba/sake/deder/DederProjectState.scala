@@ -29,38 +29,40 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
   private val configParser = ConfigParser()
   private val configFile = DederGlobals.projectRootDir / "deder.pkl"
 
-  @volatile private var projectE: Either[String, (DederProject, TasksResolver, ExecutionPlanner)] = locally {
+  @volatile var projectStateData: Either[String, DederProjectStateData] = locally {
     val projectConfig = configParser.parse(configFile)
     projectConfig.map { config =>
       val tasksResolver = TasksResolver(config, tasksRegistry)
-      (config, tasksResolver, ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule))
+      val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
+      DederProjectStateData(config, tasksResolver, executionPlanner)
     }
   }
 
-  private def refreshProjectState(): Unit = projectE.synchronized {
+  private def refreshProjectState(): Unit = projectStateData.synchronized {
     val newProjectConfig = configParser.parse(configFile)
-    if (newProjectConfig != projectE.map(_._1)) {
+    if (newProjectConfig != projectStateData.map(_._1)) {
       // TODO make sure no requests are running
       // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)
-      projectE = newProjectConfig.map { config =>
+      projectStateData = newProjectConfig.map { config =>
         val tasksResolver = TasksResolver(config, tasksRegistry)
-        (config, tasksResolver, ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule))
+        val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
+        DederProjectStateData(config, tasksResolver, executionPlanner)
       }
     }
   }
 
-  def execute(moduleId: String, taskName: String, logCallback: ServerNotification => Unit): Unit =
-    val serverNotificationsLogger = ServerNotificationsLogger(logCallback)
+  def execute(moduleId: String, taskName: String, notificationCallback: ServerNotification => Unit): Unit =
+    val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
     try {
       refreshProjectState()
-      projectE match {
+      projectStateData match {
         case Left(errorMessage) =>
           serverNotificationsLogger.add(
             ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)
           )
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
 
-        case Right((projectConfig, tasksResolver, executionPlanner)) =>
+        case Right(DederProjectStateData(projectConfig, tasksResolver, executionPlanner)) =>
           val tasksExecSubgraph = executionPlanner.getExecSubgraph(moduleId, taskName)
           val tasksExecStages = executionPlanner.execStages(moduleId, taskName)
           val tasksExecutor =
@@ -101,3 +103,9 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
         e.printStackTrace()
     }
 }
+
+case class DederProjectStateData(
+    projectConfig: DederProject,
+    tasksResolver: TasksResolver,
+    executionPlanner: ExecutionPlanner
+)

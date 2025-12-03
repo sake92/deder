@@ -10,8 +10,12 @@ case class DederPath(path: os.SubPath) {
 }
 
 object DederPath {
+  def apply(relPath: String): DederPath =
+    DederPath(os.SubPath(relPath))
+
   def apply(absPath: os.Path): DederPath =
     DederPath(absPath.subRelativeTo(DederGlobals.projectRootDir))
+
   given Hashable[DederPath] with {
     def hashStr(value: DederPath): String =
       val finalPath = value.absPath
