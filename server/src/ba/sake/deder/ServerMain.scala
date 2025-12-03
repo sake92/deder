@@ -7,13 +7,12 @@ import java.util.concurrent.Executors
 import scala.util.Properties
 import scala.util.Using
 import ba.sake.deder.bsp.DederBspProxyServer
-import ba.sake.deder.cli.DederCliServer
 
 @main def serverMain(projectRootDir: String = "."): Unit = {
 
   if !Properties.isJavaAtLeast(17) then throw DederException("Must run with Java 17+")
 
-  val projectRoot = os.pwd / os.RelPath(projectRootDir)
+  val projectRoot = os.pwd / os.SubPath(projectRootDir)
   System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
   acquireServerLock(projectRoot)

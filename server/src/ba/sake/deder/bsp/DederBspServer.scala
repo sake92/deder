@@ -128,7 +128,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit) extend
         }
       )
     }
-    CompletableFuture.completedFuture(new CompileResult(StatusCode.OK))
+    val compileResult = new CompileResult(StatusCode.OK)
+    compileResult.setOriginId(params.getOriginId)
+    CompletableFuture.completedFuture(compileResult)
   }
 
   def buildTargetCleanCache(params: CleanCacheParams): CompletableFuture[CleanCacheResult] = {
@@ -210,7 +212,24 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit) extend
     capabilities.setCanRun(true)
     capabilities.setCanTest(true)
     capabilities.setCanDebug(true)
-    new BuildTarget(id, tags.asJava, languageIds.asJava, dependencies.asJava, capabilities)
+    val buildTarget = new BuildTarget(id, tags.asJava, languageIds.asJava, dependencies.asJava, capabilities)
+    buildTarget.setDisplayName(module.id)
+    buildTarget.setBaseDirectory(DederPath(module.root).absPath.toNIO.toUri.toString)
+    module match {
+      case m: DederProject.JavaModule =>
+        buildTarget.setDataKind(BuildTargetDataKind.JVM)
+        val data = new JvmBuildTarget() // TODO set path & version
+        buildTarget.setData(data)
+      case m: DederProject.ScalaModule =>
+        val binaryVersion = m.scalaVersion.split("\\.").take(2).mkString(".") // TODO extract with coursier
+        // TODO val scalaJars = List("scala-compiler.jar", "scala-reflect.jar", "scala-library.jar").asJava
+        val data =
+          new ScalaBuildTarget("org.scala-lang", m.scalaVersion, binaryVersion, ScalaPlatform.JVM, List.empty.asJava)
+        buildTarget.setData(data)
+        buildTarget.setDataKind(BuildTargetDataKind.SCALA)
+      case _ =>
+    }
+    buildTarget
   }
 
   private def buildTargetUri(module: DederModule): String =

@@ -1,23 +1,21 @@
 package ba.sake.deder.cli
 
-import java.io.{ByteArrayOutputStream, IOException}
+import java.io.*
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
-import java.nio.channels.{ServerSocketChannel, SocketChannel}
+import java.nio.channels.{Channels, ServerSocketChannel, SocketChannel}
 import java.nio.file.{Files, Path}
 import java.nio.charset.StandardCharsets
 import java.nio.ByteBuffer
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
 import ba.sake.tupson.{*, given}
-import java.nio.channels.Channels
-
 import ba.sake.deder.*
 
 class DederCliServer(projectState: DederProjectState) {
 
   def start(): Unit = {
     val socketPath = DederGlobals.projectRootDir / ".deder/server-cli.sock"
-   // println(s"Starting server with socket $socketPath")
+    // println(s"Starting server with socket $socketPath")
     os.makeDir.all(socketPath / os.up)
     Files.deleteIfExists(socketPath.toNIO)
 
@@ -30,7 +28,7 @@ class DederCliServer(projectState: DederProjectState) {
       var clientId = 0
       while true do {
         // Accept client connection (blocking)
-        println("Waiting for a client to connect...")
+        println("Waiting for a CLI client to connect...")
         val clientChannel = serverChannel.accept() // TODO finally close
         clientId += 1
         val currentClientId = clientId
@@ -56,32 +54,23 @@ class DederCliServer(projectState: DederProjectState) {
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
     // newline delimited JSON messages
-    // TODO Channels.newInputStream .. much much simpler
-    val buf = ByteBuffer.allocate(1024)
-    var messageOS = new ByteArrayOutputStream(1024)
-    while clientChannel.read(buf) != -1 do {
-      buf.flip()
-      while buf.hasRemaining do {
-        val c = buf.get()
-        if c == '\n' then {
-          val messageJson = messageOS.toString(StandardCharsets.UTF_8)
-          val message = messageJson.parseJson[CliClientMessage]
-          message match {
-            case m: CliClientMessage.Run =>
-              val logCallback: ServerNotification => Unit = sn =>
-                serverMessages.put(CliServerMessage.fromServerNotification(sn))
-              projectState.execute(m.args(0), m.args(1), logCallback)
-          }
-          messageOS = new ByteArrayOutputStream(1024)
-        } else {
-          messageOS.write(c)
-        }
+    var isReader = new BufferedReader(
+      new InputStreamReader(Channels.newInputStream(clientChannel), StandardCharsets.UTF_8)
+    )
+    var messageJson: String = null
+    println(s"Waiting for messages from client ${clientId}...")
+    while ({ messageJson = isReader.readLine(); messageJson != null }) {
+      println(s"Received message from client ${clientId}: ${messageJson}")
+      val message = messageJson.parseJson[CliClientMessage]
+      message match {
+        case m: CliClientMessage.Run =>
+          val logCallback: ServerNotification => Unit = sn =>
+            serverMessages.put(CliServerMessage.fromServerNotification(sn))
+          projectState.execute(m.args(0), m.args(1), logCallback)
       }
-      buf.clear()
     }
   }
 
-  // TODO virtual thread ??
   private def clientWrite(
       clientChannel: SocketChannel,
       clientId: Int,
@@ -91,8 +80,8 @@ class DederCliServer(projectState: DederProjectState) {
       while true do {
         // newline delimited JSON messages
         val message = serverMessages.take()
-        val buf = ByteBuffer.wrap((message.toJson + '\n').getBytes(StandardCharsets.UTF_8))
-        clientChannel.write(buf)
+        val os = Channels.newOutputStream(clientChannel)
+        os.write((message.toJson + '\n').getBytes(StandardCharsets.UTF_8))
       }
     } catch {
       case e: IOException =>
@@ -103,7 +92,6 @@ class DederCliServer(projectState: DederProjectState) {
 
 enum CliClientMessage derives JsonRW {
   case Run(args: Seq[String])
-  // TODO handle BSP messages
 }
 
 enum CliServerMessage derives JsonRW {

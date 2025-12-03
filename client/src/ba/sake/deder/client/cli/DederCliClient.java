@@ -52,13 +52,18 @@ public class DederCliClient {
 	}
 
 	void serverWrite(SocketChannel channel, String[] args) throws IOException {
-		// while (true) {
-		// newline delimited JSON messages
-		var message = new ClientMessage.Run(args);
-		var messageJson = jsonMapper.writeValueAsString(message);
-		var os = Channels.newOutputStream(channel);
-		os.write((messageJson + '\n').getBytes(StandardCharsets.UTF_8));
-		// }
+		//while (true) {
+			// newline delimited JSON messages
+			var message = new ClientMessage.Run(args);
+			var messageJson = jsonMapper.writeValueAsString(message);
+			System.out.println("Sending message to server: " + messageJson);
+			var os = Channels.newOutputStream(channel);
+			os.write((messageJson + '\n').getBytes(StandardCharsets.UTF_8));
+			try {
+				Thread.sleep(1000); // wait for server to process
+			} catch (InterruptedException e) {
+			}
+		//}
 	}
 
 	void serverRead(SocketChannel channel) throws IOException {
