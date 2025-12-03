@@ -54,12 +54,12 @@ class DederCliServer(projectState: DederProjectState) {
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
     // newline delimited JSON messages
-    var isReader = new BufferedReader(
+    var reader = new BufferedReader(
       new InputStreamReader(Channels.newInputStream(clientChannel), StandardCharsets.UTF_8)
     )
     var messageJson: String = null
     println(s"Waiting for messages from client ${clientId}...")
-    while ({ messageJson = isReader.readLine(); messageJson != null }) {
+    while ({ messageJson = reader.readLine(); println(s"oppp $messageJson"); messageJson != null }) {
       println(s"Received message from client ${clientId}: ${messageJson}")
       val message = messageJson.parseJson[CliClientMessage]
       message match {
@@ -69,6 +69,7 @@ class DederCliServer(projectState: DederProjectState) {
           projectState.execute(m.args(0), m.args(1), logCallback)
       }
     }
+    println(s"Client ${clientId} disconnected from reading thread.")
   }
 
   private def clientWrite(
@@ -77,15 +78,18 @@ class DederCliServer(projectState: DederProjectState) {
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit =
     try {
+      val os = Channels.newOutputStream(clientChannel)
       while true do {
         // newline delimited JSON messages
         val message = serverMessages.take()
-        val os = Channels.newOutputStream(clientChannel)
         os.write((message.toJson + '\n').getBytes(StandardCharsets.UTF_8))
+        os.flush()
       }
     } catch {
       case e: IOException =>
         println(s"Client ${clientId} disconnected... Bye!")
+    } finally {
+      clientChannel.close()
     }
 
 }

@@ -33,14 +33,14 @@ public class DederCliClient {
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
 				}
-			}, "DederCliClientWriteThread");
+			}, "DederCliServerWriteThread");
 			Thread serverReadThread = new Thread(() -> {
 				try {
 					serverRead(channel);
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
 				}
-			}, "DederCliClientReadThread");
+			}, "DederCliServerReadThread");
 			serverWriteThread.start();
 			serverReadThread.start();
 			serverWriteThread.join();
@@ -52,26 +52,31 @@ public class DederCliClient {
 	}
 
 	void serverWrite(SocketChannel channel, String[] args) throws IOException {
-		//while (true) {
-			// newline delimited JSON messages
-			var message = new ClientMessage.Run(args);
-			var messageJson = jsonMapper.writeValueAsString(message);
-			System.out.println("Sending message to server: " + messageJson);
-			var os = Channels.newOutputStream(channel);
-			os.write((messageJson + '\n').getBytes(StandardCharsets.UTF_8));
-			try {
-				Thread.sleep(1000); // wait for server to process
-			} catch (InterruptedException e) {
-			}
-		//}
+		// while (true) {
+		// newline delimited JSON messages
+		var message = new ClientMessage.Run(args);
+		var messageJson = jsonMapper.writeValueAsString(message);
+		System.out.println("Sending message to server: " + messageJson);
+
+		var os = Channels.newOutputStream(channel);
+		os.write((messageJson + '\n').getBytes(StandardCharsets.UTF_8));
+		os.flush();
+		System.out.println("Sent message to server: " + messageJson);
+		try {
+			Thread.sleep(1000); // wait for server to process
+		} catch (InterruptedException e) {
+		}
+		// }
+		System.out.println("serverWrite exiting...");
 	}
 
 	void serverRead(SocketChannel channel) throws IOException {
 		// newline delimited JSON messages
-		var isReader = new BufferedReader(
+		var reader = new BufferedReader(
 				new InputStreamReader(Channels.newInputStream(channel), StandardCharsets.UTF_8));
 		var messageJson = "";
-		while ((messageJson = isReader.readLine()) != null) {
+		while ((messageJson = reader.readLine()) != null) {
+			System.out.println("Received message from server: " + messageJson);
 			var message = jsonMapper.readValue(messageJson, ServerMessage.class);
 			if (message instanceof ServerMessage.Output output) {
 				System.out.println(output.text());

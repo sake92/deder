@@ -6,6 +6,7 @@ import java.nio.channels.OverlappingFileLockException
 import java.util.concurrent.Executors
 import scala.util.Properties
 import scala.util.Using
+import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
 
 @main def serverMain(projectRootDir: String = "."): Unit = {
