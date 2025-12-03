@@ -1,7 +1,5 @@
 package ba.sake.deder.cli;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.io.*;
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
@@ -10,6 +8,9 @@ import java.nio.channels.Channels;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 // TODO handle color stuff https://clig.dev/#output
 
@@ -17,14 +18,10 @@ public class DederCliClient {
 
 	private final ObjectMapper jsonMapper = new ObjectMapper();
 
-	// TODO in BSP mode it would run forever, listening to server messages ->
-	// forwarding stdout
-	// and forwarding stdin to server
-
-	// TODO the server needs to know that it's a BSP client communication
-
 	public void start(String[] args) throws IOException {
-		var socketPath = Path.of(".deder/server.sock");
+		// TODO pass in debug level
+
+		var socketPath = Path.of(".deder/server-cli.sock");
 		var address = UnixDomainSocketAddress.of(socketPath);
 		// System.out.println("Connecting to server...");
 		try (var channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
@@ -36,14 +33,14 @@ public class DederCliClient {
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
 				}
-			}, "write-to-server");
+			}, "DederCliClientWriteThread");
 			Thread serverReadThread = new Thread(() -> {
 				try {
 					serverRead(channel);
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
 				}
-			}, "read-from-server");
+			}, "DederCliClientReadThread");
 			serverWriteThread.start();
 			serverReadThread.start();
 			serverWriteThread.join();
@@ -65,33 +62,63 @@ public class DederCliClient {
 	}
 
 	void serverRead(SocketChannel channel) throws IOException {
-        // newline delimited JSON messages
-        var isReader = new BufferedReader(new InputStreamReader(Channels.newInputStream(channel), StandardCharsets.UTF_8));
-        var messageJson = "";
-        while ((messageJson = isReader.readLine()) != null) {
-            var message = jsonMapper.readValue(messageJson, ServerMessage.class);
-            switch (message) {
-                case ServerMessage.Output(var text) -> {
-                    System.out.println(text);
-                }
-                case ServerMessage.Log(var text, var level) -> {
-                    System.err.println(text);
-                }
-                case ServerMessage.RunSubprocess runSubprocess -> {
-                    ProcessBuilder processBuilder = new ProcessBuilder(runSubprocess.cmd());
-                    processBuilder.inheritIO();
-                    Process process = processBuilder.start();
-                    try {
-                        process.waitFor();
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-                case ServerMessage.Exit(int exitCode) -> {
-                    System.exit(exitCode); // TODO cleanup
-                }
-            }
-        }
-    }
+		// newline delimited JSON messages
+		var isReader = new BufferedReader(
+				new InputStreamReader(Channels.newInputStream(channel), StandardCharsets.UTF_8));
+		var messageJson = "";
+		while ((messageJson = isReader.readLine()) != null) {
+			var message = jsonMapper.readValue(messageJson, ServerMessage.class);
+			if (message instanceof ServerMessage.Output output) {
+				System.out.println(output.text());
+			} else if (message instanceof ServerMessage.Log log) {
+				System.err.println(log.text());
+			} else if (message instanceof ServerMessage.RunSubprocess runSubprocess) {
+				var processBuilder = new ProcessBuilder(runSubprocess.cmd());
+				processBuilder.inheritIO();
+				var process = processBuilder.start();
+				try {
+					process.waitFor();
+				} catch (InterruptedException e) {
+					throw new RuntimeException(e);
+				}
+			} else if (message instanceof ServerMessage.Exit exit) {
+				System.exit(exit.exitCode()); // TODO cleanup
+			}
+		}
+	}
 
+}
+
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
+@JsonSubTypes({ @JsonSubTypes.Type(value = ClientMessage.Run.class, name = "Run") })
+sealed interface ClientMessage {
+
+	record Run(String[] args) implements ClientMessage {
+	}
+}
+
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
+@JsonSubTypes({ @JsonSubTypes.Type(value = ServerMessage.Output.class, name = "Output"),
+		@JsonSubTypes.Type(value = ServerMessage.Log.class, name = "Log"),
+		@JsonSubTypes.Type(value = ServerMessage.RunSubprocess.class, name = "RunSubprocess"),
+		@JsonSubTypes.Type(value = ServerMessage.Exit.class, name = "Exit") })
+sealed interface ServerMessage {
+
+	// goes to stdout
+	record Output(String text) implements ServerMessage {
+	}
+
+	// goes to stderr
+	record Log(String text, Level level) implements ServerMessage {
+	}
+
+	record RunSubprocess(String[] cmd) implements ServerMessage {
+	}
+
+	record Exit(int exitCode) implements ServerMessage {
+	}
+
+	enum Level {
+		ERROR, WARNING, INFO, DEBUG, TRACE
+	}
 }

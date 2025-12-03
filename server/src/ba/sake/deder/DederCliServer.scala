@@ -1,7 +1,5 @@
 package ba.sake.deder
 
-import ba.sake.deder.ServerNotification.Level
-
 import java.io.{ByteArrayOutputStream, IOException}
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
@@ -16,7 +14,7 @@ import java.nio.channels.Channels
 class DederCliServer(projectState: DederProjectState) {
 
   def start(): Unit = {
-    val socketPath = DederGlobals.projectRootDir / ".deder/server.sock"
+    val socketPath = DederGlobals.projectRootDir / ".deder/server-cli.sock"
    // println(s"Starting server with socket $socketPath")
     os.makeDir.all(socketPath / os.up)
     Files.deleteIfExists(socketPath.toNIO)
@@ -132,10 +130,6 @@ object CliServerMessage {
     case ServerNotification.RequestFinished(success) =>
       CliServerMessage.Exit(if success then 0 else 1)
   }
-
-  // all just goes to standard output
-  //def toBspMessage(sn: ServerNotification): CliServerMessage =
-  //  CliServerMessage.Output(sn.asBspMessage)
 
   enum Level derives JsonRW:
     case ERROR, WARNING, INFO, DEBUG, TRACE

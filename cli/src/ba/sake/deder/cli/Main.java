@@ -6,8 +6,12 @@ public class Main {
 
 
     public static void main(String[] args) throws IOException {
-        // TODO pass in debug level
-        var client = new DederCliClient();
-        client.start(args);
+        if (args.length == 1 && args[0].equals("--bsp")) {
+            var client = new DederBspProxyClient();
+            client.start(args);
+        } else {
+            var client = new DederCliClient();
+            client.start(args);
+        }
     }
 }

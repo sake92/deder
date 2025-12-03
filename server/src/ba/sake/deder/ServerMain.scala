@@ -6,6 +6,7 @@ import java.nio.channels.OverlappingFileLockException
 import java.util.concurrent.Executors
 import scala.util.Properties
 import scala.util.Using
+import ba.sake.deder.bsp.DederBspProxyServer
 
 @main def serverMain(projectRootDir: String = "."): Unit = {
 
@@ -21,8 +22,12 @@ import scala.util.Using
 
   val cliServer = DederCliServer(projectState)
   val cliServerThread = new Thread(() => cliServer.start(), "DederCliServer")
+  val bspProxyServer = DederBspProxyServer(projectState)
+  val bspProxyServerThread = new Thread(() => bspProxyServer.start(), "DederBspProxyServer")
   cliServerThread.start()
+  bspProxyServerThread.start()
   cliServerThread.join()
+  bspProxyServerThread.join()
 }
 
 def acquireServerLock(projectRoot: os.Path): Unit = {
