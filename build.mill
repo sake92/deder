@@ -34,17 +34,17 @@ object config extends JavaModule {
   )
 }
 
-object cli extends JavaModule {
-  def finalMainClass = "ba.sake.deder.cli.Main"
+object client extends JavaModule {
+  def finalMainClass = "ba.sake.deder.client.Main"
   def javacOptions = Seq("--release", "17")
   def mvnDeps = Seq(
     mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
   )
 }
 
-object `cli-native` extends JavaModule, NativeImageModule {
-  def moduleDir = cli.moduleDir
-  def finalMainClass = "ba.sake.deder.cli.Main"
+object `client-native` extends JavaModule, NativeImageModule {
+  def moduleDir = client.moduleDir
+  def finalMainClass = "ba.sake.deder.client.Main"
   def mvnDeps = Seq(
     mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
   )

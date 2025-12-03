@@ -1,4 +1,4 @@
-package ba.sake.deder
+package ba.sake.deder.cli
 
 import java.io.{ByteArrayOutputStream, IOException}
 import java.net.StandardProtocolFamily
@@ -10,6 +10,8 @@ import java.nio.ByteBuffer
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
 import ba.sake.tupson.{*, given}
 import java.nio.channels.Channels
+
+import ba.sake.deder.*
 
 class DederCliServer(projectState: DederProjectState) {
 

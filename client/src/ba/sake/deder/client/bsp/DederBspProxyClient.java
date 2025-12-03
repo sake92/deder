@@ -1,4 +1,4 @@
-package ba.sake.deder.cli;
+package ba.sake.deder.client.bsp;
 
 import java.io.*;
 import java.net.StandardProtocolFamily;
