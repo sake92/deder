@@ -26,6 +26,8 @@ import ba.sake.deder.bsp.DederBspProxyServer
 
   val cliServer = DederCliServer(projectState)
   val cliServerThread = new Thread(() => cliServer.start(), "DederCliServer")
+
+  // TODO make BSP configurable, no need in CI for example..
   val bspProxyServer = DederBspProxyServer(projectState)
   val bspProxyServerThread = new Thread(() => bspProxyServer.start(), "DederBspProxyServer")
   cliServerThread.start()

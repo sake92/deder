@@ -29,6 +29,21 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       sources
     }
 
+  val resourcesTask = CachedTaskBuilder
+    .make[Seq[DederPath]](
+      name = "resources",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+    )
+    .build { ctx =>
+      val resources = ctx.module match {
+        case m: JavaModule  => m.resources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
+        case m: ScalaModule => m.resources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
+        case _              => ???
+      }
+      // println(s"Module: ${ctx.module.id} sources: " + sources)
+      resources
+    }
+
   val javacOptionsTask = CachedTaskBuilder
     .make[Seq[String]](
       name = "javacOptions",
@@ -243,6 +258,19 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       ) ++ ctx.transitiveResults.flatten.flatten ++ mandatoryDeps ++ dependencies).reverse.distinct.reverse
     }
 
+  val mainClassTask = TaskBuilder
+    .make[String](
+      name = "mainClass",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+    )
+    .build { ctx =>
+      ctx.module match {
+        case m: JavaModule  => m.mainClass
+        case m: ScalaModule => m.mainClass
+        case _              => ???
+      }
+    }
+
   val runTask = TaskBuilder
     .make[String](
       name = "run",
@@ -265,6 +293,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
 
   val all: Seq[Task[?, ?]] = Seq(
     sourcesTask,
+    resourcesTask,
     javacOptionsTask,
     scalacOptionsTask,
     scalaVersionTask,
@@ -274,6 +303,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     compileClasspathTask,
     compileTask,
     runClasspathTask,
+    mainClassTask,
     runTask
   )
 

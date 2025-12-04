@@ -35,12 +35,13 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
   // used for BSP to keep last known good state
   @volatile var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
 
-  def refreshProjectState(): Unit = current.synchronized {
+  def refreshProjectState(onError : String => Unit): Unit = current.synchronized {
     // TODO make sure no requests are running
     // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)
     val newProjectConfig = configParser.parse(configFile)
     newProjectConfig match {
       case Left(errorMessage) =>
+        onError(errorMessage)
         current = Left(errorMessage)
       case Right(newConfig) =>
         val tasksResolver = TasksResolver(newConfig, tasksRegistry)
@@ -55,21 +56,20 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
   def executeTask[T](
       moduleId: String,
       task: Task[T, ?],
-      notificationCallback: ServerNotification => Unit
+      notificationCallback: ServerNotification => Unit, useLastGood: Boolean = false
   ): T =
-    execute(moduleId, task.name, notificationCallback).asInstanceOf[T]
+    execute(moduleId, task.name, notificationCallback, useLastGood).asInstanceOf[T]
 
   // used mostly by CLI
   def execute(moduleId: String, taskName: String, notificationCallback: ServerNotification => Unit, useLastGood: Boolean = false): Any =
     val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
     try {
-      refreshProjectState()
+      refreshProjectState(errorMessage => serverNotificationsLogger.add(
+        ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)
+      ))
       val state = if useLastGood then lastGood else current
       state match {
         case Left(errorMessage) =>
-          serverNotificationsLogger.add(
-            ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)
-          )
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
           throw TaskEvaluationException(s"Project state is invalid during task execution: ${errorMessage}")
 

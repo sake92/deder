@@ -8,7 +8,6 @@ import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
 
-// TODO refactor all to use task evaluation api
 class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     extends BuildServer,
       JavaBuildServer,
@@ -24,17 +23,17 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     // capabilities.setTestProvider()
     // capabilities.setRunProvider()
     // capabilities.setDebugProvider()
-    capabilities.setDependencySourcesProvider(false)
-    capabilities.setDependencyModulesProvider(false)
     capabilities.setCanReload(true)
     capabilities.setBuildTargetChangedProvider(true)
     capabilities.setJvmCompileClasspathProvider(true)
     capabilities.setJvmRunEnvironmentProvider(true)
     capabilities.setJvmTestEnvironmentProvider(true)
     capabilities.setOutputPathsProvider(true)
+    // unsupported for now
+    capabilities.setDependencySourcesProvider(false)
+    capabilities.setDependencyModulesProvider(false)
     capabilities.setInverseSourcesProvider(false)
 
-    // TODO capabilities.setTestProvider(new TestProvider(List("java", "scala").asJava))
     val result = new InitializeBuildResult(
       "deder-bsp",
       "0.0.1",
@@ -45,15 +44,12 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   def onBuildInitialized(): Unit = {
-    // println(s"BSP onBuildInitialized called")
     // TODO maybe trigger compilation immediately?
   }
 
   def workspaceBuildTargets(): CompletableFuture[WorkspaceBuildTargetsResult] = {
-    //println("BSP workspaceBuildTargets called")
     val buildTargets = projectState.lastGood match {
       case Left(errorMessage) =>
-        client.onBuildLogMessage(new LogMessageParams(MessageType.ERROR, errorMessage))
         List.empty
       case Right(projectStateData) =>
         projectStateData.projectConfig.modules.asScala.map(m => buildTarget(m, projectStateData)).toList
@@ -63,108 +59,120 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   def buildTargetSources(params: SourcesParams): CompletableFuture[SourcesResult] = {
-    println(s"BSP buildTargetSources called ${params}")
     val sourcesItems = params.getTargets.asScala.flatMap { targetId =>
       val moduleId = targetId.getUri.split("#").last
       projectState.lastGood match {
         case Left(errorMessage) =>
-          println(s"Cannot provide sources for target $moduleId: $errorMessage")
           List.empty
         case Right(projectStateData) =>
+          val coreTasks = projectStateData.tasksRegistry.coreTasks
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
-          module.sources.asScala.map { srcDir =>
-            val srcDirPath = DederPath(s"${module.root}/${srcDir}").absPath
-            val sourceItems =
-              if os.exists(srcDirPath) then
-                os.walk(srcDirPath).map { srcFile =>
-                  new SourceItem(
-                    srcFile.toNIO.toUri.toString,
-                    if (os.isDir(srcFile)) SourceItemKind.DIRECTORY else SourceItemKind.FILE,
-                    false // generated
-                  )
-                }
-              else List.empty
-            val sourcesItem = SourcesItem(targetId, sourceItems.asJava)
-            sourcesItem.setRoots(List(srcDirPath.toNIO.toUri.toString).asJava)
-            sourcesItem
-          }.toList
+          module match {
+            case _: DederProject.JavaModule | _: DederProject.ScalaModule =>
+              val sourceDirs =
+                projectState.executeTask(moduleId, coreTasks.sourcesTask, notifyClient, useLastGood = true)
+              sourceDirs.map { srcDir =>
+                val srcDirPath = srcDir.absPath
+                val sourceItems =
+                  if os.exists(srcDirPath) then
+                    os.walk(srcDirPath).map { srcFile =>
+                      new SourceItem(
+                        srcFile.toNIO.toUri.toString,
+                        if (os.isDir(srcFile)) SourceItemKind.DIRECTORY else SourceItemKind.FILE,
+                        false // generated
+                      )
+                    }
+                  else List.empty
+                val sourcesItem = SourcesItem(targetId, sourceItems.asJava)
+                sourcesItem.setRoots(List(srcDirPath.toNIO.toUri.toString).asJava)
+                sourcesItem
+              }
+            case _ => List.empty
+          }
       }
     }
-    // println(s"Returning sources items for ${params.getTargets()}: ${sourcesItems} ")
     CompletableFuture.completedFuture(new SourcesResult(sourcesItems.asJava))
   }
 
   def buildTargetResources(params: ResourcesParams): CompletableFuture[ResourcesResult] = {
-    println(s"BSP buildTargetResources called ${params}")
-    val resourcesItems = params.getTargets.asScala.map { targetId =>
+    val resourcesItems = params.getTargets.asScala.flatMap { targetId =>
       val moduleId = targetId.getUri.split("#").last
       projectState.lastGood match {
         case Left(value) =>
-          println(s"Project in bad state: $value")
-          ResourcesItem(targetId, List.empty.asJava)
+          List.empty
         case Right(projectStateData) =>
+          val coreTasks = projectStateData.tasksRegistry.coreTasks
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
-          val resourceDirs = module match {
-            case m: DederProject.JavaModule  => m.resources.asScala
-            case m: DederProject.ScalaModule => m.resources.asScala
-            case _                           => List.empty
-          }
-          val resourceUrls = resourceDirs.flatMap { resourceDir =>
-            val resourceDirPath = DederPath(s"${module.root}/${resourceDir}").absPath
-            if os.exists(resourceDirPath) then
-              os.walk(resourceDirPath).map { resourceFile =>
-                resourceFile.toNIO.toUri.toString
+          module match {
+            case _: DederProject.JavaModule | _: DederProject.ScalaModule =>
+              val resourceDirs =
+                projectState.executeTask(moduleId, coreTasks.resourcesTask, notifyClient, useLastGood = true)
+              resourceDirs.map { srcDir =>
+                val srcDirPath = srcDir.absPath
+                val sourceItems =
+                  if os.exists(srcDirPath) then
+                    os.walk(srcDirPath).map { resourceFile =>
+                      resourceFile.toNIO.toUri.toString
+                    }
+                  else List.empty
+                ResourcesItem(targetId, sourceItems.asJava)
               }
-            else List.empty
+            case _ => List.empty
           }
-          ResourcesItem(targetId, resourceUrls.asJava)
       }
     }
     CompletableFuture.completedFuture(new ResourcesResult(resourcesItems.asJava))
   }
 
   def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] = {
-    println(s"BSP buildTargetCompile called ${params}")
     val targetIds = params.getTargets.asScala.map(_.getUri).toList
+    var allCompileSucceeded = true
     targetIds.foreach { targetId =>
-      println(s"Compiling target $targetId")
-      projectState.execute(
-        targetId.split("#").last,
-        "compile",
-        notification => {
-          println(notification)
-        }
-      )
+      projectState.lastGood match {
+        case Left(errorMessage) => allCompileSucceeded = false
+        case Right(projectStateData) =>
+          val coreTasks = projectStateData.tasksRegistry.coreTasks
+          params.getTargets().asScala.foreach { targetId =>
+            val moduleId = targetId.getUri.split("#").last
+            val module = projectStateData.tasksResolver.modulesMap(moduleId)
+            try {
+              projectState.executeTask(moduleId, coreTasks.compileTask, notifyClient, useLastGood = true)
+            } catch {
+              case e: TaskEvaluationException =>
+                allCompileSucceeded = false
+            }
+          }
+      }
     }
-    val compileResult = new CompileResult(StatusCode.OK)
+    val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
+    val compileResult = new CompileResult(status)
     compileResult.setOriginId(params.getOriginId)
     CompletableFuture.completedFuture(compileResult)
   }
 
   def buildTargetCleanCache(params: CleanCacheParams): CompletableFuture[CleanCacheResult] = {
-    println(s"BSP buildTargetCleanCache called ${params}")
+
+    // TODO remove "classes" folder for each target
     CompletableFuture.completedFuture(CleanCacheResult(true))
   }
 
-  // sources of build target dependencies that are external to the workspace
-  // hmm, so coursier source jars?
   def buildTargetDependencySources(params: DependencySourcesParams): CompletableFuture[DependencySourcesResult] = {
-    println(s"BSP buildTargetDependencySources called ${params}")
+    // sources of build target dependencies that are external to the workspace
+    // hmm, so coursier source jars?
     ???
   }
 
   def buildTargetDependencyModules(params: DependencyModulesParams): CompletableFuture[DependencyModulesResult] = {
-    println(s"BSP buildTargetDependencyModules called ${params}")
+    // TODO list of dependencies(maven)
     ???
   }
 
   def buildTargetInverseSources(params: InverseSourcesParams): CompletableFuture[InverseSourcesResult] = {
-    println(s"BSP buildTargetInverseSources called ${params}")
+    // TODO return if a file belongs to target(s), just peek in file path..
     ???
   }
 
   def buildTargetOutputPaths(params: OutputPathsParams): CompletableFuture[OutputPathsResult] = {
-    println(s"BSP buildTargetOutputPaths called ${params}")
     val excludedDirNames = Seq(".deder", ".bsp", ".metals", ".idea", ".vscode")
     val outputPathsItems = for {
       dirName <- excludedDirNames
@@ -175,10 +183,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   def buildTargetJavacOptions(params: JavacOptionsParams): CompletableFuture[JavacOptionsResult] = {
-    println(s"BSP buildTargetJavacOptions called ${params}")
     val javacOptionsItems = projectState.lastGood match {
       case Left(errorMessage) =>
-        println(s"Cannot provide javac options: $errorMessage")
         List.empty
       case Right(projectStateData) =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
@@ -187,13 +193,18 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           module match {
             case _: DederProject.JavaModule | _: DederProject.ScalaModule =>
-              val javacOptions = projectState.executeTask(moduleId, coreTasks.javacOptionsTask, n => {})
+              val javacOptions =
+                projectState.executeTask(moduleId, coreTasks.javacOptionsTask, notifyClient, useLastGood = true)
               val compileClasspath = projectState
-                .executeTask(moduleId, coreTasks.compileClasspathTask, n => {})
+                .executeTask(moduleId, coreTasks.compileClasspathTask, notifyClient, useLastGood = true)
                 .map { cpEntry => cpEntry.toNIO.toUri.toString }
                 .toList
               val classesDir =
-                projectState.executeTask(moduleId, coreTasks.classesDirTask, n => {}).toNIO.toUri.toString
+                projectState
+                  .executeTask(moduleId, coreTasks.classesDirTask, notifyClient, useLastGood = true)
+                  .toNIO
+                  .toUri
+                  .toString
               val javacOptionsItem =
                 JavacOptionsItem(targetId, javacOptions.asJava, compileClasspath.asJava, classesDir)
               List(javacOptionsItem)
@@ -206,20 +217,36 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   def buildTargetScalaMainClasses(params: ScalaMainClassesParams): CompletableFuture[ScalaMainClassesResult] = {
-    println(s"BSP buildTargetScalaMainClasses called ${params}")
-    CompletableFuture.completedFuture(ScalaMainClassesResult(List.empty.asJava))
+    val items = projectState.lastGood match {
+      case Left(errorMessage) =>
+        List.empty
+      case Right(projectStateData) =>
+        val coreTasks = projectStateData.tasksRegistry.coreTasks
+        params.getTargets().asScala.map { targetId =>
+          val moduleId = targetId.getUri.split("#").last
+          val module = projectStateData.tasksResolver.modulesMap(moduleId)
+          module match {
+            case _: DederProject.JavaModule | _: DederProject.ScalaModule =>
+              val mainClass =
+                projectState.executeTask(moduleId, coreTasks.mainClassTask, notifyClient, useLastGood = true)
+              val item = ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
+              // TODO arguments + JVM opts
+              ScalaMainClassesItem(targetId, List(item).asJava)
+          }
+        }
+    }
+    val result = ScalaMainClassesResult(items.asJava)
+    result.setOriginId(params.getOriginId)
+    CompletableFuture.completedFuture(result)
   }
 
   def buildTargetScalaTestClasses(params: ScalaTestClassesParams): CompletableFuture[ScalaTestClassesResult] = {
-    println(s"BSP buildTargetScalaTestClasses called ${params}")
     CompletableFuture.completedFuture(ScalaTestClassesResult(List.empty.asJava))
   }
 
   def buildTargetScalacOptions(params: ScalacOptionsParams): CompletableFuture[ScalacOptionsResult] = {
-    println(s"BSP buildTargetScalacOptions called ${params}")
     val scalacOptionsItems = projectState.lastGood match {
       case Left(errorMessage) =>
-        println(s"Cannot provide scalac options: $errorMessage")
         List.empty
       case Right(projectStateData) =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
@@ -228,13 +255,18 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           module match {
             case _: DederProject.JavaModule | _: DederProject.ScalaModule =>
-              val scalacOptions = projectState.executeTask(moduleId, coreTasks.scalacOptionsTask, n => {})
+              val scalacOptions =
+                projectState.executeTask(moduleId, coreTasks.scalacOptionsTask, notifyClient, useLastGood = true)
               val compileClasspath = projectState
-                .executeTask(moduleId, coreTasks.compileClasspathTask, n => {})
+                .executeTask(moduleId, coreTasks.compileClasspathTask, notifyClient, useLastGood = true)
                 .map { cpEntry => cpEntry.toNIO.toUri.toString }
                 .toList
               val classesDir =
-                projectState.executeTask(moduleId, coreTasks.classesDirTask, n => {}).toNIO.toUri.toString
+                projectState
+                  .executeTask(moduleId, coreTasks.classesDirTask, notifyClient, useLastGood = true)
+                  .toNIO
+                  .toUri
+                  .toString
               val scalacOptionsItem =
                 ScalacOptionsItem(targetId, scalacOptions.asJava, compileClasspath.asJava, classesDir)
               List(scalacOptionsItem)
@@ -262,7 +294,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   def workspaceReload(): CompletableFuture[Object] = {
-    projectState.refreshProjectState()
+    projectState.refreshProjectState(m => client.onBuildLogMessage(new LogMessageParams(MessageType.ERROR, m)))
     CompletableFuture.completedFuture(().asInstanceOf[Object])
   }
 
@@ -315,4 +347,24 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   private def buildTargetUri(module: DederModule): String =
     DederPath(module.root).absPath.toNIO.toUri.toString + "#" + module.id
 
+  private val notifyClient = (n: ServerNotification) =>
+    n match {
+      case n: ServerNotification.Log =>
+        // dont spam the client with debug/trace messages..
+        if n.level.ordinal <= ServerNotification.Level.INFO.ordinal then client.onBuildLogMessage(toBspLogMessage(n))
+      case n: ServerNotification.RequestFinished =>
+      // do nothing
+      case _ => // ignore other notifications for now
+    }
+
+  private def toBspLogMessage(n: ServerNotification.Log): LogMessageParams = {
+    val level = n.level match {
+      case ServerNotification.Level.ERROR   => MessageType.ERROR
+      case ServerNotification.Level.WARNING => MessageType.WARNING
+      case ServerNotification.Level.INFO    => MessageType.INFO
+      case ServerNotification.Level.DEBUG   => MessageType.LOG
+      case ServerNotification.Level.TRACE   => MessageType.LOG
+    }
+    new LogMessageParams(level, n.message)
+  }
 }
