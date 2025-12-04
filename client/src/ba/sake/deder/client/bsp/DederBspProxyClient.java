@@ -31,7 +31,7 @@ public class DederBspProxyClient {
 					throw new UncheckedIOException(e);
 				}
 				log(logFile, "Client input stream ended, closing server write stream.");
-			}, "DederBspClientWriteThread");
+			}, "DederBspServerWriteThread");
 			Thread serverReadThread = new Thread(() -> {
 				try {
 					var is = Channels.newInputStream(channel);
@@ -41,7 +41,7 @@ public class DederBspProxyClient {
 					throw new UncheckedIOException(e);
 				}
 				log(logFile, "Server output stream ended, closing client read stream.");
-			}, "DederBspClientReadThread");
+			}, "DederBspServerReadThread");
 			serverWriteThread.start();
 			serverReadThread.start();
 			serverReadThread.join();

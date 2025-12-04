@@ -8,6 +8,7 @@ import java.nio.file.{Files, Path}
 import java.nio.charset.StandardCharsets
 import java.nio.ByteBuffer
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
+import scala.util.control.NonFatal
 import ba.sake.tupson.{*, given}
 import ba.sake.deder.*
 
@@ -29,20 +30,27 @@ class DederCliServer(projectState: DederProjectState) {
       while true do {
         // Accept client connection (blocking)
         println("Waiting for a CLI client to connect...")
-        val clientChannel = serverChannel.accept() // TODO finally close
+        val clientChannel = serverChannel.accept() // TODO if null
         clientId += 1
         val currentClientId = clientId
         println(s"Client #$currentClientId connected")
         val serverMessages = new LinkedBlockingQueue[CliServerMessage]()
-        val clientReadThread = new Thread(() => clientRead(clientChannel, currentClientId, serverMessages))
-        val clientWriteThread = new Thread(() => clientWrite(clientChannel, currentClientId, serverMessages))
-        clientReadThread.start()
+        val clientReadThread = new Thread(
+          () => clientRead(clientChannel, currentClientId, serverMessages),
+          s"ClientReadThread-$currentClientId"
+        )
+        val clientWriteThread = new Thread(
+          () => clientWrite(clientChannel, currentClientId, serverMessages),
+          s"ClientWriteThread-$currentClientId"
+        )
         clientWriteThread.start()
+        clientReadThread.start()
+        // no join, just let them run
       }
     } finally {
+      println("Shutting down CLI server...")
       serverChannel.close()
       Files.deleteIfExists(socketPath.toNIO)
-      println("Server shut down")
     }
   }
 
@@ -53,23 +61,17 @@ class DederCliServer(projectState: DederProjectState) {
       clientId: Int,
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
-    // newline delimited JSON messages
-    var reader = new BufferedReader(
-      new InputStreamReader(Channels.newInputStream(clientChannel), StandardCharsets.UTF_8)
-    )
-    var messageJson: String = null
-    println(s"Waiting for messages from client ${clientId}...")
-    while ({ messageJson = reader.readLine(); println(s"oppp $messageJson"); messageJson != null }) {
-      println(s"Received message from client ${clientId}: ${messageJson}")
-      val message = messageJson.parseJson[CliClientMessage]
-      message match {
-        case m: CliClientMessage.Run =>
-          val logCallback: ServerNotification => Unit = sn =>
-            serverMessages.put(CliServerMessage.fromServerNotification(sn))
-          projectState.execute(m.args(0), m.args(1), logCallback)
-      }
+    // newline delimited JSON messages, only one for now..
+    var reader =
+      new BufferedReader(new InputStreamReader(Channels.newInputStream(clientChannel), StandardCharsets.UTF_8), 1)
+    var messageJson: String = reader.readLine()
+    val message = messageJson.parseJson[CliClientMessage]
+    message match {
+      case m: CliClientMessage.Run =>
+        val logCallback: ServerNotification => Unit = sn =>
+          serverMessages.put(CliServerMessage.fromServerNotification(sn))
+        projectState.execute(m.args(0), m.args(1), logCallback)
     }
-    println(s"Client ${clientId} disconnected from reading thread.")
   }
 
   private def clientWrite(
@@ -83,7 +85,6 @@ class DederCliServer(projectState: DederProjectState) {
         // newline delimited JSON messages
         val message = serverMessages.take()
         os.write((message.toJson + '\n').getBytes(StandardCharsets.UTF_8))
-        os.flush()
       }
     } catch {
       case e: IOException =>

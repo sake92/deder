@@ -11,7 +11,8 @@ import ba.sake.deder.bsp.DederBspProxyServer
 
 @main def serverMain(projectRootDir: String = "."): Unit = {
 
-  if !Properties.isJavaAtLeast(17) then throw DederException("Must run with Java 17+")
+  // 21 because unix sockets locking bug, i'd have to use bytebuffers for 17 and 18.. meh
+  if !Properties.isJavaAtLeast(21) then throw DederException("Must run with Java 21+")
 
   val projectRoot = os.pwd / os.SubPath(projectRootDir)
   System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)

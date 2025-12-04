@@ -36,7 +36,6 @@ object config extends JavaModule {
 
 object client extends JavaModule {
   def finalMainClass = "ba.sake.deder.client.Main"
-  def javacOptions = Seq("--release", "17")
   def mvnDeps = Seq(
     mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
   )
