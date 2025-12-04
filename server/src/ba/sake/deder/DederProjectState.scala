@@ -2,6 +2,7 @@ package ba.sake.deder
 
 import java.util.concurrent.ExecutorService
 import scala.util.control.NonFatal
+import scala.compiletime.uninitialized
 import scala.jdk.CollectionConverters.*
 import dependency.ScalaParameters
 import dependency.parser.DependencyParser
@@ -29,26 +30,25 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
   private val configParser = ConfigParser()
   private val configFile = DederGlobals.projectRootDir / "deder.pkl"
 
-  // TODO maybe just use exception..
-  @volatile var projectStateData: Either[String, DederProjectStateData] = locally {
-    val projectConfig = configParser.parse(configFile)
-    projectConfig.map { config =>
-      val tasksResolver = TasksResolver(config, tasksRegistry)
-      val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
-      DederProjectStateData(config, tasksRegistry, tasksResolver, executionPlanner)
-    }
-  }
+  @volatile var current: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
 
-  private def refreshProjectState(): Unit = projectStateData.synchronized {
+  // used for BSP to keep last known good state
+  @volatile var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
+
+  def refreshProjectState(): Unit = current.synchronized {
+    // TODO make sure no requests are running
+    // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)
     val newProjectConfig = configParser.parse(configFile)
-    if (newProjectConfig != projectStateData.map(_._1)) {
-      // TODO make sure no requests are running
-      // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)
-      projectStateData = newProjectConfig.map { config =>
-        val tasksResolver = TasksResolver(config, tasksRegistry)
+    newProjectConfig match {
+      case Left(errorMessage) =>
+        current = Left(errorMessage)
+      case Right(newConfig) =>
+        val tasksResolver = TasksResolver(newConfig, tasksRegistry)
         val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
-        DederProjectStateData(config, tasksRegistry, tasksResolver, executionPlanner)
-      }
+        val goodProjectStateData =
+          DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner)
+        lastGood = Right(goodProjectStateData)
+        current = Right(goodProjectStateData)
     }
   }
 
@@ -60,11 +60,12 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
     execute(moduleId, task.name, notificationCallback).asInstanceOf[T]
 
   // used mostly by CLI
-  def execute(moduleId: String, taskName: String, notificationCallback: ServerNotification => Unit): Any =
+  def execute(moduleId: String, taskName: String, notificationCallback: ServerNotification => Unit, useLastGood: Boolean = false): Any =
     val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
     try {
       refreshProjectState()
-      projectStateData match {
+      val state = if useLastGood then lastGood else current
+      state match {
         case Left(errorMessage) =>
           serverNotificationsLogger.add(
             ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)

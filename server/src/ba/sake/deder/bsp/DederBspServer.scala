@@ -8,6 +8,7 @@ import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
 
+// TODO refactor all to use task evaluation api
 class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     extends BuildServer,
       JavaBuildServer,
@@ -18,16 +19,20 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   def buildInitialize(params: InitializeBuildParams): CompletableFuture[InitializeBuildResult] = {
     println(s"BSP buildInitialize called ${params}")
     val capabilities = new BuildServerCapabilities()
+    capabilities.setResourcesProvider(true)
+    capabilities.setCompileProvider(new CompileProvider(List("java", "scala").asJava))
+    // capabilities.setTestProvider()
+    // capabilities.setRunProvider()
+    // capabilities.setDebugProvider()
+    capabilities.setDependencySourcesProvider(false)
+    capabilities.setDependencyModulesProvider(false)
     capabilities.setCanReload(true)
     capabilities.setBuildTargetChangedProvider(true)
     capabilities.setJvmCompileClasspathProvider(true)
-    capabilities.setCompileProvider(new CompileProvider(List("java", "scala").asJava))
-    capabilities.setResourcesProvider(true)
-    capabilities.setOutputPathsProvider(true)
     capabilities.setJvmRunEnvironmentProvider(true)
-    // capabilities.setRunProvider()
     capabilities.setJvmTestEnvironmentProvider(true)
-    // capabilities.setTestProvider()
+    capabilities.setOutputPathsProvider(true)
+    capabilities.setInverseSourcesProvider(false)
 
     // TODO capabilities.setTestProvider(new TestProvider(List("java", "scala").asJava))
     val result = new InitializeBuildResult(
@@ -40,19 +45,19 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   def onBuildInitialized(): Unit = {
-    println(s"BSP onBuildInitialized called")
+    // println(s"BSP onBuildInitialized called")
+    // TODO maybe trigger compilation immediately?
   }
 
   def workspaceBuildTargets(): CompletableFuture[WorkspaceBuildTargetsResult] = {
-    println("BSP workspaceBuildTargets called")
-    val buildTargets = projectState.projectStateData match {
+    //println("BSP workspaceBuildTargets called")
+    val buildTargets = projectState.lastGood match {
       case Left(errorMessage) =>
-        println(s"Cannot provide build targets: $errorMessage")
+        client.onBuildLogMessage(new LogMessageParams(MessageType.ERROR, errorMessage))
         List.empty
       case Right(projectStateData) =>
         projectStateData.projectConfig.modules.asScala.map(m => buildTarget(m, projectStateData)).toList
     }
-    // println(s"Returning build targets: ${buildTargets} ")
     val result = new WorkspaceBuildTargetsResult(buildTargets.asJava)
     CompletableFuture.completedFuture(result)
   }
@@ -61,7 +66,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     println(s"BSP buildTargetSources called ${params}")
     val sourcesItems = params.getTargets.asScala.flatMap { targetId =>
       val moduleId = targetId.getUri.split("#").last
-      projectState.projectStateData match {
+      projectState.lastGood match {
         case Left(errorMessage) =>
           println(s"Cannot provide sources for target $moduleId: $errorMessage")
           List.empty
@@ -93,7 +98,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     println(s"BSP buildTargetResources called ${params}")
     val resourcesItems = params.getTargets.asScala.map { targetId =>
       val moduleId = targetId.getUri.split("#").last
-      projectState.projectStateData match {
+      projectState.lastGood match {
         case Left(value) =>
           println(s"Project in bad state: $value")
           ResourcesItem(targetId, List.empty.asJava)
@@ -141,6 +146,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.completedFuture(CleanCacheResult(true))
   }
 
+  // sources of build target dependencies that are external to the workspace
+  // hmm, so coursier source jars?
   def buildTargetDependencySources(params: DependencySourcesParams): CompletableFuture[DependencySourcesResult] = {
     println(s"BSP buildTargetDependencySources called ${params}")
     ???
@@ -169,7 +176,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   def buildTargetJavacOptions(params: JavacOptionsParams): CompletableFuture[JavacOptionsResult] = {
     println(s"BSP buildTargetJavacOptions called ${params}")
-    val javacOptionsItems = projectState.projectStateData match {
+    val javacOptionsItems = projectState.lastGood match {
       case Left(errorMessage) =>
         println(s"Cannot provide javac options: $errorMessage")
         List.empty
@@ -210,7 +217,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   def buildTargetScalacOptions(params: ScalacOptionsParams): CompletableFuture[ScalacOptionsResult] = {
     println(s"BSP buildTargetScalacOptions called ${params}")
-    val scalacOptionsItems = projectState.projectStateData match {
+    val scalacOptionsItems = projectState.lastGood match {
       case Left(errorMessage) =>
         println(s"Cannot provide scalac options: $errorMessage")
         List.empty
@@ -254,24 +261,22 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     ???
   }
 
-  def buildShutdown(): CompletableFuture[Object] = {
-    println(s"BSP buildShutdown called")
-    CompletableFuture.completedFuture(null.asInstanceOf[Object])
-  }
-
-  def onBuildExit(): Unit = {
-    println(s"BSP onBuildExit called")
-    onExit()
-  }
-
   def workspaceReload(): CompletableFuture[Object] = {
-    println(s"BSP workspaceReload called")
+    projectState.refreshProjectState()
     CompletableFuture.completedFuture(().asInstanceOf[Object])
   }
 
   def onRunReadStdin(params: ReadParams): Unit = {
     println(s"BSP onRunReadStdin called ${params}")
   }
+
+  def buildShutdown(): CompletableFuture[Object] = {
+    // dont care, this is a long running server
+    CompletableFuture.completedFuture(null.asInstanceOf[Object])
+  }
+
+  def onBuildExit(): Unit =
+    onExit() // just closes the unix socket connection
 
   private def buildTarget(module: DederModule, projectStateData: DederProjectStateData): BuildTarget = {
     val id = new BuildTargetIdentifier(buildTargetUri(module))

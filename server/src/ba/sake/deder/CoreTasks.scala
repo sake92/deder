@@ -92,11 +92,11 @@ class CoreTasks(zincCompiler: ZincCompiler) {
 
   val classesDirTask = TaskBuilder
     .make[os.Path](
-      name = "classesDir",
+      name = "classes",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
     .build { ctx =>
-      ctx.out / "classes"
+      ctx.out
     }
 
   val transitiveClassesDirTask = TaskBuilder
