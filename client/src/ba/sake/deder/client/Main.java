@@ -13,11 +13,17 @@ public class Main {
 			client.start(args);
 		} else {
 			var logLevel = ServerMessage.LogLevel.INFO;
+			String[] adaptedArgs;
 			if (args.length > 0 && args[0].equals("--log-level")) {
 				logLevel = ServerMessage.LogLevel.valueOf(args[1].toUpperCase());
+				adaptedArgs = new String[args.length - 2];
+				System.arraycopy(args, 2, adaptedArgs, 0, args.length - 2);
+			} else {
+				adaptedArgs = new String[args.length];
+				System.arraycopy(args, 0, adaptedArgs, 0, args.length);
 			}
 			var client = new DederCliClient(logLevel);
-			client.start(args);
+			client.start(adaptedArgs);
 		}
 	}
 }

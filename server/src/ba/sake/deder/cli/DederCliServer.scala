@@ -16,7 +16,6 @@ class DederCliServer(projectState: DederProjectState) {
 
   def start(): Unit = {
     val socketPath = DederGlobals.projectRootDir / ".deder/server-cli.sock"
-    // println(s"Starting server with socket $socketPath")
     os.makeDir.all(socketPath / os.up)
     Files.deleteIfExists(socketPath.toNIO)
 
@@ -29,7 +28,6 @@ class DederCliServer(projectState: DederProjectState) {
       var clientId = 0
       while true do {
         // Accept client connection (blocking)
-        println("Waiting for a CLI client to connect...")
         val clientChannel = serverChannel.accept() // TODO if null
         clientId += 1
         val currentClientId = clientId

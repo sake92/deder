@@ -36,10 +36,8 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
 
   def compile(
       scalaVersion: String,
-      scalaCompilerJar: os.Path,
-      scalaLibraryJars: Seq[os.Path],
-      scalaReflectJar: Option[os.Path],
-      additionalCompileClasspath: Seq[os.Path],
+      compilerJars: Seq[os.Path], // compiler + reflect
+      compileClasspath: Seq[os.Path],
       zincCacheFile: os.Path,
       sources: Seq[os.Path],
       classesDir: os.Path,
@@ -49,6 +47,9 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
   ): Unit = {
 
     val classloader = this.getClass.getClassLoader
+    val scalaLibraryJars = compileClasspath.filter { p =>
+      (p.last.startsWith("scala-library-") || p.last.startsWith("scala3-library-")) && p.last.endsWith(".jar")
+    }
 
     val scalaInstance = new ScalaInstance(
       version = scalaVersion,
@@ -56,8 +57,8 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       loaderCompilerOnly = classloader,
       loaderLibraryOnly = classloader,
       libraryJars = scalaLibraryJars.map(_.toIO).toArray,
-      compilerJars = (Array(scalaCompilerJar) ++ scalaReflectJar).map(_.toIO),
-      allJars = (Array(scalaCompilerJar) ++ scalaLibraryJars ++ scalaReflectJar).map(_.toIO),
+      compilerJars = compilerJars.map(_.toIO).toArray,
+      allJars = (compilerJars ++ scalaLibraryJars).map(_.toIO).toArray,
       explicitActual = Some(scalaVersion)
     )
 
@@ -68,7 +69,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     val converter = PlainVirtualFileConverter.converter
 
     val sourcesVFs = sources.map(s => converter.toVirtualFile(s.toNIO)).toArray
-    val classpath = (scalaLibraryJars ++ additionalCompileClasspath).map(f => converter.toVirtualFile(f.toNIO)).toArray
+    val classpath = compileClasspath.map(f => converter.toVirtualFile(f.toNIO)).toArray
 
     val compileOptions = CompileOptions.of(
       /*_classpath =*/ classpath,

@@ -11,10 +11,12 @@ import ba.sake.deder.bsp.DederBspProxyServer
 
 @main def serverMain(projectRootDir: String = "."): Unit = {
 
+  println(s"Deder server starting for project root dir: $projectRootDir")
+
   // 21 because unix sockets locking bug, i'd have to use bytebuffers for 17 and 18.. meh
   if !Properties.isJavaAtLeast(21) then throw DederException("Must run with Java 21+")
 
-  val projectRoot = os.pwd / os.SubPath(projectRootDir)
+  val projectRoot = os.pwd / os.RelPath(projectRootDir)
   System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
   acquireServerLock(projectRoot)
@@ -28,6 +30,9 @@ import ba.sake.deder.bsp.DederBspProxyServer
   val bspProxyServerThread = new Thread(() => bspProxyServer.start(), "DederBspProxyServer")
   cliServerThread.start()
   bspProxyServerThread.start()
+
+  println("Deder server started.")
+
   cliServerThread.join()
   bspProxyServerThread.join()
 }

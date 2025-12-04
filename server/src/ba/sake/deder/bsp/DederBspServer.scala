@@ -8,7 +8,10 @@ import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
 
-class DederBspServer(projectState: DederProjectState, onExit: () => Unit) extends BuildServer {
+class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
+    extends BuildServer,
+      JavaBuildServer,
+      ScalaBuildServer {
 
   var client: BuildClient = null // set by DederBspProxyServer
 
@@ -162,6 +165,78 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit) extend
       outputPathItems = OutputPathItem(DederPath(dirName).absPath.toNIO.toUri.toString, OutputPathItemKind.DIRECTORY)
     } yield OutputPathsItem(targetId, List.empty.asJava)
     CompletableFuture.completedFuture(new OutputPathsResult(outputPathsItems.asJava))
+  }
+
+  def buildTargetJavacOptions(params: JavacOptionsParams): CompletableFuture[JavacOptionsResult] = {
+    println(s"BSP buildTargetJavacOptions called ${params}")
+    val javacOptionsItems = projectState.projectStateData match {
+      case Left(errorMessage) =>
+        println(s"Cannot provide javac options: $errorMessage")
+        List.empty
+      case Right(projectStateData) =>
+        val coreTasks = projectStateData.tasksRegistry.coreTasks
+        params.getTargets().asScala.flatMap { targetId =>
+          val moduleId = targetId.getUri.split("#").last
+          val module = projectStateData.tasksResolver.modulesMap(moduleId)
+          module match {
+            case _: DederProject.JavaModule | _: DederProject.ScalaModule =>
+              val javacOptions = projectState.executeTask(moduleId, coreTasks.javacOptionsTask, n => {})
+              val compileClasspath = projectState
+                .executeTask(moduleId, coreTasks.compileClasspathTask, n => {})
+                .map { cpEntry => cpEntry.toNIO.toUri.toString }
+                .toList
+              val classesDir =
+                projectState.executeTask(moduleId, coreTasks.classesDirTask, n => {}).toNIO.toUri.toString
+              val javacOptionsItem =
+                JavacOptionsItem(targetId, javacOptions.asJava, compileClasspath.asJava, classesDir)
+              List(javacOptionsItem)
+            case _ =>
+              List.empty
+          }
+        }
+    }
+    CompletableFuture.completedFuture(JavacOptionsResult(javacOptionsItems.asJava))
+  }
+
+  def buildTargetScalaMainClasses(params: ScalaMainClassesParams): CompletableFuture[ScalaMainClassesResult] = {
+    println(s"BSP buildTargetScalaMainClasses called ${params}")
+    CompletableFuture.completedFuture(ScalaMainClassesResult(List.empty.asJava))
+  }
+
+  def buildTargetScalaTestClasses(params: ScalaTestClassesParams): CompletableFuture[ScalaTestClassesResult] = {
+    println(s"BSP buildTargetScalaTestClasses called ${params}")
+    CompletableFuture.completedFuture(ScalaTestClassesResult(List.empty.asJava))
+  }
+
+  def buildTargetScalacOptions(params: ScalacOptionsParams): CompletableFuture[ScalacOptionsResult] = {
+    println(s"BSP buildTargetScalacOptions called ${params}")
+    val scalacOptionsItems = projectState.projectStateData match {
+      case Left(errorMessage) =>
+        println(s"Cannot provide scalac options: $errorMessage")
+        List.empty
+      case Right(projectStateData) =>
+        val coreTasks = projectStateData.tasksRegistry.coreTasks
+        params.getTargets().asScala.flatMap { targetId =>
+          val moduleId = targetId.getUri.split("#").last
+          val module = projectStateData.tasksResolver.modulesMap(moduleId)
+          module match {
+            case _: DederProject.JavaModule | _: DederProject.ScalaModule =>
+              val scalacOptions = projectState.executeTask(moduleId, coreTasks.scalacOptionsTask, n => {})
+              val compileClasspath = projectState
+                .executeTask(moduleId, coreTasks.compileClasspathTask, n => {})
+                .map { cpEntry => cpEntry.toNIO.toUri.toString }
+                .toList
+              val classesDir =
+                projectState.executeTask(moduleId, coreTasks.classesDirTask, n => {}).toNIO.toUri.toString
+              val scalacOptionsItem =
+                ScalacOptionsItem(targetId, scalacOptions.asJava, compileClasspath.asJava, classesDir)
+              List(scalacOptionsItem)
+            case _ =>
+              List.empty
+          }
+        }
+    }
+    CompletableFuture.completedFuture(ScalacOptionsResult(scalacOptionsItems.asJava))
   }
 
   def buildTargetRun(params: RunParams): CompletableFuture[RunResult] = {

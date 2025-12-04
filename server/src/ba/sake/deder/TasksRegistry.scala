@@ -5,7 +5,7 @@ import ba.sake.deder.zinc.ZincCompiler
 
 class TasksRegistry(zincCompiler: ZincCompiler) {
 
-  private val coreTasks = CoreTasks(zincCompiler)
+  val coreTasks: CoreTasks = CoreTasks(zincCompiler)
 
   def resolve(moduleType: ModuleType): Seq[Task[?, ?]] = {
     coreTasks.all.filter { t =>

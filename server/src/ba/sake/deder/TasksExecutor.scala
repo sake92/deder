@@ -17,8 +17,9 @@ class TasksExecutor(
     tasksExecutorService: ExecutorService
 ) {
 
-  def execute(stages: Seq[Seq[TaskInstance]], serverNotificationsLogger: ServerNotificationsLogger): Unit = {
+  def execute(stages: Seq[Seq[TaskInstance]], serverNotificationsLogger: ServerNotificationsLogger): Any = {
     var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
+    var finalTaskResult: Any = ()
     for (taskInstances, stageIndex) <- stages.zipWithIndex do {
       val taskExecutions: Seq[Callable[(String, TaskResult[?])]] = for taskInstance <- taskInstances yield {
         val allTaskDeps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
@@ -64,6 +65,7 @@ class TasksExecutor(
               transitiveResults,
               serverNotificationsLogger
             )
+          finalTaskResult = taskRes.value // in last stage, last task's result will be returned
           taskInstance.id -> taskRes
         }
       }
@@ -71,5 +73,6 @@ class TasksExecutor(
       val results = futures.map(_.get())
       taskResults ++= results
     }
+    finalTaskResult
   }
 }

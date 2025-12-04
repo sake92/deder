@@ -29,12 +29,13 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
   private val configParser = ConfigParser()
   private val configFile = DederGlobals.projectRootDir / "deder.pkl"
 
+  // TODO maybe just use exception..
   @volatile var projectStateData: Either[String, DederProjectStateData] = locally {
     val projectConfig = configParser.parse(configFile)
     projectConfig.map { config =>
       val tasksResolver = TasksResolver(config, tasksRegistry)
       val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
-      DederProjectStateData(config, tasksResolver, executionPlanner)
+      DederProjectStateData(config, tasksRegistry, tasksResolver, executionPlanner)
     }
   }
 
@@ -46,12 +47,20 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
       projectStateData = newProjectConfig.map { config =>
         val tasksResolver = TasksResolver(config, tasksRegistry)
         val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
-        DederProjectStateData(config, tasksResolver, executionPlanner)
+        DederProjectStateData(config, tasksRegistry, tasksResolver, executionPlanner)
       }
     }
   }
 
-  def execute(moduleId: String, taskName: String, notificationCallback: ServerNotification => Unit): Unit =
+  def executeTask[T](
+      moduleId: String,
+      task: Task[T, ?],
+      notificationCallback: ServerNotification => Unit
+  ): T =
+    execute(moduleId, task.name, notificationCallback).asInstanceOf[T]
+
+  // used mostly by CLI
+  def execute(moduleId: String, taskName: String, notificationCallback: ServerNotification => Unit): Any =
     val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
     try {
       refreshProjectState()
@@ -61,8 +70,9 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
             ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)
           )
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
+          throw TaskEvaluationException(s"Project state is invalid during task execution: ${errorMessage}")
 
-        case Right(DederProjectStateData(projectConfig, tasksResolver, executionPlanner)) =>
+        case Right(DederProjectStateData(projectConfig, _, tasksResolver, executionPlanner)) =>
           val tasksExecSubgraph = executionPlanner.getExecSubgraph(moduleId, taskName)
           val tasksExecStages = executionPlanner.execStages(moduleId, taskName)
           val tasksExecutor =
@@ -72,8 +82,9 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
             taskInstance.lock.lock()
           }
           try {
-            tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
+            val result = tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
             serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
+            result
           } finally {
             allTaskInstances.reverse.foreach { taskInstance =>
               taskInstance.lock.unlock()
@@ -100,12 +111,13 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
           ServerNotification.logError(e.getMessage, Some(moduleId))
         )
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
-        e.printStackTrace()
+        throw TaskEvaluationException(s"Error during task execution: ${e.getMessage}", e)
     }
 }
 
 case class DederProjectStateData(
     projectConfig: DederProject,
+    tasksRegistry: TasksRegistry,
     tasksResolver: TasksResolver,
     executionPlanner: ExecutionPlanner
 )
