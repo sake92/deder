@@ -1,7 +1,7 @@
 package ba.sake.deder.client;
 
 import java.io.IOException;
-import ba.sake.deder.client.cli.DederCliClient;
+import ba.sake.deder.client.cli.*;
 import ba.sake.deder.client.bsp.DederBspProxyClient;
 
 public class Main {
@@ -12,7 +12,11 @@ public class Main {
 			var client = new DederBspProxyClient();
 			client.start(args);
 		} else {
-			var client = new DederCliClient();
+			var logLevel = ServerMessage.LogLevel.INFO;
+			if (args.length > 0 && args[0].equals("--log-level")) {
+				logLevel = ServerMessage.LogLevel.valueOf(args[1].toUpperCase());
+			}
+			var client = new DederCliClient(logLevel);
 			client.start(args);
 		}
 	}
