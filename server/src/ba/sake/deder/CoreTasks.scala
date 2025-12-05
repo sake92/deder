@@ -103,7 +103,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         Some(ctx.notifications)
       )
 
-      //println(s"Module: ${ctx.module.id} resolved deps: " + res)
+      // println(s"Module: ${ctx.module.id} resolved deps: " + res)
       res
     }
 
@@ -178,8 +178,46 @@ class CoreTasks(zincCompiler: ZincCompiler) {
           .applyParams(ScalaParameters(scalaVersion))
           .toCs
       ) // TODO scala3-library
+
       val additionalCompileClasspath = ctx.transitiveResults.flatten.flatten ++ dependencies
       (transitiveClassesDirs ++ Seq(scalaLibraryJar) ++ additionalCompileClasspath).reverse.distinct.reverse
+    }
+
+  val scalacPluginsTask = TaskBuilder
+    .make[Seq[os.Path]](
+      name = "scalacPlugins",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+    )
+    .dependsOn(scalaVersionTask)
+    .build { ctx =>
+      val scalaVersion = ctx.depResults._1
+      val pluginJars = ctx.module match {
+        case m: ScalaModule =>
+          Seq(
+            // // TODO not needed for scala3, plus make configurable
+            DependencyResolver.fetchOne(
+              DependencyParser
+                .parse(s"org.scalameta:::semanticdb-scalac:4.14.2")
+                .toOption
+                .get
+                .applyParams(ScalaParameters(scalaVersion))
+                .toCs
+            )
+          )
+        /*m.scalacPlugins.asScala.toSeq.map { pluginDecl =>
+            val jar = DependencyResolver.fetchOne(
+              DependencyParser
+                .parse(pluginDecl)
+                .toOption
+                .get
+                .applyParams(ScalaParameters(scalaVersion))
+                .toCs
+            )
+            DederPath(os.Path(jar.toPath()))
+          }*/
+        case _ => Seq.empty
+      }
+      pluginJars
     }
 
   val compileTask = TaskBuilder
@@ -194,6 +232,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(scalaVersionTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(classesDirTask)
+    .dependsOn(scalacPluginsTask)
     .build { ctx =>
       val sourceDirs = ctx.depResults._1
       val javacOptions = ctx.depResults._2
@@ -201,6 +240,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val scalaVersion = ctx.depResults._4
       val compileClasspath = ctx.depResults._5
       val classesDir = ctx.depResults._6
+      val scalacPlugins = ctx.depResults._7
       val sourceFiles = sourceDirs
         .flatMap { sourceDir =>
           os.walk(
@@ -242,6 +282,9 @@ class CoreTasks(zincCompiler: ZincCompiler) {
 
       val zincCacheFile = ctx.out / "inc_compile.zip"
       val zincLogger = new DederZincLogger(ctx.notifications, ctx.module.id)
+      val finalScalacOptions = scalacOptions ++
+        Seq(s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
+        scalacPlugins.map(p => s"-Xplugin:${p.toString}")
       zincCompiler.compile(
         scalaVersion,
         compilerJars,
@@ -249,7 +292,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         zincCacheFile,
         sourceFiles,
         classesDir,
-        scalacOptions,
+        finalScalacOptions,
         javacOptions,
         zincLogger
       )
@@ -334,8 +377,9 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     sourcesTask,
     resourcesTask,
     javacOptionsTask,
-    scalacOptionsTask,
     scalaVersionTask,
+    scalacOptionsTask,
+    scalacPluginsTask,
     dependenciesTask,
     allDependenciesTask,
     classesDirTask,

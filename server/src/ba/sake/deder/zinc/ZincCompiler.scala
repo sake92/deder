@@ -47,6 +47,8 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       // TODO custom reporter, for BSP diagnostics
   ): Unit = {
 
+    //println(s"Zinc compile: compileClasspath=$compileClasspath")
+
     val classloader = this.getClass.getClassLoader
     val scalaLibraryJars = compileClasspath.filter { p =>
       (p.last.startsWith("scala-library-") || p.last.startsWith("scala3-library-")) && p.last.endsWith(".jar")
