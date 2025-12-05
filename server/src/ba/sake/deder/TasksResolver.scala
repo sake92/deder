@@ -10,11 +10,13 @@ class TasksResolver(
     tasksRegistry: TasksRegistry
 ) {
 
-  private val allModules = projectConfig.modules.asScala.toSeq
+  val allModules: Seq[DederModule] = projectConfig.modules.asScala.toSeq
+
+  val modulesMap: Map[String, DederModule] =
+    allModules.map(m => m.id -> m).toMap
 
   val modulesGraph: SimpleDirectedGraph[DederModule, DefaultEdge] = {
     val graph = new SimpleDirectedGraph[DederModule, DefaultEdge](classOf[DefaultEdge])
-    val modulesMap = allModules.map(m => m.id -> m).toMap
     allModules.foreach(graph.addVertex)
     allModules.foreach { m =>
       m.moduleDeps.asScala.foreach { moduleDep =>
@@ -26,9 +28,6 @@ class TasksResolver(
     GraphUtils.checkNoCycles(graph, _.id)
     graph
   }
-  
-  val modulesMap: Map[String, DederModule] =
-    allModules.map(m => m.id -> m).toMap
 
   val tasksPerModule: Map[String, Seq[TaskInstance]] = {
     // make Tasks graph

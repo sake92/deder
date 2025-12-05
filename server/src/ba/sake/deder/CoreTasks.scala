@@ -296,6 +296,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       ) ++ ctx.transitiveResults.flatten.flatten ++ mandatoryDeps ++ dependencies).reverse.distinct.reverse
     }
 
+  // TODO optional
   val mainClassTask = TaskBuilder
     .make[String](
       name = "mainClass",
