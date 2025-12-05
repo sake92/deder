@@ -7,6 +7,7 @@ import org.eclipse.lsp4j.jsonrpc.Launcher
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
+import java.util.UUID
 
 class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     extends BuildServer,
@@ -49,7 +50,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   def workspaceReload(): CompletableFuture[Object] = {
-    projectState.refreshProjectState(m => client.onBuildLogMessage(new LogMessageParams(MessageType.ERROR, m)))
+    projectState.refreshProjectState(m => client.onBuildShowMessage(new ShowMessageParams(MessageType.ERROR, m)))
     CompletableFuture.completedFuture(().asInstanceOf[Object])
   }
 
@@ -67,7 +68,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   def buildTargetSources(params: SourcesParams): CompletableFuture[SourcesResult] = {
     val sourcesItems = params.getTargets.asScala.flatMap { targetId =>
-      val moduleId = targetId.getUri.split("#").last
+      val moduleId = targetId.moduleId
       projectState.lastGood match {
         case Left(errorMessage) =>
           List.empty
@@ -107,7 +108,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   def buildTargetResources(params: ResourcesParams): CompletableFuture[ResourcesResult] = {
     val resourcesItems = params.getTargets.asScala.flatMap { targetId =>
-      val moduleId = targetId.getUri.split("#").last
+      val moduleId = targetId.moduleId
       projectState.lastGood match {
         case Left(value) =>
           List.empty
@@ -136,6 +137,12 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] = {
+    val taskId = Option(params.getOriginId).getOrElse(s"compile-${UUID.randomUUID}")
+    val taskStartParams = TaskStartParams(TaskId(taskId))
+    taskStartParams.setEventTime(System.currentTimeMillis())
+    taskStartParams.setOriginId(params.getOriginId)
+    taskStartParams.setMessage(s"Compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}")
+    client.onBuildTaskStart(taskStartParams)
     val targetIds = params.getTargets.asScala.map(_.getUri).toList
     var allCompileSucceeded = true
     targetIds.foreach { targetId =>
@@ -145,7 +152,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         case Right(projectStateData) =>
           val coreTasks = projectStateData.tasksRegistry.coreTasks
           params.getTargets().asScala.foreach { targetId =>
-            val moduleId = targetId.getUri.split("#").last
+            val moduleId = targetId.moduleId
             val module = projectStateData.tasksResolver.modulesMap(moduleId)
             try {
               projectState.executeTask(moduleId, coreTasks.compileTask, notifyClient, useLastGood = true)
@@ -160,6 +167,11 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     println(s"BSP buildTargetCompile called for ${targetIds}, returning status: ${status}")
     val compileResult = new CompileResult(status)
     compileResult.setOriginId(params.getOriginId)
+    val taskFinishParams = TaskFinishParams(TaskId(taskId), status)
+    taskFinishParams.setEventTime(System.currentTimeMillis())
+    taskFinishParams.setOriginId(params.getOriginId)
+    taskFinishParams.setMessage(s"Finished compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}")
+    client.onBuildTaskFinish(taskFinishParams)
     CompletableFuture.completedFuture(compileResult)
   }
 
@@ -170,7 +182,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       case Right(projectStateData) =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets.asScala.foreach { targetId =>
-          val moduleId = targetId.getUri.split("#").last
+          val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           val classesDir =
             projectState.executeTask(moduleId, coreTasks.classesDirTask, notifyClient, useLastGood = true)
@@ -188,7 +200,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       case Right(projectStateData) =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets.asScala.map { targetId =>
-          val moduleId = targetId.getUri.split("#").last
+          val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           val fetchRes =
             projectState.executeTask(moduleId, coreTasks.dependenciesTask, notifyClient, useLastGood = true)
@@ -215,8 +227,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           DependencyModulesItem(targetId, depItems.asJava)
         }
     }
-    println(s"BSP buildTargetDependencyModules called for ${params.getTargets.asScala.map(_.getUri)}," +
-      s" returning: ${items.toList}")
+    println(
+      s"BSP buildTargetDependencyModules called for ${params.getTargets.asScala.map(_.getUri)}," +
+        s" returning: ${items.toList}"
+    )
     CompletableFuture.completedFuture(DependencyModulesResult(items.asJava))
   }
 
@@ -248,7 +262,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       case Right(projectStateData) =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets().asScala.flatMap { targetId =>
-          val moduleId = targetId.getUri.split("#").last
+          val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           module match {
             case _: DederProject.JavaModule | _: DederProject.ScalaModule =>
@@ -282,7 +296,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       case Right(projectStateData) =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets().asScala.map { targetId =>
-          val moduleId = targetId.getUri.split("#").last
+          val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           module match {
             case _: DederProject.JavaModule | _: DederProject.ScalaModule =>
@@ -310,7 +324,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       case Right(projectStateData) =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets().asScala.flatMap { targetId =>
-          val moduleId = targetId.getUri.split("#").last
+          val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           module match {
             case _: DederProject.JavaModule | _: DederProject.ScalaModule =>
@@ -420,5 +434,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       case ServerNotification.Level.TRACE   => MessageType.LOG
     }
     new LogMessageParams(level, n.message)
+  }
+
+  extension (id: BuildTargetIdentifier) {
+    def moduleId: String = id.getUri.split("#").last
   }
 }
