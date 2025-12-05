@@ -103,7 +103,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         Some(ctx.notifications)
       )
 
-      println(s"Module: ${ctx.module.id} resolved deps: " + res)
+      //println(s"Module: ${ctx.module.id} resolved deps: " + res)
       res
     }
 
