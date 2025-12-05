@@ -2,28 +2,26 @@ package ba.sake.deder.deps
 
 import scala.jdk.CollectionConverters.*
 import coursierapi.Fetch
+import coursierapi.FetchResult
 import coursierapi.Dependency
 import ba.sake.deder.ServerNotificationsLogger
 import ba.sake.deder.ServerNotification
 
 object DependencyResolver {
 
-  def fetch(dependencies: Seq[Dependency], notifications: Option[ServerNotificationsLogger] = None): Seq[os.Path] = {
+  def fetch(dependencies: Seq[Dependency], notifications: Option[ServerNotificationsLogger] = None): FetchResult = {
     val cache = coursierapi.Cache
       .create()
       .withLogger(notifications.map(new DederCoursierLogger(_)).orNull)
-    val files = Fetch
+    Fetch
       .create()
       .withCache(cache)
       .withDependencies(dependencies*)
-      .fetch()
-      .asScala
-      .toSeq
-    files.map(f => os.Path(f))
+      .fetchResult()
   }
 
   def fetchOne(dependency: Dependency): os.Path =
-    fetch(Seq(dependency)).head
+    os.Path(fetch(Seq(dependency)).getFiles().asScala.head.toPath())
 }
 
 class DederCoursierLogger(notifications: ServerNotificationsLogger) extends coursierapi.SimpleLogger {

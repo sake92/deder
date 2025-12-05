@@ -35,6 +35,8 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
   // used for BSP to keep last known good state
   @volatile var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
 
+  refreshProjectState(err => println(s"Initial project state load error: ${err}"))
+
   def refreshProjectState(onError : String => Unit): Unit = current.synchronized {
     // TODO make sure no requests are running
     // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)

@@ -5,7 +5,7 @@ class ServerNotificationsLogger(callback: ServerNotification => Unit) {
   def add(serverNotification: ServerNotification): Unit = {
     // TODO log per client id?
     // how to know which shell run which client.. parent_pid??
-    //println(serverNotification)
+    println(serverNotification)
     callback(serverNotification)
   }
 }

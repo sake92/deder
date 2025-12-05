@@ -83,8 +83,33 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     }
 
   val dependenciesTask = TaskBuilder
-    .make[Seq[os.Path]](
+    .make[coursierapi.FetchResult](
       name = "dependencies",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+    )
+    .dependsOn(scalaVersionTask)
+    .build { ctx =>
+      val scalaVersion = ctx.depResults._1
+      val depDeclarations = ctx.module match {
+        case m: JavaModule  => m.deps.asScala.toSeq
+        case m: ScalaModule => m.deps.asScala.toSeq
+        case _              => Seq.empty
+      }
+
+      val res = DependencyResolver.fetch(
+        depDeclarations
+          .map(depDecl => DependencyParser.parse(depDecl).toOption.get.applyParams(ScalaParameters(scalaVersion)))
+          .map(_.toCs),
+        Some(ctx.notifications)
+      )
+
+      println(s"Module: ${ctx.module.id} resolved deps: " + res)
+      res
+    }
+
+  val allDependenciesTask = TaskBuilder
+    .make[Seq[os.Path]](
+      name = "allDependencies",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
       transitive = true
     )
@@ -99,10 +124,13 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val coursierDeps = depDeclarations
         .map(depDecl => DependencyParser.parse(depDecl).toOption.get.applyParams(ScalaParameters(scalaVersion)))
         .map(_.toCs)
-      (DependencyResolver.fetch(
-        coursierDeps,
-        Some(ctx.notifications)
-      ) ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
+      val depsRes = DependencyResolver
+        .fetch(coursierDeps, Some(ctx.notifications))
+        .getFiles
+        .asScala
+        .map(f => os.Path(f.toPath()))
+        .toSeq
+      (depsRes ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
     }
 
   val classesDirTask = TaskBuilder
@@ -133,7 +161,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     )
     .dependsOn(scalacOptionsTask)
     .dependsOn(scalaVersionTask)
-    .dependsOn(dependenciesTask)
+    .dependsOn(allDependenciesTask)
     .dependsOn(classesDirTask)
     .dependsOn(transitiveClassesDirTask)
     .build { ctx =>
@@ -186,19 +214,24 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         }
         .filter(os.isFile)
 
-      val compilerJars = DependencyResolver.fetch(
-        Seq(
-          s"org.scala-lang:scala-compiler:${scalaVersion}",
-          s"org.scala-lang:scala-reflect:${scalaVersion}" // TODO only for scala 2
-        ).map(d =>
-          DependencyParser
-            .parse(d)
-            .toOption
-            .get
-            .applyParams(ScalaParameters(scalaVersion))
-            .toCs
+      val compilerJars = DependencyResolver
+        .fetch(
+          Seq(
+            s"org.scala-lang:scala-compiler:${scalaVersion}",
+            s"org.scala-lang:scala-reflect:${scalaVersion}" // TODO only for scala 2
+          ).map(d =>
+            DependencyParser
+              .parse(d)
+              .toOption
+              .get
+              .applyParams(ScalaParameters(scalaVersion))
+              .toCs
+          )
         )
-      )
+        .getFiles
+        .asScala
+        .map(f => os.Path(f.toPath()))
+        .toSeq
 
       /*println(s"Compiling module: ${ctx.module.id} with ${(
         scalaVersion,
@@ -229,7 +262,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
       transitive = true
     )
-    .dependsOn(dependenciesTask)
+    .dependsOn(allDependenciesTask)
     .dependsOn(compileTask)
     .build { ctx =>
       val dependencies: Seq[os.Path] = ctx.depResults._1
@@ -238,16 +271,21 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val mandatoryDeps = ctx.module match {
         case m: JavaModule => Seq.empty
         case m: ScalaModule =>
-          DependencyResolver.fetch(
-            Seq(
-              DependencyParser
-                .parse(s"org.scala-lang:scala-library:${m.scalaVersion}")
-                .toOption
-                .get
-                .applyParams(ScalaParameters(m.scalaVersion))
-                .toCs
+          DependencyResolver
+            .fetch(
+              Seq(
+                DependencyParser
+                  .parse(s"org.scala-lang:scala-library:${m.scalaVersion}")
+                  .toOption
+                  .get
+                  .applyParams(ScalaParameters(m.scalaVersion))
+                  .toCs
+              )
             )
-          )
+            .getFiles
+            .asScala
+            .map(f => os.Path(f.toPath()))
+            .toSeq
         case _ => Seq.empty
       }
 
@@ -286,7 +324,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         case _              => ???
       }
       val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), mainClass)
-      //println(s"Running command: " + cmd)
+      // println(s"Running command: " + cmd)
       ctx.notifications.add(ServerNotification.RunSubprocess(cmd))
       ""
     }
@@ -298,6 +336,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     scalacOptionsTask,
     scalaVersionTask,
     dependenciesTask,
+    allDependenciesTask,
     classesDirTask,
     transitiveClassesDirTask,
     compileClasspathTask,

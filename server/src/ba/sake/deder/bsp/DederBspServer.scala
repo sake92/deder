@@ -17,12 +17,13 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   def buildInitialize(params: InitializeBuildParams): CompletableFuture[InitializeBuildResult] = {
     println(s"BSP buildInitialize called ${params}")
+    val supportedLanguages = List("java", "scala")
     val capabilities = new BuildServerCapabilities()
     capabilities.setResourcesProvider(true)
-    capabilities.setCompileProvider(new CompileProvider(List("java", "scala").asJava))
-    // capabilities.setTestProvider()
-    // capabilities.setRunProvider()
-    // capabilities.setDebugProvider()
+    capabilities.setCompileProvider(new CompileProvider(supportedLanguages.asJava))
+    capabilities.setRunProvider(new RunProvider(supportedLanguages.asJava))
+    capabilities.setTestProvider(new TestProvider(supportedLanguages.asJava))
+    capabilities.setDebugProvider(new DebugProvider(supportedLanguages.asJava))
     capabilities.setCanReload(true)
     capabilities.setBuildTargetChangedProvider(true)
     capabilities.setJvmCompileClasspathProvider(true)
@@ -30,9 +31,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     capabilities.setJvmTestEnvironmentProvider(true)
     capabilities.setOutputPathsProvider(true)
     // unsupported for now
-    capabilities.setDependencySourcesProvider(false)
-    capabilities.setDependencyModulesProvider(false)
-    capabilities.setInverseSourcesProvider(false)
+    capabilities.setDependencySourcesProvider(true)
+    capabilities.setDependencyModulesProvider(true)
+    capabilities.setInverseSourcesProvider(true)
 
     val result = new InitializeBuildResult(
       "deder-bsp",
@@ -47,6 +48,11 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     // TODO maybe trigger compilation immediately?
   }
 
+  def workspaceReload(): CompletableFuture[Object] = {
+    projectState.refreshProjectState(m => client.onBuildLogMessage(new LogMessageParams(MessageType.ERROR, m)))
+    CompletableFuture.completedFuture(().asInstanceOf[Object])
+  }
+
   def workspaceBuildTargets(): CompletableFuture[WorkspaceBuildTargetsResult] = {
     val buildTargets = projectState.lastGood match {
       case Left(errorMessage) =>
@@ -54,6 +60,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       case Right(projectStateData) =>
         projectStateData.projectConfig.modules.asScala.map(m => buildTarget(m, projectStateData)).toList
     }
+    println(s"BSP workspaceBuildTargets called, returning: ${buildTargets.map(_.getId.getUri)}")
     val result = new WorkspaceBuildTargetsResult(buildTargets.asJava)
     CompletableFuture.completedFuture(result)
   }
@@ -91,6 +98,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           }
       }
     }
+    println(
+      s"BSP buildTargetSources called for ${params.getTargets.asScala.map(_.getUri)}," +
+        s" returning: ${sourcesItems.toList}"
+    )
     CompletableFuture.completedFuture(new SourcesResult(sourcesItems.asJava))
   }
 
@@ -129,7 +140,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     var allCompileSucceeded = true
     targetIds.foreach { targetId =>
       projectState.lastGood match {
-        case Left(errorMessage) => allCompileSucceeded = false
+        case Left(errorMessage) =>
+          allCompileSucceeded = false
         case Right(projectStateData) =>
           val coreTasks = projectStateData.tasksRegistry.coreTasks
           params.getTargets().asScala.foreach { targetId =>
@@ -145,31 +157,78 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       }
     }
     val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
+    println(s"BSP buildTargetCompile called for ${targetIds}, returning status: ${status}")
     val compileResult = new CompileResult(status)
     compileResult.setOriginId(params.getOriginId)
     CompletableFuture.completedFuture(compileResult)
   }
 
   def buildTargetCleanCache(params: CleanCacheParams): CompletableFuture[CleanCacheResult] = {
+    projectState.lastGood match {
+      case Left(errorMessage) =>
+        CompletableFuture.completedFuture(CleanCacheResult(false))
+      case Right(projectStateData) =>
+        val coreTasks = projectStateData.tasksRegistry.coreTasks
+        params.getTargets.asScala.foreach { targetId =>
+          val moduleId = targetId.getUri.split("#").last
+          val module = projectStateData.tasksResolver.modulesMap(moduleId)
+          val classesDir =
+            projectState.executeTask(moduleId, coreTasks.classesDirTask, notifyClient, useLastGood = true)
+          os.remove.all(classesDir, ignoreErrors = true)
+        }
+        CompletableFuture.completedFuture(CleanCacheResult(true))
+    }
+  }
 
-    // TODO remove "classes" folder for each target
-    CompletableFuture.completedFuture(CleanCacheResult(true))
+  def buildTargetDependencyModules(params: DependencyModulesParams): CompletableFuture[DependencyModulesResult] = {
+    // list of dependencies(maven)
+    val items = projectState.lastGood match {
+      case Left(errorMessage) =>
+        List.empty
+      case Right(projectStateData) =>
+        val coreTasks = projectStateData.tasksRegistry.coreTasks
+        params.getTargets.asScala.map { targetId =>
+          val moduleId = targetId.getUri.split("#").last
+          val module = projectStateData.tasksResolver.modulesMap(moduleId)
+          val fetchRes =
+            projectState.executeTask(moduleId, coreTasks.dependenciesTask, notifyClient, useLastGood = true)
+
+          // assuming that dependencies and artifacts are in the same order, 1:1 mapping
+          val depsWithArtifacts = fetchRes.getDependencies.asScala
+            .zip(fetchRes.getArtifacts.asScala)
+            .map { case (dep, entry) => (dep, entry.getKey, entry.getValue) }
+          val depItems = depsWithArtifacts.map { case (dep, artifact, file) =>
+            val mavenDependencyModuleArtifact = MavenDependencyModuleArtifact(file.toURI.toString())
+            if dep.getPublication != null then
+              mavenDependencyModuleArtifact.setClassifier(dep.getPublication.getClassifier)
+            val mavenDependencyModule = MavenDependencyModule(
+              dep.getModule().getOrganization(),
+              dep.getModule().getName(),
+              dep.getVersion(),
+              List(mavenDependencyModuleArtifact).asJava
+            )
+            val depModule = DependencyModule(dep.getModule().getName(), dep.getVersion())
+            depModule.setDataKind(DependencyModuleDataKind.MAVEN)
+            depModule.setData(mavenDependencyModule)
+            depModule
+          }
+          DependencyModulesItem(targetId, depItems.asJava)
+        }
+    }
+    println(s"BSP buildTargetDependencyModules called for ${params.getTargets.asScala.map(_.getUri)}," +
+      s" returning: ${items.toList}")
+    CompletableFuture.completedFuture(DependencyModulesResult(items.asJava))
   }
 
   def buildTargetDependencySources(params: DependencySourcesParams): CompletableFuture[DependencySourcesResult] = {
     // sources of build target dependencies that are external to the workspace
     // hmm, so coursier source jars?
-    ???
-  }
-
-  def buildTargetDependencyModules(params: DependencyModulesParams): CompletableFuture[DependencyModulesResult] = {
-    // TODO list of dependencies(maven)
-    ???
+    CompletableFuture.completedFuture(DependencySourcesResult(List.empty.asJava))
   }
 
   def buildTargetInverseSources(params: InverseSourcesParams): CompletableFuture[InverseSourcesResult] = {
     // TODO return if a file belongs to target(s), just peek in file path..
-    ???
+    CompletableFuture.completedFuture(InverseSourcesResult(List.empty.asJava))
   }
 
   def buildTargetOutputPaths(params: OutputPathsParams): CompletableFuture[OutputPathsResult] = {
@@ -280,22 +339,17 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   def buildTargetRun(params: RunParams): CompletableFuture[RunResult] = {
     println(s"BSP buildTargetRun called ${params}")
-    ???
+    CompletableFuture.completedFuture(RunResult(StatusCode.ERROR))
   }
 
   def buildTargetTest(params: TestParams): CompletableFuture[TestResult] = {
     println(s"BSP buildTargetTest called ${params}")
-    ???
+    CompletableFuture.completedFuture(TestResult(StatusCode.ERROR))
   }
 
   def debugSessionStart(params: DebugSessionParams): CompletableFuture[DebugSessionAddress] = {
     println(s"BSP debugSessionStart called ${params}")
-    ???
-  }
-
-  def workspaceReload(): CompletableFuture[Object] = {
-    projectState.refreshProjectState(m => client.onBuildLogMessage(new LogMessageParams(MessageType.ERROR, m)))
-    CompletableFuture.completedFuture(().asInstanceOf[Object])
+    CompletableFuture.completedFuture(DebugSessionAddress("localhost:5005"))
   }
 
   def onRunReadStdin(params: ReadParams): Unit = {
@@ -329,9 +383,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     buildTarget.setBaseDirectory(DederPath(module.root).absPath.toNIO.toUri.toString)
     module match {
       case m: DederProject.JavaModule =>
-        buildTarget.setDataKind(BuildTargetDataKind.JVM)
         val data = new JvmBuildTarget() // TODO set path & version
         buildTarget.setData(data)
+        buildTarget.setDataKind(BuildTargetDataKind.JVM)
       case m: DederProject.ScalaModule =>
         val binaryVersion = m.scalaVersion.split("\\.").take(2).mkString(".") // TODO extract with coursier
         // TODO val scalaJars = List("scala-compiler.jar", "scala-reflect.jar", "scala-library.jar").asJava
