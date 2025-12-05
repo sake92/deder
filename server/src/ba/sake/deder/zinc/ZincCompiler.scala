@@ -44,6 +44,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       scalacOptions: Seq[String],
       javacOptions: Seq[String],
       zincLogger: xsbti.Logger
+      // TODO custom reporter, for BSP diagnostics
   ): Unit = {
 
     val classloader = this.getClass.getClassLoader

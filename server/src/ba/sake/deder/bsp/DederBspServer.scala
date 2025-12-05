@@ -1,5 +1,6 @@
 package ba.sake.deder.bsp
 
+import java.util.UUID
 import java.util.concurrent.*
 import scala.jdk.CollectionConverters.*
 import ch.epfl.scala.bsp4j.*
@@ -7,7 +8,6 @@ import org.eclipse.lsp4j.jsonrpc.Launcher
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
-import java.util.UUID
 import ba.sake.deder.deps.DependencyResolver
 
 class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
@@ -18,7 +18,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   var client: BuildClient = null // set by DederBspProxyServer
 
-  def buildInitialize(params: InitializeBuildParams): CompletableFuture[InitializeBuildResult] = {
+  override def buildInitialize(params: InitializeBuildParams): CompletableFuture[InitializeBuildResult] = {
     println(s"BSP client connected: ${params}")
     val supportedLanguages = List("java", "scala")
     val capabilities = new BuildServerCapabilities()
@@ -46,16 +46,16 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.completedFuture(result)
   }
 
-  def onBuildInitialized(): Unit = {
+  override def onBuildInitialized(): Unit = {
     // TODO maybe trigger compilation immediately?
   }
 
-  def workspaceReload(): CompletableFuture[Object] = {
+  override def workspaceReload(): CompletableFuture[Object] = {
     projectState.refreshProjectState(m => client.onBuildShowMessage(new ShowMessageParams(MessageType.ERROR, m)))
     CompletableFuture.completedFuture(().asInstanceOf[Object])
   }
 
-  def workspaceBuildTargets(): CompletableFuture[WorkspaceBuildTargetsResult] = {
+  override def workspaceBuildTargets(): CompletableFuture[WorkspaceBuildTargetsResult] = {
     val buildTargets = projectState.lastGood match {
       case Left(errorMessage) =>
         List.empty
@@ -67,7 +67,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.completedFuture(result)
   }
 
-  def buildTargetSources(params: SourcesParams): CompletableFuture[SourcesResult] = {
+  override def buildTargetSources(params: SourcesParams): CompletableFuture[SourcesResult] = {
     val sourcesItems = params.getTargets.asScala.flatMap { targetId =>
       val moduleId = targetId.moduleId
       projectState.lastGood match {
@@ -102,7 +102,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.completedFuture(new SourcesResult(sourcesItems.asJava))
   }
 
-  def buildTargetInverseSources(params: InverseSourcesParams): CompletableFuture[InverseSourcesResult] = {
+  override def buildTargetInverseSources(params: InverseSourcesParams): CompletableFuture[InverseSourcesResult] = {
     val targetIds = projectState.lastGood match {
       case Left(errorMessage) =>
         List.empty
@@ -116,12 +116,12 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             srcDirUri.startsWith(params.getTextDocument().getUri())
           }
         }
-        modules.map(m => new BuildTargetIdentifier(buildTargetUri(m)))
+        modules.map(buildTargetId)
     }
     CompletableFuture.completedFuture(InverseSourcesResult(targetIds.asJava))
   }
 
-  def buildTargetResources(params: ResourcesParams): CompletableFuture[ResourcesResult] = {
+  override def buildTargetResources(params: ResourcesParams): CompletableFuture[ResourcesResult] = {
     val resourcesItems = params.getTargets.asScala.flatMap { targetId =>
       val moduleId = targetId.moduleId
       projectState.lastGood match {
@@ -146,48 +146,52 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.completedFuture(new ResourcesResult(resourcesItems.asJava))
   }
 
-  def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] = {
-    val taskId = Option(params.getOriginId).getOrElse(s"compile-${UUID.randomUUID}")
-    val taskStartParams = TaskStartParams(TaskId(taskId))
-    taskStartParams.setEventTime(System.currentTimeMillis())
-    taskStartParams.setOriginId(params.getOriginId)
-    taskStartParams.setMessage(s"Compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}")
-    client.onBuildTaskStart(taskStartParams)
-    val targetIds = params.getTargets.asScala.map(_.getUri).toList
+  override def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] = {
     var allCompileSucceeded = true
-    targetIds.foreach { targetId =>
-      projectState.lastGood match {
-        case Left(errorMessage) =>
-          allCompileSucceeded = false
-        case Right(projectStateData) =>
-          val coreTasks = projectStateData.tasksRegistry.coreTasks
-          params.getTargets().asScala.foreach { targetId =>
-            val moduleId = targetId.moduleId
-            val module = projectStateData.tasksResolver.modulesMap(moduleId)
-            try {
-              projectState.executeTask(moduleId, coreTasks.compileTask, notifyClient, useLastGood = true)
-            } catch {
-              case e: TaskEvaluationException =>
-                allCompileSucceeded = false
-            }
+    projectState.lastGood match {
+      case Left(errorMessage) =>
+        allCompileSucceeded = false
+      case Right(projectStateData) =>
+        val coreTasks = projectStateData.tasksRegistry.coreTasks
+        params.getTargets().asScala.foreach { targetId =>
+          var currentModuleCompileSucceeded = true
+          val moduleId = targetId.moduleId
+          val taskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
+          val taskStartParams = TaskStartParams(taskId)
+          taskStartParams.setEventTime(System.currentTimeMillis())
+          taskStartParams.setOriginId(params.getOriginId)
+          taskStartParams.setMessage(s"Compiling ${moduleId} ...")
+          taskStartParams.setDataKind(TaskStartDataKind.COMPILE_TASK)
+          taskStartParams.setData(new CompileTask(targetId))
+          client.onBuildTaskStart(taskStartParams)
+          val module = projectStateData.tasksResolver.modulesMap(moduleId)
+          try {
+            projectState.executeTask(moduleId, coreTasks.compileTask, notifyClient, useLastGood = true)
+          } catch {
+            case e: TaskEvaluationException =>
+              currentModuleCompileSucceeded = false
+              allCompileSucceeded = false
+          } finally {
+            val status = if currentModuleCompileSucceeded then StatusCode.OK else StatusCode.ERROR
+            val taskFinishParams = TaskFinishParams(taskId, status)
+            taskFinishParams.setEventTime(System.currentTimeMillis())
+            taskFinishParams.setOriginId(params.getOriginId)
+            taskFinishParams.setMessage(s"Finished compiling ${moduleId}")
+            taskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
+            taskFinishParams.setData(new CompileReport(targetId, 0, 0)) // TODO warnings/errors count
+            client.onBuildTaskFinish(taskFinishParams)
           }
-      }
+        }
     }
+
     val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
     // println(s"BSP buildTargetCompile called for ${targetIds}, returning status: ${status}")
     val compileResult = new CompileResult(status)
     compileResult.setOriginId(params.getOriginId)
-    val taskFinishParams = TaskFinishParams(TaskId(taskId), status)
-    taskFinishParams.setEventTime(System.currentTimeMillis())
-    taskFinishParams.setOriginId(params.getOriginId)
-    taskFinishParams.setMessage(
-      s"Finished compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}"
-    )
-    client.onBuildTaskFinish(taskFinishParams)
     CompletableFuture.completedFuture(compileResult)
   }
 
-  def buildTargetCleanCache(params: CleanCacheParams): CompletableFuture[CleanCacheResult] = {
+  override def buildTargetCleanCache(params: CleanCacheParams): CompletableFuture[CleanCacheResult] = {
     projectState.lastGood match {
       case Left(errorMessage) =>
         CompletableFuture.completedFuture(CleanCacheResult(false))
@@ -205,7 +209,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   // list of dependencies(maven)
-  def buildTargetDependencyModules(params: DependencyModulesParams): CompletableFuture[DependencyModulesResult] = {
+  override def buildTargetDependencyModules(
+      params: DependencyModulesParams
+  ): CompletableFuture[DependencyModulesResult] = {
     val items = projectState.lastGood match {
       case Left(errorMessage) =>
         List.empty
@@ -247,7 +253,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   // source jars of dependencies
-  def buildTargetDependencySources(params: DependencySourcesParams): CompletableFuture[DependencySourcesResult] = {
+  override def buildTargetDependencySources(
+      params: DependencySourcesParams
+  ): CompletableFuture[DependencySourcesResult] = {
     val items = projectState.lastGood match {
       case Left(errorMessage) =>
         List.empty
@@ -268,7 +276,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             .asScala
             .map(_.getValue())
             .toSeq
-            .filter(_.getName().endsWith("-sources.jar")) // coursier may return main artifact too..???
+            .filter(_.getName().endsWith("-sources.jar")) // TODO coursier returns main artifact too..???
           DependencySourcesItem(targetId, sourceArtifactFiles.map(f => f.toURI.toString).asJava)
         }
     }
@@ -276,7 +284,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   // hidden/ignored/output dirs
-  def buildTargetOutputPaths(params: OutputPathsParams): CompletableFuture[OutputPathsResult] = {
+  override def buildTargetOutputPaths(params: OutputPathsParams): CompletableFuture[OutputPathsResult] = {
     val excludedDirNames = Seq(".deder", ".bsp", ".metals", ".idea", ".vscode")
     val outputPathsItems = for {
       dirName <- excludedDirNames
@@ -286,7 +294,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.completedFuture(new OutputPathsResult(outputPathsItems.asJava))
   }
 
-  def buildTargetJavacOptions(params: JavacOptionsParams): CompletableFuture[JavacOptionsResult] = {
+  override def buildTargetJavacOptions(params: JavacOptionsParams): CompletableFuture[JavacOptionsResult] = {
     val javacOptionsItems = projectState.lastGood match {
       case Left(errorMessage) =>
         List.empty
@@ -314,7 +322,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.completedFuture(JavacOptionsResult(javacOptionsItems.asJava))
   }
 
-  def buildTargetScalaMainClasses(params: ScalaMainClassesParams): CompletableFuture[ScalaMainClassesResult] = {
+  override def buildTargetScalaMainClasses(
+      params: ScalaMainClassesParams
+  ): CompletableFuture[ScalaMainClassesResult] = {
+    // TODO discover main classes properly
     val items = projectState.lastGood match {
       case Left(errorMessage) =>
         List.empty
@@ -334,12 +345,14 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.completedFuture(result)
   }
 
-  def buildTargetScalaTestClasses(params: ScalaTestClassesParams): CompletableFuture[ScalaTestClassesResult] = {
+  override def buildTargetScalaTestClasses(
+      params: ScalaTestClassesParams
+  ): CompletableFuture[ScalaTestClassesResult] = {
     // TODO
     CompletableFuture.completedFuture(ScalaTestClassesResult(List.empty.asJava))
   }
 
-  def buildTargetScalacOptions(params: ScalacOptionsParams): CompletableFuture[ScalacOptionsResult] = {
+  override def buildTargetScalacOptions(params: ScalacOptionsParams): CompletableFuture[ScalacOptionsResult] = {
     val scalacOptionsItems = projectState.lastGood match {
       case Left(errorMessage) =>
         List.empty
@@ -367,14 +380,16 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.completedFuture(ScalacOptionsResult(scalacOptionsItems.asJava))
   }
 
-  def buildTargetJvmCompileClasspath(
+  override def buildTargetJvmCompileClasspath(
       params: JvmCompileClasspathParams
   ): CompletableFuture[JvmCompileClasspathResult] = {
     // TODO
     CompletableFuture.completedFuture(JvmCompileClasspathResult(List.empty.asJava))
   }
 
-  def buildTargetJvmRunEnvironment(params: JvmRunEnvironmentParams): CompletableFuture[JvmRunEnvironmentResult] = {
+  override def buildTargetJvmRunEnvironment(
+      params: JvmRunEnvironmentParams
+  ): CompletableFuture[JvmRunEnvironmentResult] = {
     val items = projectState.lastGood match {
       case Left(errorMessage) =>
         List.empty
@@ -403,51 +418,51 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.completedFuture(JvmRunEnvironmentResult(items.asJava))
   }
 
-  def buildTargetJvmTestEnvironment(params: JvmTestEnvironmentParams): CompletableFuture[JvmTestEnvironmentResult] = {
+  override def buildTargetJvmTestEnvironment(
+      params: JvmTestEnvironmentParams
+  ): CompletableFuture[JvmTestEnvironmentResult] = {
     // TODO
     CompletableFuture.completedFuture(JvmTestEnvironmentResult(List.empty.asJava))
   }
 
-  def buildTargetRun(params: RunParams): CompletableFuture[RunResult] = {
+  override def buildTargetRun(params: RunParams): CompletableFuture[RunResult] = {
     // TODO
     println(s"BSP buildTargetRun called ${params}")
     CompletableFuture.completedFuture(RunResult(StatusCode.ERROR))
   }
 
-  def buildTargetTest(params: TestParams): CompletableFuture[TestResult] = {
+  override def buildTargetTest(params: TestParams): CompletableFuture[TestResult] = {
     // TODO
     println(s"BSP buildTargetTest called ${params}")
     CompletableFuture.completedFuture(TestResult(StatusCode.ERROR))
   }
 
-  def debugSessionStart(params: DebugSessionParams): CompletableFuture[DebugSessionAddress] = {
-    // TODO
+  override def debugSessionStart(params: DebugSessionParams): CompletableFuture[DebugSessionAddress] = {
+    // TODO https://github.com/scalacenter/scala-debug-adapter
     println(s"BSP debugSessionStart called ${params}")
     CompletableFuture.completedFuture(DebugSessionAddress("localhost:5005"))
   }
 
-  def onRunReadStdin(params: ReadParams): Unit = {
+  override def onRunReadStdin(params: ReadParams): Unit = {
     // TODO
     println(s"BSP onRunReadStdin called ${params}")
   }
 
-  def buildShutdown(): CompletableFuture[Object] = {
+  override def buildShutdown(): CompletableFuture[Object] = {
     // dont care, this is a long running server
     CompletableFuture.completedFuture(null.asInstanceOf[Object])
   }
 
-  def onBuildExit(): Unit =
+  override def onBuildExit(): Unit =
     onExit() // just closes the unix socket connection
 
   private def buildTarget(module: DederModule, projectStateData: DederProjectStateData): BuildTarget = {
-    val id = new BuildTargetIdentifier(buildTargetUri(module))
+    val id = buildTargetId(module)
     val isTestModule = false
     // TODO if has mainClass then it's an app.. ?
     val tags = if (isTestModule) List(BuildTargetTag.TEST) else List(BuildTargetTag.APPLICATION)
     val languageIds = List(module.`type`.toString)
-    val dependencies = module.moduleDeps.asScala.map { depModule =>
-      new BuildTargetIdentifier(buildTargetUri(depModule))
-    }
+    val dependencies = module.moduleDeps.asScala.map(buildTargetId)
     val capabilities = new BuildTargetCapabilities()
     capabilities.setCanCompile(true)
     capabilities.setCanRun(true)
@@ -473,8 +488,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     buildTarget
   }
 
-  private def buildTargetUri(module: DederModule): String =
-    DederPath(module.root).absPath.toNIO.toUri.toString + "#" + module.id
+  private def buildTargetId(module: DederModule): BuildTargetIdentifier =
+    BuildTargetIdentifier(
+      DederPath(module.root).absPath.toNIO.toUri.toString + "#" + module.id
+    )
 
   private val notifyClient = (n: ServerNotification) =>
     n match {
