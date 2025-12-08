@@ -15,7 +15,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class DederCliClient {
 
+	private Path logFile;
+
 	private final ObjectMapper jsonMapper = new ObjectMapper();
+
+	public DederCliClient(Path logFile) {
+		this.logFile = logFile;
+	}
 
 	public void start(String[] args) throws IOException {
 		// TODO pass in debug level
