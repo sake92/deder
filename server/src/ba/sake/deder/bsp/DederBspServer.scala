@@ -1,5 +1,6 @@
 package ba.sake.deder.bsp
 
+import java.io.File
 import java.util.UUID
 import java.util.concurrent.*
 import scala.jdk.CollectionConverters.*
@@ -302,20 +303,30 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets().asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
-          val javacOptions =
-            projectState.executeTask(moduleId, coreTasks.javacOptionsTask, notifyClient, useLastGood = true)
-          val compileClasspath = projectState
-            .executeTask(moduleId, coreTasks.compileClasspathTask, notifyClient, useLastGood = true)
-            .map { cpEntry => cpEntry.toNIO.toUri.toString }
-            .toList
           val classesDir =
             projectState
               .executeTask(moduleId, coreTasks.classesDirTask, notifyClient, useLastGood = true)
               .toNIO
               .toUri
               .toString
+          val javacOptions =
+            projectState.executeTask(moduleId, coreTasks.javacOptionsTask, notifyClient, useLastGood = true)
+          val javacAnnotationProcessors =
+            projectState
+              .executeTask(moduleId, coreTasks.javacAnnotationProcessorsTask, notifyClient, useLastGood = true)
+          val finalJavacOptions = javacOptions ++
+            Seq(
+              "-processorpath",
+              javacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator),
+              s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir}"
+            )
+          val compileClasspath = projectState
+            .executeTask(moduleId, coreTasks.compileClasspathTask, notifyClient, useLastGood = true)
+            .map { cpEntry => cpEntry.toNIO.toUri.toString }
+            .toList
+
           val javacOptionsItem =
-            JavacOptionsItem(targetId, javacOptions.asJava, compileClasspath.asJava, classesDir)
+            JavacOptionsItem(targetId, finalJavacOptions.asJava, compileClasspath.asJava, classesDir)
           List(javacOptionsItem)
         }
     }
@@ -362,6 +373,11 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val moduleId = targetId.moduleId
           val scalacOptions =
             projectState.executeTask(moduleId, coreTasks.scalacOptionsTask, notifyClient, useLastGood = true)
+          val scalacPlugins =
+            projectState.executeTask(moduleId, coreTasks.scalacPluginsTask, notifyClient, useLastGood = true)
+          val finalScalacOptions = scalacOptions ++
+            Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
+            scalacPlugins.map(p => s"-Xplugin:${p.toString}")
           val compileClasspath = projectState
             .executeTask(moduleId, coreTasks.compileClasspathTask, notifyClient, useLastGood = true)
             .map { cpEntry => cpEntry.toNIO.toUri.toString }
@@ -373,7 +389,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               .toUri
               .toString
           val scalacOptionsItem =
-            ScalacOptionsItem(targetId, scalacOptions.asJava, compileClasspath.asJava, classesDir)
+            ScalacOptionsItem(targetId, finalScalacOptions.asJava, compileClasspath.asJava, classesDir)
           List(scalacOptionsItem)
         }
     }
@@ -383,8 +399,21 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetJvmCompileClasspath(
       params: JvmCompileClasspathParams
   ): CompletableFuture[JvmCompileClasspathResult] = {
-    // TODO
-    CompletableFuture.completedFuture(JvmCompileClasspathResult(List.empty.asJava))
+    val items = projectState.lastGood match {
+      case Left(errorMessage) =>
+        List.empty
+      case Right(projectStateData) =>
+        val coreTasks = projectStateData.tasksRegistry.coreTasks
+        params.getTargets().asScala.map { targetId =>
+          val moduleId = targetId.moduleId
+          val compileClasspath = projectState
+            .executeTask(moduleId, coreTasks.compileClasspathTask, notifyClient, useLastGood = true)
+            .map { cpEntry => cpEntry.toNIO.toUri.toString }
+            .toList
+          JvmCompileClasspathItem(targetId, compileClasspath.asJava)
+        }
+    }
+    CompletableFuture.completedFuture(JvmCompileClasspathResult(items.asJava))
   }
 
   override def buildTargetJvmRunEnvironment(

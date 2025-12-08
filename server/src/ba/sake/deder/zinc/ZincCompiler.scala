@@ -47,7 +47,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       // TODO custom reporter, for BSP diagnostics
   ): Unit = {
 
-    //println(s"Zinc compile: compileClasspath=$compileClasspath")
+    //println(s"Zinc compile: $scalacOptions ;;; $javacOptions ;;; compileClasspath=$compileClasspath")
 
     val classloader = this.getClass.getClassLoader
     val scalaLibraryJars = compileClasspath.filter { p =>
@@ -67,7 +67,8 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
 
     val classpathOptions = ClasspathOptionsUtil.auto()
     val scalaCompiler = ZincUtil.scalaCompiler(scalaInstance, compilerBridgeJar.toIO, classpathOptions)
-    val compilers = ZincUtil.compilers(scalaInstance, classpathOptions, javaHome = None, scalac = scalaCompiler)
+    val javaHome = os.Path(scala.util.Properties.javaHome)
+    val compilers = ZincUtil.compilers(scalaInstance, classpathOptions, javaHome = Some(javaHome.toNIO), scalac = scalaCompiler)
 
     val converter = PlainVirtualFileConverter.converter
 

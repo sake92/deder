@@ -183,6 +183,33 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       (transitiveClassesDirs ++ Seq(scalaLibraryJar) ++ additionalCompileClasspath).reverse.distinct.reverse
     }
 
+  val javacAnnotationProcessorsTask = TaskBuilder
+    .make[Seq[os.Path]](
+      name = "javacAnnotationProcessors",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+    )
+    .dependsOn(scalaVersionTask)
+    .build { ctx =>
+      val scalaVersion = ctx.depResults._1
+      val processorJars = DependencyResolver
+        .fetch(
+          Seq("com.sourcegraph:semanticdb-javac:0.11.1")
+            .map(d =>
+              DependencyParser
+                .parse(d)
+                .toOption
+                .get
+                .applyParams(ScalaParameters(scalaVersion))
+                .toCs
+            )
+        )
+        .getFiles
+        .asScala
+        .map(f => os.Path(f.toPath()))
+        .toSeq
+      processorJars
+    }
+
   val scalacPluginsTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "scalacPlugins",
@@ -191,32 +218,23 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val scalaVersion = ctx.depResults._1
-      val pluginJars = ctx.module match {
-        case m: ScalaModule =>
-          Seq(
-            // // TODO not needed for scala3, plus make configurable
-            DependencyResolver.fetchOne(
-              DependencyParser
-                .parse(s"org.scalameta:::semanticdb-scalac:4.14.2")
-                .toOption
-                .get
-                .applyParams(ScalaParameters(scalaVersion))
-                .toCs
-            )
+      val pluginJars = // // TODO not needed for scala3, plus make configurable
+        DependencyResolver
+          .fetch(
+            Seq("org.scalameta:::semanticdb-scalac:4.14.2")
+              .map(d =>
+                DependencyParser
+                  .parse(d)
+                  .toOption
+                  .get
+                  .applyParams(ScalaParameters(scalaVersion))
+                  .toCs
+              )
           )
-        /*m.scalacPlugins.asScala.toSeq.map { pluginDecl =>
-            val jar = DependencyResolver.fetchOne(
-              DependencyParser
-                .parse(pluginDecl)
-                .toOption
-                .get
-                .applyParams(ScalaParameters(scalaVersion))
-                .toCs
-            )
-            DederPath(os.Path(jar.toPath()))
-          }*/
-        case _ => Seq.empty
-      }
+          .getFiles
+          .asScala
+          .map(f => os.Path(f.toPath()))
+          .toSeq
       pluginJars
     }
 
@@ -233,6 +251,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(compileClasspathTask)
     .dependsOn(classesDirTask)
     .dependsOn(scalacPluginsTask)
+    .dependsOn(javacAnnotationProcessorsTask)
     .build { ctx =>
       val sourceDirs = ctx.depResults._1
       val javacOptions = ctx.depResults._2
@@ -241,6 +260,8 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val compileClasspath = ctx.depResults._5
       val classesDir = ctx.depResults._6
       val scalacPlugins = ctx.depResults._7
+      val javacAnnotationProcessors = ctx.depResults._8
+
       val sourceFiles = sourceDirs
         .flatMap { sourceDir =>
           os.walk(
@@ -282,8 +303,15 @@ class CoreTasks(zincCompiler: ZincCompiler) {
 
       val zincCacheFile = ctx.out / "inc_compile.zip"
       val zincLogger = new DederZincLogger(ctx.notifications, ctx.module.id)
+      val finalJavacOptions = javacOptions ++
+        Seq(
+          "-processorpath",
+          javacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator),
+          s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir}"
+        )
+      // TODO if scala3 Seq("-Xsemanticdb", s"-sourceroot:${DederGlobals.projectRootDir}")
       val finalScalacOptions = scalacOptions ++
-        Seq(s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
+        Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
         scalacPlugins.map(p => s"-Xplugin:${p.toString}")
       zincCompiler.compile(
         scalaVersion,
@@ -293,7 +321,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         sourceFiles,
         classesDir,
         finalScalacOptions,
-        javacOptions,
+        finalJavacOptions,
         zincLogger
       )
       DederPath(classesDir)
@@ -373,11 +401,13 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       ""
     }
 
+  // order matters for dependency resolution!!
   val all: Seq[Task[?, ?]] = Seq(
     sourcesTask,
+    scalaVersionTask,
     resourcesTask,
     javacOptionsTask,
-    scalaVersionTask,
+    javacAnnotationProcessorsTask,
     scalacOptionsTask,
     scalacPluginsTask,
     dependenciesTask,

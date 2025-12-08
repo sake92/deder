@@ -8,6 +8,7 @@ import scala.Tuple.:*
 import ba.sake.tupson.{*, given}
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
+import os.write.over
 
 case class TaskBuilder[T, Deps <: Tuple] private (
     name: String,
@@ -211,6 +212,17 @@ case class TaskInstance(
   def moduleId: String = module.id
 
   def id: String = s"${moduleId}.${task.name}"
+
+  override def canEqual(that: Any): Boolean = that.isInstanceOf[TaskInstance]
+
+  override def equals(that: Any): Boolean =
+    that match {
+      case other: TaskInstance => this.id == other.id
+      case _                   => false
+    }
+
+  override def hashCode(): Int = id.hashCode
+
 }
 
 object TaskInstance {
