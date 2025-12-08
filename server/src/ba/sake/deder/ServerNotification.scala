@@ -4,34 +4,41 @@ import java.time.Instant
 
 enum ServerNotification {
   case Output(text: String)
-  
+
   case Log(
-      level: ServerNotification.Level,
+      level: ServerNotification.LogLevel,
       timestamp: Instant,
       message: String,
       moduleId: Option[String]
   )
-  
+
   // tell client to run this subprocess
   case RunSubprocess(cmd: Seq[String])
-  
+
   // tell client to exit
   case RequestFinished(success: Boolean)
 }
 
 object ServerNotification {
-  def log(level: ServerNotification.Level, message: String, moduleId: Option[String] = None): ServerNotification =
-    ServerNotification.Log(
-      level,
-      Instant.now(),
-      message,
-      moduleId
-    )
+  def log(level: ServerNotification.LogLevel, message: String, moduleId: Option[String] = None): ServerNotification =
+    ServerNotification.Log(level, Instant.now(), message, moduleId)
 
   def logError(message: String, moduleId: Option[String] = None): ServerNotification =
-    log(ServerNotification.Level.ERROR, message, moduleId)
+    log(ServerNotification.LogLevel.ERROR, message, moduleId)
 
-  enum Level:
+  def logWarning(message: String, moduleId: Option[String] = None): ServerNotification =
+    log(ServerNotification.LogLevel.WARNING, message, moduleId)
+
+  def logInfo(message: String, moduleId: Option[String] = None): ServerNotification =
+    log(ServerNotification.LogLevel.INFO, message, moduleId)
+
+  def logDebug(message: String, moduleId: Option[String] = None): ServerNotification =
+    log(ServerNotification.LogLevel.DEBUG, message, moduleId)
+
+  def logTrace(message: String, moduleId: Option[String] = None): ServerNotification =
+    log(ServerNotification.LogLevel.TRACE, message, moduleId)
+
+  enum LogLevel:
     case ERROR, WARNING, INFO, DEBUG, TRACE
 
 }

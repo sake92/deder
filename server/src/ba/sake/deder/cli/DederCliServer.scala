@@ -70,7 +70,7 @@ class DederCliServer(projectState: DederProjectState) {
           serverMessages.put(CliServerMessage.fromServerNotification(sn))
         mainargs.Parser[DederCliOptions].constructEither(m.args) match {
           case Left(error) =>
-            serverMessages.put(CliServerMessage.Log(error, CliServerMessage.Level.ERROR))
+            serverMessages.put(CliServerMessage.Log(error, CliServerMessage.LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
             println(s"Running $cliOptions")
@@ -106,7 +106,7 @@ enum CliClientMessage derives JsonRW {
 
 enum CliServerMessage derives JsonRW {
   case Output(text: String)
-  case Log(text: String, level: CliServerMessage.Level)
+  case Log(text: String, level: CliServerMessage.LogLevel)
   case RunSubprocess(cmd: Seq[String])
   case Exit(exitCode: Int)
 }
@@ -117,11 +117,11 @@ object CliServerMessage {
       CliServerMessage.Output(m.text)
     case m: ServerNotification.Log =>
       val level = m.level match {
-        case ServerNotification.Level.ERROR   => Level.ERROR
-        case ServerNotification.Level.WARNING => Level.WARNING
-        case ServerNotification.Level.INFO    => Level.INFO
-        case ServerNotification.Level.DEBUG   => Level.DEBUG
-        case ServerNotification.Level.TRACE   => Level.TRACE
+        case ServerNotification.LogLevel.ERROR   => LogLevel.ERROR
+        case ServerNotification.LogLevel.WARNING => LogLevel.WARNING
+        case ServerNotification.LogLevel.INFO    => LogLevel.INFO
+        case ServerNotification.LogLevel.DEBUG   => LogLevel.DEBUG
+        case ServerNotification.LogLevel.TRACE   => LogLevel.TRACE
       }
       val modulePrefix = m.moduleId.map(id => s"${id}:").getOrElse("")
       CliServerMessage.Log(s"[${modulePrefix}${m.level.toString.toLowerCase}] ${m.message}", level)
@@ -131,7 +131,7 @@ object CliServerMessage {
       CliServerMessage.Exit(if success then 0 else 1)
   }
 
-  enum Level derives JsonRW:
+  enum LogLevel derives JsonRW:
     case ERROR, WARNING, INFO, DEBUG, TRACE
 
 }

@@ -1,11 +1,11 @@
 package ba.sake.deder.cli
 
 import mainargs.*
-import ba.sake.deder.ServerNotification.Level
+import ba.sake.deder.ServerNotification.LogLevel
 
-given TokensReader.Simple[Level]{
+given TokensReader.Simple[LogLevel]{
     def shortName = "logLevel"
-    def read(strs: Seq[String]) = Right(Level.valueOf(strs.head))
+    def read(strs: Seq[String]) = Right(LogLevel.valueOf(strs.head))
 }
 
 @main
@@ -15,6 +15,6 @@ case class DederCliOptions(
     @arg(doc = "Module IDs to execute", short = 'm')
     modules: Seq[String], // cant have a default.. :/
     @arg(doc = "Log level", short = 'l')
-    logLevel: Level = Level.INFO,
+    logLevel: LogLevel = LogLevel.INFO,
     args: Leftover[String]
 )

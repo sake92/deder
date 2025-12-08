@@ -526,7 +526,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     n match {
       case n: ServerNotification.Log =>
         // dont spam the client with debug/trace messages..
-        if n.level.ordinal <= ServerNotification.Level.INFO.ordinal then client.onBuildLogMessage(toBspLogMessage(n))
+        if n.level.ordinal <= ServerNotification.LogLevel.INFO.ordinal then client.onBuildLogMessage(toBspLogMessage(n))
       case n: ServerNotification.RequestFinished =>
       // do nothing
       case _ => // ignore other notifications for now
@@ -534,11 +534,11 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   private def toBspLogMessage(n: ServerNotification.Log): LogMessageParams = {
     val level = n.level match {
-      case ServerNotification.Level.ERROR   => MessageType.ERROR
-      case ServerNotification.Level.WARNING => MessageType.WARNING
-      case ServerNotification.Level.INFO    => MessageType.INFO
-      case ServerNotification.Level.DEBUG   => MessageType.LOG
-      case ServerNotification.Level.TRACE   => MessageType.LOG
+      case ServerNotification.LogLevel.ERROR   => MessageType.ERROR
+      case ServerNotification.LogLevel.WARNING => MessageType.WARNING
+      case ServerNotification.LogLevel.INFO    => MessageType.INFO
+      case ServerNotification.LogLevel.DEBUG   => MessageType.LOG
+      case ServerNotification.LogLevel.TRACE   => MessageType.LOG
     }
     new LogMessageParams(level, n.message)
   }

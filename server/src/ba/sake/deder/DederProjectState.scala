@@ -78,7 +78,7 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
     val selectedModuleIds = state match {
       case Left(errorMessage) =>
         notificationCallback(
-          ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)
+          ServerNotification.log(ServerNotification.LogLevel.ERROR, errorMessage)
         )
         Seq.empty
       case Right(dpsd) =>
@@ -107,11 +107,7 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
       useLastGood: Boolean = false
   ): Any =
     try {
-      refreshProjectState(errorMessage =>
-        serverNotificationsLogger.add(
-          ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)
-        )
-      )
+      refreshProjectState(errorMessage => serverNotificationsLogger.add(ServerNotification.logError(errorMessage, Some(moduleId))))
       val state = if useLastGood then lastGood else current
       state match {
         case Left(errorMessage) =>
@@ -128,7 +124,7 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
           }
           try {
             serverNotificationsLogger.add(
-              ServerNotification.log(ServerNotification.Level.INFO, s"Executing ${moduleId}.${taskName}")
+              ServerNotification.logInfo(s"Executing ${moduleId}.${taskName}", Some(moduleId))
             )
             tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
           } finally {
