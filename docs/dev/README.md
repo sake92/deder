@@ -1,4 +1,8 @@
 
+## Architecture
+
+![](deder_architecture.svg)
+
 ## General design
 - [PKL](https://pkl-lang.org/) for defining a build
 - client-server architecture:

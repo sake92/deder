@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+// TODO write to log file like DederBspProxyClient
 // TODO handle color stuff https://clig.dev/#output
 
 public class DederCliClient {
