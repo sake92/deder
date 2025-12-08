@@ -15,13 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class DederCliClient {
 
-	private final ServerMessage.LogLevel logLevel;
-
 	private final ObjectMapper jsonMapper = new ObjectMapper();
-
-	public DederCliClient(ServerMessage.LogLevel logLevel) {
-		this.logLevel = logLevel;
-	}
 
 	public void start(String[] args) throws IOException {
 		// TODO pass in debug level
@@ -57,7 +51,6 @@ public class DederCliClient {
 	}
 
 	void serverWrite(OutputStream os, String[] args) throws IOException {
-
 		// while (true) {
 		// newline delimited JSON messages
 		var message = new ClientMessage.Run(args);
@@ -75,9 +68,7 @@ public class DederCliClient {
 			if (message instanceof ServerMessage.Output output) {
 				System.out.println(output.text());
 			} else if (message instanceof ServerMessage.Log log) {
-				if (log.level().ordinal() <= logLevel.ordinal()) {
 					System.err.println(log.text());
-				}
 			} else if (message instanceof ServerMessage.RunSubprocess runSubprocess) {
 				var processBuilder = new ProcessBuilder(runSubprocess.cmd());
 				processBuilder.inheritIO();

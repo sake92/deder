@@ -5,7 +5,7 @@ import ba.sake.deder.ServerNotification.LogLevel
 
 given TokensReader.Simple[LogLevel]{
     def shortName = "logLevel"
-    def read(strs: Seq[String]) = Right(LogLevel.valueOf(strs.head))
+    def read(strs: Seq[String]) = Right(LogLevel.valueOf(strs.head.toUpperCase))
 }
 
 @main
