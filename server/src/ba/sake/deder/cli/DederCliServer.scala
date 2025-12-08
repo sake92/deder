@@ -66,14 +66,16 @@ class DederCliServer(projectState: DederProjectState) {
     val message = messageJson.parseJson[CliClientMessage]
     message match {
       case m: CliClientMessage.Run =>
-        val logCallback: ServerNotification => Unit = sn =>
-          serverMessages.put(CliServerMessage.fromServerNotification(sn))
         mainargs.Parser[DederCliOptions].constructEither(m.args) match {
           case Left(error) =>
-            serverMessages.put(CliServerMessage.Log(error, CliServerMessage.LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
             println(s"Running $cliOptions")
+            val logCallback: ServerNotification => Unit = {
+              case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal => // skip
+              case sn => serverMessages.put(CliServerMessage.fromServerNotification(sn))
+            }
             projectState.executeAll(cliOptions.modules, cliOptions.task, logCallback)
         }
     }
@@ -106,7 +108,7 @@ enum CliClientMessage derives JsonRW {
 
 enum CliServerMessage derives JsonRW {
   case Output(text: String)
-  case Log(text: String, level: CliServerMessage.LogLevel)
+  case Log(text: String, level: LogLevel)
   case RunSubprocess(cmd: Seq[String])
   case Exit(exitCode: Int)
 }
@@ -123,15 +125,13 @@ object CliServerMessage {
         case ServerNotification.LogLevel.DEBUG   => LogLevel.DEBUG
         case ServerNotification.LogLevel.TRACE   => LogLevel.TRACE
       }
-      val modulePrefix = m.moduleId.map(id => s"${id}:").getOrElse("")
-      CliServerMessage.Log(s"[${modulePrefix}${m.level.toString.toLowerCase}] ${m.message}", level)
+      CliServerMessage.Log(s"[${m.level.toString.toLowerCase}] ${m.message}", level)
     case rs: ServerNotification.RunSubprocess =>
       CliServerMessage.RunSubprocess(rs.cmd)
     case ServerNotification.RequestFinished(success) =>
       CliServerMessage.Exit(if success then 0 else 1)
   }
-
-  enum LogLevel derives JsonRW:
-    case ERROR, WARNING, INFO, DEBUG, TRACE
-
 }
+
+enum LogLevel derives JsonRW:
+  case ERROR, WARNING, INFO, DEBUG, TRACE
