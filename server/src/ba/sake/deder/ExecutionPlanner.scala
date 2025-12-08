@@ -9,6 +9,7 @@ class ExecutionPlanner(
 ) {
 
   // build independent exec stages (~toposort)
+  // TODO better plan for skewed graphs (some tasks have many deps, some none)
   def execStages(moduleId: String, taskName: String): Seq[Seq[TaskInstance]] = {
     val taskToExecute = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
       throw DederException(s"Task not found ${moduleId}.${taskName}")

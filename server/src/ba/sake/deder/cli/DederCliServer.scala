@@ -68,7 +68,14 @@ class DederCliServer(projectState: DederProjectState) {
       case m: CliClientMessage.Run =>
         val logCallback: ServerNotification => Unit = sn =>
           serverMessages.put(CliServerMessage.fromServerNotification(sn))
-        projectState.execute(m.args(0), m.args(1), logCallback)
+        mainargs.Parser[DederCliOptions].constructEither(m.args) match {
+          case Left(error) =>
+            serverMessages.put(CliServerMessage.Log(error, CliServerMessage.Level.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          case Right(cliOptions) =>
+            println(s"Running $cliOptions")
+            projectState.executeAll(cliOptions.modules, cliOptions.task, logCallback)
+        }
     }
   }
 
@@ -85,9 +92,9 @@ class DederCliServer(projectState: DederProjectState) {
         os.write((message.toJson + '\n').getBytes(StandardCharsets.UTF_8))
       }
     } catch {
-      case e: IOException =>
-        println(s"Client ${clientId} disconnected... Bye!")
+      case e: IOException => // all good, client disconnected..
     } finally {
+      println(s"Client ${clientId} disconnected... Bye!")
       clientChannel.close()
     }
 

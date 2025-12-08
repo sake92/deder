@@ -77,6 +77,8 @@ case class TaskExecContext[T, Deps <: Tuple](
     out: os.Path
 )(using ev: TaskDeps[Deps] =:= true)
 
+// TODO add "args", .e.g. for run task
+// TODO make T: JsonRW mandatory, to show in --json and web server..
 sealed trait Task[T, Deps <: Tuple](using ev: TaskDeps[Deps] =:= true) {
   def name: String
   def supportedModuleTypes: Set[ModuleType]
@@ -202,6 +204,9 @@ case class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     }
   }
 }
+
+// TODO SourceFileTask
+// TODO ConfigValueTask
 
 // dynamic, for each module
 case class TaskInstance(

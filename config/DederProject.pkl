@@ -17,6 +17,7 @@ abstract class DederModule {
 
   type: ModuleType
 
+  // TODO only alphanum and _- chars !
   hidden idValidation = (value) ->
     if (value.isBlank) throw("Id must not be blank.")
     else true

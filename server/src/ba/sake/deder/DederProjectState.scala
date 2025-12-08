@@ -37,7 +37,7 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
 
   refreshProjectState(err => println(s"Initial project state load error: ${err}"))
 
-  def refreshProjectState(onError : String => Unit): Unit = current.synchronized {
+  def refreshProjectState(onError: String => Unit): Unit = current.synchronized {
     // TODO make sure no requests are running
     // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)
     val newProjectConfig = configParser.parse(configFile)
@@ -58,21 +58,63 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
   def executeTask[T](
       moduleId: String,
       task: Task[T, ?],
-      notificationCallback: ServerNotification => Unit, useLastGood: Boolean = false
-  ): T =
-    execute(moduleId, task.name, notificationCallback, useLastGood).asInstanceOf[T]
+      notificationCallback: ServerNotification => Unit,
+      useLastGood: Boolean = false
+  ): T = {
+    val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
+    executeOne(moduleId, task.name, serverNotificationsLogger, useLastGood).asInstanceOf[T]
+  }
 
   // used mostly by CLI
-  def execute(moduleId: String, taskName: String, notificationCallback: ServerNotification => Unit, useLastGood: Boolean = false): Any =
+  def executeAll(
+      moduleSelectors: Seq[String],
+      taskName: String,
+      notificationCallback: ServerNotification => Unit,
+      useLastGood: Boolean = false
+  ): Unit = {
     val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
+    val state = if useLastGood then lastGood else current
+    // TODO deduplicate unnecessary work !
+    val selectedModuleIds = state match {
+      case Left(errorMessage) =>
+        notificationCallback(
+          ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)
+        )
+        Seq.empty
+      case Right(dpsd) =>
+        val allModuleIds = dpsd.tasksResolver.allModules.map(_.id)
+        if moduleSelectors.isEmpty then allModuleIds
+        else
+          moduleSelectors.flatMap { selector =>
+            // TODO improve wildcard selection, e.g mymodule*jvm
+            allModuleIds.filter(_ == selector)
+          }
+    }
+    println(s"Running ${taskName} on modules ${selectedModuleIds}")
     try {
-      refreshProjectState(errorMessage => serverNotificationsLogger.add(
-        ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)
-      ))
+      selectedModuleIds.foreach(moduleId => executeOne(moduleId, taskName, serverNotificationsLogger, useLastGood))
+      serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
+    } catch {
+      case e: TaskEvaluationException =>
+        serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
+    }
+  }
+
+  def executeOne(
+      moduleId: String,
+      taskName: String,
+      serverNotificationsLogger: ServerNotificationsLogger,
+      useLastGood: Boolean = false
+  ): Any =
+    try {
+      refreshProjectState(errorMessage =>
+        serverNotificationsLogger.add(
+          ServerNotification.log(ServerNotification.Level.ERROR, errorMessage)
+        )
+      )
       val state = if useLastGood then lastGood else current
       state match {
         case Left(errorMessage) =>
-          serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
           throw TaskEvaluationException(s"Project state is invalid during task execution: ${errorMessage}")
 
         case Right(DederProjectStateData(projectConfig, _, tasksResolver, executionPlanner)) =>
@@ -85,9 +127,10 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
             taskInstance.lock.lock()
           }
           try {
-            val result = tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
-            serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
-            result
+            serverNotificationsLogger.add(
+              ServerNotification.log(ServerNotification.Level.INFO, s"Executing ${moduleId}.${taskName}")
+            )
+            tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
           } finally {
             allTaskInstances.reverse.foreach { taskInstance =>
               taskInstance.lock.unlock()

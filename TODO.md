@@ -6,7 +6,8 @@
 - maybe use "CI" env var to disable BSP/semanticdb in CI runners?
     - and enable locally by default..
 
-
+- add BSP integration tests from Metals and testkit??
+    - https://scalameta.org/metals/docs/integrations/new-build-tool/#automated-tests
 
 
 
