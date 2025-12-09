@@ -142,6 +142,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       ctx.out
     }
 
+  // this is localRunClasspath in mill ??
   val transitiveClassesDirTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "transitiveClassesDir",
@@ -367,38 +368,58 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       ) ++ ctx.transitiveResults.flatten.flatten ++ mandatoryDeps ++ dependencies).reverse.distinct.reverse
     }
 
-  // TODO optional
+  val mainClassesTask = TaskBuilder
+    .make[Seq[String]](
+      name = "mainClasses",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+    )
+    .dependsOn(transitiveClassesDirTask)
+    .build { ctx =>
+      MainClassesDiscovery.discover(ctx.depResults._1)
+    }
+
   val mainClassTask = TaskBuilder
-    .make[String](
+    .make[Option[String]](
       name = "mainClass",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
     .build { ctx =>
       ctx.module match {
-        case m: JavaModule  => m.mainClass
-        case m: ScalaModule => m.mainClass
-        case _              => ???
+        case m: JavaModule  => Option(m.mainClass)
+        case m: ScalaModule => Option(m.mainClass)
+        case _              => None
       }
     }
 
-  val runTask = TaskBuilder
+  val finalMainClassTask = TaskBuilder
     .make[String](
+      name = "finalMainClass",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
+    )
+    .dependsOn(mainClassTask)
+    .dependsOn(mainClassesTask)
+    .build { ctx =>
+      val mainClass = ctx.depResults._1.orElse(ctx.depResults._2.headOption)
+      mainClass.getOrElse(
+        throw new Exception(s"No main class found for module: ${ctx.module.id}")
+      )
+    }
+
+  val runTask = TaskBuilder
+    .make[Seq[String]](
       name = "run",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
     .dependsOn(runClasspathTask)
+    .dependsOn(finalMainClassTask)
     .build { ctx =>
       val runClasspath = ctx.depResults._1
       val cp = runClasspath.map(_.toString)
-      val mainClass = ctx.module match {
-        case m: JavaModule  => m.mainClass
-        case m: ScalaModule => m.mainClass
-        case _              => ???
-      }
+      val mainClass = ctx.depResults._2
       val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), mainClass)
       // println(s"Running command: " + cmd)
       ctx.notifications.add(ServerNotification.RunSubprocess(cmd))
-      ""
+      cmd
     }
 
   // order matters for dependency resolution!!
@@ -418,6 +439,8 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     compileTask,
     runClasspathTask,
     mainClassTask,
+    mainClassesTask,
+    finalMainClassTask,
     runTask
   )
 

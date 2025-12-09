@@ -40,7 +40,7 @@ public class Main {
 		}, () -> log("No parent process"));
 
 		DederClient client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(args, logFile);
-
+		// TODO try like 5 times until it connects, then bail
 		try {
 			client.start();
 		} catch (Exception e) {

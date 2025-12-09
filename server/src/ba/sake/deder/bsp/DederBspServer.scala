@@ -96,10 +96,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           }
       }
     }
-    /*println(
+    println(
       s"BSP buildTargetSources called for ${params.getTargets.asScala.map(_.getUri)}," +
         s" returning: ${sourcesItems.toList}"
-    )*/
+    )
     CompletableFuture.completedFuture(new SourcesResult(sourcesItems.asJava))
   }
 
@@ -336,7 +336,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetScalaMainClasses(
       params: ScalaMainClassesParams
   ): CompletableFuture[ScalaMainClassesResult] = {
-    // TODO discover main classes properly
     val items = projectState.lastGood match {
       case Left(errorMessage) =>
         List.empty
@@ -344,15 +343,18 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets().asScala.map { targetId =>
           val moduleId = targetId.moduleId
-          val mainClass =
-            projectState.executeTask(moduleId, coreTasks.mainClassTask, notifyClient, useLastGood = true)
-          val item = ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
-          // TODO arguments + JVM opts
-          ScalaMainClassesItem(targetId, List(item).asJava)
+          val mainClasses =
+            projectState.executeTask(moduleId, coreTasks.mainClassesTask, notifyClient, useLastGood = true)
+          val items = mainClasses.map { mainClass =>
+            // TODO arguments + JVM opts
+            ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
+          }
+          ScalaMainClassesItem(targetId, items.asJava)
         }
     }
     val result = ScalaMainClassesResult(items.asJava)
     result.setOriginId(params.getOriginId)
+    println(s"BSP buildTargetScalaMainClasses called, returning: ${result}")
     CompletableFuture.completedFuture(result)
   }
 
@@ -426,8 +428,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets().asScala.map { targetId =>
           val moduleId = targetId.moduleId
-          val mainClass =
-            projectState.executeTask(moduleId, coreTasks.mainClassTask, notifyClient, useLastGood = true)
+          val mainClasses =
+            projectState.executeTask(moduleId, coreTasks.mainClassesTask, notifyClient, useLastGood = true)
           val classpath = projectState
             .executeTask(moduleId, coreTasks.runClasspathTask, notifyClient, useLastGood = true)
             .map { cpEntry => cpEntry.toNIO.toUri.toString }
@@ -435,16 +437,24 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val jvmOptions = List.empty[String] // TODO: Get JVM options
           val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
           val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
-          JvmEnvironmentItem(
+          val item = JvmEnvironmentItem(
             targetId,
             classpath.asJava,
             jvmOptions.asJava,
             workingDirectory,
             environmentVariables.asJava
           )
+          val mainClassItems = mainClasses.map { mainClass =>
+            // TODO what are the arguments???
+            JvmMainClass(mainClass, List.empty.asJava)
+          }
+          item.setMainClasses(mainClassItems.asJava)
+          item
         }
     }
-    CompletableFuture.completedFuture(JvmRunEnvironmentResult(items.asJava))
+    val res = JvmRunEnvironmentResult(items.asJava)
+    println(s"BSP buildTargetJvmRunEnvironment called, returning: ${res}")
+    CompletableFuture.completedFuture(res)
   }
 
   override def buildTargetJvmTestEnvironment(
@@ -490,7 +500,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     val isTestModule = false
     // TODO if has mainClass then it's an app.. ?
     val tags = if (isTestModule) List(BuildTargetTag.TEST) else List(BuildTargetTag.APPLICATION)
-    val languageIds = List(module.`type`.toString)
+    val languageIds = if (module.`type`.toString == "scala") List("scala", "java") else List(module.`type`.toString)
     val dependencies = module.moduleDeps.asScala.map(buildTargetId)
     val capabilities = new BuildTargetCapabilities()
     capabilities.setCanCompile(true)
