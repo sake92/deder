@@ -12,14 +12,22 @@ public class Main {
 	private static Path logFile;
 
 	public static void main(String[] args) throws Exception {
+		var isBspClient = false;
+		if (args.length == 1 && args[0].equals("--bsp")) {
+			isBspClient = true;
+		}
+
 		var processHandle = ProcessHandle.current();
 		var parentProcess = processHandle.parent();
-		logFile = Path
-				.of(".deder/logs/client/cli-client-" + System.currentTimeMillis() + "-" + processHandle.pid() + ".log");
+		var logFileName = isBspClient ? "bsp-client" : "cli-client";
+		logFile = Path.of(".deder/logs/client/" + logFileName + "-" + System.currentTimeMillis() + "-"
+				+ processHandle.pid() + ".log");
 		Files.createDirectories(logFile.getParent());
 		Files.createFile(logFile);
 
-		log("Deder Client started.");
+		log("Deder client started.");
+		log("Client Type: " + (isBspClient ? "BSP" : "CLI"));
+		log("Arguments: " + String.join(" ", args));
 		log("PID: " + processHandle.pid());
 		parentProcess.ifPresentOrElse(pp -> {
 			log("Parent PID: " + pp.pid());
@@ -37,7 +45,7 @@ public class Main {
 			log("Deder server started.");
 		}
 
-		if (args.length == 1 && args[0].equals("--bsp")) {
+		if (isBspClient) {
 			var client = new DederBspProxyClient(logFile);
 			client.start();
 		} else {

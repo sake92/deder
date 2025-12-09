@@ -3,7 +3,6 @@ package ba.sake.deder.client.cli;
 import java.io.*;
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;

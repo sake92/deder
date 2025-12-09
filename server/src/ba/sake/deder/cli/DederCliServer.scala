@@ -82,6 +82,7 @@ class DederCliServer(projectState: DederProjectState) {
       case _: CliClientMessage.Shutdown =>
         // println(s"Client $clientId requested server shutdown.")
         serverMessages.put(CliServerMessage.Log("Server is shutting down...", LogLevel.INFO))
+        Thread.sleep(100) // let the message be sent
         projectState.shutdown()
     }
   }
