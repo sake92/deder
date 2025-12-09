@@ -6,37 +6,42 @@ import java.net.UnixDomainSocketAddress;
 import java.nio.channels.Channels;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
+import java.nio.file.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import ba.sake.deder.client.DederClient;
 
 // TODO write to log file like DederBspProxyClient
 // TODO handle color stuff https://clig.dev/#output
 
-public class DederCliClient {
+public class DederCliClient implements DederClient {
 
+	private String[] args;
 	private Path logFile;
-
+	private Thread serverWriteThread;
+	private Thread serverReadThread;
 	private final ObjectMapper jsonMapper = new ObjectMapper();
 
-	public DederCliClient(Path logFile) {
+	public DederCliClient(String[] args, Path logFile) {
+		this.args = args;
 		this.logFile = logFile;
 	}
 
-	public void start(String[] args) throws IOException {
+	@Override
+	public void start() throws Exception {
 		var socketPath = Path.of(".deder/server-cli.sock");
 		var address = UnixDomainSocketAddress.of(socketPath);
 		try (var channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
 			channel.connect(address);
 			var os = Channels.newOutputStream(channel);
 			var is = Channels.newInputStream(channel);
-			Thread serverWriteThread = new Thread(() -> {
+			serverWriteThread = new Thread(() -> {
 				try {
 					serverWrite(os, args);
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
 				}
 			}, "DederCliServerWriteThread");
-			Thread serverReadThread = new Thread(() -> {
+			serverReadThread = new Thread(() -> {
 				try {
 					serverRead(is);
 				} catch (IOException e) {
@@ -45,15 +50,27 @@ public class DederCliClient {
 			}, "DederCliServerReadThread");
 			serverWriteThread.start();
 			serverReadThread.start();
-			serverWriteThread.join();
 			serverReadThread.join();
-			// System.out.println("Server disconnected"); // channel.read == -1
+			log("Server disconnected"); // channel.read == -1
+			serverWriteThread.interrupt(); // cancel the write thread
+			serverWriteThread.join();
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
 	}
 
-	void serverWrite(OutputStream os, String[] args) throws IOException {
+	@Override
+	public void stop() throws Exception {
+		if (serverWriteThread == null || serverReadThread == null) {
+			return; // didn't connect at all
+		}
+		serverWriteThread.interrupt();
+		serverReadThread.interrupt();
+		serverWriteThread.join(1000);
+		serverReadThread.join(1000);
+	}
+
+	private void serverWrite(OutputStream os, String[] args) throws IOException {
 		// while (true) {
 		// newline delimited JSON messages
 		ClientMessage message;
@@ -63,11 +80,12 @@ public class DederCliClient {
 			message = new ClientMessage.Run(args);
 		}
 		var messageJson = jsonMapper.writeValueAsString(message);
+		log("Sending message to server: " + messageJson);
 		os.write((messageJson + '\n').getBytes(StandardCharsets.UTF_8));
 		// }
 	}
 
-	void serverRead(InputStream is) throws IOException {
+	private void serverRead(InputStream is) throws IOException {
 		// newline delimited JSON messages
 		var reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
 		String messageJson = null;
@@ -92,4 +110,12 @@ public class DederCliClient {
 		}
 	}
 
+	private void log(String message) {
+		try {
+			Files.writeString(logFile, message + System.lineSeparator(), StandardCharsets.UTF_8,
+					StandardOpenOption.APPEND);
+		} catch (IOException e) {
+			throw new UncheckedIOException(e);
+		}
+	}
 }

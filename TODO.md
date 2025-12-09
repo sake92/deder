@@ -9,7 +9,3 @@
 - add BSP integration tests from Metals and testkit??
     - https://scalameta.org/metals/docs/integrations/new-build-tool/#automated-tests
 
-
-
-
-

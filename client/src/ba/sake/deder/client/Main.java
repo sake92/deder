@@ -26,11 +26,11 @@ public class Main {
 		var parentProcess = processHandle.parent();
 		var logFileName = isBspClient ? "bsp-client" : "cli-client";
 		var timestamp = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS).toString().replaceAll("[^0-9]", "-");
-		logFile = Path.of(".deder/logs/client/" + logFileName + "-" + timestamp + "-" + processHandle.pid() + ".log");
+		logFile = Path.of(".deder/logs/client/" + logFileName + "_" + timestamp + "_" + processHandle.pid() + ".log");
 		Files.createDirectories(logFile.getParent());
 		Files.createFile(logFile);
 
-		log("Deder client started.");
+		log("Deder client starting...");
 		log("Client Type: " + (isBspClient ? "BSP" : "CLI"));
 		log("Arguments: " + String.join(" ", args));
 		log("PID: " + processHandle.pid());
@@ -39,23 +39,20 @@ public class Main {
 			pp.info().commandLine().ifPresent(cmd -> log("Parent Command: " + cmd));
 		}, () -> log("No parent process"));
 
+		DederClient client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(args, logFile);
+
 		try {
-			startClient(args, isBspClient);
+			client.start();
 		} catch (Exception e) {
 			startServer();
-			startClient(args, isBspClient);
+			try {
+				client.stop();
+				client.start();
+			} catch (Exception ex) {
+				log("Error occurred while restarting client: " + ex.getMessage());
+			}
 		}
 	}
-
-	private static void startClient(String[] args, boolean isBspClient) throws Exception {
-		if (isBspClient) {
-			var client = new DederBspProxyClient(logFile);
-			client.start();
-		} else {
-			var client = new DederCliClient(logFile);
-			client.start(args);
-		}
-	};
 
 	private static void startServer() throws Exception {
 		System.err.println("Deder server not running, starting it...");
@@ -64,7 +61,7 @@ public class Main {
 		// TODO download server.jar if not present
 		startServerProcess();
 		System.err.println("Deder server started.");
-		Thread.sleep(1000); // wait a bit for server to start
+		Thread.sleep(2000); // wait a bit for server to start
 		log("Deder server started.");
 	}
 

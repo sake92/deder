@@ -7,16 +7,20 @@ import java.nio.channels.Channels;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import ba.sake.deder.client.DederClient;
 
 // just stream stdin/stdout ...
-public class DederBspProxyClient {
+public class DederBspProxyClient implements DederClient {
 
 	private Path logFile;
+	private Thread serverWriteThread;
+	private Thread serverReadThread;
 
 	public DederBspProxyClient(Path logFile) {
 		this.logFile = logFile;
 	}
 
+	@Override
 	public void start() throws IOException {
 		var socketPath = Path.of(".deder/server-bsp.sock");
 		var address = UnixDomainSocketAddress.of(socketPath);
@@ -24,7 +28,7 @@ public class DederBspProxyClient {
 		try (var channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
 			var connected = channel.connect(address);
 			log("Connected with server!");
-			Thread serverWriteThread = new Thread(() -> {
+			serverWriteThread = new Thread(() -> {
 				try {
 					var os = Channels.newOutputStream(channel);
 					System.in.transferTo(os);
@@ -34,7 +38,7 @@ public class DederBspProxyClient {
 				}
 				log("Client input stream ended, closing server write stream.");
 			}, "DederBspServerWriteThread");
-			Thread serverReadThread = new Thread(() -> {
+			serverReadThread = new Thread(() -> {
 				try {
 					var is = Channels.newInputStream(channel);
 					is.transferTo(System.out);
@@ -55,9 +59,21 @@ public class DederBspProxyClient {
 		}
 	}
 
+	@Override
+	public void stop() throws Exception {
+		if (serverWriteThread == null || serverReadThread == null) {
+			return; // didn't connect at all
+		}
+		serverWriteThread.interrupt();
+		serverReadThread.interrupt();
+		serverWriteThread.join(1000);
+		serverReadThread.join(1000);
+	}
+
 	private void log(String message) {
 		try {
-			Files.writeString(logFile, message + System.lineSeparator(), StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+			Files.writeString(logFile, message + System.lineSeparator(), StandardCharsets.UTF_8,
+					StandardOpenOption.APPEND);
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
