@@ -24,6 +24,7 @@ object server extends ScalaModule {
   )
   def moduleDeps = Seq(config)
 
+  def finalMainClass = "ba.sake.deder.ServerMain"
   def manifest = super.manifest().add("Multi-Release" -> "true")
 
   def scalacOptions = super.scalacOptions() ++ Seq("-Yretain-trees")

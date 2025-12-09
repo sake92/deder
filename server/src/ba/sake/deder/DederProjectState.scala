@@ -12,7 +12,9 @@ import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
 
-class DederProjectState(tasksExecutorService: ExecutorService) {
+class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () => Unit) {
+
+  @volatile private var shutdownStarted = false
 
   // keep hot
   private val zincCompiler = locally {
@@ -107,7 +109,10 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
       useLastGood: Boolean = false
   ): Any =
     try {
-      refreshProjectState(errorMessage => serverNotificationsLogger.add(ServerNotification.logError(errorMessage, Some(moduleId))))
+      if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
+      refreshProjectState(errorMessage =>
+        serverNotificationsLogger.add(ServerNotification.logError(errorMessage, Some(moduleId)))
+      )
       val state = if useLastGood then lastGood else current
       state match {
         case Left(errorMessage) =>
@@ -155,6 +160,11 @@ class DederProjectState(tasksExecutorService: ExecutorService) {
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         throw TaskEvaluationException(s"Error during task execution: ${e.getMessage}", e)
     }
+
+  def shutdown(): Unit = {
+    shutdownStarted = true
+    onShutdown()
+  }
 }
 
 case class DederProjectStateData(

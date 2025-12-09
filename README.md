@@ -14,7 +14,7 @@ Build the client:
 Run the server manually:
 ```scala
 # start server for a project
-./mill -i server.run examples/multi
+./mill -i server.run --root-dir examples/multi
 ```
 
 Run client:
@@ -22,10 +22,10 @@ Run client:
 # in another terminal, run commands:
 cd examples/multi
 
-../../out/client/assembly.dest/out.jar uber run
+../../out/client/assembly.dest/out.jar -t run -m uber
 
 # or with native client
-../../out/client-native/nativeImage.dest/native-executable uber run
+../../out/client-native/nativeImage.dest/native-executable -t run -m uber
 
 ```
 

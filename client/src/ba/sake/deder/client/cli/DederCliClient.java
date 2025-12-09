@@ -24,8 +24,6 @@ public class DederCliClient {
 	}
 
 	public void start(String[] args) throws IOException {
-		// TODO pass in debug level
-
 		var socketPath = Path.of(".deder/server-cli.sock");
 		var address = UnixDomainSocketAddress.of(socketPath);
 		try (var channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
@@ -59,7 +57,12 @@ public class DederCliClient {
 	void serverWrite(OutputStream os, String[] args) throws IOException {
 		// while (true) {
 		// newline delimited JSON messages
-		var message = new ClientMessage.Run(args);
+		ClientMessage message;
+		if (args.length == 1 && args[0].equals("shutdown")) {
+			message = new ClientMessage.Shutdown();
+		} else {
+			message = new ClientMessage.Run(args);
+		}
 		var messageJson = jsonMapper.writeValueAsString(message);
 		os.write((messageJson + '\n').getBytes(StandardCharsets.UTF_8));
 		// }
@@ -74,7 +77,7 @@ public class DederCliClient {
 			if (message instanceof ServerMessage.Output output) {
 				System.out.println(output.text());
 			} else if (message instanceof ServerMessage.Log log) {
-					System.err.println(log.text());
+				System.err.println(log.text());
 			} else if (message instanceof ServerMessage.RunSubprocess runSubprocess) {
 				var processBuilder = new ProcessBuilder(runSubprocess.cmd());
 				processBuilder.inheritIO();

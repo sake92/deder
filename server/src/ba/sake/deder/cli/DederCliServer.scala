@@ -71,14 +71,18 @@ class DederCliServer(projectState: DederProjectState) {
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
-            println(s"Running $cliOptions")
+            // println(s"Running $cliOptions")
             val logCallback: ServerNotification => Unit = {
-              case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal => 
-                // skip
+              case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
+              // skip
               case sn => serverMessages.put(CliServerMessage.fromServerNotification(sn))
             }
             projectState.executeAll(cliOptions.modules, cliOptions.task, logCallback)
         }
+      case _: CliClientMessage.Shutdown =>
+        // println(s"Client $clientId requested server shutdown.")
+        serverMessages.put(CliServerMessage.Log("Server is shutting down...", LogLevel.INFO))
+        projectState.shutdown()
     }
   }
 
@@ -105,6 +109,7 @@ class DederCliServer(projectState: DederProjectState) {
 
 enum CliClientMessage derives JsonRW {
   case Run(args: Seq[String])
+  case Shutdown()
 }
 
 enum CliServerMessage derives JsonRW {
