@@ -50,7 +50,6 @@ public class DederBspProxyClient {
 			log("Server disconnected"); // channel.read == -1
 			serverWriteThread.interrupt(); // cancel the write thread
 			serverWriteThread.join();
-
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
