@@ -6,43 +6,49 @@
     "name": "com.fasterxml.jackson.databind.ObjectMapper"
   },
   {
-    "name": "ba.sake.deder.cli.ClientMessage",
+    "name": "ba.sake.deder.client.cli.ClientMessage",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "ba.sake.deder.cli.ClientMessage$Run",
+    "name": "ba.sake.deder.client.cli.ClientMessage$Run",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "ba.sake.deder.cli.ServerMessage",
+    "name": "ba.sake.deder.client.cli.ServerMessage",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "ba.sake.deder.cli.ServerMessage$Output",
+    "name": "ba.sake.deder.client.cli.ServerMessage$Output",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "ba.sake.deder.cli.ServerMessage$Log",
+    "name": "ba.sake.deder.client.cli.ServerMessage$Log",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "ba.sake.deder.cli.ServerMessage$RunSubprocess",
+    "name": "ba.sake.deder.client.cli.ServerMessage$Log$LogLevel",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true
   },
   {
-    "name": "ba.sake.deder.cli.ServerMessage$Exit",
+    "name": "ba.sake.deder.client.cli.ServerMessage$RunSubprocess",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.client.cli.ServerMessage$Exit",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true

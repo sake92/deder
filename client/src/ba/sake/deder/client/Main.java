@@ -13,11 +13,18 @@ public class Main {
 
 	public static void main(String[] args) throws Exception {
 		var processHandle = ProcessHandle.current();
-		// TODO print parent process info
+		var parentProcess = processHandle.parent();
 		logFile = Path
 				.of(".deder/logs/client/cli-client-" + System.currentTimeMillis() + "-" + processHandle.pid() + ".log");
 		Files.createDirectories(logFile.getParent());
 		Files.createFile(logFile);
+
+		log("Deder Client started.");
+		log("PID: " + processHandle.pid());
+		parentProcess.ifPresentOrElse(pp -> {
+			log("Parent PID: " + pp.pid());
+			pp.info().commandLine().ifPresent(cmd -> log("Parent Command: " + cmd));
+		}, () -> log("No parent process"));
 
 		var serverLockFile = Paths.get(".deder/server.lock");
 		if (!serverLockFile.toFile().exists()) {

@@ -2,30 +2,30 @@
 
 Config based client-server build tool
 
-Build a client:
+Build the client:
 ```scala
-./mill -i cli.assembly
+./mill -i client.assembly
 
 # build native image cli client
-./mill -i cli.nativeImage
+./mill -i client-native.nativeImage
 ```
 
 
-Run a server:
+Run the server manually:
 ```scala
 # start server for a project
 ./mill -i server.run examples/multi
 ```
 
-Run a client:
+Run client:
 ```scala
 # in another terminal, run commands:
 cd examples/multi
 
-../../out/cli/assembly.dest/out.jar uber run
+../../out/client/assembly.dest/out.jar uber run
 
 # or with native client
-../../out/cli/nativeImage.dest/native-executable uber run
+../../out/client-native/nativeImage.dest/native-executable uber run
 
 ```
 
