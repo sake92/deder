@@ -67,7 +67,7 @@ public class Main {
 	}
 
 	private static void startServer() throws Exception {
-		var processBuilder = new ProcessBuilder("java", "-jar", ".deder/server.jar", ".");
+		var processBuilder = new ProcessBuilder("java", "-jar", ".deder/server.jar");
 		processBuilder.redirectOutput(logFile.toFile());
 		processBuilder.redirectErrorStream(true);
 		var serverProcess = processBuilder.start();

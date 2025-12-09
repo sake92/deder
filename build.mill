@@ -50,10 +50,6 @@ object `client-native` extends JavaModule, NativeImageModule {
     mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
   )
   def jvmId = "graalvm-community:25.0.1"
-  def jvmWorker = mill.api.ModuleRef(ZincWorkerGraalvm)
+  def jvmIndexVersion = "0.0.4-128-8f0ad3"
   def nativeImageOptions = Seq("--no-fallback")
-}
-
-object ZincWorkerGraalvm extends JvmWorkerModule {
-  def jvmIndexVersion = "latest.release"
 }
