@@ -23,7 +23,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val sources = ctx.module match {
         case m: JavaModule  => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
         case m: ScalaModule => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
-        case _              => ???
+        case _              => Seq.empty
       }
       // println(s"Module: ${ctx.module.id} sources: " + sources)
       sources
@@ -38,7 +38,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val resources = ctx.module match {
         case m: JavaModule  => m.resources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
         case m: ScalaModule => m.resources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
-        case _              => ???
+        case _              => Seq.empty
       }
       // println(s"Module: ${ctx.module.id} sources: " + sources)
       resources

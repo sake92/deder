@@ -6,6 +6,10 @@ import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.concurrent.TimeUnit;
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.stream.Collectors;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import ba.sake.deder.client.cli.DederCliClient;
@@ -17,12 +21,39 @@ public class Main {
 	private static Path serverLogFile;
 
 	public static void main(String[] args) throws Exception {
+
+		var processHandle = ProcessHandle.current();
+
+		if (args.length == 2 && args[0].equals("bsp") && args[1].equals("install")) {
+			System.err.println("Installing BSP config...");
+			var commandLineArgs = new ArrayList<String>();
+			commandLineArgs.add(processHandle.info().command().get());
+			commandLineArgs.addAll(Arrays.asList(processHandle.info().arguments().get()));
+			// this is called with "bsp install", need to remove "install"
+			commandLineArgs.remove(commandLineArgs.size() - 1);
+			var commandLineArgsJson = commandLineArgs.stream().map(arg -> "\"" + arg + "\"")
+					.collect(Collectors.joining(", "));
+			Files.createDirectories(Path.of(".bsp"));
+			var bspConfig = """
+					{
+						"name": "Deder",
+						"argv": [ %s ],
+						"version": "0.0.1",
+						"bspVersion": "2.2.0-M2",
+						"languages": [ "java", "scala" ]
+					}
+					""".formatted(commandLineArgsJson);
+			Files.write(Path.of(".bsp/deder.json"), bspConfig.getBytes(StandardCharsets.UTF_8),
+					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+			System.err.println("BSP config installed at .bsp/deder.json");
+			return;
+		}
+
 		var isBspClient = false;
-		if (args.length == 1 && args[0].equals("--bsp")) {
+		if (args.length == 1 && args[0].equals("bsp")) {
 			isBspClient = true;
 		}
 
-		var processHandle = ProcessHandle.current();
 		var parentProcess = processHandle.parent();
 		var logFileName = isBspClient ? "bsp-client" : "cli-client";
 		var timestamp = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS).toString().replaceAll("[^0-9]", "-");
@@ -31,7 +62,7 @@ public class Main {
 		Files.createFile(logFile);
 
 		log("Deder client starting...");
-		log("Client Type: " + (isBspClient ? "BSP" : "CLI"));
+		log("Deder client type: " + (isBspClient ? "BSP" : "CLI"));
 		log("Arguments: " + String.join(" ", args));
 		log("PID: " + processHandle.pid());
 		parentProcess.ifPresentOrElse(pp -> {
@@ -40,16 +71,26 @@ public class Main {
 		}, () -> log("No parent process"));
 
 		DederClient client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(args, logFile);
-		// TODO try like 5 times until it connects, then bail
+
+		var currentAttempt = 1;
+		var connected = false;
 		try {
 			client.start();
+			connected = true;
 		} catch (Exception e) {
 			startServer();
-			try {
-				client.stop();
-				client.start();
-			} catch (Exception ex) {
-				log("Error occurred while restarting client: " + ex.getMessage());
+			while (!connected && currentAttempt <= 10) {
+				try {
+					Thread.sleep(1000);
+					System.err.println("Attempting to reconnect to server, attempt " + currentAttempt + "...");
+					log("Attempting to reconnect to server, attempt " + currentAttempt + "...");
+					currentAttempt++;
+					client.stop();
+					client.start();
+					connected = true;
+				} catch (Exception ex) {
+					log("Error occurred while restarting client: " + ex.getMessage());
+				}
 			}
 		}
 	}
@@ -61,7 +102,6 @@ public class Main {
 		// TODO download server.jar if not present
 		startServerProcess();
 		System.err.println("Deder server started.");
-		Thread.sleep(2000); // wait a bit for server to start
 		log("Deder server started.");
 	}
 

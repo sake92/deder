@@ -63,8 +63,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       case Right(projectStateData) =>
         projectStateData.projectConfig.modules.asScala.map(m => buildTarget(m, projectStateData)).toList
     }
-    // println(s"BSP workspaceBuildTargets called, returning: ${buildTargets.map(_.getId.getUri)}")
     val result = new WorkspaceBuildTargetsResult(buildTargets.asJava)
+    println(s"BSP workspaceBuildTargets called, returning: ${result}")
     CompletableFuture.completedFuture(result)
   }
 
