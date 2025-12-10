@@ -36,16 +36,17 @@ public class Main {
 			Files.createDirectories(Path.of(".bsp"));
 			var bspConfig = """
 					{
-						"name": "Deder",
+						"name": "deder-bsp",
 						"argv": [ %s ],
 						"version": "0.0.1",
 						"bspVersion": "2.2.0-M2",
 						"languages": [ "java", "scala" ]
 					}
 					""".formatted(commandLineArgsJson);
-			Files.write(Path.of(".bsp/deder.json"), bspConfig.getBytes(StandardCharsets.UTF_8),
-					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-			System.err.println("BSP config installed at .bsp/deder.json");
+			var bspConfigPath = Path.of(".bsp/deder-bsp.json");
+			Files.write(bspConfigPath, bspConfig.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE,
+					StandardOpenOption.TRUNCATE_EXISTING);
+			System.err.println("BSP config installed at " + bspConfigPath.toAbsolutePath());
 			return;
 		}
 
@@ -100,6 +101,8 @@ public class Main {
 		log("Deder server not running, starting it...");
 		ensureJavaInstalled();
 		// TODO download server.jar if not present
+		Files.copy(Path.of("/home/sake/projects/sake92/deder/out/server/assembly.dest/out.jar"),
+				Path.of(".deder/server.jar"), StandardCopyOption.REPLACE_EXISTING);
 		startServerProcess();
 		System.err.println("Deder server started.");
 		log("Deder server started.");
