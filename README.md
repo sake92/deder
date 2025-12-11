@@ -2,6 +2,30 @@
 
 Config based client-server build tool
 
+See [dev docs](docs/dev/README.md) for more technical details
+
+## Concepts
+- project is a root project, your git repo
+- modules are "subprojects", like common/frontend..
+- modules have tasks defined for them
+
+## Status
+
+Supported commands:
+
+- `deder -t mytask`, runs a task for each module that has it
+- `deder -t mytask -m mymodule`, runs a task for this specific module
+- `deder -t compile -m mymodule --json`, runs compile task for mymodule and prints its result in json format
+- `deder -t run -m mymodule`, runs the main class for mymodule (#nonblocking! client-side)
+- `deder shutdown`, stops the Deder server for current project
+- `deder bsp install`, writes BSP config file for current project
+- `deder bsp`, starts a BSP client for current project
+
+See [examples](examples/multi/) for a realistic example project.
+
+
+## Building locally
+
 Build the client:
 ```scala
 ./mill -i client.assembly

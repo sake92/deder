@@ -20,8 +20,9 @@ class TasksResolver(
     allModules.foreach(graph.addVertex)
     allModules.foreach { m =>
       m.moduleDeps.asScala.foreach { moduleDep =>
-        // TODO check module type??
+        // TODO check platform type??
         // need to allow java<->scala deps both way
+        // but not scala->scalajs etc
         graph.addEdge(m, moduleDep)
       }
     }

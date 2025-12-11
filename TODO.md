@@ -13,3 +13,38 @@
 - add BSP integration tests from Metals and testkit??
     - https://scalameta.org/metals/docs/integrations/new-build-tool/#automated-tests
 
+
+
+# Add more commands
+
+- clean -t mytask, or all if no -t
+
+
+Mill-inspired:
+- resolve -m my*module -t my*task --json
+    - list tasks on a module
+    - list modules that have this task..
+    - or combine
+
+- inspect a task instance, list its direct dependencies
+
+- plan --json, list how Deder plans to execute a task
+    - maybe in stages
+
+- visualize ?? or maybe not, make a web server dashboard, no need to open files
+    - maybe ASCII art ???????? #infinite #possibilities
+- visualizePlan, subgraph of execution
+
+- init ofc, import from other build tools...
+
+
+
+
+
+
+
+
+
+
+
+
