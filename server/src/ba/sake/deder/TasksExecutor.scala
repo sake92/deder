@@ -17,7 +17,11 @@ class TasksExecutor(
     tasksExecutorService: ExecutorService
 ) {
 
-  def execute(stages: Seq[Seq[TaskInstance]], serverNotificationsLogger: ServerNotificationsLogger): Any = {
+  def execute(
+      stages: Seq[Seq[TaskInstance]],
+      args: Seq[String],
+      serverNotificationsLogger: ServerNotificationsLogger
+  ): Any = {
     var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
     var finalTaskResult: Any = ()
     for (taskInstances, stageIndex) <- stages.zipWithIndex do {
@@ -63,6 +67,7 @@ class TasksExecutor(
               taskInstance.module,
               depResults,
               transitiveResults,
+              args,
               serverNotificationsLogger
             )
           finalTaskResult = taskRes.value // in last stage, last task's result will be returned

@@ -55,6 +55,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
   def executeAll(
       moduleSelectors: Seq[String],
       taskName: String,
+      args: Seq[String],
       notificationCallback: ServerNotification => Unit,
       useLastGood: Boolean = false,
       json: Boolean = false
@@ -86,7 +87,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
             var jsonValues = Map.empty[String, JValue]
             selectedModuleIds.foreach { moduleId =>
               val taskInstance = dpsd.executionPlanner.getTaskInstance(moduleId, taskName)
-              val taskRes = executeTask(moduleId, taskInstance.task, serverNotificationsLogger, useLastGood)
+              val taskRes = executeTask(moduleId, taskInstance.task, args, serverNotificationsLogger, useLastGood)
               if json then
                 val jsonRes = taskInstance.task.rw.write(taskRes)
                 jsonValues = jsonValues.updated(moduleId, jsonRes)
@@ -104,14 +105,16 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
   def executeTask[T](
       moduleId: String,
       task: Task[T, ?],
+      args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean = false
   ): T =
-    executeOne(moduleId, task.name, serverNotificationsLogger, useLastGood).asInstanceOf[T]
+    executeOne(moduleId, task.name, args, serverNotificationsLogger, useLastGood).asInstanceOf[T]
 
   def executeOne(
       moduleId: String,
       taskName: String,
+      args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean = false
   ): Any =
@@ -138,7 +141,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
             serverNotificationsLogger.add(
               ServerNotification.logInfo(s"Executing ${moduleId}.${taskName}", Some(moduleId))
             )
-            tasksExecutor.execute(tasksExecStages, serverNotificationsLogger)
+            tasksExecutor.execute(tasksExecStages, args, serverNotificationsLogger)
           } finally {
             allTaskInstances.reverse.foreach { taskInstance =>
               taskInstance.lock.unlock()
