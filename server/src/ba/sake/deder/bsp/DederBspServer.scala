@@ -221,9 +221,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         params.getTargets.asScala.map { targetId =>
           val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
-          val fetchRes =
+          val dependencies =
             projectState.executeTask(moduleId, coreTasks.dependenciesTask, notifyClient, useLastGood = true)
-
+          val fetchRes = DependencyResolver.fetch(dependencies)
           // assuming that dependencies and artifacts are in the same order, 1:1 mapping
           val depsWithArtifacts = fetchRes.getDependencies.asScala
             .zip(fetchRes.getArtifacts.asScala)
@@ -265,14 +265,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         params.getTargets.asScala.map { targetId =>
           val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
-          val fetchRes =
+          val dependencies =
             projectState.executeTask(moduleId, coreTasks.dependenciesTask, notifyClient, useLastGood = true)
-          val depSources = fetchRes.getDependencies().asScala.map { dep =>
+          val fetchRes = DependencyResolver.fetch(dependencies)
+          val depSources = fetchRes.getDependencies.asScala.map { dep =>
             dep.withClassifier("sources").withType("jar").withConfiguration("sources")
           }
           // println(s"Fetching sources for dependencies: ${depSources.map(_.toString).mkString(", ")}")
           val sourceArtifactFiles = DependencyResolver
-            .fetch(depSources.toSeq)
+            .doFetch(depSources.toSeq)
             .getArtifacts()
             .asScala
             .map(_.getValue())

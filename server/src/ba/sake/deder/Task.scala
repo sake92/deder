@@ -10,7 +10,7 @@ import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import os.write.over
 
-case class TaskBuilder[T, Deps <: Tuple] private (
+case class TaskBuilder[T: JsonRW, Deps <: Tuple] private (
     name: String,
     taskDeps: Deps,
     // if it triggers upstream modules task with same name
@@ -25,7 +25,7 @@ case class TaskBuilder[T, Deps <: Tuple] private (
 }
 
 object TaskBuilder {
-  def make[T](
+  def make[T: JsonRW](
       name: String,
       // if it triggers upstream modules task with same name
       transitive: Boolean = false,
@@ -79,7 +79,7 @@ case class TaskExecContext[T, Deps <: Tuple](
 
 // TODO add "args", .e.g. for run task
 // TODO make T: JsonRW mandatory, to show in --json and web server..
-sealed trait Task[T, Deps <: Tuple](using ev: TaskDeps[Deps] =:= true) {
+sealed trait Task[T: JsonRW, Deps <: Tuple](using ev: TaskDeps[Deps] =:= true) {
   def name: String
   def supportedModuleTypes: Set[ModuleType]
   def transitive: Boolean
@@ -94,7 +94,7 @@ sealed trait Task[T, Deps <: Tuple](using ev: TaskDeps[Deps] =:= true) {
   ): TaskResult[T]
 }
 
-case class TaskImpl[T, Deps <: Tuple](
+case class TaskImpl[T: JsonRW, Deps <: Tuple](
     name: String,
     execute: TaskExecContext[T, Deps] => T,
     taskDeps: Deps = EmptyTuple,
@@ -103,7 +103,7 @@ case class TaskImpl[T, Deps <: Tuple](
     transitive: Boolean = false,
     supportedModuleTypes: Set[ModuleType] = Set.empty
 )(using ev: TaskDeps[Deps] =:= true)
-    extends Task[T, Deps](using ev) {
+    extends Task[T, Deps] {
   override private[deder] def executeUnsafe(
       project: DederProject,
       module: DederModule,
@@ -144,7 +144,7 @@ case class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     transitive: Boolean = false,
     supportedModuleTypes: Set[ModuleType] = Set.empty
 )(using ev: TaskDeps[Deps] =:= true)
-    extends Task[T, Deps](using ev) {
+    extends Task[T, Deps] {
 
   private[deder] override def executeUnsafe(
       project: DederProject,

@@ -8,6 +8,7 @@ import dependency.ScalaParameters
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.zinc.{DederZincLogger, ZincCompiler}
 import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, ScalaModule}
+import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 
@@ -83,7 +84,7 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     }
 
   val dependenciesTask = TaskBuilder
-    .make[coursierapi.FetchResult](
+    .make[Seq[deps.Dependency]](
       name = "dependencies",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
@@ -95,16 +96,8 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         case m: ScalaModule => m.deps.asScala.toSeq
         case _              => Seq.empty
       }
-
-      val res = DependencyResolver.fetch(
-        depDeclarations
-          .map(depDecl => DependencyParser.parse(depDecl).toOption.get.applyParams(ScalaParameters(scalaVersion)))
-          .map(_.toCs),
-        Some(ctx.notifications)
-      )
-
       // println(s"Module: ${ctx.module.id} resolved deps: " + res)
-      res
+      depDeclarations.map(depDecl => Dependency.make(depDecl, scalaVersion))
     }
 
   val allDependenciesTask = TaskBuilder
@@ -121,15 +114,8 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         case m: ScalaModule => m.deps.asScala.toSeq
         case _              => Seq.empty
       }
-      val coursierDeps = depDeclarations
-        .map(depDecl => DependencyParser.parse(depDecl).toOption.get.applyParams(ScalaParameters(scalaVersion)))
-        .map(_.toCs)
-      val depsRes = DependencyResolver
-        .fetch(coursierDeps, Some(ctx.notifications))
-        .getFiles
-        .asScala
-        .map(f => os.Path(f.toPath()))
-        .toSeq
+      val deps = depDeclarations.map(depDecl => Dependency.make(depDecl, scalaVersion))
+      val depsRes = DependencyResolver.fetchFiles(deps, Some(ctx.notifications))
       (depsRes ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
     }
 
@@ -171,15 +157,9 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val dependencies = ctx.depResults._3: Seq[os.Path]
       // dirty hack to get class dirs, all except for this module.. :/
       val transitiveClassesDirs = ctx.depResults._5.filterNot(_ == ctx.depResults._4)
-      val scalaLibraryJar = DependencyResolver.fetchOne(
-        DependencyParser
-          .parse(s"org.scala-lang:scala-library:${scalaVersion}")
-          .toOption
-          .get
-          .applyParams(ScalaParameters(scalaVersion))
-          .toCs
+      val scalaLibraryJar = DependencyResolver.fetchFile(
+        Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion)
       ) // TODO scala3-library
-
       val additionalCompileClasspath = ctx.transitiveResults.flatten.flatten ++ dependencies
       (transitiveClassesDirs ++ Seq(scalaLibraryJar) ++ additionalCompileClasspath).reverse.distinct.reverse
     }
@@ -192,22 +172,10 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val scalaVersion = ctx.depResults._1
-      val processorJars = DependencyResolver
-        .fetch(
-          Seq("com.sourcegraph:semanticdb-javac:0.11.1")
-            .map(d =>
-              DependencyParser
-                .parse(d)
-                .toOption
-                .get
-                .applyParams(ScalaParameters(scalaVersion))
-                .toCs
-            )
-        )
-        .getFiles
-        .asScala
-        .map(f => os.Path(f.toPath()))
-        .toSeq
+      val processorJars = DependencyResolver.fetchFiles(
+        Seq(Dependency.make("com.sourcegraph:semanticdb-javac:0.11.1", scalaVersion)),
+        Some(ctx.notifications)
+      )
       processorJars
     }
 
@@ -219,23 +187,11 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val scalaVersion = ctx.depResults._1
-      val pluginJars = // // TODO not needed for scala3, plus make configurable
-        DependencyResolver
-          .fetch(
-            Seq("org.scalameta:::semanticdb-scalac:4.14.2")
-              .map(d =>
-                DependencyParser
-                  .parse(d)
-                  .toOption
-                  .get
-                  .applyParams(ScalaParameters(scalaVersion))
-                  .toCs
-              )
-          )
-          .getFiles
-          .asScala
-          .map(f => os.Path(f.toPath()))
-          .toSeq
+      // TODO not needed for scala3, plus make configurable
+      val pluginJars = DependencyResolver.fetchFiles(
+        Seq(Dependency.make("org.scalameta:::semanticdb-scalac:4.14.2", scalaVersion)),
+        Some(ctx.notifications)
+      )
       pluginJars
     }
 
@@ -276,24 +232,12 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         }
         .filter(os.isFile)
 
-      val compilerJars = DependencyResolver
-        .fetch(
-          Seq(
-            s"org.scala-lang:scala-compiler:${scalaVersion}",
-            s"org.scala-lang:scala-reflect:${scalaVersion}" // TODO only for scala 2
-          ).map(d =>
-            DependencyParser
-              .parse(d)
-              .toOption
-              .get
-              .applyParams(ScalaParameters(scalaVersion))
-              .toCs
-          )
-        )
-        .getFiles
-        .asScala
-        .map(f => os.Path(f.toPath()))
-        .toSeq
+      val compilerJars = DependencyResolver.fetchFiles(
+        Seq(
+          s"org.scala-lang:scala-compiler:${scalaVersion}",
+          s"org.scala-lang:scala-reflect:${scalaVersion}" // TODO only for scala 2
+        ).map(d => Dependency.make(d, scalaVersion))
+      )
 
       /*println(s"Compiling module: ${ctx.module.id} with ${(
         scalaVersion,
@@ -343,29 +287,16 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val mandatoryDeps = ctx.module match {
         case m: JavaModule => Seq.empty
         case m: ScalaModule =>
-          DependencyResolver
-            .fetch(
-              Seq(
-                DependencyParser
-                  .parse(s"org.scala-lang:scala-library:${m.scalaVersion}")
-                  .toOption
-                  .get
-                  .applyParams(ScalaParameters(m.scalaVersion))
-                  .toCs
-              )
-            )
-            .getFiles
-            .asScala
-            .map(f => os.Path(f.toPath()))
-            .toSeq
+          DependencyResolver.fetchFiles(
+            Seq(Dependency.make(s"org.scala-lang:scala-library:${m.scalaVersion}", m.scalaVersion))
+          )
         case _ => Seq.empty
       }
 
       // println(s"Resolved deps: " + allDeps)
       // classdirs that are last in each module are pushed last in final classpath
-      (Seq(classesDir).map(
-        _.absPath
-      ) ++ ctx.transitiveResults.flatten.flatten ++ mandatoryDeps ++ dependencies).reverse.distinct.reverse
+      val classesDirsAbs = Seq(classesDir).map(_.absPath)
+      (classesDirsAbs ++ ctx.transitiveResults.flatten.flatten ++ mandatoryDeps ++ dependencies).reverse.distinct.reverse
     }
 
   val mainClassesTask = TaskBuilder

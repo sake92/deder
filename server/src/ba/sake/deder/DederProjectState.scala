@@ -4,11 +4,8 @@ import java.util.concurrent.ExecutorService
 import scala.util.control.NonFatal
 import scala.compiletime.uninitialized
 import scala.jdk.CollectionConverters.*
-import dependency.ScalaParameters
-import dependency.parser.DependencyParser
-import dependency.api.ops.*
-
 import ba.sake.deder.config.{ConfigParser, DederProject}
+import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
 
@@ -18,13 +15,8 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
 
   // keep hot
   private val zincCompiler = locally {
-    val compilerBridgeJar = DependencyResolver.fetchOne(
-      DependencyParser
-        .parse("org.scala-sbt::compiler-bridge:1.11.0")
-        .toOption
-        .get
-        .applyParams(ScalaParameters("2.13.17"))
-        .toCs
+    val compilerBridgeJar = DependencyResolver.fetchFile(
+      Dependency.make("org.scala-sbt::compiler-bridge:1.11.0", "2.13.17")
     )
     ZincCompiler(compilerBridgeJar)
   }
