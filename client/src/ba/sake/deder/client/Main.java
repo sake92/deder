@@ -23,28 +23,7 @@ public class Main {
 		var processHandle = ProcessHandle.current();
 
 		if (args.length == 2 && args[0].equals("bsp") && args[1].equals("install")) {
-			System.err.println("Installing BSP config...");
-			var commandLineArgs = new ArrayList<String>();
-			commandLineArgs.add(processHandle.info().command().get());
-			commandLineArgs.addAll(Arrays.asList(processHandle.info().arguments().get()));
-			// this is called with "bsp install", need to remove "install"
-			commandLineArgs.remove(commandLineArgs.size() - 1);
-			var commandLineArgsJson = commandLineArgs.stream().map(arg -> "\"" + arg + "\"")
-					.collect(Collectors.joining(", "));
-			Files.createDirectories(Path.of(".bsp"));
-			var bspConfig = """
-					{
-						"name": "deder-bsp",
-						"argv": [ %s ],
-						"version": "0.0.1",
-						"bspVersion": "2.2.0-M2",
-						"languages": [ "java", "scala" ]
-					}
-					""".formatted(commandLineArgsJson);
-			var bspConfigPath = Path.of(".bsp/deder-bsp.json");
-			Files.write(bspConfigPath, bspConfig.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE,
-					StandardOpenOption.TRUNCATE_EXISTING);
-			System.err.println("BSP config installed at " + bspConfigPath.toAbsolutePath());
+			writeBspInstallScript(processHandle);
 			return;
 		}
 
@@ -52,8 +31,6 @@ public class Main {
 		if (args.length == 1 && args[0].equals("bsp")) {
 			isBspClient = true;
 		}
-
-		// TODO handle "shutdown" command to stop server, if not running just exit
 
 		var parentProcess = processHandle.parent();
 		var logFileName = isBspClient ? "bsp-client" : "cli-client";
@@ -79,6 +56,11 @@ public class Main {
 			client.start();
 			connected = true;
 		} catch (Exception e) {
+			if (args.length == 1 && args[0].equals("shutdown")) {
+				log("Deder server not running. No need to shutdown.");
+				System.err.println("Deder server not running. No need to shutdown.");
+				return;
+			}
 			startServer();
 			while (!connected && currentAttempt <= 10) {
 				try {
@@ -141,6 +123,31 @@ public class Main {
 			System.exit(1);
 		}
 		serverProcess.errorReader().lines().forEach(line -> log("SERVER: " + line));
+	}
+
+	private static void writeBspInstallScript(ProcessHandle processHandle) throws IOException {
+		System.err.println("Installing BSP config...");
+		var commandLineArgs = new ArrayList<String>();
+		commandLineArgs.add(processHandle.info().command().get());
+		commandLineArgs.addAll(Arrays.asList(processHandle.info().arguments().get()));
+		// this is called with "bsp install", need to remove "install"
+		commandLineArgs.remove(commandLineArgs.size() - 1);
+		var commandLineArgsJson = commandLineArgs.stream().map(arg -> "\"" + arg + "\"")
+				.collect(Collectors.joining(", "));
+		Files.createDirectories(Path.of(".bsp"));
+		var bspConfig = """
+				{
+					"name": "deder-bsp",
+					"argv": [ %s ],
+					"version": "0.0.1",
+					"bspVersion": "2.2.0-M2",
+					"languages": [ "java", "scala" ]
+				}
+				""".formatted(commandLineArgsJson);
+		var bspConfigPath = Path.of(".bsp/deder-bsp.json");
+		Files.write(bspConfigPath, bspConfig.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE,
+				StandardOpenOption.TRUNCATE_EXISTING);
+		System.err.println("BSP config installed at " + bspConfigPath);
 	}
 
 	private static void log(String message) {
