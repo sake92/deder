@@ -13,9 +13,9 @@ See [dev docs](docs/dev/README.md) for more technical details
 
 Supported commands:
 
-- `deder -t mytask`, runs a task for each module that has it
-- `deder -t mytask -m mymodule`, runs a task for this specific module
-- `deder -t compile -m mymodule --json`, runs compile task for mymodule and prints its result in json format
+- `deder -t mytask`, executes a task for each module that has it
+- `deder -t mytask -m mymodule`, executes a task for this specific module
+- `deder -t compile -m mymodule --json`, executes compile task for mymodule and prints its result in json format
 - `deder -t run -m mymodule`, runs the main class for mymodule (#nonblocking! client-side)
 - `deder shutdown`, stops the Deder server for current project
 - `deder bsp install`, writes BSP config file for current project
@@ -54,8 +54,14 @@ cd examples/multi
 ```
 
 
+## IDE setup
 
+Run `deder bsp install` and just open with VSCode or IntelliJ (open as a BSP project).
 
-
+Currently working features:
+- import of project
+- navigation
+- compilation
+- run main scala classes (Java doesnt.. #todo-fixme )
 
 
