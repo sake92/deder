@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+
 # This is a wrapper script, that automatically selects or downloads Mill from Maven Central or GitHub release pages.
 #
 # This script determines the Mill version to use by trying these sources
