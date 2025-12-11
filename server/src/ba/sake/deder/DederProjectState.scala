@@ -94,7 +94,8 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
             if json then serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
             serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
           } catch {
-            case e: TaskEvaluationException =>
+            case e: TaskNotFoundException =>
+              serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
               serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
           }
     }

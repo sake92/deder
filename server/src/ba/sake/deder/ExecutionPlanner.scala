@@ -12,7 +12,7 @@ class ExecutionPlanner(
   // TODO better plan for skewed graphs (some tasks have many deps, some none)
   def execStages(moduleId: String, taskName: String): Seq[Seq[TaskInstance]] = {
     val taskToExecute = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
-      throw DederException(s"Task not found ${moduleId}.${taskName}")
+      throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
     }
     var stages = Map.empty[Int, Seq[TaskInstance]]
     var maxDepth = 0
@@ -42,7 +42,7 @@ class ExecutionPlanner(
 
     def go(moduleId: String, taskName: String): Unit = {
       val taskToExecute = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
-        throw DederException(s"Task not found ${moduleId}.${taskName}")
+        throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
       }
       val deps = tasksGraph.outgoingEdgesOf(taskToExecute).asScala.toSeq
       deps.foreach { depEdge =>
@@ -60,7 +60,7 @@ class ExecutionPlanner(
 
   def getTaskInstance(moduleId: String, taskName: String): TaskInstance = {
     tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
-      throw DederException(s"Task not found ${moduleId}.${taskName}")
+      throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
     }
   }
 }
