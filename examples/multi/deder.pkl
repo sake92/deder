@@ -1,7 +1,7 @@
 amends "../../config/DederProject.pkl"
 
 local const baseModule = new ScalaModule {
-  scalaVersion = "2.13.11"
+  scalaVersion = "2.13.18"
 }
 
 local const common = (baseModule) {

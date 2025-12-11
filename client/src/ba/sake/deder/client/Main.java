@@ -83,7 +83,7 @@ public class Main {
 		log("Deder server not running, starting it...");
 		ensureJavaInstalled();
 		// TODO download server.jar if not present
-		Files.copy(Path.of("/home/sake/projects/sake92/deder/out/server/assembly.dest/out.jar"),
+		Files.copy(Path.of("../../out/server/assembly.dest/out.jar"),
 				Path.of(".deder/server.jar"), StandardCopyOption.REPLACE_EXISTING);
 		startServerProcess();
 		System.err.println("Deder server started.");

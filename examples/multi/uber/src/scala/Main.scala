@@ -16,3 +16,4 @@ object Main extends App {
     true
   }) {}
 }
+

@@ -32,27 +32,20 @@ Build the client:
 
 # build native image cli client
 ./mill -i client-native.nativeImage
+
+# AND PUT IT IN PATH !!!
 ```
 
-
-Run the server manually:
-```scala
-# start server for a project
-./mill -i server.run --root-dir examples/multi
-```
 
 Run client:
 ```scala
 # in another terminal, run commands:
 cd examples/multi
 
-../../out/client/assembly.dest/out.jar -t run -m uber
+deder -t compile
 
-# or with native client
-../../out/client-native/nativeImage.dest/native-executable -t run -m uber
-
+deder -t run -m uber
 ```
-
 
 ## IDE setup
 
@@ -64,4 +57,4 @@ Currently working features:
 - compilation
 - run main scala classes (Java doesnt.. #todo-fixme )
 
-
+If you work on server code, after you build it you can run `./reset` in examples/multi
