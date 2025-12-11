@@ -10,7 +10,6 @@ import java.nio.file.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ba.sake.deder.client.DederClient;
 
-// TODO write to log file like DederBspProxyClient
 // TODO handle color stuff https://clig.dev/#output
 
 public class DederCliClient implements DederClient {

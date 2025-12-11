@@ -4,7 +4,7 @@ import java.io.*
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
 import java.nio.channels.{Channels, ServerSocketChannel, SocketChannel}
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.nio.charset.StandardCharsets
 import java.nio.ByteBuffer
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
@@ -15,11 +15,14 @@ import ba.sake.deder.*
 class DederCliServer(projectState: DederProjectState) {
 
   def start(): Unit = {
-    val socketPath = DederGlobals.projectRootDir / ".deder/server-cli.sock"
+
+    val relativeSocketPath = ".deder/server-cli.sock"
+    val socketPath = DederGlobals.projectRootDir / os.RelPath(relativeSocketPath)
     os.makeDir.all(socketPath / os.up)
     Files.deleteIfExists(socketPath.toNIO)
 
-    val address = UnixDomainSocketAddress.of(socketPath.toNIO)
+    // unix limitation for socket path is 108 bytes, so use relative path
+    val address = UnixDomainSocketAddress.of(Paths.get(relativeSocketPath))
     val serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
     serverChannel.bind(address)
 

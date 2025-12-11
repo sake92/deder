@@ -1,8 +1,6 @@
 package ba.sake.deder.client;
 
 import java.io.*;
-import java.net.ConnectException;
-import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +52,8 @@ public class Main {
 		if (args.length == 1 && args[0].equals("bsp")) {
 			isBspClient = true;
 		}
+
+		// TODO handle "shutdown" command to stop server, if not running just exit
 
 		var parentProcess = processHandle.parent();
 		var logFileName = isBspClient ? "bsp-client" : "cli-client";

@@ -3,7 +3,7 @@ package ba.sake.deder.bsp
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
 import java.nio.channels.{ServerSocketChannel, SocketChannel}
-import java.nio.file.{Files, Path}
+import java.nio.file.{Files, Path, Paths}
 import java.nio.channels.Channels
 import org.eclipse.lsp4j.jsonrpc.Launcher
 import ch.epfl.scala.bsp4j._
@@ -13,12 +13,13 @@ import ba.sake.deder.DederGlobals
 class DederBspProxyServer(projectState: DederProjectState) {
 
   def start(): Unit = {
-    val socketPath = DederGlobals.projectRootDir / ".deder/server-bsp.sock"
-    // println(s"Starting BSP server with socket $socketPath")
+    val relativeSocketPath = ".deder/server-bsp.sock"
+    val socketPath = DederGlobals.projectRootDir / os.RelPath(relativeSocketPath)
     os.makeDir.all(socketPath / os.up)
     Files.deleteIfExists(socketPath.toNIO)
 
-    val address = UnixDomainSocketAddress.of(socketPath.toNIO)
+    // unix limitation for socket path is 108 bytes, so use relative path
+    val address = UnixDomainSocketAddress.of(Paths.get(relativeSocketPath))
     val serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
     serverChannel.bind(address)
 
