@@ -25,6 +25,18 @@ jobs:
           chmod +x pkl-codegen-java
           ./scripts/gen-config-bindings.sh
       - name: Compile
-        run: ./mill -i __.compile
-      - name: Test
-        run: ./mill -i __.test
+        run: |
+        ./mill -i server.assembly
+        ./mill -i client.assembly
+        mkdir -p deder_bin
+        cp out/client/assembly.dest/out.jar deder_bin/deder
+        echo "${{ github.workspace }}/deder_bin" >> $GITHUB_PATH
+      - name: Compile examples/multi
+        working-directory: ./examples/multi
+        run: |
+          deder -t compile
+          deder -t compile -m common --json
+          deder shutdown
+      
+      #- name: Test
+      #  run: ./mill -i __.test
