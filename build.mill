@@ -5,7 +5,6 @@ import mill.*
 import mill.scalalib.*
 
 object server extends ScalaModule {
-  def jvmId = "zulu:21.0.9"
   def scalaVersion = "3.7.4"
   def mvnDeps = Seq(
     mvn"org.jgrapht:jgrapht-core:1.5.2",
@@ -31,14 +30,12 @@ object server extends ScalaModule {
 }
 
 object config extends JavaModule {
-  def jvmId = "zulu:21.0.9"
   def mvnDeps = Seq(
     mvn"org.pkl-lang:pkl-config-java:0.30.1"
   )
 }
 
 object client extends JavaModule {
-  def jvmId = "zulu:21.0.9"
   def mainClass = Some("ba.sake.deder.client.Main")
   def mvnDeps = Seq(
     mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"

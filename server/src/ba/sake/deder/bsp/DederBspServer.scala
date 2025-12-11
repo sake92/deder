@@ -6,11 +6,10 @@ import java.util.concurrent.*
 import scala.jdk.CollectionConverters.*
 import ch.epfl.scala.bsp4j.*
 import org.eclipse.lsp4j.jsonrpc.Launcher
-import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
+import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.DependencyResolver
-import org.pkl.core.stdlib.math.MathNodes.e
 
 class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     extends BuildServer,
