@@ -1,13 +1,12 @@
-//| mill-version: 1.0.4
+//| mill-version: 1.1.0-RC3
 package build
 
 import mill.*
 import mill.scalalib.*
-import mill.api.Task.Simple
-import mill.util.JarManifest
 
 object server extends ScalaModule {
-  def scalaVersion = "3.7.1"
+  def jvmId = "zulu:21.0.9"
+  def scalaVersion = "3.7.4"
   def mvnDeps = Seq(
     mvn"org.jgrapht:jgrapht-core:1.5.2",
     mvn"org.jgrapht:jgrapht-io:1.5.2",
@@ -21,24 +20,26 @@ object server extends ScalaModule {
     mvn"io.get-coursier:interface:1.0.25",
     mvn"com.lihaoyi::mainargs:0.7.7",
     mvn"io.github.classgraph:classgraph:4.8.184",
-    mvn"ch.epfl.scala:bsp4j:2.2.0-M2",
+    mvn"ch.epfl.scala:bsp4j:2.2.0-M2"
   )
   def moduleDeps = Seq(config)
 
-  def finalMainClass = "ba.sake.deder.ServerMain"
+  def mainClass = Some("ba.sake.deder.ServerMain")
   def manifest = super.manifest().add("Multi-Release" -> "true")
 
   def scalacOptions = super.scalacOptions() ++ Seq("-Yretain-trees")
 }
 
 object config extends JavaModule {
+  def jvmId = "zulu:21.0.9"
   def mvnDeps = Seq(
-    mvn"org.pkl-lang:pkl-config-java:0.30.0"
+    mvn"org.pkl-lang:pkl-config-java:0.30.1"
   )
 }
 
 object client extends JavaModule {
-  def finalMainClass = "ba.sake.deder.client.Main"
+  def jvmId = "zulu:21.0.9"
+  def mainClass = Some("ba.sake.deder.client.Main")
   def mvnDeps = Seq(
     mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
   )
@@ -46,10 +47,8 @@ object client extends JavaModule {
 
 object `client-native` extends JavaModule, NativeImageModule {
   def moduleDir = client.moduleDir
-  def finalMainClass = "ba.sake.deder.client.Main"
-  def mvnDeps = Seq(
-    mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
-  )
+  def mainClass = client.mainClass
+  def mvnDeps = client.mvnDeps
   def jvmId = "graalvm-community:25.0.1"
   def jvmIndexVersion = "0.0.4-128-8f0ad3"
   def nativeImageOptions = Seq("--no-fallback")
