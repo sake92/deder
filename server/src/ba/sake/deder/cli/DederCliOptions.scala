@@ -16,5 +16,7 @@ case class DederCliOptions(
     modules: Seq[String], // cant have a default.. :/
     @arg(doc = "Log level", short = 'l')
     logLevel: LogLevel = LogLevel.INFO,
+    @arg(doc = "Output result as JSON")
+    json: Flag,
     args: Leftover[String]
 )

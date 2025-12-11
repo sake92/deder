@@ -77,7 +77,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         case Right(projectStateData) =>
           val coreTasks = projectStateData.tasksRegistry.coreTasks
           val sourceDirs =
-            projectState.executeTask(moduleId, coreTasks.sourcesTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.sourcesTask, serverNotificationsLogger, useLastGood = true)
           sourceDirs.map { srcDir =>
             val srcDirPath = srcDir.absPath
             val sourceItems =
@@ -111,7 +111,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         val modules = projectStateData.tasksResolver.allModules.filter { m =>
           val sourceDirs =
-            projectState.executeTask(m.id, coreTasks.sourcesTask, notifyClient, useLastGood = true)
+            projectState.executeTask(m.id, coreTasks.sourcesTask, serverNotificationsLogger, useLastGood = true)
           sourceDirs.exists { srcDir =>
             val srcDirUri = srcDir.absPath.toURI.toString()
             srcDirUri.startsWith(params.getTextDocument().getUri())
@@ -131,7 +131,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         case Right(projectStateData) =>
           val coreTasks = projectStateData.tasksRegistry.coreTasks
           val resourceDirs =
-            projectState.executeTask(moduleId, coreTasks.resourcesTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.resourcesTask, serverNotificationsLogger, useLastGood = true)
           resourceDirs.map { resourceDir =>
             val resourceDirPath = resourceDir.absPath
             val resourceItems =
@@ -167,7 +167,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           client.onBuildTaskStart(taskStartParams)
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           try {
-            projectState.executeTask(moduleId, coreTasks.compileTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.compileTask, serverNotificationsLogger, useLastGood = true)
           } catch {
             case e: TaskEvaluationException =>
               currentModuleCompileSucceeded = false
@@ -202,7 +202,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           val classesDir =
-            projectState.executeTask(moduleId, coreTasks.classesDirTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.classesDirTask, serverNotificationsLogger, useLastGood = true)
           os.remove.all(classesDir, ignoreErrors = true)
         }
         CompletableFuture.completedFuture(CleanCacheResult(true))
@@ -222,7 +222,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           val dependencies =
-            projectState.executeTask(moduleId, coreTasks.dependenciesTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.dependenciesTask, serverNotificationsLogger, useLastGood = true)
           val fetchRes = DependencyResolver.fetch(dependencies)
           // assuming that dependencies and artifacts are in the same order, 1:1 mapping
           val depsWithArtifacts = fetchRes.getDependencies.asScala
@@ -266,7 +266,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           val dependencies =
-            projectState.executeTask(moduleId, coreTasks.dependenciesTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.dependenciesTask, serverNotificationsLogger, useLastGood = true)
           val fetchRes = DependencyResolver.fetch(dependencies)
           val depSources = fetchRes.getDependencies.asScala.map { dep =>
             dep.withClassifier("sources").withType("jar").withConfiguration("sources")
@@ -306,15 +306,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val moduleId = targetId.moduleId
           val classesDir =
             projectState
-              .executeTask(moduleId, coreTasks.classesDirTask, notifyClient, useLastGood = true)
+              .executeTask(moduleId, coreTasks.classesDirTask, serverNotificationsLogger, useLastGood = true)
               .toNIO
               .toUri
               .toString
           val javacOptions =
-            projectState.executeTask(moduleId, coreTasks.javacOptionsTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.javacOptionsTask, serverNotificationsLogger, useLastGood = true)
           val javacAnnotationProcessors =
             projectState
-              .executeTask(moduleId, coreTasks.javacAnnotationProcessorsTask, notifyClient, useLastGood = true)
+              .executeTask(moduleId, coreTasks.javacAnnotationProcessorsTask, serverNotificationsLogger, useLastGood = true)
           val finalJavacOptions = javacOptions ++
             Seq(
               "-processorpath",
@@ -322,7 +322,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir}"
             )
           val compileClasspath = projectState
-            .executeTask(moduleId, coreTasks.compileClasspathTask, notifyClient, useLastGood = true)
+            .executeTask(moduleId, coreTasks.compileClasspathTask, serverNotificationsLogger, useLastGood = true)
             .map { cpEntry => cpEntry.toNIO.toUri.toString }
             .toList
 
@@ -345,7 +345,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         params.getTargets().asScala.map { targetId =>
           val moduleId = targetId.moduleId
           val mainClasses =
-            projectState.executeTask(moduleId, coreTasks.mainClassesTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.mainClassesTask, serverNotificationsLogger, useLastGood = true)
           val items = mainClasses.map { mainClass =>
             // TODO arguments + JVM opts
             ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
@@ -375,19 +375,19 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         params.getTargets().asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
           val scalacOptions =
-            projectState.executeTask(moduleId, coreTasks.scalacOptionsTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.scalacOptionsTask, serverNotificationsLogger, useLastGood = true)
           val scalacPlugins =
-            projectState.executeTask(moduleId, coreTasks.scalacPluginsTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.scalacPluginsTask, serverNotificationsLogger, useLastGood = true)
           val finalScalacOptions = scalacOptions ++
             Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
             scalacPlugins.map(p => s"-Xplugin:${p.toString}")
           val compileClasspath = projectState
-            .executeTask(moduleId, coreTasks.compileClasspathTask, notifyClient, useLastGood = true)
+            .executeTask(moduleId, coreTasks.compileClasspathTask, serverNotificationsLogger, useLastGood = true)
             .map { cpEntry => cpEntry.toNIO.toUri.toString }
             .toList
           val classesDir =
             projectState
-              .executeTask(moduleId, coreTasks.classesDirTask, notifyClient, useLastGood = true)
+              .executeTask(moduleId, coreTasks.classesDirTask, serverNotificationsLogger, useLastGood = true)
               .toNIO
               .toUri
               .toString
@@ -410,7 +410,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         params.getTargets().asScala.map { targetId =>
           val moduleId = targetId.moduleId
           val compileClasspath = projectState
-            .executeTask(moduleId, coreTasks.compileClasspathTask, notifyClient, useLastGood = true)
+            .executeTask(moduleId, coreTasks.compileClasspathTask, serverNotificationsLogger, useLastGood = true)
             .map { cpEntry => cpEntry.toNIO.toUri.toString }
             .toList
           JvmCompileClasspathItem(targetId, compileClasspath.asJava)
@@ -430,9 +430,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         params.getTargets().asScala.map { targetId =>
           val moduleId = targetId.moduleId
           val mainClasses =
-            projectState.executeTask(moduleId, coreTasks.mainClassesTask, notifyClient, useLastGood = true)
+            projectState.executeTask(moduleId, coreTasks.mainClassesTask, serverNotificationsLogger, useLastGood = true)
           val classpath = projectState
-            .executeTask(moduleId, coreTasks.runClasspathTask, notifyClient, useLastGood = true)
+            .executeTask(moduleId, coreTasks.runClasspathTask, serverNotificationsLogger, useLastGood = true)
             .map { cpEntry => cpEntry.toNIO.toUri.toString }
             .toList
           val jvmOptions = List.empty[String] // TODO: Get JVM options
@@ -533,15 +533,14 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       DederPath(module.root).absPath.toNIO.toUri.toString + "#" + module.id
     )
 
-  private val notifyClient = (n: ServerNotification) =>
-    n match {
-      case n: ServerNotification.Log =>
-        // dont spam the client with debug/trace messages..
-        if n.level.ordinal <= ServerNotification.LogLevel.INFO.ordinal then client.onBuildLogMessage(toBspLogMessage(n))
-      case n: ServerNotification.RequestFinished =>
-      // do nothing
-      case _ => // ignore other notifications for now
-    }
+  private val serverNotificationsLogger = ServerNotificationsLogger {
+    case n: ServerNotification.Log =>
+      // dont spam the client with debug/trace messages..
+      if n.level.ordinal <= ServerNotification.LogLevel.INFO.ordinal then client.onBuildLogMessage(toBspLogMessage(n))
+    case n: ServerNotification.RequestFinished =>
+    // do nothing
+    case _ => // ignore other notifications for now
+  }
 
   private def toBspLogMessage(n: ServerNotification.Log): LogMessageParams = {
     val level = n.level match {

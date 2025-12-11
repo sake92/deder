@@ -80,7 +80,7 @@ class DederCliServer(projectState: DederProjectState) {
               // skip
               case sn => serverMessages.put(CliServerMessage.fromServerNotification(sn))
             }
-            projectState.executeAll(cliOptions.modules, cliOptions.task, logCallback)
+            projectState.executeAll(cliOptions.modules, cliOptions.task, logCallback, json = cliOptions.json.value)
         }
       case _: CliClientMessage.Shutdown =>
         // println(s"Client $clientId requested server shutdown.")

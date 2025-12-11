@@ -57,4 +57,10 @@ class ExecutionPlanner(
     GraphUtils.checkNoCycles(subgraph, _.id)
     subgraph
   }
+
+  def getTaskInstance(moduleId: String, taskName: String): TaskInstance = {
+    tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
+      throw DederException(s"Task not found ${moduleId}.${taskName}")
+    }
+  }
 }

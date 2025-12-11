@@ -4,10 +4,12 @@ import java.util.concurrent.ExecutorService
 import scala.util.control.NonFatal
 import scala.compiletime.uninitialized
 import scala.jdk.CollectionConverters.*
+import ba.sake.tupson.toJson
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
+import org.typelevel.jawn.ast.JValue
 
 class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () => Unit) {
 
@@ -49,50 +51,62 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
     }
   }
 
-  def executeTask[T](
-      moduleId: String,
-      task: Task[T, ?],
-      notificationCallback: ServerNotification => Unit,
-      useLastGood: Boolean = false
-  ): T = {
-    val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
-    executeOne(moduleId, task.name, serverNotificationsLogger, useLastGood).asInstanceOf[T]
-  }
-
   // used mostly by CLI
   def executeAll(
       moduleSelectors: Seq[String],
       taskName: String,
       notificationCallback: ServerNotification => Unit,
-      useLastGood: Boolean = false
+      useLastGood: Boolean = false,
+      json: Boolean = false
   ): Unit = {
     val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
     val state = if useLastGood then lastGood else current
     // TODO deduplicate unnecessary work !
-    val selectedModuleIds = state match {
+    state match {
       case Left(errorMessage) =>
-        notificationCallback(
-          ServerNotification.log(ServerNotification.LogLevel.ERROR, errorMessage)
-        )
-        Seq.empty
+        serverNotificationsLogger.add(ServerNotification.logError(errorMessage))
       case Right(dpsd) =>
         val allModuleIds = dpsd.tasksResolver.allModules.map(_.id)
-        if moduleSelectors.isEmpty then allModuleIds
-        else
-          moduleSelectors.flatMap { selector =>
-            // TODO improve wildcard selection, e.g mymodule*jvm
-            allModuleIds.filter(_ == selector)
+        val selectedModuleIds =
+          if moduleSelectors.isEmpty then allModuleIds
+          else
+            moduleSelectors.flatMap { selector =>
+              // TODO improve wildcard selection, e.g mymodule*jvm
+              allModuleIds.filter(_ == selector)
+            }
+
+        println(s"Running ${taskName} on modules ${selectedModuleIds}")
+        if selectedModuleIds.isEmpty then {
+          serverNotificationsLogger.add(
+            ServerNotification.logError(s"No modules found for selectors: ${moduleSelectors.mkString(", ")}")
+          )
+          serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
+        } else
+          try {
+            var jsonValues = Map.empty[String, JValue]
+            selectedModuleIds.foreach { moduleId =>
+              val taskInstance = dpsd.executionPlanner.getTaskInstance(moduleId, taskName)
+              val taskRes = executeTask(moduleId, taskInstance.task, serverNotificationsLogger, useLastGood)
+              if json then
+                val jsonRes = taskInstance.task.rw.write(taskRes)
+                jsonValues = jsonValues.updated(moduleId, jsonRes)
+            }
+            if json then serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
+            serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
+          } catch {
+            case e: TaskEvaluationException =>
+              serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
           }
     }
-    println(s"Running ${taskName} on modules ${selectedModuleIds}")
-    try {
-      selectedModuleIds.foreach(moduleId => executeOne(moduleId, taskName, serverNotificationsLogger, useLastGood))
-      serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
-    } catch {
-      case e: TaskEvaluationException =>
-        serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
-    }
   }
+
+  def executeTask[T](
+      moduleId: String,
+      task: Task[T, ?],
+      serverNotificationsLogger: ServerNotificationsLogger,
+      useLastGood: Boolean = false
+  ): T =
+    executeOne(moduleId, task.name, serverNotificationsLogger, useLastGood).asInstanceOf[T]
 
   def executeOne(
       moduleId: String,
