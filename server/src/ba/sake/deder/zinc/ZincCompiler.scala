@@ -67,7 +67,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
 
     val classpathOptions = ClasspathOptionsUtil.auto()
     val scalaCompiler = ZincUtil.scalaCompiler(scalaInstance, compilerBridgeJar.toIO, classpathOptions)
-    val javaHome = os.Path(scala.util.Properties.javaHome)
+    val javaHome = os.Path(scala.util.Properties.javaHome) // TODO customize?
     val compilers = ZincUtil.compilers(scalaInstance, classpathOptions, javaHome = Some(javaHome.toNIO), scalac = scalaCompiler)
 
     val converter = PlainVirtualFileConverter.converter

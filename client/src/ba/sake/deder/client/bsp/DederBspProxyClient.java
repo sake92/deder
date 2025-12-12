@@ -57,6 +57,7 @@ public class DederBspProxyClient implements DederClient {
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
+		// TODO future: try to reconnect, if server restars..
 	}
 
 	@Override

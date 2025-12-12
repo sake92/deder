@@ -83,8 +83,8 @@ public class Main {
 		log("Deder server not running, starting it...");
 		ensureJavaInstalled();
 		// TODO download server.jar if not present
-		Files.copy(Path.of("../../out/server/assembly.dest/out.jar"),
-				Path.of(".deder/server.jar"), StandardCopyOption.REPLACE_EXISTING);
+		Files.copy(Path.of("../../out/server/assembly.dest/out.jar"), Path.of(".deder/server.jar"),
+				StandardCopyOption.REPLACE_EXISTING);
 		startServerProcess();
 		System.err.println("Deder server started.");
 		log("Deder server started.");
@@ -111,6 +111,7 @@ public class Main {
 		var serverLogFile = Path.of(".deder/logs/server.log");
 		Files.writeString(serverLogFile, "=".repeat(50) + System.lineSeparator(), StandardCharsets.UTF_8,
 				StandardOpenOption.APPEND, StandardOpenOption.CREATE);
+		// TODO set server JVM options, read from deder.properties?
 		var processBuilder = new ProcessBuilder("java", "-jar", ".deder/server.jar", "--root-dir", cwd.toString());
 		processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(serverLogFile.toFile()));
 		processBuilder.redirectErrorStream(true);

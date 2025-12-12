@@ -34,7 +34,7 @@ abstract class DederModule {
     else true
 }
 
-typealias ModuleType = "java" | "scala"
+typealias ModuleType = "java" | "scala" | "scala-test"
 
 class JavaModule extends DederModule {
   type: ModuleType = "java"

@@ -1,5 +1,16 @@
 
+## Tests
+
+- sbt test interface
+- always a separate JVM process, 1 or more for isolation..
+- on first run just randomly distribute between workers, record stats
+    - on next run use stats to figure out how to exec more performantly
+
+
+
 ## Misc
+
+- scala 3 support
 
 - maybe use "CI" env var to disable BSP/semanticdb in CI runners?
     - and enable locally by default..
@@ -25,12 +36,6 @@
 - add BSP integration tests from Metals and testkit??
     - https://scalameta.org/metals/docs/integrations/new-build-tool/#automated-tests
 
-## Tests
-
-- sbt test interface
-- always a separate JVM process, 1 or more for isolation..
-- on first run just randomly distribute between workers, record stats
-    - on next run use stats to figure out how to exec more performantly
 
 ## Packaging, publishing
 

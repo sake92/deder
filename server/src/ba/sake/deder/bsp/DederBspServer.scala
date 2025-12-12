@@ -10,6 +10,7 @@ import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.DependencyResolver
+import dependency.ScalaParameters
 
 class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     extends BuildServer,
@@ -456,15 +457,21 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     buildTarget.setBaseDirectory(DederPath(module.root).absPath.toNIO.toUri.toString)
     module match {
       case m: DederProject.JavaModule =>
-        val data = new JvmBuildTarget() // TODO set path & version
-        buildTarget.setData(data)
+        val jvmBuildTarget = new JvmBuildTarget()
+        jvmBuildTarget.setJavaHome(scala.util.Properties.javaHome) // TODO configurable?
+        jvmBuildTarget.setJavaVersion(System.getProperty("java.version")) // TODO configurable?
+        buildTarget.setData(jvmBuildTarget)
         buildTarget.setDataKind(BuildTargetDataKind.JVM)
       case m: DederProject.ScalaModule =>
-        val binaryVersion = m.scalaVersion.split("\\.").take(2).mkString(".") // TODO extract with coursier
-        // TODO val scalaJars = List("scala-compiler.jar", "scala-reflect.jar", "scala-library.jar").asJava
-        val data =
+        val binaryVersion = ScalaParameters(m.scalaVersion).scalaBinaryVersion
+        // TODO val jars = List("scala-compiler.jar", "scala-reflect.jar", "scala-library.jar").asJava
+        val scalaBuildTarget =
           new ScalaBuildTarget("org.scala-lang", m.scalaVersion, binaryVersion, ScalaPlatform.JVM, List.empty.asJava)
-        buildTarget.setData(data)
+        val jvmBuildTarget = new JvmBuildTarget()
+        jvmBuildTarget.setJavaHome(scala.util.Properties.javaHome) // TODO configurable?
+        jvmBuildTarget.setJavaVersion(System.getProperty("java.version")) // TODO configurable?
+        //scalaBuildTarget.setJvmBuildTarget(jvmBuildTarget)
+        buildTarget.setData(scalaBuildTarget)
         buildTarget.setDataKind(BuildTargetDataKind.SCALA)
       case _ =>
     }
