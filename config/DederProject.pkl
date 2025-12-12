@@ -1,6 +1,14 @@
 module ba.sake.deder.config.DederProject
 
-modules: Listing<DederModule>
+// TODO write tests https://pkl-lang.org/blog/testing-in-pkl.html#writing-tests
+
+modules: Listing<DederModule>(modulesValidation)
+
+hidden modulesValidation = (value: Listing<DederModule>) ->
+  if (!(value.toList().map((m) -> m.id).distinct.length == value.length))
+    throw("Module ids must be unique.")
+  else true
+
 
 abstract class DederModule {
   /// Module id, used in CLI and referring from other modules
@@ -17,17 +25,15 @@ abstract class DederModule {
 
   type: ModuleType
 
-  // TODO only alphanum and _- chars !
-  hidden idValidation = (value) ->
-    if (value.isBlank) throw("Id must not be blank.")
+  hidden idValidation = (value: String) ->
+    if (!value.matches(Regex("^[a-zA-Z0-9_-]+$"))) throw("Id must be alphanumeric and can contain '_' and '-'.")
     else true
 
-  hidden rootValidation = (value) ->
-      if (value.isBlank) throw("Id must not be blank.")
-      else true
+  hidden rootValidation = (value: String) ->
+    if (!value.matches(Regex("^[a-zA-Z0-9_-]+$"))) throw("Root must be alphanumeric and can contain '_' and '-'.")
+    else true
 }
 
-// TODO remove ??
 typealias ModuleType = "java" | "scala"
 
 class JavaModule extends DederModule {

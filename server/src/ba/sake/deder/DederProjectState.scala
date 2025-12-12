@@ -39,8 +39,8 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
     val newProjectConfig = configParser.parse(configFile)
     newProjectConfig match {
       case Left(errorMessage) =>
-        onError(errorMessage)
         current = Left(errorMessage)
+        onError(errorMessage)
       case Right(newConfig) =>
         val tasksResolver = TasksResolver(newConfig, tasksRegistry)
         val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
@@ -51,55 +51,55 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
     }
   }
 
-  // used mostly by CLI
-  def executeAll(
+  def executeCLI(
       moduleSelectors: Seq[String],
       taskName: String,
       args: Seq[String],
       notificationCallback: ServerNotification => Unit,
       useLastGood: Boolean = false,
       json: Boolean = false
-  ): Unit = {
+  ): Unit = try {
     val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
-    val state = if useLastGood then lastGood else current
+    refreshProjectState(errorMessage => throw TaskEvaluationException(s"Project state is invalid: ${errorMessage}"))
+    val state = (if useLastGood then lastGood else current).toOption.get
     // TODO deduplicate unnecessary work !
-    state match {
-      case Left(errorMessage) =>
-        serverNotificationsLogger.add(ServerNotification.logError(errorMessage))
-      case Right(dpsd) =>
-        val allModuleIds = dpsd.tasksResolver.allModules.map(_.id)
-        val selectedModuleIds =
-          if moduleSelectors.isEmpty then allModuleIds
-          else
-            moduleSelectors.flatMap { selector =>
-              // TODO improve wildcard selection, e.g mymodule*jvm
-              allModuleIds.filter(_ == selector)
-            }
+    val allModuleIds = state.tasksResolver.allModules.map(_.id)
+    val selectedModuleIds =
+      if moduleSelectors.isEmpty then allModuleIds
+      else
+        moduleSelectors.flatMap { selector =>
+          // TODO improve wildcard selection, e.g mymodule*jvm
+          allModuleIds.filter(_ == selector)
+        }
 
-        println(s"Running ${taskName} on modules ${selectedModuleIds}")
-        if selectedModuleIds.isEmpty then {
-          serverNotificationsLogger.add(
-            ServerNotification.logError(s"No modules found for selectors: ${moduleSelectors.mkString(", ")}")
-          )
+    println(s"Running ${taskName} on modules ${selectedModuleIds}")
+    if selectedModuleIds.isEmpty then {
+      serverNotificationsLogger.add(
+        ServerNotification.logError(s"No modules found for selectors: ${moduleSelectors.mkString(", ")}")
+      )
+      serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
+    } else
+      try {
+        var jsonValues = Map.empty[String, JValue]
+        selectedModuleIds.foreach { moduleId =>
+          val taskInstance = state.executionPlanner.getTaskInstance(moduleId, taskName)
+          val taskRes = executeTask(moduleId, taskInstance.task, args, serverNotificationsLogger, useLastGood)
+          if json then
+            val jsonRes = taskInstance.task.rw.write(taskRes)
+            jsonValues = jsonValues.updated(moduleId, jsonRes)
+        }
+        if json then serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
+        serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
+      } catch {
+        case e: TaskNotFoundException =>
+          serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
-        } else
-          try {
-            var jsonValues = Map.empty[String, JValue]
-            selectedModuleIds.foreach { moduleId =>
-              val taskInstance = dpsd.executionPlanner.getTaskInstance(moduleId, taskName)
-              val taskRes = executeTask(moduleId, taskInstance.task, args, serverNotificationsLogger, useLastGood)
-              if json then
-                val jsonRes = taskInstance.task.rw.write(taskRes)
-                jsonValues = jsonValues.updated(moduleId, jsonRes)
-            }
-            if json then serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
-            serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
-          } catch {
-            case e: TaskNotFoundException =>
-              serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
-              serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
-          }
-    }
+      }
+
+  } catch {
+    case NonFatal(e) =>
+      notificationCallback(ServerNotification.logError(e.getMessage))
+      notificationCallback(ServerNotification.RequestFinished(success = false))
   }
 
   def executeTask[T](
@@ -121,32 +121,32 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
     try {
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
       refreshProjectState(errorMessage =>
-        serverNotificationsLogger.add(ServerNotification.logError(errorMessage, Some(moduleId)))
+        throw TaskEvaluationException(s"Project state is invalid during task execution: ${errorMessage}")
       )
-      val state = if useLastGood then lastGood else current
-      state match {
-        case Left(errorMessage) =>
-          throw TaskEvaluationException(s"Project state is invalid during task execution: ${errorMessage}")
+      val state = (if useLastGood then lastGood else current).toOption.get
 
-        case Right(DederProjectStateData(projectConfig, _, tasksResolver, executionPlanner)) =>
-          val tasksExecSubgraph = executionPlanner.getExecSubgraph(moduleId, taskName)
-          val tasksExecStages = executionPlanner.execStages(moduleId, taskName)
-          val tasksExecutor =
-            TasksExecutor(projectConfig, tasksResolver.modulesGraph, tasksResolver.tasksGraph, tasksExecutorService)
-          val allTaskInstances = tasksExecStages.flatten.sortBy(_.id)
-          allTaskInstances.foreach { taskInstance =>
-            taskInstance.lock.lock()
-          }
-          try {
-            serverNotificationsLogger.add(
-              ServerNotification.logInfo(s"Executing ${moduleId}.${taskName}", Some(moduleId))
-            )
-            tasksExecutor.execute(tasksExecStages, args, serverNotificationsLogger)
-          } finally {
-            allTaskInstances.reverse.foreach { taskInstance =>
-              taskInstance.lock.unlock()
-            }
-          }
+      val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(moduleId, taskName)
+      val tasksExecStages = state.executionPlanner.execStages(moduleId, taskName)
+      val tasksExecutor =
+        TasksExecutor(
+          state.projectConfig,
+          state.tasksResolver.modulesGraph,
+          state.tasksResolver.tasksGraph,
+          tasksExecutorService
+        )
+      val allTaskInstances = tasksExecStages.flatten.sortBy(_.id) // essential!!
+      allTaskInstances.foreach { taskInstance =>
+        taskInstance.lock.lock()
+      }
+      try {
+        serverNotificationsLogger.add(
+          ServerNotification.logInfo(s"Executing ${moduleId}.${taskName}", Some(moduleId))
+        )
+        tasksExecutor.execute(tasksExecStages, args, serverNotificationsLogger)
+      } finally {
+        allTaskInstances.reverse.foreach { taskInstance =>
+          taskInstance.lock.unlock()
+        }
       }
 
       /*
@@ -164,9 +164,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
 
     } catch {
       case NonFatal(e) =>
-        serverNotificationsLogger.add(
-          ServerNotification.logError(e.getMessage, Some(moduleId))
-        )
+        serverNotificationsLogger.add(ServerNotification.logError(e.getMessage, Some(moduleId)))
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         throw TaskEvaluationException(s"Error during task execution: ${e.getMessage}", e)
     }
