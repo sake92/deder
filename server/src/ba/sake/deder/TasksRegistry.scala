@@ -1,11 +1,10 @@
 package ba.sake.deder
 
 import ba.sake.deder.config.DederProject.ModuleType
-import ba.sake.deder.zinc.ZincCompiler
 
-class TasksRegistry(zincCompiler: ZincCompiler) {
+class TasksRegistry() {
 
-  val coreTasks: CoreTasks = CoreTasks(zincCompiler)
+  val coreTasks: CoreTasks = CoreTasks()
 
   def resolve(moduleType: ModuleType): Seq[Task[?, ?]] = {
     coreTasks.all.filter { t =>

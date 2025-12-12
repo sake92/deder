@@ -22,14 +22,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
 
   @volatile private var shutdownStarted = false
 
-  // keep hot
-  private val zincCompiler = locally {
-    val compilerBridgeJar = DependencyResolver.fetchFile(
-      Dependency.make("org.scala-sbt::compiler-bridge:1.11.0", "2.13.17")
-    )
-    ZincCompiler(compilerBridgeJar)
-  }
-  private val tasksRegistry = TasksRegistry(zincCompiler)
+  private val tasksRegistry = TasksRegistry()
   private val configParser = ConfigParser()
   private val configFile = DederGlobals.projectRootDir / "deder.pkl"
 
@@ -71,7 +64,9 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
   ): Unit = try {
     val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
     refreshProjectState(errorMessage => throw TaskEvaluationException(s"Project state is invalid: ${errorMessage}"))
-    val state = (if useLastGood then lastGood else current).toOption.get
+    val state = (if useLastGood then lastGood else current).toOption.getOrElse(
+      throw TaskEvaluationException(s"Project state is not available (lastGood=${useLastGood})")
+    )
     // TODO deduplicate unnecessary work !
     val allModuleIds = state.tasksResolver.allModules.map(_.id)
     val selectedModuleIds =
@@ -133,7 +128,9 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
       refreshProjectState(errorMessage =>
         throw TaskEvaluationException(s"Project state is invalid during task execution: ${errorMessage}")
       )
-      val state = (if useLastGood then lastGood else current).toOption.get
+      val state = (if useLastGood then lastGood else current).toOption.getOrElse(
+        throw TaskEvaluationException(s"Project state is not available (lastGood=${useLastGood})")
+      )
 
       val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(moduleId, taskName)
       val tasksExecStages = state.executionPlanner.execStages(moduleId, taskName)
@@ -176,7 +173,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
       case NonFatal(e) =>
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage, Some(moduleId)))
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
-        throw TaskEvaluationException(s"Error during task execution: ${e.getMessage}", e)
+        throw TaskEvaluationException(s"Error during execution of task '${taskName}': ${e.getMessage}", e)
     } finally {
       lastRequestFinishedAt.set(Instant.now())
     }

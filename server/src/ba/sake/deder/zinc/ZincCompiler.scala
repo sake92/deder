@@ -47,18 +47,49 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       // TODO custom reporter, for BSP diagnostics
   ): Unit = {
 
-    //println(s"Zinc compile: $scalacOptions ;;; $javacOptions ;;; compileClasspath=$compileClasspath")
-
-    val classloader = this.getClass.getClassLoader
+    // val classloader = this.getClass.getClassLoader
     val scalaLibraryJars = compileClasspath.filter { p =>
-      (p.last.startsWith("scala-library-") || p.last.startsWith("scala3-library-")) && p.last.endsWith(".jar")
+      (p.last.startsWith("scala-library-") || p.last.startsWith("scala3-library_3")) && p.last.endsWith(".jar")
     }
+
+    val parentClassloader = this.getClass.getClassLoader
+
+    val libraryClassloader = new java.net.URLClassLoader(
+      scalaLibraryJars.map(_.toNIO.toUri.toURL).toArray,
+      parentClassloader
+    )
+
+    val compilerClassloader = new java.net.URLClassLoader(
+      compilerJars.map(_.toNIO.toUri.toURL).toArray,
+      libraryClassloader
+    )
+
+    val allJarsClassloader = new java.net.URLClassLoader(
+      (compilerJars ++ scalaLibraryJars).map(_.toNIO.toUri.toURL).toArray,
+      parentClassloader
+    )
+
+    println(
+      s"""Zinc compile:
+        |compilerBridgeJar = $compilerBridgeJar
+        |
+        |scalacOptions = $scalacOptions
+        |
+        |javacOptions = $javacOptions 
+        |
+        |compileClasspath = ${compileClasspath.mkString("\n")}
+        |
+        |compilerJars = ${compilerJars.mkString("\n")}
+        |
+        |scalaLibraryJars = ${scalaLibraryJars.mkString("\n")}
+        |""".stripMargin
+    )
 
     val scalaInstance = new ScalaInstance(
       version = scalaVersion,
-      loader = classloader,
-      loaderCompilerOnly = classloader,
-      loaderLibraryOnly = classloader,
+      loader = allJarsClassloader,
+      loaderCompilerOnly = compilerClassloader,
+      loaderLibraryOnly = libraryClassloader,
       libraryJars = scalaLibraryJars.map(_.toIO).toArray,
       compilerJars = compilerJars.map(_.toIO).toArray,
       allJars = (compilerJars ++ scalaLibraryJars).map(_.toIO).toArray,
@@ -68,7 +99,8 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     val classpathOptions = ClasspathOptionsUtil.auto()
     val scalaCompiler = ZincUtil.scalaCompiler(scalaInstance, compilerBridgeJar.toIO, classpathOptions)
     val javaHome = os.Path(scala.util.Properties.javaHome) // TODO customize?
-    val compilers = ZincUtil.compilers(scalaInstance, classpathOptions, javaHome = Some(javaHome.toNIO), scalac = scalaCompiler)
+    val compilers =
+      ZincUtil.compilers(scalaInstance, classpathOptions, javaHome = Some(javaHome.toNIO), scalac = scalaCompiler)
 
     val converter = PlainVirtualFileConverter.converter
 
@@ -105,9 +137,9 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     val setup = getSetup(zincCacheFile.toNIO, reporter)
     val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
 
-    //try {
-      val newResult = incrementalCompiler.compile(inputs, zincLogger)
-      analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
+    // try {
+    val newResult = incrementalCompiler.compile(inputs, zincLogger)
+    analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
     /*} catch {
       case e: xsbti.CompileFailed =>
       // println("Noooooooooooooooooooooooooooooooooo")

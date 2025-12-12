@@ -12,7 +12,18 @@ import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 
-class CoreTasks(zincCompiler: ZincCompiler) {
+class CoreTasks() {
+
+  // TODO figure out how to cache these
+  private def zincCompiler(scalaVersion: String) = {
+    val dep =
+      if scalaVersion.startsWith("3.") then s"org.scala-lang:scala3-sbt-bridge:${scalaVersion}"
+      else "org.scala-sbt::compiler-bridge:1.11.0"
+    val compilerBridgeJar = DependencyResolver.fetchFile(
+      Dependency.make(dep, scalaVersion)
+    )
+    ZincCompiler(compilerBridgeJar)
+  }
 
   // source dirs
   val sourcesTask = CachedTaskBuilder
@@ -65,8 +76,12 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     )
     .build { ctx =>
       ctx.module match {
-        case m: ScalaModule => m.scalacOptions.asScala.toSeq
-        case _              => Seq.empty
+        case m: ScalaModule =>
+          val additional = ScalaParameters(m.scalaVersion).scalaVersion match {
+            case s"3.${_}" => Seq.empty // ("-Xtasty-reader")
+            case _         => Seq.empty
+          }
+          additional ++ m.scalacOptions.asScala.toSeq
       }
     }
 
@@ -157,11 +172,29 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val dependencies = ctx.depResults._3: Seq[os.Path]
       // dirty hack to get class dirs, all except for this module.. :/
       val transitiveClassesDirs = ctx.depResults._5.filterNot(_ == ctx.depResults._4)
-      val scalaLibraryJar = DependencyResolver.fetchFile(
-        Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion)
-      ) // TODO scala3-library
+      val scalaLibDep = ScalaParameters(scalaVersion).scalaVersion match {
+        case s"3.${_}" => s"org.scala-lang::scala3-library:${scalaVersion}"
+        case _         => s"org.scala-lang:scala-library:${scalaVersion}"
+      }
+      println(s"Module: ${ctx.module.id} scalaLibDep: ${scalaLibDep}")
+      val scalaLibraryJars = DependencyResolver.fetchFiles(Seq(Dependency.make(scalaLibDep, scalaVersion)))
       val additionalCompileClasspath = ctx.transitiveResults.flatten.flatten ++ dependencies
-      (transitiveClassesDirs ++ Seq(scalaLibraryJar) ++ additionalCompileClasspath).reverse.distinct.reverse
+      val res = (transitiveClassesDirs ++ scalaLibraryJars ++ additionalCompileClasspath).reverse.distinct.reverse
+      // there can only be one of each scala library version in classpath
+      var foundScala2Lib = false
+      var foundScala3Lib = false
+      val filteredRes = res.filter { p =>
+        if p.last.startsWith("scala-library-") then
+          val filter = !foundScala2Lib
+          foundScala2Lib = true
+          filter
+        else if p.last.startsWith("scala3-library_3") then
+          val filter = !foundScala3Lib
+          foundScala3Lib = true
+          filter
+        else true
+      }
+      filteredRes
     }
 
   val javacAnnotationProcessorsTask = TaskBuilder
@@ -187,9 +220,14 @@ class CoreTasks(zincCompiler: ZincCompiler) {
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val scalaVersion = ctx.depResults._1
-      // TODO not needed for scala3, plus make configurable
+      // TODO make configurable on/off
+      val semanticDbDeps = ScalaParameters(scalaVersion).scalaVersion match {
+        case s"3.${_}" => Seq.empty
+        case _         => Seq("org.scalameta:::semanticdb-scalac:4.14.2")
+      }
+      println(s"Module: ${ctx.module.id} semanticDbDeps: ${semanticDbDeps.mkString(", ")}")
       val pluginJars = DependencyResolver.fetchFiles(
-        Seq(Dependency.make("org.scalameta:::semanticdb-scalac:4.14.2", scalaVersion)),
+        semanticDbDeps.map(d => Dependency.make(d, scalaVersion)),
         Some(ctx.notifications)
       )
       pluginJars
@@ -232,19 +270,26 @@ class CoreTasks(zincCompiler: ZincCompiler) {
         }
         .filter(os.isFile)
 
+      val compilerDeps = ScalaParameters(scalaVersion).scalaVersion match {
+        case s"3.${_}" =>
+          Seq(s"org.scala-lang::scala3-compiler:${scalaVersion}")
+        case _ =>
+          Seq(
+            s"org.scala-lang:scala-compiler:${scalaVersion}",
+            s"org.scala-lang:scala-reflect:${scalaVersion}"
+          )
+      }
+      println(s"Module: ${ctx.module.id} compilerJars: ${compilerDeps.mkString(", ")}")
       val compilerJars = DependencyResolver.fetchFiles(
-        Seq(
-          s"org.scala-lang:scala-compiler:${scalaVersion}",
-          s"org.scala-lang:scala-reflect:${scalaVersion}" // TODO only for scala 2
-        ).map(d => Dependency.make(d, scalaVersion))
+        compilerDeps.map(d => Dependency.make(d, scalaVersion))
       )
 
       /*println(s"Compiling module: ${ctx.module.id} with ${(
-        scalaVersion,
-        compilerJars,
-        compileClasspath,
-        classesDir
-      )}")*/
+          scalaVersion,
+          compilerJars,
+          compileClasspath,
+          classesDir
+        )}")*/
 
       val zincCacheFile = ctx.out / "inc_compile.zip"
       val zincLogger = new DederZincLogger(ctx.notifications, ctx.module.id)
@@ -254,11 +299,16 @@ class CoreTasks(zincCompiler: ZincCompiler) {
           javacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator),
           s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir}"
         )
-      // TODO if scala3 Seq("-Xsemanticdb", s"-sourceroot:${DederGlobals.projectRootDir}")
-      val finalScalacOptions = scalacOptions ++
-        Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
-        scalacPlugins.map(p => s"-Xplugin:${p.toString}")
-      zincCompiler.compile(
+      val semanticDbScalacOpts = ScalaParameters(scalaVersion).scalaVersion match {
+        case s"3.${_}" =>
+          scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++
+            Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}")
+        case _ =>
+          Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
+            scalacPlugins.map(p => s"-Xplugin:${p.toString}")
+      }
+      val finalScalacOptions = scalacOptions ++ semanticDbScalacOpts
+      zincCompiler(scalaVersion).compile(
         scalaVersion,
         compilerJars,
         compileClasspath,
@@ -287,11 +337,18 @@ class CoreTasks(zincCompiler: ZincCompiler) {
       val mandatoryDeps = ctx.module match {
         case m: JavaModule => Seq.empty
         case m: ScalaModule =>
+          val scalaVersion = m.scalaVersion
+          val scalaLibDep = ScalaParameters(scalaVersion).scalaVersion match {
+            case s"3.${_}" => s"org.scala-lang::scala3-library:${scalaVersion}"
+            case _         => s"org.scala-lang:scala-library:${scalaVersion}"
+          }
           DependencyResolver.fetchFiles(
-            Seq(Dependency.make(s"org.scala-lang:scala-library:${m.scalaVersion}", m.scalaVersion))
+            Seq(Dependency.make(scalaLibDep, scalaVersion))
           )
         case _ => Seq.empty
       }
+
+      println(s"Module: ${ctx.module.id} mandatoryDeps: ${mandatoryDeps.mkString(", ")}")
 
       // println(s"Resolved deps: " + allDeps)
       // classdirs that are last in each module are pushed last in final classpath

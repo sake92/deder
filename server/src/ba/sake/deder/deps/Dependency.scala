@@ -18,7 +18,14 @@ case class Dependency(
 
 object Dependency {
   def make(declaration: String, scalaVersion: String, platform: Option[String] = None): Dependency =
-    val coursierDep = DependencyParser.parse(declaration).toOption.get
+    val coursierDep = DependencyParser
+      .parse(declaration)
+      .toOption
+      .getOrElse(
+        throw new IllegalArgumentException(
+          s"Invalid dependency declaration '${declaration}' for scalaVersion='${scalaVersion}'"
+        )
+      )
     val scalaParameters = ScalaParameters(scalaVersion).copy(platform = platform)
     Dependency(coursierDep, scalaParameters)
 

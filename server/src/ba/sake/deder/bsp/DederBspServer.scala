@@ -337,11 +337,17 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets().asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
+          val scalaVersion = executeTask(moduleId, coreTasks.scalaVersionTask)
           val scalacOptions = executeTask(moduleId, coreTasks.scalacOptionsTask)
           val scalacPlugins = executeTask(moduleId, coreTasks.scalacPluginsTask)
-          val finalScalacOptions = scalacOptions ++
-            Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
-            scalacPlugins.map(p => s"-Xplugin:${p.toString}")
+          val semanticdbOptions =
+            if scalaVersion.startsWith("3.") then
+              scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++
+                Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}")
+            else
+              Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
+                scalacPlugins.map(p => s"-Xplugin:${p.toString}")
+          val finalScalacOptions = scalacOptions ++ semanticdbOptions
           val compileClasspath =
             executeTask(moduleId, coreTasks.compileClasspathTask).map(_.toNIO.toUri.toString).toList
           val classesDir = executeTask(moduleId, coreTasks.classesDirTask).toNIO.toUri.toString
@@ -470,7 +476,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val jvmBuildTarget = new JvmBuildTarget()
         jvmBuildTarget.setJavaHome(scala.util.Properties.javaHome) // TODO configurable?
         jvmBuildTarget.setJavaVersion(System.getProperty("java.version")) // TODO configurable?
-        //scalaBuildTarget.setJvmBuildTarget(jvmBuildTarget)
+        // scalaBuildTarget.setJvmBuildTarget(jvmBuildTarget)
         buildTarget.setData(scalaBuildTarget)
         buildTarget.setDataKind(BuildTargetDataKind.SCALA)
       case _ =>

@@ -9,6 +9,7 @@ import org.jgrapht.graph.{DefaultEdge, SimpleDirectedGraph}
 import java.util
 import java.util.Collections
 import java.util.concurrent.{Callable, CopyOnWriteArrayList, ExecutorService}
+import scala.util.control.NonFatal
 
 class TasksExecutor(
     projectConfig: DederProject,
@@ -60,19 +61,24 @@ class TasksExecutor(
           transitiveResults.map(_.sortBy(_._1).map(_._2))
         }
 
-        () => {
-          val taskRes = taskInstance.task
-            .executeUnsafe(
-              projectConfig,
-              taskInstance.module,
-              depResults,
-              transitiveResults,
-              args,
-              serverNotificationsLogger
-            )
-          finalTaskResult = taskRes.value // in last stage, last task's result will be returned
-          taskInstance.id -> taskRes
-        }
+        () =>
+          try {
+            val taskRes = taskInstance.task
+              .executeUnsafe(
+                projectConfig,
+                taskInstance.module,
+                depResults,
+                transitiveResults,
+                args,
+                serverNotificationsLogger
+              )
+            finalTaskResult = taskRes.value // in last stage, last task's result will be returned
+            taskInstance.id -> taskRes
+          } catch {
+            case NonFatal(e) =>
+              println(s"Error during execution of task ${taskInstance.id}: ${e.getMessage}")
+              throw e
+          }
       }
       val futures = taskExecutions.map(tasksExecutorService.submit)
       val results = futures.map(_.get())

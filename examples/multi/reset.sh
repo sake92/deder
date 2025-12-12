@@ -1,5 +1,5 @@
 
-rm -rf .metals/metals.log .bsp/ .deder/out/ .deder/logs/
+rm -rf .metals/metals.log .metals/bsp.trace.json .bsp/ .deder/out/ .deder/logs/
 mkdir -p .metals
 touch .metals/bsp.trace.json
 
