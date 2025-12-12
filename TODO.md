@@ -1,17 +1,12 @@
 
-- jar
-- uber assembly
-- tests via sbt test interface..
-
-- max inactive period for server, shutdown if no reqs in flight for 10 mins
-
-- if project is in bad state (e.g. config invalid), metals cannot import it,
-    and even if you fix it, there is no way to reimport it properly
+## Misc
 
 - maybe use "CI" env var to disable BSP/semanticdb in CI runners?
     - and enable locally by default..
 
 - temp override of settings, say scalacOptions when running BSP request??? hmmm
+
+- use proper logger for server, or at least add timestamps
 
 ## Watch files
 - source task type
@@ -32,9 +27,16 @@
 
 ## Tests
 
+- sbt test interface
 - always a separate JVM process, 1 or more for isolation..
 - on first run just randomly distribute between workers, record stats
     - on next run use stats to figure out how to exec more performantly
+
+## Packaging, publishing
+
+- jar
+- uber assembly
+- publish
 
 ## Tracing
 - otel
