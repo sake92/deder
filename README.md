@@ -28,12 +28,14 @@ See [examples](examples/multi/) for a realistic example project.
 
 Build the client:
 ```scala
-./mill -i client.assembly
-
-# build native image cli client
-./mill -i client-native.nativeImage
-
+# executable JAR
+./mill client.assembly
+# or as graalvm native image
+./mill client-native.nativeImage
 # AND PUT IT IN PATH !!!
+
+# build server
+./mill server.assembly
 ```
 
 
@@ -41,6 +43,7 @@ Run client:
 ```scala
 # in another terminal, run commands:
 cd examples/multi
+./reset # copy the server JAR etc
 
 deder -t compile
 
