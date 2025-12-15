@@ -116,22 +116,15 @@ class CoreTasks() {
     }
 
   val allDependenciesTask = TaskBuilder
-    .make[Seq[os.Path]](
+    .make[Seq[deps.Dependency]](
       name = "allDependencies",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
       transitive = true
     )
-    .dependsOn(scalaVersionTask)
+    .dependsOn(dependenciesTask)
     .build { ctx =>
-      val scalaVersion = ctx.depResults._1
-      val depDeclarations = ctx.module match {
-        case m: JavaModule  => m.deps.asScala.toSeq
-        case m: ScalaModule => m.deps.asScala.toSeq
-        case _              => Seq.empty
-      }
-      val deps = depDeclarations.map(depDecl => Dependency.make(depDecl, scalaVersion))
-      val depsRes = DependencyResolver.fetchFiles(deps, Some(ctx.notifications))
-      (depsRes ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
+      val deps = ctx.depResults._1
+      (deps ++ ctx.transitiveResults.flatten.flatten).distinct
     }
 
   val classesDirTask = TaskBuilder
@@ -169,31 +162,20 @@ class CoreTasks() {
     .build { ctx =>
       val scalacOptions = ctx.depResults._1
       val scalaVersion = ctx.depResults._2
-      val dependencies = ctx.depResults._3: Seq[os.Path]
+      val dependencies = ctx.depResults._3
       // dirty hack to get class dirs, all except for this module.. :/
       val transitiveClassesDirs = ctx.depResults._5.filterNot(_ == ctx.depResults._4)
       val scalaLibDep =
         if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
         else s"org.scala-lang:scala-library:${scalaVersion}"
       println(s"Module: ${ctx.module.id} scalaLibDep: ${scalaLibDep}")
-      val scalaLibraryJars = DependencyResolver.fetchFiles(Seq(Dependency.make(scalaLibDep, scalaVersion)))
-      val additionalCompileClasspath = ctx.transitiveResults.flatten.flatten ++ dependencies
-      val res = (transitiveClassesDirs ++ scalaLibraryJars ++ additionalCompileClasspath).reverse.distinct.reverse
-      // there can only be one of each scala library version in classpath
-      var foundScala2Lib = false
-      var foundScala3Lib = false
-      val filteredRes = res.filter { p =>
-        if p.last.startsWith("scala-library-") then
-          val filter = !foundScala2Lib
-          foundScala2Lib = true
-          filter
-        else if p.last.startsWith("scala3-library_3") then
-          val filter = !foundScala3Lib
-          foundScala3Lib = true
-          filter
-        else true
-      }
-      filteredRes
+      val depsJars = DependencyResolver
+        .fetchFiles(
+          Seq(Dependency.make(scalaLibDep, scalaVersion)) ++ dependencies,
+          Some(ctx.notifications)
+        )
+      // val additionalCompileClasspath = ctx.transitiveResults.flatten.flatten ++ depsJars
+      (transitiveClassesDirs ++ depsJars).reverse.distinct.reverse
     }
 
   val javacAnnotationProcessorsTask = TaskBuilder
@@ -327,7 +309,7 @@ class CoreTasks() {
     .dependsOn(allDependenciesTask)
     .dependsOn(compileTask)
     .build { ctx =>
-      val dependencies: Seq[os.Path] = ctx.depResults._1
+      val dependencies = ctx.depResults._1
       val classesDir: DederPath = ctx.depResults._2
 
       val mandatoryDeps = ctx.module match {
@@ -337,18 +319,15 @@ class CoreTasks() {
           val scalaLibDep =
             if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
             else s"org.scala-lang:scala-library:${scalaVersion}"
-          DependencyResolver.fetchFiles(
-            Seq(Dependency.make(scalaLibDep, scalaVersion))
-          )
+          Seq(Dependency.make(scalaLibDep, scalaVersion))
         case _ => Seq.empty
       }
+      val depsJars = DependencyResolver.fetchFiles(mandatoryDeps ++ dependencies, Some(ctx.notifications))
 
-      println(s"Module: ${ctx.module.id} mandatoryDeps: ${mandatoryDeps.mkString(", ")}")
-
-      // println(s"Resolved deps: " + allDeps)
+      // println(s"Resolved deps: " + depsJars)
       // classdirs that are last in each module are pushed last in final classpath
       val classesDirsAbs = Seq(classesDir).map(_.absPath)
-      (classesDirsAbs ++ ctx.transitiveResults.flatten.flatten ++ mandatoryDeps ++ dependencies).reverse.distinct.reverse
+      (classesDirsAbs ++ ctx.transitiveResults.flatten.flatten ++ depsJars).reverse.distinct.reverse
     }
 
   val mainClassesTask = TaskBuilder

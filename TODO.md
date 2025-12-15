@@ -10,8 +10,6 @@
 
 ## Misc
 
-- scala 3 support
-
 - maybe use "CI" env var to disable BSP/semanticdb in CI runners?
     - and enable locally by default..
 
