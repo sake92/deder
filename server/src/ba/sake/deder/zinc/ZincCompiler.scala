@@ -68,7 +68,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       (compilerJars ++ scalaLibraryJars).map(_.toNIO.toUri.toURL).toArray,
       parentClassloader
     )
-
+/*
     println(
       s"""Zinc compile:
         |compilerBridgeJar = $compilerBridgeJar
@@ -83,7 +83,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
         |
         |scalaLibraryJars = ${scalaLibraryJars.mkString("\n")}
         |""".stripMargin
-    )
+    )*/
 
     val scalaInstance = new ScalaInstance(
       version = scalaVersion,

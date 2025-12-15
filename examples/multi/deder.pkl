@@ -32,9 +32,20 @@ local const uber = (baseModule) {
   mainClass = "uber.Main"
 }
 
+local const uberTest = new ScalaTestModule {
+  id = "uber-test"
+  root = "uber/test"
+  scalaVersion = "3.7.1"
+  moduleDeps { frontend; backend }
+  deps {
+    "org.scalameta::munit:1.2.1"
+  }
+}
+
 modules {
   common
   frontend
   backend
   uber
+  uberTest
 }
