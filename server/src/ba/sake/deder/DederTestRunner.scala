@@ -2,6 +2,8 @@ package ba.sake.deder
 
 // peek at https://github.com/scala-js/scala-js/blob/main/test-bridge/src/main/scala/org/scalajs/testing/bridge/HTMLRunner.scala
 
+// TODO forked execution, in client JVM!
+
 import sbt.testing._
 import java.io.File
 import java.net.URLClassLoader
@@ -22,6 +24,7 @@ class DederTestRunner(
     val urls = testClasspath.map(_.toURI.toURL).toArray
     val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
 
+    // TODO allow only one framework to be configured..
     val frameworks = discoverFrameworks(classLoader)
 
     if (frameworks.isEmpty) {
