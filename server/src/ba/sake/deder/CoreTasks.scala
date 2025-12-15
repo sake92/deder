@@ -172,10 +172,9 @@ class CoreTasks() {
       val dependencies = ctx.depResults._3: Seq[os.Path]
       // dirty hack to get class dirs, all except for this module.. :/
       val transitiveClassesDirs = ctx.depResults._5.filterNot(_ == ctx.depResults._4)
-      val scalaLibDep = ScalaParameters(scalaVersion).scalaVersion match {
-        case s"3.${_}" => s"org.scala-lang::scala3-library:${scalaVersion}"
-        case _         => s"org.scala-lang:scala-library:${scalaVersion}"
-      }
+      val scalaLibDep =
+        if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
+        else s"org.scala-lang:scala-library:${scalaVersion}"
       println(s"Module: ${ctx.module.id} scalaLibDep: ${scalaLibDep}")
       val scalaLibraryJars = DependencyResolver.fetchFiles(Seq(Dependency.make(scalaLibDep, scalaVersion)))
       val additionalCompileClasspath = ctx.transitiveResults.flatten.flatten ++ dependencies
@@ -220,11 +219,10 @@ class CoreTasks() {
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val scalaVersion = ctx.depResults._1
-      // TODO make configurable on/off
-      val semanticDbDeps = ScalaParameters(scalaVersion).scalaVersion match {
-        case s"3.${_}" => Seq.empty
-        case _         => Seq("org.scalameta:::semanticdb-scalac:4.14.2")
-      }
+      // TODO make configurable on/off + version
+      val semanticDbDeps =
+        if scalaVersion.startsWith("3.") then Seq.empty
+        else Seq("org.scalameta:::semanticdb-scalac:4.13.9")
       println(s"Module: ${ctx.module.id} semanticDbDeps: ${semanticDbDeps.mkString(", ")}")
       val pluginJars = DependencyResolver.fetchFiles(
         semanticDbDeps.map(d => Dependency.make(d, scalaVersion)),
@@ -270,15 +268,13 @@ class CoreTasks() {
         }
         .filter(os.isFile)
 
-      val compilerDeps = ScalaParameters(scalaVersion).scalaVersion match {
-        case s"3.${_}" =>
-          Seq(s"org.scala-lang::scala3-compiler:${scalaVersion}")
-        case _ =>
+      val compilerDeps =
+        if scalaVersion.startsWith("3.") then Seq(s"org.scala-lang::scala3-compiler:${scalaVersion}")
+        else
           Seq(
             s"org.scala-lang:scala-compiler:${scalaVersion}",
             s"org.scala-lang:scala-reflect:${scalaVersion}"
           )
-      }
       println(s"Module: ${ctx.module.id} compilerJars: ${compilerDeps.mkString(", ")}")
       val compilerJars = DependencyResolver.fetchFiles(
         compilerDeps.map(d => Dependency.make(d, scalaVersion))
@@ -299,14 +295,14 @@ class CoreTasks() {
           javacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator),
           s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir}"
         )
-      val semanticDbScalacOpts = ScalaParameters(scalaVersion).scalaVersion match {
-        case s"3.${_}" =>
-          scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++
-            Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}")
-        case _ =>
+      val semanticDbScalacOpts =
+        if scalaVersion.startsWith("3.") then
+          Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}") ++
+            scalacPlugins.map(p => s"-Xplugin:${p.toString}")
+        else
           Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
             scalacPlugins.map(p => s"-Xplugin:${p.toString}")
-      }
+
       val finalScalacOptions = scalacOptions ++ semanticDbScalacOpts
       zincCompiler(scalaVersion).compile(
         scalaVersion,
@@ -338,10 +334,9 @@ class CoreTasks() {
         case m: JavaModule => Seq.empty
         case m: ScalaModule =>
           val scalaVersion = m.scalaVersion
-          val scalaLibDep = ScalaParameters(scalaVersion).scalaVersion match {
-            case s"3.${_}" => s"org.scala-lang::scala3-library:${scalaVersion}"
-            case _         => s"org.scala-lang:scala-library:${scalaVersion}"
-          }
+          val scalaLibDep =
+            if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
+            else s"org.scala-lang:scala-library:${scalaVersion}"
           DependencyResolver.fetchFiles(
             Seq(Dependency.make(scalaLibDep, scalaVersion))
           )
