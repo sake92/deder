@@ -171,7 +171,6 @@ class CoreTasks() {
       val scalaLibDep =
         if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
         else s"org.scala-lang:scala-library:${scalaVersion}"
-      println(s"Module: ${ctx.module.id} scalaLibDep: ${scalaLibDep}")
       val depsJars = DependencyResolver
         .fetchFiles(
           Seq(Dependency.make(scalaLibDep, scalaVersion)) ++ dependencies,
@@ -208,7 +207,6 @@ class CoreTasks() {
       val semanticDbDeps =
         if scalaVersion.startsWith("3.") then Seq.empty
         else Seq("org.scalameta:::semanticdb-scalac:4.13.9")
-      println(s"Module: ${ctx.module.id} semanticDbDeps: ${semanticDbDeps.mkString(", ")}")
       val pluginJars = DependencyResolver.fetchFiles(
         semanticDbDeps.map(d => Dependency.make(d, scalaVersion)),
         Some(ctx.notifications)
@@ -260,7 +258,6 @@ class CoreTasks() {
             s"org.scala-lang:scala-compiler:${scalaVersion}",
             s"org.scala-lang:scala-reflect:${scalaVersion}"
           )
-      println(s"Module: ${ctx.module.id} compilerJars: ${compilerDeps.mkString(", ")}")
       val compilerJars = DependencyResolver.fetchFiles(
         compilerDeps.map(d => Dependency.make(d, scalaVersion))
       )
@@ -389,7 +386,7 @@ class CoreTasks() {
     }
 
   val testClassesTask = TaskBuilder
-    .make[Seq[String]](
+    .make[Seq[DiscoveredFrameworkTests]](
       name = "testClasses",
       supportedModuleTypes = Set(ModuleType.SCALA_TEST)
     )
@@ -402,12 +399,12 @@ class CoreTasks() {
       val urls = testClasspath.map(_.toURI.toURL).toArray
       val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
       val testDiscovery = DederTestDiscovery(
+        classLoader = classLoader,
         testClassesDir = classesDir.absPath.toIO,
         logger = DederTestLogger(ctx.notifications, ctx.module.id)
       )
-      val frameworks = testDiscovery.discoverFrameworks(classLoader)
-      frameworks.flatMap { framework =>
-        testDiscovery.discoverTests(framework, classLoader).map(_._1)
+      testDiscovery.discover().map { case (framework, tests) =>
+        DiscoveredFrameworkTests(framework.name(), tests.map(_._1))
       }
     }
 
@@ -418,22 +415,21 @@ class CoreTasks() {
     )
     .dependsOn(compileTask)
     .dependsOn(runClasspathTask)
+    // TODO testClassesTask
     .build { ctx =>
       val classesDir = ctx.depResults._1
       val classpath = ctx.depResults._2
-      val testClasspath = Seq(classesDir.absPath) ++ classpath
+      val testClasspath = (Seq(classesDir.absPath) ++ classpath).reverse.distinct.reverse
       val urls = testClasspath.map(_.toURI.toURL).toArray
       val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
       val testDiscovery = DederTestDiscovery(
+        classLoader = classLoader,
         testClassesDir = classesDir.absPath.toIO,
         logger = DederTestLogger(ctx.notifications, ctx.module.id)
       )
-      val frameworks = testDiscovery.discoverFrameworks(classLoader)
-      val tests = frameworks.map { framework =>
-        framework -> testDiscovery.discoverTests(framework, classLoader)
-      }
+      val frameworkTests = testDiscovery.discover()
       val testRunner = DederTestRunner(
-        tests = tests,
+        tests = frameworkTests,
         classLoader = classLoader,
         logger = DederTestLogger(ctx.notifications, ctx.module.id)
       )
@@ -460,6 +456,7 @@ class CoreTasks() {
     mainClassesTask,
     finalMainClassTask,
     runTask,
+    testClassesTask,
     testTask
   )
 

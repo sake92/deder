@@ -5,8 +5,11 @@ import java.io.File
 import java.net.URLClassLoader
 import scala.collection.mutable
 import ba.sake.deder.*
+import ba.sake.tupson.JsonRW
 
-class DederTestDiscovery(testClassesDir: File, logger: DederTestLogger) {
+case class DiscoveredFrameworkTests(framework: String, testClasses: Seq[String]) derives JsonRW
+
+class DederTestDiscovery(classLoader: ClassLoader, testClassesDir: File, logger: DederTestLogger) {
 
   private val frameworkClassNames: Seq[String] = Seq(
     "org.scalatest.tools.Framework",
@@ -16,7 +19,13 @@ class DederTestDiscovery(testClassesDir: File, logger: DederTestLogger) {
     "zio.test.sbt.ZTestFramework"
   )
 
-  def discoverFrameworks(classLoader: ClassLoader): Seq[Framework] = {
+  def discover(): Seq[(Framework, Seq[(String, Fingerprint)])] =
+    discoverFrameworks().map { framework =>
+      val testClasses = discoverTests(framework)
+      (framework, testClasses)
+    }
+
+  private def discoverFrameworks(): Seq[Framework] =
     frameworkClassNames.flatMap { className =>
       try {
         val cls = classLoader.loadClass(className)
@@ -28,12 +37,8 @@ class DederTestDiscovery(testClassesDir: File, logger: DederTestLogger) {
           None
       }
     }
-  }
 
-  def discoverTests(
-      framework: Framework,
-      classLoader: ClassLoader
-  ): Seq[(String, Fingerprint)] = {
+  private def discoverTests(framework: Framework): Seq[(String, Fingerprint)] = {
     val fingerprints = framework.fingerprints()
     val testClasses = findClassFiles()
     testClasses.flatMap { className =>
@@ -46,7 +51,11 @@ class DederTestDiscovery(testClassesDir: File, logger: DederTestLogger) {
 
   private def findClassFiles(): Seq[String] = {
     val osDir = os.Path(testClassesDir)
-    os.walk(osDir).filter(_.last.endsWith(".class")).map(_.relativeTo(osDir).baseName)
+    os.walk(osDir)
+      .filter(_.last.endsWith(".class"))
+      .map(_.subRelativeTo(osDir))
+      .map(_.segments.mkString(".").stripSuffix(".class"))
+      .toSeq
   }
 
   private def matchesFingerprint(
@@ -59,16 +68,15 @@ class DederTestDiscovery(testClassesDir: File, logger: DederTestLogger) {
       fingerprint match {
         case sub: SubclassFingerprint =>
           val superCls = classLoader.loadClass(sub.superclassName())
-          superCls.isAssignableFrom(cls) &&
-          sub.isModule == isModule(cls)
+          superCls.isAssignableFrom(cls) && sub.isModule == isModule(cls)
         case ann: AnnotatedFingerprint =>
           val annCls = classLoader.loadClass(ann.annotationName())
           cls.isAnnotationPresent(annCls.asInstanceOf[Class[java.lang.annotation.Annotation]]) &&
           ann.isModule == isModule(cls)
       }
     } catch {
-      case _: Exception =>
-        logger.debug(s"Failed to match fingerprint for class $className")
+      case e: Exception =>
+        logger.debug(s"Failed to match fingerprint for class $className: ${e.getMessage}")
         false
     }
   }

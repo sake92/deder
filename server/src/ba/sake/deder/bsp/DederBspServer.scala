@@ -312,11 +312,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       params.getTargets().asScala.map { targetId =>
         val moduleId = targetId.moduleId
-        val mainClasses = executeTask(moduleId, coreTasks.mainClassesTask)
-        val items = mainClasses.map { mainClass =>
-          // TODO arguments + JVM opts
-          ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
-        }
+        val module = projectStateData.tasksResolver.modulesMap(moduleId)
+        // TODO figure out nicer way for test modules
+        val items =
+          if module.isInstanceOf[DederProject.ScalaTestModule] then List.empty
+          else
+            executeTask(moduleId, coreTasks.mainClassesTask).map { mainClass =>
+              // TODO arguments + JVM opts
+              ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
+            }
         ScalaMainClassesItem(targetId, items.asJava)
       }
     }
@@ -330,16 +334,20 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       params: ScalaTestClassesParams
   ): CompletableFuture[ScalaTestClassesResult] = {
     val items = withLastGoodState { projectStateData =>
+      val coreTasks = projectStateData.tasksRegistry.coreTasks
       val testModules = projectStateData.projectConfig.modules.asScala.collect { case m: DederProject.ScalaTestModule =>
         m
       }
       testModules.map { module =>
         val targetId = buildTargetId(module)
-        //DederTestDiscovery.discover(module)
-        // TODO discover test classes
-        ScalaTestClassesItem(targetId, List.empty.asJava)
+        val frameworkTests = executeTask(module.id, coreTasks.testClassesTask)
+        frameworkTests.map { ft =>
+          val item = ScalaTestClassesItem(targetId, ft.testClasses.asJava)
+          item.setFramework(ft.framework)
+          item
+        }
       }
-    }
+    }.flatten
     CompletableFuture.completedFuture(ScalaTestClassesResult(items.asJava))
   }
 
@@ -472,7 +480,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       List(BuildTargetTag.APPLICATION).filter(_ => isAppModule),
       List(BuildTargetTag.LIBRARY).filter(_ => !isTestModule && !isAppModule)
     ).flatten
-    val languageIds = if (module.`type`.toString == "scala") List("scala", "java") else List(module.`type`.toString)
+    val languageIds = module.`type` match {
+      case ModuleType.SCALA | ModuleType.SCALA_TEST => List("scala", "java")
+      case ModuleType.JAVA                          => List("java")
+    }
     val dependencies = module.moduleDeps.asScala.map(buildTargetId)
     val capabilities = new BuildTargetCapabilities()
     capabilities.setCanCompile(true)

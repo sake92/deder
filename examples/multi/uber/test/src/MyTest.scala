@@ -1,3 +1,5 @@
+package uber
+
 class MyTest extends munit.FunSuite {
 
   test("basic") {
