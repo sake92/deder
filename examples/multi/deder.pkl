@@ -36,7 +36,7 @@ local const uberTest = new ScalaTestModule {
   id = "uber-test"
   root = "uber/test"
   scalaVersion = "3.7.1"
-  moduleDeps { frontend; backend }
+  moduleDeps { uber }
   deps {
     "org.scalameta::munit:1.2.1"
   }
