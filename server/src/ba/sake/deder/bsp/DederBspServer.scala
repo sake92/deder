@@ -11,6 +11,7 @@ import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.DependencyResolver
 import dependency.ScalaParameters
+import ba.sake.deder.config.DederProject.ModuleType
 
 class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     extends BuildServer,
@@ -52,7 +53,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   override def onBuildInitialized(): Unit = {
-    // TODO maybe trigger compilation immediately?
+    // trigger compile immediately
+    projectState.executeCLI(Seq.empty, "compile", Seq.empty, n => serverNotificationsLogger.add(n), useLastGood = true)
   }
 
   override def workspaceReload(): CompletableFuture[Object] = {
@@ -327,8 +329,18 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetScalaTestClasses(
       params: ScalaTestClassesParams
   ): CompletableFuture[ScalaTestClassesResult] = {
-    // TODO
-    CompletableFuture.completedFuture(ScalaTestClassesResult(List.empty.asJava))
+    val items = withLastGoodState { projectStateData =>
+      val testModules = projectStateData.projectConfig.modules.asScala.collect { case m: DederProject.ScalaTestModule =>
+        m
+      }
+      testModules.map { module =>
+        val targetId = buildTargetId(module)
+        //DederTestDiscovery.discover(module)
+        // TODO discover test classes
+        ScalaTestClassesItem(targetId, List.empty.asJava)
+      }
+    }
+    CompletableFuture.completedFuture(ScalaTestClassesResult(items.asJava))
   }
 
   override def buildTargetScalacOptions(params: ScalacOptionsParams): CompletableFuture[ScalacOptionsResult] =
@@ -448,15 +460,24 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   private def buildTarget(module: DederModule, projectStateData: DederProjectStateData): BuildTarget = {
     val id = buildTargetId(module)
-    val isTestModule = false
-    // TODO if has mainClass then it's an app.. ?
-    val tags = if (isTestModule) List(BuildTargetTag.TEST) else List(BuildTargetTag.APPLICATION)
+    val testModuleTypes = Set(ModuleType.SCALA_TEST)
+    val isTestModule = testModuleTypes.contains(module.`type`)
+    val isAppModule = module match {
+      case m: DederProject.ScalaModule => m.mainClass != null
+      case m: DederProject.JavaModule  => m.mainClass != null
+      case _                           => false
+    }
+    val tags = List(
+      List(BuildTargetTag.TEST).filter(_ => isTestModule),
+      List(BuildTargetTag.APPLICATION).filter(_ => isAppModule),
+      List(BuildTargetTag.LIBRARY).filter(_ => !isTestModule && !isAppModule)
+    ).flatten
     val languageIds = if (module.`type`.toString == "scala") List("scala", "java") else List(module.`type`.toString)
     val dependencies = module.moduleDeps.asScala.map(buildTargetId)
     val capabilities = new BuildTargetCapabilities()
     capabilities.setCanCompile(true)
-    capabilities.setCanRun(true)
-    capabilities.setCanTest(true)
+    capabilities.setCanRun(isAppModule)
+    capabilities.setCanTest(isTestModule)
     capabilities.setCanDebug(true)
     val buildTarget = new BuildTarget(id, tags.asJava, languageIds.asJava, dependencies.asJava, capabilities)
     buildTarget.setDisplayName(module.id)

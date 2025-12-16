@@ -1,10 +1,12 @@
-package ba.sake.deder
+package ba.sake.deder.testing
+
+import ba.sake.deder.*
 
 // peek at https://github.com/scala-js/scala-js/blob/main/test-bridge/src/main/scala/org/scalajs/testing/bridge/HTMLRunner.scala
 
-// TODO forked execution, in client JVM!
+// TODO forked execution
 
-import sbt.testing._
+import sbt.testing.{Task as SbtTestTask, *}
 import java.io.File
 import java.net.URLClassLoader
 import scala.collection.mutable
@@ -150,7 +152,7 @@ class DederTestRunner(
     cls.getName.endsWith("$")
   }
 
-  private def executeTasks(tasks: Seq[Task], handler: EventHandler): Unit = {
+  private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Unit = {
     tasks.foreach { task =>
       val nestedTasks = task.execute(handler, Array(logger))
       if (nestedTasks.nonEmpty) {

@@ -11,7 +11,7 @@ import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, S
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
-import os.write.over
+import ba.sake.deder.testing.* 
 
 class CoreTasks() {
 
