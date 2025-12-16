@@ -18,7 +18,7 @@ import ba.sake.deder.zinc.ZincCompiler
 class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () => Unit) {
 
   // TODO configurable
-  private val maxInactiveDuration = Duration.ofMinutes(5)
+  private val maxInactiveDuration = Duration.ofMinutes(10)
 
   @volatile private var shutdownStarted = false
 
@@ -30,7 +30,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
   // used for BSP to keep last known good state
   @volatile var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
 
-  val lastRequestFinishedAt = new java.util.concurrent.atomic.AtomicReference[Instant](null)
+  val lastRequestStartedAt = new java.util.concurrent.atomic.AtomicReference[Instant](null)
 
   refreshProjectState(err => println(s"Initial project state load error: ${err}"))
 
@@ -124,6 +124,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
       useLastGood: Boolean = false
   ): Any =
     try {
+      lastRequestStartedAt.set(Instant.now())
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
       refreshProjectState(errorMessage =>
         throw TaskEvaluationException(s"Project state is invalid during task execution: ${errorMessage}")
@@ -174,8 +175,6 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage, Some(moduleId)))
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         throw TaskEvaluationException(s"Error during execution of task '${taskName}': ${e.getMessage}", e)
-    } finally {
-      lastRequestFinishedAt.set(Instant.now())
     }
 
   private def scheduleInactiveShutdownChecker(): Unit = {
@@ -183,10 +182,10 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
     executor.scheduleAtFixedRate(
       () => {
         try {
-          val lastFinished = lastRequestFinishedAt.get()
-          if lastFinished != null then {
+          val lastStarted = lastRequestStartedAt.get()
+          if lastStarted != null then {
             val now = Instant.now()
-            val inactiveDuration = Duration.between(lastFinished, now)
+            val inactiveDuration = Duration.between(lastStarted, now)
             if inactiveDuration.compareTo(maxInactiveDuration) > 0 then {
               println(s"No requests in flight for ${inactiveDuration.toMinutes} minutes, shutting down server.")
               shutdown()

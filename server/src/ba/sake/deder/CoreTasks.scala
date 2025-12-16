@@ -1,10 +1,11 @@
 package ba.sake.deder
 
 import java.io.File
+import java.net.URLClassLoader
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import dependency.parser.DependencyParser
-import dependency.api.ops.*
-import dependency.ScalaParameters
+import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.zinc.{DederZincLogger, ZincCompiler}
 import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, ScalaModule, ScalaTestModule}
@@ -12,12 +13,10 @@ import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.testing.*
-import java.net.URLClassLoader
 
 class CoreTasks() {
 
-  // TODO figure out how to cache these
-  private def zincCompiler(scalaVersion: String) = {
+  private def makeZincCompiler(scalaVersion: String) = {
     val dep =
       if scalaVersion.startsWith("3.") then s"org.scala-lang:scala3-sbt-bridge:${scalaVersion}"
       else "org.scala-sbt::compiler-bridge:1.11.0"
@@ -26,6 +25,15 @@ class CoreTasks() {
     )
     ZincCompiler(compilerBridgeJar)
   }
+
+  private val zincCache: Cache[String, ZincCompiler] =
+    Scaffeine()
+      .expireAfterAccess(5.minute)
+      .maximumSize(10)
+      .build()
+
+  private def getZincCompiler(scalaVersion: String): ZincCompiler =
+    zincCache.get(scalaVersion, _ => makeZincCompiler(scalaVersion))
 
   // source dirs
   val sourcesTask = CachedTaskBuilder
@@ -286,7 +294,7 @@ class CoreTasks() {
             scalacPlugins.map(p => s"-Xplugin:${p.toString}")
 
       val finalScalacOptions = scalacOptions ++ semanticDbScalacOpts
-      zincCompiler(scalaVersion).compile(
+      getZincCompiler(scalaVersion).compile(
         scalaVersion,
         compilerJars,
         compileClasspath,

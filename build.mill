@@ -20,7 +20,8 @@ object server extends ScalaModule {
     mvn"com.lihaoyi::mainargs:0.7.7",
     mvn"io.github.classgraph:classgraph:4.8.184",
     mvn"org.scala-sbt:test-interface:1.0",
-    mvn"ch.epfl.scala:bsp4j:2.2.0-M2"
+    mvn"ch.epfl.scala:bsp4j:2.2.0-M2",
+    mvn"com.github.blemale::scaffeine:5.3.0"
   )
   def moduleDeps = Seq(config)
 
