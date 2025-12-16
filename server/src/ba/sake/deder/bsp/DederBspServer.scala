@@ -38,7 +38,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     capabilities.setCompileProvider(new CompileProvider(supportedLanguages.asJava))
     capabilities.setRunProvider(new RunProvider(supportedLanguages.asJava))
     capabilities.setTestProvider(new TestProvider(supportedLanguages.asJava))
-    capabilities.setDebugProvider(new DebugProvider(supportedLanguages.asJava))
+    // metals does debug stuff for us! https://github.com/scalameta/metals/issues/5928
+    // capabilities.setDebugProvider(new DebugProvider(supportedLanguages.asJava))
     capabilities.setCanReload(true)
     capabilities.setBuildTargetChangedProvider(true)
     capabilities.setJvmCompileClasspathProvider(true)
@@ -429,9 +430,37 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetJvmTestEnvironment(
       params: JvmTestEnvironmentParams
-  ): CompletableFuture[JvmTestEnvironmentResult] = {
-    // TODO
-    CompletableFuture.completedFuture(JvmTestEnvironmentResult(List.empty.asJava))
+  ): CompletableFuture[JvmTestEnvironmentResult] = CompletableFuture.supplyAsync { () =>
+    val items = withLastGoodState { projectStateData =>
+      val coreTasks = projectStateData.tasksRegistry.coreTasks
+      params.getTargets().asScala.map { targetId =>
+        val moduleId = targetId.moduleId
+        val testClasses = executeTask(moduleId, coreTasks.testClassesTask)
+        val classpath =
+          executeTask(moduleId, coreTasks.runClasspathTask).map(_.toNIO.toUri.toString).toList
+        val jvmOptions = List.empty[String] // TODO: Get JVM options
+        val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
+        val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
+        val item = JvmEnvironmentItem(
+          targetId,
+          classpath.asJava,
+          jvmOptions.asJava,
+          workingDirectory,
+          environmentVariables.asJava
+        )
+        val testClassItems = testClasses.flatMap { ft =>
+          ft.testClasses.map { testClass =>
+            // TODO what are the arguments???
+            JvmMainClass(testClass, List.empty.asJava)
+          }
+        }
+        item.setMainClasses(testClassItems.asJava)
+        item
+      }
+    }
+    val res = JvmTestEnvironmentResult(items.asJava)
+    println(s"BSP buildTargetJvmTestEnvironment called, returning: ${res}")
+    res
   }
 
   override def buildTargetRun(params: RunParams): CompletableFuture[RunResult] = {
@@ -447,10 +476,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   override def debugSessionStart(params: DebugSessionParams): CompletableFuture[DebugSessionAddress] =
-    CompletableFuture.completedFuture {
-      // TODO https://github.com/scalacenter/scala-debug-adapter
-      println(s"BSP debugSessionStart called ${params}")
-      DebugSessionAddress("localhost:5005")
+    CompletableFuture.failedFuture {
+      new UnsupportedOperationException("Debugging is not supported in Deder BSP server")
     }
 
   override def onRunReadStdin(params: ReadParams): Unit = {
@@ -489,7 +516,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     capabilities.setCanCompile(true)
     capabilities.setCanRun(isAppModule)
     capabilities.setCanTest(isTestModule)
-    capabilities.setCanDebug(true)
+    capabilities.setCanDebug(false) // Metals does it for us https://github.com/scalameta/metals/issues/5928
     val buildTarget = new BuildTarget(id, tags.asJava, languageIds.asJava, dependencies.asJava, capabilities)
     buildTarget.setDisplayName(module.id)
     buildTarget.setBaseDirectory(DederPath(module.root).absPath.toNIO.toUri.toString)
