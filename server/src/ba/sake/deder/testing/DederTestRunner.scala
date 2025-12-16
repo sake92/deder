@@ -9,36 +9,38 @@ import java.io.File
 import java.net.URLClassLoader
 import scala.collection.mutable
 import ba.sake.deder.*
+import ba.sake.tupson.JsonRW
 
 class DederTestRunner(
-    testClasspath: Seq[File],
-    testDiscovery: DederTestDiscovery,
+    tests: Seq[(Framework, Seq[(String, Fingerprint)])],
+    classLoader: ClassLoader,
     logger: DederTestLogger
 ) {
 
   def run(options: DederTestOptions = DederTestOptions()): DederTestResults = {
-    val urls = testClasspath.map(_.toURI.toURL).toArray
-    val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
-    val frameworks = testDiscovery.discoverFrameworks(classLoader)
-    if (frameworks.isEmpty) {
+    val res = if (tests.isEmpty) {
       logger.warn("No test frameworks found on classpath")
-      return DederTestResults.empty
+      DederTestResults.empty
+    } else {
+      logger.info(s"Found ${tests.size} test framework(s): ${tests.map(_._1.name()).mkString(", ")}")
+      val allResults = tests.flatMap { case (framework, testClasses) =>
+        runFramework(framework, testClasses, options)
+      }
+      DederTestResults.aggregate(allResults)
     }
-    logger.info(s"Found ${frameworks.size} test framework(s): ${frameworks.map(_.name).mkString(", ")}")
-    val allResults = frameworks.flatMap { framework =>
-      runFramework(framework, classLoader, options)
-    }
-    DederTestResults.aggregate(allResults)
+    logger.info(
+      s"Test run complete. Passed: ${res.passed}, Failed: ${res.failed}, Errors: ${res.errors}, Skipped: ${res.skipped}; Duration: ${res.duration}ms"
+    )
+    res
   }
 
   private def runFramework(
       framework: Framework,
-      classLoader: ClassLoader,
+      testClasses: Seq[(String, Fingerprint)],
       options: DederTestOptions
   ): Seq[DederTestResult] = {
     logger.info(s"Running tests with ${framework.name()}")
-    val testFingerprints = testDiscovery.discoverTests(framework, classLoader)
-    if (testFingerprints.isEmpty) {
+    if (testClasses.isEmpty) {
       logger.warn(s"No tests found for ${framework.name()}")
       return Seq.empty
     }
@@ -47,7 +49,7 @@ class DederTestRunner(
       Array.empty[String], // remoteArgs
       classLoader
     )
-    val tasks = testFingerprints.map { case (className, fingerprint) =>
+    val tasks = testClasses.map { case (className, fingerprint) =>
       val taskDef = new TaskDef(
         className,
         fingerprint,
@@ -133,7 +135,7 @@ case class DederTestResults(
     errors: Int,
     skipped: Int,
     duration: Long
-) {
+) derives JsonRW {
   def success: Boolean = failed == 0 && errors == 0
 }
 

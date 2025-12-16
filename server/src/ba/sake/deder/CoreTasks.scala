@@ -12,6 +12,7 @@ import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.testing.*
+import java.net.URLClassLoader
 
 class CoreTasks() {
 
@@ -387,27 +388,56 @@ class CoreTasks() {
       cmd
     }
 
+  val testClassesTask = TaskBuilder
+    .make[Seq[String]](
+      name = "testClasses",
+      supportedModuleTypes = Set(ModuleType.SCALA_TEST)
+    )
+    .dependsOn(compileTask)
+    .dependsOn(runClasspathTask)
+    .build { ctx =>
+      val classesDir = ctx.depResults._1
+      val classpath = ctx.depResults._2
+      val testClasspath = Seq(classesDir.absPath) ++ classpath
+      val urls = testClasspath.map(_.toURI.toURL).toArray
+      val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
+      val testDiscovery = DederTestDiscovery(
+        testClassesDir = classesDir.absPath.toIO,
+        logger = DederTestLogger(ctx.notifications, ctx.module.id)
+      )
+      val frameworks = testDiscovery.discoverFrameworks(classLoader)
+      frameworks.flatMap { framework =>
+        testDiscovery.discoverTests(framework, classLoader).map(_._1)
+      }
+    }
+
   val testTask = TaskBuilder
-    .make[String](
+    .make[DederTestResults](
       name = "test",
       supportedModuleTypes = Set(ModuleType.SCALA_TEST)
     )
     .dependsOn(compileTask)
     .dependsOn(runClasspathTask)
     .build { ctx =>
-      val classesDir: DederPath = ctx.depResults._1
+      val classesDir = ctx.depResults._1
       val classpath = ctx.depResults._2
+      val testClasspath = Seq(classesDir.absPath) ++ classpath
+      val urls = testClasspath.map(_.toURI.toURL).toArray
+      val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
       val testDiscovery = DederTestDiscovery(
         testClassesDir = classesDir.absPath.toIO,
         logger = DederTestLogger(ctx.notifications, ctx.module.id)
       )
+      val frameworks = testDiscovery.discoverFrameworks(classLoader)
+      val tests = frameworks.map { framework =>
+        framework -> testDiscovery.discoverTests(framework, classLoader)
+      }
       val testRunner = DederTestRunner(
-        testClasspath = classpath.map(_.toIO),
-        testDiscovery = testDiscovery,
+        tests = tests,
+        classLoader = classLoader,
         logger = DederTestLogger(ctx.notifications, ctx.module.id)
       )
-      val results = testRunner.run()
-      ""
+      testRunner.run()
     }
 
   // order matters for dependency resolution!!
