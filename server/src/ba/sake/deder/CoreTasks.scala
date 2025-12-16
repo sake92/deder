@@ -11,7 +11,7 @@ import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, S
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
-import ba.sake.deder.testing.* 
+import ba.sake.deder.testing.*
 
 class CoreTasks() {
 
@@ -397,9 +397,13 @@ class CoreTasks() {
     .build { ctx =>
       val classesDir: DederPath = ctx.depResults._1
       val classpath = ctx.depResults._2
+      val testDiscovery = DederTestDiscovery(
+        testClassesDir = classesDir.absPath.toIO,
+        logger = DederTestLogger(ctx.notifications, ctx.module.id)
+      )
       val testRunner = DederTestRunner(
         testClasspath = classpath.map(_.toIO),
-        testClassesDir = classesDir.absPath.toIO,
+        testDiscovery = testDiscovery,
         logger = DederTestLogger(ctx.notifications, ctx.module.id)
       )
       val results = testRunner.run()
