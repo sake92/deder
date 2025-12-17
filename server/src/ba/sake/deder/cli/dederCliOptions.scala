@@ -10,11 +10,30 @@ given TokensReader.Simple[LogLevel]{
 
 @main
 case class DederCliModulesOptions(
-    @arg(doc = "Output result as graph")
-    graph: Flag,
+    @arg(doc = "Output result as ASCII graph")
+    ascii: Flag,
     @arg(doc = "Output result as DOT graph")
-    dot: Flag,
-    args: Leftover[String]
+    dot: Flag
+)
+
+@main
+case class DederCliTasksOptions(
+    @arg(doc = "Output result as ASCII graph")
+    ascii: Flag,
+    @arg(doc = "Output result as DOT graph")
+    dot: Flag
+)
+
+@main
+case class DederCliPlanOptions(
+    @arg(doc = "Module ID to plan", short = 'm')
+    module: String,
+    @arg(doc = "The task to plan", short = 't')
+    task: String,
+    @arg(doc = "Output result as ASCII graph")
+    ascii: Flag,
+    @arg(doc = "Output result as DOT graph")
+    dot: Flag
 )
 
 @main

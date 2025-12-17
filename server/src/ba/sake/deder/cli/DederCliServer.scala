@@ -87,7 +87,7 @@ class DederCliServer(projectState: DederProjectState) {
                     GraphUtils.generateDOT(state.tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id))
                   serverMessages.put(CliServerMessage.Output(dot))
                   serverMessages.put(CliServerMessage.Exit(0))
-                else if cliOptions.graph.value then {
+                else if cliOptions.ascii.value then {
                   val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.modulesGraph, v => v.id)
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
                   serverMessages.put(CliServerMessage.Exit(0))
@@ -99,20 +99,67 @@ class DederCliServer(projectState: DederProjectState) {
             }
         }
       case m: CliClientMessage.Tasks =>
-        projectState.lastGood match {
+        mainargs.Parser[DederCliTasksOptions].constructEither(m.args) match {
           case Left(error) =>
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
-          case Right(state) =>
-            val modulesWithTasks = state.tasksResolver.allModules.map { module =>
-              val moduleTasks = state.tasksResolver.tasksPerModule(module.id).map(t => s"  ${t.task.name}")
-              s"${module.id}:\n${moduleTasks.mkString("\n")}"
+          case Right(cliOptions) =>
+            projectState.lastGood match {
+              case Left(error) =>
+                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
+              case Right(state) =>
+                if cliOptions.dot.value then
+                  val dot =
+                    GraphUtils.generateDOT(state.tasksResolver.tasksGraph, v => v.id, v => Map("label" -> v.id))
+                  serverMessages.put(CliServerMessage.Output(dot))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                else if cliOptions.ascii.value then {
+                  val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.tasksGraph, v => v.id)
+                  serverMessages.put(CliServerMessage.Output(asciiGraph))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                } else {
+                  val modulesWithTasks = state.tasksResolver.allModules.map { module =>
+                    val moduleTasks = state.tasksResolver.tasksPerModule(module.id).map(t => s"  ${t.task.name}")
+                    s"${module.id}:\n${moduleTasks.mkString("\n")}"
+                  }
+                  serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                }
             }
-            serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
-            serverMessages.put(CliServerMessage.Exit(0))
         }
       case m: CliClientMessage.Plan =>
-        () // TODO
+        mainargs.Parser[DederCliPlanOptions].constructEither(m.args) match {
+          case Left(error) =>
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          case Right(cliOptions) =>
+            projectState.lastGood match {
+              case Left(error) =>
+                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
+              case Right(state) =>
+                val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(cliOptions.module, cliOptions.task)
+                if cliOptions.dot.value then
+                  val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
+                  serverMessages.put(CliServerMessage.Output(dot))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                else if cliOptions.ascii.value then {
+                  val asciiGraph = GraphUtils.generateAscii(tasksExecSubgraph, v => v.id)
+                  serverMessages.put(CliServerMessage.Output(asciiGraph))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                } else {
+                  val tasksExecStages = state.executionPlanner.execStages(cliOptions.module, cliOptions.task)
+                  val stagesStr = tasksExecStages.zipWithIndex
+                    .map { case (stage, idx) =>
+                      s"Stage #${idx}:\n" + stage.map(ti => s"  ${ti.id}").mkString("\n")
+                    }
+                    .mkString("\n")
+                  serverMessages.put(CliServerMessage.Output(stagesStr))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                }
+            }
+        }
       case m: CliClientMessage.Exec =>
         mainargs.Parser[DederCliExecOptions].constructEither(m.args) match {
           case Left(error) =>
