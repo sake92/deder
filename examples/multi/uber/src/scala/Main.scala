@@ -13,6 +13,7 @@ object Main extends App {
     print("Type something: ")
     val line = scala.io.StdIn.readLine()
     println(s"You typed: $line")
+    Thread.sleep(1000)
     true
   }) {}
   

@@ -73,10 +73,34 @@ public class DederCliClient implements DederClient {
 		// while (true) {
 		// newline delimited JSON messages
 		ClientMessage message;
-		if (args.length == 1 && args[0].equals("shutdown")) {
-			message = new ClientMessage.Shutdown();
+		if (args.length == 1) {
+			var leftoverArgs = new String[args.length - 1];
+			System.arraycopy(args, 1, leftoverArgs, 0, args.length - 1);
+			switch (args[0]) {
+			case "version":
+				System.out.println("Client version: 0.0.1");
+				message = new ClientMessage.Version();
+				break;
+			case "clean":
+				message = new ClientMessage.Clean(leftoverArgs);
+				break;
+			case "modules":
+				message = new ClientMessage.Modules(leftoverArgs);
+				break;
+			case "tasks":
+				message = new ClientMessage.Tasks(leftoverArgs);
+				break;
+			case "plan":
+				message = new ClientMessage.Plan(leftoverArgs);
+				break;
+			case "shutdown":
+				message = new ClientMessage.Shutdown();
+				break;
+			default:
+				message = new ClientMessage.Exec(args);
+			}
 		} else {
-			message = new ClientMessage.Run(args);
+			message = new ClientMessage.Exec(args);
 		}
 		var messageJson = jsonMapper.writeValueAsString(message);
 		log("Sending message to server: " + messageJson);

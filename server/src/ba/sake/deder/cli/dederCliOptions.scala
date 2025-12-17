@@ -9,7 +9,7 @@ given TokensReader.Simple[LogLevel]{
 }
 
 @main
-case class DederCliOptions(
+case class DederCliExecOptions(
     @arg(doc = "The task to execute", short = 't')
     task: String = "compile",
     @arg(doc = "Module IDs to execute", short = 'm')
