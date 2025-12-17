@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.stream.Collectors;
+import java.util.Properties;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import ba.sake.deder.client.cli.DederCliClient;
@@ -111,8 +112,24 @@ public class Main {
 		var serverLogFile = Path.of(".deder/logs/server.log");
 		Files.writeString(serverLogFile, "=".repeat(50) + System.lineSeparator(), StandardCharsets.UTF_8,
 				StandardOpenOption.APPEND, StandardOpenOption.CREATE);
-		// TODO set server JVM options, read from deder.properties?
-		var processBuilder = new ProcessBuilder("java", "-jar", ".deder/server.jar", "--root-dir", cwd.toString());
+		var props = new Properties();
+		var propFileName = ".deder/server.properties";
+		var javaOpts = "";
+		try (FileInputStream inputStream = new FileInputStream(propFileName)) {
+			props.load(inputStream);
+			javaOpts = props.getProperty("JAVA_OPTS", "");
+		}
+		var processArgs = new ArrayList<String>();
+		processArgs.add("java");
+		if (!javaOpts.isBlank()) {
+			processArgs.addAll(Arrays.asList(javaOpts.split(" ")));
+		}
+		processArgs.add("-cp");
+		processArgs.add(".deder/server.jar");
+		processArgs.add("ba.sake.deder.ServerMain");
+		processArgs.add("--root-dir");
+		processArgs.add(cwd.toString());
+		var processBuilder = new ProcessBuilder(processArgs);
 		processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(serverLogFile.toFile()));
 		processBuilder.redirectErrorStream(true);
 		var serverProcess = processBuilder.start();
