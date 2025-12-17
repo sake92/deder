@@ -54,6 +54,8 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
     }
   }
 
+  // TODO execute as one action, not per module
+  // merge plan graphs into one !
   def executeCLI(
       moduleSelectors: Seq[String],
       taskName: String,

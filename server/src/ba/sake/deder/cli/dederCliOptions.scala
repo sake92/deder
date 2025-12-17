@@ -26,12 +26,15 @@ case class DederCliTasksOptions(
     ascii: Flag,
     @arg(doc = "Output result as DOT graph")
     dot: Flag
+    // TODO filtering? by module? but deps must be included..
+    // by task name?
+    // print first deps levels only?
 )
 
 @main
 case class DederCliPlanOptions(
-    @arg(doc = "Module ID to plan", short = 'm')
-    module: String,
+    @arg(doc = "Module IDs to plan", short = 'm')
+    module: String, // TODO Seq[String], currently unsupported
     @arg(doc = "The task to plan", short = 't')
     task: String,
     @arg(doc = "Output result as JSON")

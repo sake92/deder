@@ -138,6 +138,7 @@ class DederCliServer(projectState: DederProjectState) {
                 }
             }
         }
+        
       case m: CliClientMessage.Plan =>
         mainargs.Parser[DederCliPlanOptions].constructEither(m.args) match {
           case Left(error) =>

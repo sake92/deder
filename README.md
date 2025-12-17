@@ -45,9 +45,37 @@ Run client:
 cd examples/multi
 ./reset # copy the server JAR etc
 
+################
+# print version of client and server
+deder version
+
+################
+# list modules
+# supports flags: --json, --ascii, --dot
+deder modules
+
+################
+# list tasks
+# supports flags: --json, --ascii, --dot
+deder tasks
+
+################
+# print execution plan for a task
+# supports flags: --json, --ascii, --dot
+deder plan -m common -t compileClasspath
+
+################
+# by default executes compile on all modules
+deder
+
+# execute compile explicitly, on all modules
 deder -t compile
 
+#execute compile explicitly, on uber module
 deder -t run -m uber
+
+# shutdown server
+deder shutdown
 ```
 
 ## IDE setup
