@@ -71,17 +71,32 @@ class DederCliServer(projectState: DederProjectState) {
       case m: CliClientMessage.Version =>
         serverMessages.put(CliServerMessage.Output(s"Server version: 0.0.1"))
         serverMessages.put(CliServerMessage.Exit(0))
-      case m: CliClientMessage.Clean =>
-        ()
       case m: CliClientMessage.Modules =>
-        projectState.lastGood match {
+        mainargs.Parser[DederCliModulesOptions].constructEither(m.args) match {
           case Left(error) =>
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
-          case Right(state) =>
-            val modules = state.tasksResolver.allModules.map(_.id)
-            serverMessages.put(CliServerMessage.Output(modules.mkString("\n")))
-            serverMessages.put(CliServerMessage.Exit(0))
+          case Right(cliOptions) =>
+            projectState.lastGood match {
+              case Left(error) =>
+                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
+              case Right(state) =>
+                if cliOptions.dot.value then
+                  val dot =
+                    GraphUtils.generateDOT(state.tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id))
+                  serverMessages.put(CliServerMessage.Output(dot))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                else if cliOptions.graph.value then {
+                  val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.modulesGraph, v => v.id)
+                  serverMessages.put(CliServerMessage.Output(asciiGraph))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                } else {
+                  val modules = state.tasksResolver.allModules
+                  serverMessages.put(CliServerMessage.Output(modules.map(_.id).mkString("\n")))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                }
+            }
         }
       case m: CliClientMessage.Tasks =>
         projectState.lastGood match {
@@ -96,6 +111,8 @@ class DederCliServer(projectState: DederProjectState) {
             serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
             serverMessages.put(CliServerMessage.Exit(0))
         }
+      case m: CliClientMessage.Plan =>
+        () // TODO
       case m: CliClientMessage.Exec =>
         mainargs.Parser[DederCliExecOptions].constructEither(m.args) match {
           case Left(error) =>
@@ -116,8 +133,8 @@ class DederCliServer(projectState: DederProjectState) {
               json = cliOptions.json.value
             )
         }
-      case m: CliClientMessage.Plan =>
-        ()
+      case m: CliClientMessage.Clean =>
+        () // TODO
       case _: CliClientMessage.Shutdown =>
         // println(s"Client $clientId requested server shutdown.")
         serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
@@ -149,11 +166,11 @@ class DederCliServer(projectState: DederProjectState) {
 
 enum CliClientMessage derives JsonRW {
   case Version()
-  case Clean(args: Seq[String])
   case Modules(args: Seq[String])
   case Tasks(args: Seq[String])
-  case Exec(args: Seq[String])
   case Plan(args: Seq[String])
+  case Exec(args: Seq[String])
+  case Clean(args: Seq[String])
   case Shutdown()
 }
 

@@ -9,6 +9,15 @@ given TokensReader.Simple[LogLevel]{
 }
 
 @main
+case class DederCliModulesOptions(
+    @arg(doc = "Output result as graph")
+    graph: Flag,
+    @arg(doc = "Output result as DOT graph")
+    dot: Flag,
+    args: Leftover[String]
+)
+
+@main
 case class DederCliExecOptions(
     @arg(doc = "The task to execute", short = 't')
     task: String = "compile",

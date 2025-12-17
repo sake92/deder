@@ -73,7 +73,7 @@ public class DederCliClient implements DederClient {
 		// while (true) {
 		// newline delimited JSON messages
 		ClientMessage message;
-		if (args.length == 1) {
+		if (args.length > 0) {
 			var leftoverArgs = new String[args.length - 1];
 			System.arraycopy(args, 1, leftoverArgs, 0, args.length - 1);
 			switch (args[0]) {

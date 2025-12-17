@@ -16,19 +16,19 @@ public sealed interface ClientMessage {
 	record Version() implements ClientMessage {
 	}
 
-	record Clean(String[] args) implements ClientMessage {
-	}
-
 	record Modules(String[] args) implements ClientMessage {
 	}
 
 	record Tasks(String[] args) implements ClientMessage {
 	}
 
+	record Plan(String[] args) implements ClientMessage {
+	}
+
 	record Exec(String[] args) implements ClientMessage {
 	}
 
-	record Plan(String[] args) implements ClientMessage {
+	record Clean(String[] args) implements ClientMessage {
 	}
 
 	record Shutdown() implements ClientMessage {
