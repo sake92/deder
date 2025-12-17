@@ -12,7 +12,37 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "ba.sake.deder.client.cli.ClientMessage$Run",
+    "name": "ba.sake.deder.client.cli.ClientMessage$Version",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.client.cli.ClientMessage$Modules",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.client.cli.ClientMessage$Tasks",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.client.cli.ClientMessage$Plan",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.client.cli.ClientMessage$Exec",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "ba.sake.deder.client.cli.ClientMessage$Clean",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,
     "allDeclaredConstructors": true

@@ -24,14 +24,14 @@ jobs:
           curl -L -o pkl-codegen-java https://github.com/apple/pkl/releases/download/0.30.1/pkl-codegen-java
           chmod +x pkl-codegen-java
           ./scripts/gen-config-bindings.sh
-      - name: Compile
+      - name: Build server and client
         run: |
           ./mill -i server.assembly
           ./mill -i client.assembly
           mkdir -p deder_bin
           cp out/client/assembly.dest/out.jar deder_bin/deder
           echo "${{ github.workspace }}/deder_bin" >> $GITHUB_PATH
-      - name: Compile examples/multi
+      - name: Exercise examples/multi
         working-directory: ./examples/multi
         run: |
           deder version

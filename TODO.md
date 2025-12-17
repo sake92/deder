@@ -57,9 +57,7 @@ Locally would be interesting to have a dashboard with nice overview:
 
 # Add more commands
 
-- clean -t mytask, or all if no -t
-
-- init ofc, import from other build tools...
+- init, import from other build tools...
 
 
 ## Plugins
