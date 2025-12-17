@@ -385,7 +385,7 @@ class CoreTasks() {
       val runClasspath = ctx.depResults._1
       val cp = runClasspath.map(_.toString)
       val mainClass = ctx.depResults._2
-      val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), mainClass)
+      val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), mainClass) ++ ctx.args
       // println(s"Running command: " + cmd)
       ctx.notifications.add(ServerNotification.RunSubprocess(cmd))
       cmd
