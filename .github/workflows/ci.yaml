@@ -34,8 +34,23 @@ jobs:
       - name: Compile examples/multi
         working-directory: ./examples/multi
         run: |
+          deder version
+
+          deder modules
+          deder modules --json
+          deder modules --ascii
+          deder modules --dot
+
+          deder tasks
+
+          deder plan -m common -t compile
+          deder plan -m uber -t compile --json
+
           deder -t compile
-          deder -t compile -m common --json
+          deder -t compile -m common
+
+          deder -t test -m uber-test
+
           deder shutdown
       
       #- name: Test

@@ -29,6 +29,7 @@ object ServerMain {
 
     acquireServerLock(projectRoot)
 
+    // TODO read from server.properties file
     val tasksExecutorService = Executors.newFixedThreadPool(10)
     val onShutdown = () => {
       println("Deder server is shutting down...")
