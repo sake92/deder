@@ -12,6 +12,13 @@ enum ServerNotification {
       moduleId: Option[String]
   )
 
+  case TaskProgress(
+      moduleId: String,
+      taskName: String,
+      progress: Long,
+      total: Long
+  )
+
   // tell client to run this subprocess
   case RunSubprocess(cmd: Seq[String])
 

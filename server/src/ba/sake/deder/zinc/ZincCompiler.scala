@@ -24,6 +24,8 @@ import xsbti.compile.{
 }
 import sbt.internal.inc.ScalaInstance
 import java.nio.file.Path
+import ba.sake.deder.ServerNotificationsLogger
+import ba.sake.deder.ServerNotification
 
 object ZincCompiler {
   def apply(compilerBridgeJar: os.Path): ZincCompiler =
@@ -43,7 +45,9 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       classesDir: os.Path,
       scalacOptions: Seq[String],
       javacOptions: Seq[String],
-      zincLogger: xsbti.Logger
+      zincLogger: xsbti.Logger,
+      moduleId: String,
+      notifications: ServerNotificationsLogger
       // TODO custom reporter, for BSP diagnostics
   ): Unit = {
 
@@ -68,14 +72,14 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       (compilerJars ++ scalaLibraryJars).map(_.toNIO.toUri.toURL).toArray,
       parentClassloader
     )
-/*
+    /*
     println(
       s"""Zinc compile:
         |compilerBridgeJar = $compilerBridgeJar
         |
         |scalacOptions = $scalacOptions
         |
-        |javacOptions = $javacOptions 
+        |javacOptions = $javacOptions
         |
         |compileClasspath = ${compileClasspath.mkString("\n")}
         |
@@ -134,7 +138,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     }
 
     val reporter = xsbti.ReporterUtil.getReporter(zincLogger, xsbti.ReporterUtil.getDefaultReporterConfig)
-    val setup = getSetup(zincCacheFile.toNIO, reporter)
+    val setup = getSetup(zincCacheFile.toNIO, reporter, moduleId, notifications)
     val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
 
     // try {
@@ -147,7 +151,12 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     }*/
   }
 
-  private def getSetup(cacheFile: Path, reporter: xsbti.Reporter): Setup = {
+  private def getSetup(
+      cacheFile: Path,
+      reporter: xsbti.Reporter,
+      moduleId: String,
+      notifications: ServerNotificationsLogger
+  ): Setup = {
     val perClasspathEntryLookup: PerClasspathEntryLookup = new PerClasspathEntryLookup {
       override def analysis(x$0: xsbti.VirtualFile): java.util.Optional[CompileAnalysis] =
         Optional.empty[CompileAnalysis]
@@ -160,7 +169,12 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     val incOptions: IncOptions = IncOptions.of()
 
     val compileProgress = new CompileProgress {
-      // TODO
+      override def advance(current: Int, total: Int, prevPhase: String, nextPhase: String): Boolean = {
+        notifications.add(
+          ServerNotification.TaskProgress(moduleId, "compile", current.toLong, total.toLong)
+        )
+        true
+      }
     }
 
     Setup.of(

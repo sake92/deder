@@ -272,6 +272,8 @@ object CliServerMessage {
         case ServerNotification.LogLevel.TRACE   => LogLevel.TRACE
       }
       CliServerMessage.Log(s"[${m.level.toString.toLowerCase}] ${m.message}", level)
+    case tp: ServerNotification.TaskProgress =>
+      CliServerMessage.Log(s"${tp.moduleId}.${tp.taskName} progress: ${tp.progress}/${tp.total}", LogLevel.TRACE)
     case rs: ServerNotification.RunSubprocess =>
       CliServerMessage.RunSubprocess(rs.cmd)
     case ServerNotification.RequestFinished(success) =>

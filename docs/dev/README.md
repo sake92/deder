@@ -8,7 +8,7 @@
 - client-server architecture:
   - CLI client that talks JSON-RPC via Unix socket 
   - BSP client via BSP protocol
-  - web client??
+  - web client
 
 ## Build Server
 
@@ -17,8 +17,8 @@
 
 ### Concurrency
 
-- flatten the tasks graph
-- force order of taking the locks
+- consistent order of taking the locks, sorted by task instance ids, e.g.
+  - a.task1, a.task2, b.task1 ...
 - if module A depends on B, then it has to lock B too !!!
     - because it needs to B.compile first
     - first take all task locks, only then start the tasks..
@@ -29,7 +29,6 @@
 ## CLI
 
 https://clig.dev/
-- nice stuff about output, Disable color !!!
 - interactivity
 - --json support
 - autocomplete

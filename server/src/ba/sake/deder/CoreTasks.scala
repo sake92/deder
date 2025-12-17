@@ -301,7 +301,9 @@ class CoreTasks() {
         classesDir,
         finalScalacOptions,
         finalJavacOptions,
-        zincLogger
+        zincLogger,
+        moduleId = ctx.module.id,
+        notifications = ctx.notifications
       )
       DederPath(classesDir)
     }

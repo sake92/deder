@@ -5,7 +5,8 @@
 - on first run just randomly distribute between workers, record stats per test/suite
 - on next run use stats to figure out how to exec more performantly
 
-
+## CLI
+- autocomplete
 
 ## Misc
 
