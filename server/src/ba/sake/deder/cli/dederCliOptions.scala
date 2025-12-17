@@ -46,6 +46,12 @@ case class DederCliPlanOptions(
 )
 
 @main
+case class DederCliCleanOptions(
+    @arg(doc = "Module IDs to clean", short = 'm')
+    modules: Seq[String], // cant have a default.. :/
+)
+
+@main
 case class DederCliExecOptions(
     @arg(doc = "The task to execute", short = 't')
     task: String = "compile",

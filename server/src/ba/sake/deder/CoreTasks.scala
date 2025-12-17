@@ -143,9 +143,7 @@ class CoreTasks() {
       name = "classes",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA)
     )
-    .build { ctx =>
-      ctx.out
-    }
+    .build { ctx => ctx.out }
 
   // this is localRunClasspath in mill ??
   val transitiveClassesDirTask = TaskBuilder

@@ -138,7 +138,7 @@ class DederCliServer(projectState: DederProjectState) {
                 }
             }
         }
-        
+
       case m: CliClientMessage.Plan =>
         mainargs.Parser[DederCliPlanOptions].constructEither(m.args) match {
           case Left(error) =>
@@ -196,7 +196,23 @@ class DederCliServer(projectState: DederProjectState) {
             )
         }
       case m: CliClientMessage.Clean =>
-        () // TODO
+        mainargs.Parser[DederCliCleanOptions].constructEither(m.args) match {
+          case Left(error) =>
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          case Right(cliOptions) =>
+            projectState.lastGood match {
+              case Left(error) =>
+                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
+              case Right(state) =>
+                val moduleIds =
+                  if cliOptions.modules.nonEmpty then cliOptions.modules
+                  else state.tasksResolver.allModules.map(_.id)
+                DederCleaner.cleanModules(moduleIds)
+                serverMessages.put(CliServerMessage.Exit(0))
+            }
+        }
       case _: CliClientMessage.Shutdown =>
         // println(s"Client $clientId requested server shutdown.")
         serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
