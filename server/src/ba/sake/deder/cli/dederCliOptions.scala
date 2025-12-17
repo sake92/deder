@@ -10,6 +10,8 @@ given TokensReader.Simple[LogLevel]{
 
 @main
 case class DederCliModulesOptions(
+    @arg(doc = "Output result as JSON")
+    json: Flag,
     @arg(doc = "Output result as ASCII graph")
     ascii: Flag,
     @arg(doc = "Output result as DOT graph")
@@ -18,6 +20,8 @@ case class DederCliModulesOptions(
 
 @main
 case class DederCliTasksOptions(
+    @arg(doc = "Output result as JSON")
+    json: Flag,
     @arg(doc = "Output result as ASCII graph")
     ascii: Flag,
     @arg(doc = "Output result as DOT graph")
@@ -30,6 +34,8 @@ case class DederCliPlanOptions(
     module: String,
     @arg(doc = "The task to plan", short = 't')
     task: String,
+    @arg(doc = "Output result as JSON")
+    json: Flag,
     @arg(doc = "Output result as ASCII graph")
     ascii: Flag,
     @arg(doc = "Output result as DOT graph")

@@ -10,7 +10,7 @@ class TasksResolver(
     tasksRegistry: TasksRegistry
 ) {
 
-  val allModules: Seq[DederModule] = projectConfig.modules.asScala.toSeq
+  val allModules: Seq[DederModule] = projectConfig.modules.asScala.sortBy(_.id).toSeq
 
   val modulesMap: Map[String, DederModule] =
     allModules.map(m => m.id -> m).toMap

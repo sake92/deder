@@ -82,12 +82,16 @@ class DederCliServer(projectState: DederProjectState) {
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
-                if cliOptions.dot.value then
+                if cliOptions.json.value then {
+                  val modules = state.tasksResolver.allModules
+                  serverMessages.put(CliServerMessage.Output(modules.map(_.id).toJson))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                } else if cliOptions.dot.value then {
                   val dot =
                     GraphUtils.generateDOT(state.tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id))
                   serverMessages.put(CliServerMessage.Output(dot))
                   serverMessages.put(CliServerMessage.Exit(0))
-                else if cliOptions.ascii.value then {
+                } else if cliOptions.ascii.value then {
                   val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.modulesGraph, v => v.id)
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
                   serverMessages.put(CliServerMessage.Exit(0))
@@ -109,12 +113,18 @@ class DederCliServer(projectState: DederProjectState) {
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
-                if cliOptions.dot.value then
+                if cliOptions.json.value then {
+                  val tasksPerModule = state.tasksResolver.tasksPerModule.map { case (moduleId, tasks) =>
+                    moduleId -> tasks.map(_.task.name)
+                  }
+                  serverMessages.put(CliServerMessage.Output(tasksPerModule.toJson))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                } else if cliOptions.dot.value then {
                   val dot =
                     GraphUtils.generateDOT(state.tasksResolver.tasksGraph, v => v.id, v => Map("label" -> v.id))
                   serverMessages.put(CliServerMessage.Output(dot))
                   serverMessages.put(CliServerMessage.Exit(0))
-                else if cliOptions.ascii.value then {
+                } else if cliOptions.ascii.value then {
                   val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.tasksGraph, v => v.id)
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
                   serverMessages.put(CliServerMessage.Exit(0))
@@ -140,11 +150,15 @@ class DederCliServer(projectState: DederProjectState) {
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
                 val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(cliOptions.module, cliOptions.task)
-                if cliOptions.dot.value then
+                if cliOptions.json.value then {
+                  val tasksExecStages = state.executionPlanner.execStages(cliOptions.module, cliOptions.task)
+                  serverMessages.put(CliServerMessage.Output(tasksExecStages.map(_.map(_.id)).toJson))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                } else if cliOptions.dot.value then {
                   val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
                   serverMessages.put(CliServerMessage.Output(dot))
                   serverMessages.put(CliServerMessage.Exit(0))
-                else if cliOptions.ascii.value then {
+                } else if cliOptions.ascii.value then {
                   val asciiGraph = GraphUtils.generateAscii(tasksExecSubgraph, v => v.id)
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
                   serverMessages.put(CliServerMessage.Exit(0))

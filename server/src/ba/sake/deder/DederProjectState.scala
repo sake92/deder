@@ -156,20 +156,6 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
           taskInstance.lock.unlock()
         }
       }
-
-      /*
-    println("Modules graph:")
-    println(GraphUtils.generateDOT(tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id)))
-    println("Tasks graph:")
-    println(GraphUtils.generateDOT(tasksResolver.tasksGraph, v => v.id, v => Map("label" -> v.id)))
-    println("Planned exec subgraph:")
-    println(GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id)))
-    println("Exec stages:")
-    println(tasksExecStages.map(_.map(_.id)).mkString("\n"))
-
-    println("#" * 50)
-       */
-
     } catch {
       case NonFatal(e) =>
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage, Some(moduleId)))
