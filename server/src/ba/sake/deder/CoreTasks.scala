@@ -35,45 +35,42 @@ class CoreTasks() {
   private def getZincCompiler(scalaVersion: String): ZincCompiler =
     zincCache.get(scalaVersion, _ => makeZincCompiler(scalaVersion))
 
-  // source dirs
-  val sourcesTask = CachedTaskBuilder
-    .make[Seq[DederPath]](
-      name = "sources",
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA)
-    )
-    .build { ctx =>
+  /** source folders */
+  val sourcesTask = SourceFilesTask(
+    name = "sources",
+    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA),
+    execute = { ctx =>
       val sources = ctx.module match {
-        case m: JavaModule      => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
-        case m: ScalaModule     => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
-        case m: ScalaTestModule => m.sources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
+        case m: JavaModule      => m.sources.asScala.toSeq
+        case m: ScalaModule     => m.sources.asScala.toSeq
+        case m: ScalaTestModule => m.sources.asScala.toSeq
         case _                  => Seq.empty
       }
       // println(s"Module: ${ctx.module.id} sources: " + sources)
-      sources
+      sources.map(s => DederPath(os.SubPath(s"${ctx.module.root}/${s}")))
     }
+  )
 
-  val resourcesTask = CachedTaskBuilder
-    .make[Seq[DederPath]](
-      name = "resources",
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA)
-    )
-    .build { ctx =>
+  /** resource folders */
+  val resourcesTask = SourceFilesTask(
+    name = "resources",
+    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA),
+    execute = { ctx =>
       val resources = ctx.module match {
-        case m: JavaModule      => m.resources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
-        case m: ScalaModule     => m.resources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
-        case m: ScalaTestModule => m.resources.asScala.toSeq.map(s => DederPath(os.SubPath(s"${m.root}/${s}")))
+        case m: JavaModule      => m.resources.asScala.toSeq
+        case m: ScalaModule     => m.resources.asScala.toSeq
+        case m: ScalaTestModule => m.resources.asScala.toSeq
         case _                  => Seq.empty
       }
       // println(s"Module: ${ctx.module.id} sources: " + sources)
-      resources
+      resources.map(s => DederPath(os.SubPath(s"${ctx.module.root}/${s}")))
     }
+  )
 
-  val javacOptionsTask = CachedTaskBuilder
-    .make[Seq[String]](
-      name = "javacOptions",
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA)
-    )
-    .build { ctx =>
+  val javacOptionsTask = ConfigValueTask[Seq[String]](
+    name = "javacOptions",
+    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA),
+    execute = { ctx =>
       ctx.module match {
         case m: JavaModule      => m.javacOptions.asScala.toSeq
         case m: ScalaModule     => m.javacOptions.asScala.toSeq
@@ -81,32 +78,31 @@ class CoreTasks() {
         case _                  => Seq.empty
       }
     }
+  )
 
-  val scalacOptionsTask = CachedTaskBuilder
-    .make[Seq[String]](
-      name = "scalacOptions",
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST)
-    )
-    .build { ctx =>
+  val scalacOptionsTask = ConfigValueTask[Seq[String]](
+    name = "scalacOptions",
+    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST),
+    execute = { ctx =>
       ctx.module match {
         case m: ScalaModule     => m.scalacOptions.asScala.toSeq
         case m: ScalaTestModule => m.scalacOptions.asScala.toSeq
         case _                  => Seq.empty
       }
     }
+  )
 
-  val scalaVersionTask = TaskBuilder
-    .make[String](
-      name = "scalaVersion",
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA)
-    )
-    .build { ctx =>
+  val scalaVersionTask = ConfigValueTask[String](
+    name = "scalaVersion",
+    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA),
+    execute = { ctx =>
       ctx.module match {
         case m: ScalaModule     => m.scalaVersion
         case m: ScalaTestModule => m.scalaVersion
         case _                  => "2.13.17" // dummy default scala version
       }
     }
+  )
 
   val dependenciesTask = TaskBuilder
     .make[Seq[deps.Dependency]](
@@ -186,6 +182,7 @@ class CoreTasks() {
       (transitiveClassesDirs ++ depsJars).reverse.distinct.reverse
     }
 
+  // TODO make configurable
   val javacAnnotationProcessorsTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "javacAnnotationProcessors",
@@ -201,6 +198,7 @@ class CoreTasks() {
       processorJars
     }
 
+  // TODO make configurable
   val scalacPluginsTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "scalacPlugins",
@@ -349,18 +347,17 @@ class CoreTasks() {
       MainClassesDiscovery.discover(ctx.depResults._1)
     }
 
-  val mainClassTask = TaskBuilder
-    .make[Option[String]](
-      name = "mainClass",
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
-    )
-    .build { ctx =>
+  val mainClassTask = ConfigValueTask[Option[String]](
+    name = "mainClass",
+    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
+    execute = { ctx =>
       ctx.module match {
         case m: JavaModule  => Option(m.mainClass)
         case m: ScalaModule => Option(m.mainClass)
         case _              => None
       }
     }
+  )
 
   val finalMainClassTask = TaskBuilder
     .make[String](

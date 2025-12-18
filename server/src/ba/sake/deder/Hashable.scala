@@ -33,6 +33,14 @@ object Hashable {
     }
   }
 
+  given [T](using h: Hashable[T]): Hashable[Option[T]] with {
+    def hashStr(value: Option[T]): String =
+      value match {
+        case Some(v) => h.hashStr(v)
+        case None    => ""
+      }
+  }
+
   given [T](using h: Hashable[T]): Hashable[Seq[T]] with {
     def hashStr(value: Seq[T]): String = {
       val combinedHash = value.map(h.hashStr).mkString("-")

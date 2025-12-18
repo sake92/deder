@@ -68,6 +68,7 @@ type TaskDepResults[T <: Tuple] <: Tuple = T match {
   case Task[t, ?] *: rest => t *: TaskDepResults[rest]
 }
 
+// needs a T because of transitive results
 case class TaskExecContext[T, Deps <: Tuple](
     project: DederProject,
     module: DederModule,
@@ -137,14 +138,14 @@ case class TaskImpl[T: JsonRW, Deps <: Tuple](
   }
 }
 
-case class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
-    name: String,
-    execute: TaskExecContext[T, Deps] => T,
-    taskDeps: Deps = EmptyTuple,
+class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
+    val name: String,
+    val execute: TaskExecContext[T, Deps] => T,
+    val taskDeps: Deps = EmptyTuple,
     // if it triggers upstream modules task with same name
     // the only way to reference a task across modules
-    transitive: Boolean = false,
-    supportedModuleTypes: Set[ModuleType] = Set.empty
+    val transitive: Boolean = false,
+    val supportedModuleTypes: Set[ModuleType] = Set.empty
 )(using ev: TaskDeps[Deps] =:= true)
     extends Task[T, Deps] {
 
@@ -208,8 +209,37 @@ case class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
   }
 }
 
-// TODO SourceFileTask
-// TODO ConfigValueTask
+// specialized task just for source file
+// so we can easily retrigger watched tasks
+class SourceFileTask(
+    name: String,
+    supportedModuleTypes: Set[ModuleType] = Set.empty,
+    execute: TaskExecContext[DederPath, EmptyTuple] => DederPath
+) extends CachedTask[DederPath, EmptyTuple](
+      name,
+      execute,
+      taskDeps = EmptyTuple,
+      transitive = false,
+      supportedModuleTypes
+    )
+
+class SourceFilesTask(
+    name: String,
+    execute: TaskExecContext[Seq[DederPath], EmptyTuple] => Seq[DederPath],
+    supportedModuleTypes: Set[ModuleType] = Set.empty
+) extends CachedTask[Seq[DederPath], EmptyTuple](
+      name,
+      execute,
+      taskDeps = EmptyTuple,
+      transitive = false,
+      supportedModuleTypes
+    )
+
+class ConfigValueTask[T: JsonRW: Hashable](
+    name: String,
+    execute: TaskExecContext[T, EmptyTuple] => T,
+    supportedModuleTypes: Set[ModuleType] = Set.empty
+) extends CachedTask[T, EmptyTuple](name, execute, taskDeps = EmptyTuple, transitive = false, supportedModuleTypes)
 
 // dynamic, for each module
 case class TaskInstance(
