@@ -26,6 +26,8 @@ import sbt.internal.inc.ScalaInstance
 import java.nio.file.Path
 import ba.sake.deder.ServerNotificationsLogger
 import ba.sake.deder.ServerNotification
+import sbt.internal.util.ManagedLogger
+import sbt.util.LoggerContext
 
 object ZincCompiler {
   def apply(compilerBridgeJar: os.Path): ZincCompiler =
@@ -57,17 +59,14 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     }
 
     val parentClassloader = this.getClass.getClassLoader
-
     val libraryClassloader = new java.net.URLClassLoader(
       scalaLibraryJars.map(_.toNIO.toUri.toURL).toArray,
       parentClassloader
     )
-
     val compilerClassloader = new java.net.URLClassLoader(
       compilerJars.map(_.toNIO.toUri.toURL).toArray,
       libraryClassloader
     )
-
     val allJarsClassloader = new java.net.URLClassLoader(
       (compilerJars ++ scalaLibraryJars).map(_.toNIO.toUri.toURL).toArray,
       parentClassloader
@@ -107,7 +106,6 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       ZincUtil.compilers(scalaInstance, classpathOptions, javaHome = Some(javaHome.toNIO), scalac = scalaCompiler)
 
     val converter = PlainVirtualFileConverter.converter
-
     val sourcesVFs = sources.map(s => converter.toVirtualFile(s.toNIO)).toArray
     val classpath = compileClasspath.map(f => converter.toVirtualFile(f.toNIO)).toArray
 
@@ -137,11 +135,12 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       )
     }
 
-    val reporter = xsbti.ReporterUtil.getReporter(zincLogger, xsbti.ReporterUtil.getDefaultReporterConfig)
+    val reporter = new DederZincReporter(moduleId, notifications, zincLogger)
     val setup = getSetup(zincCacheFile.toNIO, reporter, moduleId, notifications)
     val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
 
     // try {
+    notifications.add(ServerNotification.CompileStarted(moduleId, sources)) // so we can reset BSP diagnostics
     val newResult = incrementalCompiler.compile(inputs, zincLogger)
     analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
     /*} catch {

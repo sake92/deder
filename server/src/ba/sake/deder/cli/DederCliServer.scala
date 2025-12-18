@@ -185,7 +185,8 @@ class DederCliServer(projectState: DederProjectState) {
             val logCallback: ServerNotification => Unit = {
               case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
               // skip
-              case sn => serverMessages.put(CliServerMessage.fromServerNotification(sn))
+              case sn =>
+                CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
             }
             projectState.executeCLI(
               cliOptions.modules,
@@ -260,9 +261,9 @@ enum CliServerMessage derives JsonRW {
 }
 
 object CliServerMessage {
-  def fromServerNotification(sn: ServerNotification): CliServerMessage = sn match {
+  def fromServerNotification(sn: ServerNotification): Option[CliServerMessage] = sn match {
     case m: ServerNotification.Output =>
-      CliServerMessage.Output(m.text)
+      Some(CliServerMessage.Output(m.text))
     case m: ServerNotification.Log =>
       val level = m.level match {
         case ServerNotification.LogLevel.ERROR   => LogLevel.ERROR
@@ -271,13 +272,17 @@ object CliServerMessage {
         case ServerNotification.LogLevel.DEBUG   => LogLevel.DEBUG
         case ServerNotification.LogLevel.TRACE   => LogLevel.TRACE
       }
-      CliServerMessage.Log(s"[${m.level.toString.toLowerCase}] ${m.message}", level)
+      Some(CliServerMessage.Log(s"[${m.level.toString.toLowerCase}] ${m.message}", level))
     case tp: ServerNotification.TaskProgress =>
-      CliServerMessage.Log(s"${tp.moduleId}.${tp.taskName} progress: ${tp.progress}/${tp.total}", LogLevel.TRACE)
+      None
+    case cs: ServerNotification.CompileStarted =>
+      None
+    case cd: ServerNotification.CompileDiagnostic =>
+      None
     case rs: ServerNotification.RunSubprocess =>
-      CliServerMessage.RunSubprocess(rs.cmd)
+      Some(CliServerMessage.RunSubprocess(rs.cmd))
     case ServerNotification.RequestFinished(success) =>
-      CliServerMessage.Exit(if success then 0 else 1)
+      Some(CliServerMessage.Exit(if success then 0 else 1))
   }
 }
 

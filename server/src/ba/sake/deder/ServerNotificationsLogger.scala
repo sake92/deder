@@ -8,6 +8,8 @@ class ServerNotificationsLogger(callback: ServerNotification => Unit) {
       case ServerNotification.Log(level, timestamp, message, moduleId) =>
         if level.ordinal <= ServerNotification.LogLevel.INFO.ordinal then println(s"[${level.toString}] $message")
       case _: ServerNotification.TaskProgress    =>
+      case _: ServerNotification.CompileStarted =>
+      case _: ServerNotification.CompileDiagnostic =>
       case _: ServerNotification.RunSubprocess   =>
       case _: ServerNotification.RequestFinished =>
 

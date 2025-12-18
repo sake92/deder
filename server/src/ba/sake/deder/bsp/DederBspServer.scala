@@ -4,6 +4,7 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.*
 import scala.jdk.CollectionConverters.*
+import ch.epfl.scala.bsp4j
 import ch.epfl.scala.bsp4j.*
 import org.eclipse.lsp4j.jsonrpc.Launcher
 import ba.sake.deder.*
@@ -21,28 +22,68 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   var client: BuildClient = null // set by DederBspProxyServer
 
+  // fresh one for each BSP request!
   private def makeServerNotificationsLogger(
       originId: Option[String] = None,
       targetId: Option[BuildTargetIdentifier] = None,
       taskId: Option[TaskId] = None
-  ) = ServerNotificationsLogger {
-    case n: ServerNotification.Log =>
-      // dont spam the client with debug/trace messages..
-      if n.level.ordinal <= ServerNotification.LogLevel.INFO.ordinal then client.onBuildLogMessage(toBspLogMessage(n))
-    case tp: ServerNotification.TaskProgress =>
-      taskId.foreach { taskId =>
-        val params = TaskProgressParams(taskId)
-        params.setOriginId(originId.orNull)
-        params.setEventTime(System.currentTimeMillis())
-        params.setDataKind("compile-progress") // TODO just used for compile now..
-        params.setData(new CompileTask(targetId.orNull))
-        params.setProgress(tp.progress)
-        params.setTotal(tp.total)
-        params.setMessage(s"${tp.moduleId}.${tp.taskName}: ${tp.progress.toDouble / tp.total.toDouble * 100}%")
-        client.onBuildTaskProgress(params)
-      }
-    case n: ServerNotification.RequestFinished => // do nothing
-    case _                                     => // ignore other notifications for now
+  ) = {
+    ServerNotificationsLogger {
+      case n: ServerNotification.Log =>
+        // dont spam the client with debug/trace messages..
+        if n.level.ordinal <= ServerNotification.LogLevel.INFO.ordinal then client.onBuildLogMessage(toBspLogMessage(n))
+      case tp: ServerNotification.TaskProgress =>
+        taskId.foreach { taskId =>
+          val params = TaskProgressParams(taskId)
+          params.setOriginId(originId.orNull)
+          params.setEventTime(System.currentTimeMillis())
+          params.setDataKind("compile-progress") // TODO just used for compile now..
+          params.setData(new CompileTask(targetId.orNull))
+          params.setProgress(tp.progress)
+          params.setTotal(tp.total)
+          val percentage = tp.progress.toDouble / tp.total.toDouble * 100
+          params.setMessage(f"${tp.moduleId}.${tp.taskName}: ${percentage}%.2f%%")
+          client.onBuildTaskProgress(params)
+        }
+      case cs: ServerNotification.CompileStarted =>
+        // reset diagnostics for these files
+        cs.files.foreach { file =>
+          val fileUri = TextDocumentIdentifier(file.toURI.toString)
+          val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List.empty.asJava, true)
+          client.onBuildPublishDiagnostics(params)
+        }
+      case cd: ServerNotification.CompileDiagnostic =>
+        val file = cd.problem.position.sourceFile.get
+        val problem = cd.problem
+        val fileUri = TextDocumentIdentifier(file.toURI.toString)
+        val range = {
+          val pos = problem.position
+          // Zinc's range starts at 1 whereas BSP at 0
+          val startLine = pos.startLine().get - 1
+          val startColumn = pos.startColumn().get - 1
+          val endLine = pos.endLine().get - 1
+          val endColumn = pos.endColumn().get - 1
+          new bsp4j.Range(
+            new bsp4j.Position(startLine, startColumn),
+            new bsp4j.Position(endLine, endColumn)
+          )
+        }
+        val severity = problem.severity() match {
+          case xsbti.Severity.Error => DiagnosticSeverity.ERROR
+          case xsbti.Severity.Warn  => DiagnosticSeverity.WARNING
+          case xsbti.Severity.Info  => DiagnosticSeverity.INFORMATION
+        }
+        val diagnostic = new Diagnostic(range, problem.message())
+        diagnostic.setSeverity(severity)
+        diagnostic.setCode(problem.category())
+        diagnostic.setSource("deder")
+        val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List(diagnostic).asJava, false)
+        client.onBuildPublishDiagnostics(params)
+
+      case n: ServerNotification.RequestFinished => // do nothing
+      case n: ServerNotification.Output          => // do nothing
+      case n: ServerNotification.RunSubprocess   => // do nothing
+    }
   }
 
   override def buildInitialize(params: InitializeBuildParams): CompletableFuture[InitializeBuildResult] = {
@@ -69,9 +110,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   override def onBuildInitialized(): Unit = {
-    // trigger compile immediately? then no progress is seen in metals.. just "importing"
-    //val serverNotificationsLogger = makeServerNotificationsLogger()
-    //projectState.executeCLI(Seq.empty, "compile", Seq.empty, n => serverNotificationsLogger.add(n), useLastGood = true)
+    // we dont trigger compile immediately
+    // coz there is no progress seen in metals.. just "importing"
   }
 
   override def workspaceReload(): CompletableFuture[Object] = CompletableFuture.supplyAsync { () =>
@@ -167,18 +207,17 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] =
     CompletableFuture.supplyAsync { () =>
-      val taskId = TaskId(s"compile-${UUID.randomUUID}")
       var allCompileSucceeded = true
       withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets.asScala.foreach { targetId =>
+          val moduleId = targetId.moduleId
+          val taskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
           val serverNotificationsLogger = makeServerNotificationsLogger(
             originId = Option(params.getOriginId),
             targetId = Some(targetId),
             taskId = Some(taskId)
           )
-          var currentModuleCompileSucceeded = true
-          val moduleId = targetId.moduleId
           val taskStartParams = TaskStartParams(taskId)
           taskStartParams.setEventTime(System.currentTimeMillis())
           taskStartParams.setOriginId(params.getOriginId)
@@ -187,6 +226,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           taskStartParams.setData(new CompileTask(targetId))
           client.onBuildTaskStart(taskStartParams)
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
+          var currentModuleCompileSucceeded = true
           try {
             executeTask(serverNotificationsLogger, moduleId, coreTasks.compileTask)
           } catch {

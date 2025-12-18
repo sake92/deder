@@ -19,6 +19,16 @@ enum ServerNotification {
       total: Long
   )
 
+  case CompileStarted(
+      moduleId: String,
+      files: Seq[os.Path]
+  )
+
+  case CompileDiagnostic(
+      moduleId: String,
+      problem: xsbti.Problem
+  )
+
   // tell client to run this subprocess
   case RunSubprocess(cmd: Seq[String])
 
