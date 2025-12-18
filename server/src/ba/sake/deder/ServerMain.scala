@@ -30,6 +30,7 @@ object ServerMain {
     acquireServerLock(projectRoot)
 
     // TODO read from server.properties file
+    // TODO maybe make it elastic ThreadPool with min/max threads for better memory usage?
     val tasksExecutorService = Executors.newFixedThreadPool(10)
     val onShutdown = () => {
       println("Deder server is shutting down...")
@@ -49,6 +50,20 @@ object ServerMain {
     bspProxyServerThread.start()
 
     println("Deder server started.")
+
+    os.watch.watch(
+      roots = Seq(projectRoot),
+      onEvent = paths => {
+        if paths.exists(isServerConfigFile) then
+          println(s"Server configuration file changed: ${paths}, restarting server...")
+          // TODO
+        else if paths.exists(isProjectConfigFile) then
+          println(s"Configuration file changed: ${paths}, reloading project...")
+          projectState.refreshProjectState(_ => ())
+        else if paths.exists(isTaskTriggerCandidate) then
+          println(s"Source files changed: ${paths}, triggering tasks...")
+      }
+    )
 
     cliServerThread.join()
     bspProxyServerThread.join()
@@ -75,5 +90,40 @@ object ServerMain {
         case _: Exception => // Ignore errors during cleanup
       }
     }))
+  }
+
+  def isServerConfigFile(p: os.Path): Boolean =
+    p == DederGlobals.projectRootDir / ".deder/server.properties"
+
+  def isProjectConfigFile(p: os.Path): Boolean =
+    p == DederGlobals.projectRootDir / "deder.pkl"
+
+  def isTaskTriggerCandidate(p: os.Path): Boolean =
+    !isServerConfigFile(p) && (
+      isProjectConfigFile(p) ||
+        !isDederArtifact(p) && !isDevArtifact(p)
+    )
+
+  def isDederArtifact(p: os.Path): Boolean = {
+    val pathSegments = p.segments.toSeq
+    val pathSegments2 = pathSegments.sliding(2).map(s => (s(0), s(1))).toSet
+    pathSegments2.contains(".deder" -> "out") ||
+    pathSegments2.contains(".deder" -> "logs") ||
+    pathSegments2.contains(".deder" -> "server.jar") ||
+    pathSegments2.contains(".deder" -> "server.lock") ||
+    pathSegments2.contains(".deder" -> "server-cli.sock") ||
+    pathSegments2.contains(".deder" -> "server-bsp.sock")
+  }
+
+  def isDevArtifact(p: os.Path): Boolean = {
+    val pathSegments = p.segments.toSeq
+    pathSegments.contains(".git") ||
+    pathSegments.contains(".github") ||
+    pathSegments.contains(".idea") ||
+    pathSegments.contains(".vscode") ||
+    pathSegments.contains(".metals") ||
+    pathSegments.contains(".bsp") ||
+    pathSegments.contains("target") ||
+    pathSegments.contains("out")
   }
 }

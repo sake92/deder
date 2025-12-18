@@ -11,7 +11,7 @@ object server extends ScalaModule {
     mvn"org.jgrapht:jgrapht-io:1.5.2",
     mvn"org.scalameta::ascii-graphs:0.1.2".withDottyCompat(scalaVersion()),
     mvn"ba.sake::tupson:0.18.0",
-    mvn"com.lihaoyi::os-lib:0.11.6",
+    mvn"com.lihaoyi::os-lib-watch:0.11.6",
     mvn"commons-codec:commons-codec:1.20.0",
     mvn"org.scala-sbt:zinc_2.13:1.11.0",
     mvn"org.scala-sbt:compiler-interface:1.11.0",
