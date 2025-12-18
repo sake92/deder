@@ -42,11 +42,7 @@ Run client:
 cd examples/multi
 ./reset # copy the server JAR etc
 
-################
-# print version of client and server
-deder version
-
-################
+################ expore the build
 # list modules
 # supports flags: --json, --ascii, --dot
 deder modules
@@ -61,7 +57,8 @@ deder tasks
 # supports flags: --json, --ascii, --dot
 deder plan -m common -t compileClasspath
 
-################
+
+################ run tasks
 # by default executes compile on all modules
 deder
 
@@ -74,6 +71,7 @@ deder -t run -m uber
 # execute test on uber-test module
 deder -t test -m uber-test
 
+
 ################ BSP
 # write BSP config file for current project
 deder bsp install
@@ -81,18 +79,25 @@ deder bsp install
 # start a BSP client for current project
 deder bsp
 
+
+################ Misc
+
+deder version
+
 # shutdown server
 deder shutdown
+
 ```
 
 ## IDE setup
 
 Run `deder bsp install` and just open with VSCode or IntelliJ (open as a BSP project).
+The `reset.sh` script does this for you..
 
 Currently working features:
 - import of project
 - navigation
-- compilation
+- compilation and diagnostics
 - run main scala classes (Java doesnt.. #todo-fixme )
 
-If you work on server code, after you build it you can run `./reset` in examples/multi
+If you work on server code, after you build it you can run `./reset.sh` in examples/multi
