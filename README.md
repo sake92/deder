@@ -10,8 +10,8 @@ THERE ARE ZERO TESTS! ZERO!!!
 
 
 ## Concepts
-- project is a root project, your git repo
-- modules are "subprojects", like common/frontend..
+- project is the root of your git repo
+- modules are "subprojects", like common/frontend/app..
 - modules have tasks defined for them
 
 See [examples](examples/multi/) for a realistic example project.
@@ -20,12 +20,15 @@ See [examples](examples/multi/) for a realistic example project.
 ## Building locally
 
 Build the client:
-```scala
+```shell
 # executable JAR
 ./mill client.assembly
 # or as graalvm native image
 ./mill client-native.nativeImage
+
 # AND PUT IT IN PATH !!!
+cp out/client/assembly.dest/out.jar /mybins/deder
+cp out/client-native/nativeImage.dest/native-executable /mybins/deder
 
 # build server
 ./mill server.assembly
@@ -33,8 +36,9 @@ Build the client:
 
 
 Run client:
-```scala
+```shell
 # in another terminal, run commands:
+
 cd examples/multi
 ./reset # copy the server JAR etc
 

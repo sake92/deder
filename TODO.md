@@ -28,10 +28,8 @@
         - if this compile task depends on it, rerun it
 
 ## BSP
-- report compilation progress
-- report compile errors
-- test discovery
-- test run
+- java main classes cant be run..??
+- test run dosnt work, although Metals should cover DAP (same should work for Mill...)
 - add BSP integration tests from Metals and testkit??
     - https://scalameta.org/metals/docs/integrations/new-build-tool/#automated-tests
 
