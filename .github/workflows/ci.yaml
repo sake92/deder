@@ -21,8 +21,6 @@ jobs:
           java-version: 21
       - name: Generate config bindings
         run: |
-          curl -L -o pkl-codegen-java https://github.com/apple/pkl/releases/download/0.30.1/pkl-codegen-java
-          chmod +x pkl-codegen-java
           ./scripts/gen-config-bindings.sh
       - name: Build server and client
         run: |

@@ -405,7 +405,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     }
     val result = ScalaMainClassesResult(items.asJava)
     result.setOriginId(params.getOriginId)
-    println(s"BSP buildTargetScalaMainClasses called, returning: ${result}")
+    //println(s"BSP buildTargetScalaMainClasses called, returning: ${result}")
     result
   }
 
@@ -519,7 +519,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       }
     }
     val res = JvmRunEnvironmentResult(items.asJava)
-    println(s"BSP buildTargetJvmRunEnvironment called, returning: ${res}")
+    //println(s"BSP buildTargetJvmRunEnvironment called, returning: ${res}")
     res
   }
 
@@ -557,7 +557,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       }
     }
     val res = JvmTestEnvironmentResult(items.asJava)
-    println(s"BSP buildTargetJvmTestEnvironment called, returning: ${res}")
+    //println(s"BSP buildTargetJvmTestEnvironment called, returning: ${res}")
     res
   }
 

@@ -19,19 +19,19 @@ See [examples](examples/multi/) for a realistic example project.
 
 ## Building locally
 
-Build the client:
+Build the server and client:
 ```shell
-# executable JAR
+./scripts/gen-config-bindings.sh
+./mill server.assembly
+
+# client executable JAR
 ./mill client.assembly
-# or as graalvm native image
+# or as native client
 ./mill client-native.nativeImage
 
-# AND PUT IT IN PATH !!!
-cp out/client/assembly.dest/out.jar /mybins/deder
-cp out/client-native/nativeImage.dest/native-executable /mybins/deder
-
-# build server
-./mill server.assembly
+# AND PUT CLIENT IN PATH !!! for example:
+cp out/client/assembly.dest/out.jar /usr/local/bin/deder
+cp out/client-native/nativeImage.dest/native-executable /usr/local/bin/deder
 ```
 
 
