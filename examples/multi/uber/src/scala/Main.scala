@@ -15,13 +15,10 @@ object Main {
       print("Type something: ")
       val line = scala.io.StdIn.readLine()
       println(s"You typed: $line")
-      Thread.sleep(1000)
+      Thread.sleep(2000)
       true
     }) {}
 
   }
 }
-
-
-
 

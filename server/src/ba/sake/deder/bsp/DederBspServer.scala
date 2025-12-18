@@ -390,9 +390,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val items =
           if module.isInstanceOf[DederProject.ScalaTestModule] then List.empty
           else
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask).map { mainClass =>
-              // TODO arguments + JVM opts
-              ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
+            try {
+              executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask).map { mainClass =>
+                // TODO arguments + JVM opts
+                ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
+              }
+            } catch {
+              case e: TaskEvaluationException =>
+                // module failed to compile for example
+                List.empty
             }
         ScalaMainClassesItem(targetId, items.asJava)
       }
@@ -412,16 +418,22 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       val testModules = projectStateData.projectConfig.modules.asScala.collect { case m: DederProject.ScalaTestModule =>
         m
       }
-      testModules.map { module =>
+      testModules.flatMap { module =>
         val targetId = buildTargetId(module)
-        val frameworkTests = executeTask(serverNotificationsLogger, module.id, coreTasks.testClassesTask)
-        frameworkTests.map { ft =>
-          val item = ScalaTestClassesItem(targetId, ft.testClasses.asJava)
-          item.setFramework(ft.framework)
-          item
+        try {
+          val frameworkTests = executeTask(serverNotificationsLogger, module.id, coreTasks.testClassesTask)
+          frameworkTests.map { ft =>
+            val item = ScalaTestClassesItem(targetId, ft.testClasses.asJava)
+            item.setFramework(ft.framework)
+            item
+          }
+        } catch {
+          case e: TaskEvaluationException =>
+            // module failed to compile for example
+            List.empty
         }
       }
-    }.flatten
+    }
     ScalaTestClassesResult(items.asJava)
   }
 
