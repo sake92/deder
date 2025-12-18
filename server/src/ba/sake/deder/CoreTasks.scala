@@ -142,9 +142,9 @@ class CoreTasks() {
     .build { ctx => ctx.out }
 
   // this is localRunClasspath in mill ??
-  val transitiveClassesDirTask = TaskBuilder
+  val allClassesDirsTask = TaskBuilder
     .make[Seq[os.Path]](
-      name = "transitiveClassesDir",
+      name = "allClassesDirs",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA),
       transitive = true
     )
@@ -163,13 +163,11 @@ class CoreTasks() {
     .dependsOn(scalaVersionTask)
     .dependsOn(allDependenciesTask)
     .dependsOn(classesDirTask)
-    .dependsOn(transitiveClassesDirTask)
+    .dependsOn(allClassesDirsTask)
     .build { ctx =>
-      val scalacOptions = ctx.depResults._1
-      val scalaVersion = ctx.depResults._2
-      val dependencies = ctx.depResults._3
+      val (scalacOptions, scalaVersion, dependencies, classesDir, allClassesDirs) = ctx.depResults
       // dirty hack to get class dirs, all except for this module.. :/
-      val transitiveClassesDirs = ctx.depResults._5.filterNot(_ == ctx.depResults._4)
+      val otherTransitiveClassesDirs = allClassesDirs.filterNot(_ == classesDir)
       val scalaLibDep =
         if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
         else s"org.scala-lang:scala-library:${scalaVersion}"
@@ -179,7 +177,7 @@ class CoreTasks() {
           Some(ctx.notifications)
         )
       // val additionalCompileClasspath = ctx.transitiveResults.flatten.flatten ++ depsJars
-      (transitiveClassesDirs ++ depsJars).reverse.distinct.reverse
+      (otherTransitiveClassesDirs ++ depsJars).reverse.distinct.reverse
     }
 
   // TODO make configurable
@@ -233,14 +231,16 @@ class CoreTasks() {
     .dependsOn(scalacPluginsTask)
     .dependsOn(javacAnnotationProcessorsTask)
     .build { ctx =>
-      val sourceDirs = ctx.depResults._1
-      val javacOptions = ctx.depResults._2
-      val scalacOptions = ctx.depResults._3
-      val scalaVersion = ctx.depResults._4
-      val compileClasspath = ctx.depResults._5
-      val classesDir = ctx.depResults._6
-      val scalacPlugins = ctx.depResults._7
-      val javacAnnotationProcessors = ctx.depResults._8
+      val (
+        sourceDirs,
+        javacOptions,
+        scalacOptions,
+        scalaVersion,
+        compileClasspath,
+        classesDir,
+        scalacPlugins,
+        javacAnnotationProcessors
+      ) = ctx.depResults
 
       val sourceFiles = sourceDirs
         .flatMap { sourceDir =>
@@ -316,10 +316,7 @@ class CoreTasks() {
     .dependsOn(allDependenciesTask)
     .dependsOn(compileTask)
     .build { ctx =>
-      val scalaVersion = ctx.depResults._1
-      val dependencies = ctx.depResults._2
-      val classesDir = ctx.depResults._3
-
+      val (scalaVersion, dependencies, classesDir) = ctx.depResults
       val mandatoryDeps = ctx.module match {
         case m: JavaModule => Seq.empty
         case _: (ScalaModule | ScalaTestModule) =>
@@ -342,7 +339,7 @@ class CoreTasks() {
       name = "mainClasses",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
-    .dependsOn(transitiveClassesDirTask)
+    .dependsOn(allClassesDirsTask)
     .build { ctx =>
       MainClassesDiscovery.discover(ctx.depResults._1)
     }
@@ -367,10 +364,12 @@ class CoreTasks() {
     .dependsOn(mainClassTask)
     .dependsOn(mainClassesTask)
     .build { ctx =>
-      val mainClass = ctx.depResults._1.orElse(ctx.depResults._2.headOption)
-      mainClass.getOrElse(
-        throw new Exception(s"No main class found for module: ${ctx.module.id}")
-      )
+      val (mainClass, mainClasses) = ctx.depResults
+      mainClass
+        .orElse(mainClasses.headOption)
+        .getOrElse(
+          throw new Exception(s"No main class found for module: ${ctx.module.id}")
+        )
     }
 
   val runTask = TaskBuilder
@@ -381,9 +380,8 @@ class CoreTasks() {
     .dependsOn(runClasspathTask)
     .dependsOn(finalMainClassTask)
     .build { ctx =>
-      val runClasspath = ctx.depResults._1
+      val (runClasspath, mainClass) = ctx.depResults
       val cp = runClasspath.map(_.toString)
-      val mainClass = ctx.depResults._2
       val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), mainClass) ++ ctx.args
       // println(s"Running command: " + cmd)
       ctx.notifications.add(ServerNotification.RunSubprocess(cmd))
@@ -398,8 +396,7 @@ class CoreTasks() {
     .dependsOn(compileTask)
     .dependsOn(runClasspathTask)
     .build { ctx =>
-      val classesDir = ctx.depResults._1
-      val classpath = ctx.depResults._2
+      val (classesDir, classpath) = ctx.depResults
       val testClasspath = Seq(classesDir.absPath) ++ classpath
       val urls = testClasspath.map(_.toURI.toURL).toArray
       val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
@@ -422,9 +419,8 @@ class CoreTasks() {
     .dependsOn(runClasspathTask)
     // TODO testClassesTask
     .build { ctx =>
-      val classesDir = ctx.depResults._1
-      val classpath = ctx.depResults._2
-      val testClasspath = (Seq(classesDir.absPath) ++ classpath).reverse.distinct.reverse
+      val (classesDir, runClasspath) = ctx.depResults
+      val testClasspath = (Seq(classesDir.absPath) ++ runClasspath).reverse.distinct.reverse
       val urls = testClasspath.map(_.toURI.toURL).toArray
       val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
       val testDiscovery = DederTestDiscovery(
@@ -453,7 +449,7 @@ class CoreTasks() {
     dependenciesTask,
     allDependenciesTask,
     classesDirTask,
-    transitiveClassesDirTask,
+    allClassesDirsTask,
     compileClasspathTask,
     compileTask,
     runClasspathTask,
