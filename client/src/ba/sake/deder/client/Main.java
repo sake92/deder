@@ -63,10 +63,10 @@ public class Main {
 				return;
 			}
 			startServer();
-			while (!connected && currentAttempt <= 10) {
+			while (!connected && currentAttempt <= 100) {
 				try {
-					Thread.sleep(1000);
-					System.err.println("Attempting to reconnect to server, attempt " + currentAttempt + "...");
+					Thread.sleep(100);
+					//System.err.println("Attempting to reconnect to server, attempt " + currentAttempt + "...");
 					log("Attempting to reconnect to server, attempt " + currentAttempt + "...");
 					currentAttempt++;
 					client.stop();
@@ -113,11 +113,13 @@ public class Main {
 		Files.writeString(serverLogFile, "=".repeat(50) + System.lineSeparator(), StandardCharsets.UTF_8,
 				StandardOpenOption.APPEND, StandardOpenOption.CREATE);
 		var props = new Properties();
-		var propFileName = ".deder/server.properties";
+		var propFileName = Paths.get(".deder/server.properties");
 		var javaOpts = "";
-		try (FileInputStream inputStream = new FileInputStream(propFileName)) {
-			props.load(inputStream);
-			javaOpts = props.getProperty("JAVA_OPTS", "");
+		if (Files.exists(propFileName) && Files.isRegularFile(propFileName)) {
+			try (FileInputStream inputStream = new FileInputStream(propFileName.toFile())) {
+				props.load(inputStream);
+				javaOpts = props.getProperty("JAVA_OPTS", "");
+			}
 		}
 		var processArgs = new ArrayList<String>();
 		// detach server process so it keeps running after client exits

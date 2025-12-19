@@ -119,6 +119,7 @@ public class DederCliClient implements DederClient {
 		Thread subprocessRunningThread = null;
 		while ((messageJson = reader.readLine()) != null) {
 			var message = jsonMapper.readValue(messageJson, ServerMessage.class);
+			//System.out.println("Received message from server: " + messageJson);
 			if (message instanceof ServerMessage.Output output) {
 				System.out.println(output.text());
 			} else if (message instanceof ServerMessage.Log log) {
@@ -132,7 +133,12 @@ public class DederCliClient implements DederClient {
 				subprocessRunningThread = createSubprocessRunningThread(runSubprocess.cmd());
 				subprocessRunningThread.start();
 			} else if (message instanceof ServerMessage.Exit exit) {
-				System.exit(exit.exitCode()); // TODO cleanup
+				if (subprocessRunningThread != null && subprocessRunningThread.isAlive()) {
+					// TODO is this logic sound? :/
+					log("Subprocess still running, not exiting...");
+				} else {
+					System.exit(exit.exitCode()); // TODO cleanup
+				}
 			}
 		}
 	}

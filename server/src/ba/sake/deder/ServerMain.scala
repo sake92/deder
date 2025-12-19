@@ -120,6 +120,7 @@ object ServerMain {
     pathSegments2.contains(".deder" -> "server-bsp.sock")
   }
 
+  // TODO read gitignore..
   def isDevArtifact(p: os.Path): Boolean = {
     val pathSegments = p.segments.toSeq
     pathSegments.contains(".git") ||
@@ -128,6 +129,8 @@ object ServerMain {
     pathSegments.contains(".vscode") ||
     pathSegments.contains(".metals") ||
     pathSegments.contains(".bsp") ||
+    pathSegments.contains(".bsp") ||
+    pathSegments.contains(".scala-build") ||
     pathSegments.contains("target") ||
     pathSegments.contains("out")
   }
