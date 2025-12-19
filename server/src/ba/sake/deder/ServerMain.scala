@@ -62,6 +62,7 @@ object ServerMain {
           projectState.refreshProjectState(_ => ())
         else if paths.exists(isTaskTriggerCandidate) then
           println(s"Source files changed: ${paths}, triggering tasks...")
+          projectState.triggerFileWatchedTasks(paths)
       }
     )
 

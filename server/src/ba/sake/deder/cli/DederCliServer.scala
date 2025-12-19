@@ -193,7 +193,8 @@ class DederCliServer(projectState: DederProjectState) {
               cliOptions.task,
               args = cliOptions.args.value,
               logCallback,
-              json = cliOptions.json.value
+              json = cliOptions.json.value,
+              watch = cliOptions.watch.value
             )
         }
       case m: CliClientMessage.Clean =>

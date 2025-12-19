@@ -27,10 +27,12 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
   private val configFile = DederGlobals.projectRootDir / "deder.pkl"
 
   @volatile var current: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
-  // used for BSP to keep last known good state
+  // used for BSP
   @volatile var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
 
   val lastRequestStartedAt = new java.util.concurrent.atomic.AtomicReference[Instant](null)
+
+  var watchedTasks = Seq.empty[WatchedTaskData]
 
   refreshProjectState(err => println(s"Initial project state load error: ${err}"))
 
@@ -62,13 +64,15 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
       args: Seq[String],
       notificationCallback: ServerNotification => Unit,
       useLastGood: Boolean = false,
-      json: Boolean = false
+      json: Boolean = false,
+      watch: Boolean = false
   ): Unit = try {
     val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
     refreshProjectState(errorMessage => throw TaskEvaluationException(s"Project state is invalid: ${errorMessage}"))
     val state = (if useLastGood then lastGood else current).toOption.getOrElse(
       throw TaskEvaluationException(s"Project state is not available (lastGood=${useLastGood})")
     )
+
     // TODO deduplicate unnecessary work !
     val allModuleIds = state.tasksResolver.allModules.map(_.id)
     val selectedModuleIds =
@@ -94,9 +98,28 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
           if json then
             val jsonRes = taskInstance.task.rw.write(taskRes)
             jsonValues = jsonValues.updated(moduleId, jsonRes)
+          if watch then {
+            val affectingSourceFileTasks =
+              state.executionPlanner.getAffectingSourceFileTasks(moduleId, taskName)
+            val affectingConfigValueTasks =
+              state.executionPlanner.getAffectingConfigValueTasks(moduleId, taskName)
+            watchedTasks = watchedTasks.appended(
+              WatchedTaskData(
+                taskInstance,
+                args,
+                serverNotificationsLogger,
+                useLastGood,
+                affectingSourceFileTasks,
+                affectingConfigValueTasks
+              )
+            )
+            serverNotificationsLogger.add(
+              ServerNotification.logInfo(s"Executing ${moduleId}.${taskName} in watch mode...")
+            )
+          }
         }
         if json then serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
-        serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
+        if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
       } catch {
         case e: TaskNotFoundException =>
           serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
@@ -190,6 +213,49 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
     )
   }
 
+  def triggerFileWatchedTasks(changedPaths: Set[os.Path]): Unit = {
+    watchedTasks.foreach { watchedTask =>
+      val affected = watchedTask.affectingSourceFileTasks.exists { taskInstance =>
+        val sourceFiles = taskInstance.task match {
+          case sourceFilesTask: SourceFilesTask =>
+            executeTask(
+              taskInstance.moduleId,
+              sourceFilesTask,
+              watchedTask.args,
+              watchedTask.serverNotificationsLogger,
+              watchedTask.useLastGood
+            ).map(_.absPath)
+          case sourceFileTask: SourceFileTask =>
+            Seq(
+              executeTask(
+                taskInstance.moduleId,
+                sourceFileTask,
+                watchedTask.args,
+                watchedTask.serverNotificationsLogger,
+                watchedTask.useLastGood
+              ).absPath
+            )
+          case _ => Seq.empty
+        }
+        changedPaths.zip(sourceFiles).exists { (changedPath, sourceFile) =>
+          changedPath.startsWith(sourceFile)
+        }
+      }
+      if affected then {
+        executeOne(
+          watchedTask.taskInstance.moduleId,
+          watchedTask.taskInstance.task.name,
+          watchedTask.args,
+          watchedTask.serverNotificationsLogger,
+          watchedTask.useLastGood
+        )
+        watchedTask.serverNotificationsLogger.add(
+          ServerNotification.logInfo(s"Executing ${watchedTask.taskInstance.id} in watch mode...")
+        )
+      }
+    }
+  }
+
   def shutdown(): Unit = {
     shutdownStarted = true
     onShutdown()
@@ -201,4 +267,13 @@ case class DederProjectStateData(
     tasksRegistry: TasksRegistry,
     tasksResolver: TasksResolver,
     executionPlanner: ExecutionPlanner
+)
+
+case class WatchedTaskData(
+    taskInstance: TaskInstance,
+    args: Seq[String],
+    serverNotificationsLogger: ServerNotificationsLogger,
+    useLastGood: Boolean,
+    affectingSourceFileTasks: Set[TaskInstance],
+    affectingConfigValueTasks: Set[TaskInstance]
 )

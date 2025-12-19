@@ -95,14 +95,14 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
   ): TaskResult[T]
 }
 
-case class TaskImpl[T: JsonRW, Deps <: Tuple](
-    name: String,
-    execute: TaskExecContext[T, Deps] => T,
-    taskDeps: Deps = EmptyTuple,
+class TaskImpl[T: JsonRW, Deps <: Tuple](
+    val name: String,
+    val execute: TaskExecContext[T, Deps] => T,
+    val taskDeps: Deps = EmptyTuple,
     // if it triggers upstream modules task with same name
     // the only way to reference a task across modules
-    transitive: Boolean = false,
-    supportedModuleTypes: Set[ModuleType] = Set.empty
+    val transitive: Boolean = false,
+    val supportedModuleTypes: Set[ModuleType] = Set.empty
 )(using ev: TaskDeps[Deps] =:= true)
     extends Task[T, Deps] {
   override private[deder] def executeUnsafe(
@@ -136,6 +136,8 @@ case class TaskImpl[T: JsonRW, Deps <: Tuple](
     )
     taskResult
   }
+
+  override def toString(): String = s"TaskImpl($name)"
 }
 
 class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
@@ -207,6 +209,9 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
       computeTaskResult()
     }
   }
+
+  override def toString(): String = s"CachedTask($name)"
+
 }
 
 // specialized task just for source file
@@ -221,7 +226,9 @@ class SourceFileTask(
       taskDeps = EmptyTuple,
       transitive = false,
       supportedModuleTypes
-    )
+    ) {
+  override def toString(): String = s"SourceFileTask($name)"
+}
 
 class SourceFilesTask(
     name: String,
@@ -233,25 +240,27 @@ class SourceFilesTask(
       taskDeps = EmptyTuple,
       transitive = false,
       supportedModuleTypes
-    )
+    ) {
+  override def toString(): String = s"SourceFilesTask($name)"
+}
 
 class ConfigValueTask[T: JsonRW: Hashable](
     name: String,
     execute: TaskExecContext[T, EmptyTuple] => T,
     supportedModuleTypes: Set[ModuleType] = Set.empty
-) extends CachedTask[T, EmptyTuple](name, execute, taskDeps = EmptyTuple, transitive = false, supportedModuleTypes)
+) extends CachedTask[T, EmptyTuple](name, execute, taskDeps = EmptyTuple, transitive = false, supportedModuleTypes) {
+  override def toString(): String = s"ConfigValueTask($name)"
+}
 
 // dynamic, for each module
-case class TaskInstance(
-    module: DederModule,
-    task: Task[?, ?],
-    lock: Lock
+class TaskInstance(
+    val module: DederModule,
+    val task: Task[?, ?],
+    val lock: Lock
 ) {
   def moduleId: String = module.id
 
   def id: String = s"${moduleId}.${task.name}"
-
-  override def canEqual(that: Any): Boolean = that.isInstanceOf[TaskInstance]
 
   override def equals(that: Any): Boolean =
     that match {
@@ -261,9 +270,10 @@ case class TaskInstance(
 
   override def hashCode(): Int = id.hashCode
 
+  override def toString(): String = s"TaskInstance(${id}, ${task})"
 }
 
 object TaskInstance {
   def apply(module: DederModule, task: Task[?, ?]): TaskInstance =
-    TaskInstance(module, task, new ReentrantLock())
+    new TaskInstance(module, task, new ReentrantLock())
 }

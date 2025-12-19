@@ -58,6 +58,41 @@ class ExecutionPlanner(
     subgraph
   }
 
+  def getAffectingSourceFileTasks(moduleId: String, taskName: String): Set[TaskInstance] =
+    getRootDepTasks(moduleId, taskName).filter(_.task match {
+      case _: SourceFileTask  => true
+      case _: SourceFilesTask => true
+      case _                  => false
+    })
+
+  def getAffectingConfigValueTasks(moduleId: String, taskName: String): Set[TaskInstance] =
+    getRootDepTasks(moduleId, taskName).filter(_.task match {
+      case _: ConfigValueTask[?] => true
+      case _                     => false
+    })
+
+  private def getRootDepTasks(moduleId: String, taskName: String): Set[TaskInstance] = {
+    val affectingTasks = Set.newBuilder[TaskInstance]
+    def go(moduleId: String, taskName: String): Unit = {
+      val taskInstance = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
+        throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
+      }
+      val deps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
+      deps.foreach { depEdge =>
+        val d = tasksGraph.getEdgeTarget(depEdge)
+        go(d.moduleId, d.task.name)
+      }
+      taskInstance.task match {
+        case _: SourceFileTask     => affectingTasks.addOne(taskInstance)
+        case _: SourceFilesTask    => affectingTasks.addOne(taskInstance)
+        case _: ConfigValueTask[?] => affectingTasks.addOne(taskInstance)
+        case _                     =>
+      }
+    }
+    go(moduleId, taskName)
+    affectingTasks.result()
+  }
+
   def getTaskInstance(moduleId: String, taskName: String): TaskInstance = {
     tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
       throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
