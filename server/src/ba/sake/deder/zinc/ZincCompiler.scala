@@ -1,11 +1,13 @@
 package ba.sake.deder.zinc
 
-import sbt.internal.inc.consistent.ConsistentFileAnalysisStore
-
 import java.io.File
+import java.nio.file.Path
 import java.util.Optional
 import java.util.function.Supplier
 import sbt.internal.inc.{FileAnalysisStore, PlainVirtualFileConverter, ZincUtil}
+import sbt.internal.inc.consistent.ConsistentFileAnalysisStore
+import sbt.internal.util.ManagedLogger
+import sbt.util.LoggerContext
 import xsbti.compile.analysis.ReadWriteMappers
 import xsbti.compile.{
   AnalysisContents,
@@ -23,11 +25,8 @@ import xsbti.compile.{
   Setup
 }
 import sbt.internal.inc.ScalaInstance
-import java.nio.file.Path
 import ba.sake.deder.ServerNotificationsLogger
 import ba.sake.deder.ServerNotification
-import sbt.internal.util.ManagedLogger
-import sbt.util.LoggerContext
 
 object ZincCompiler {
   def apply(compilerBridgeJar: os.Path): ZincCompiler =
@@ -50,10 +49,8 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       zincLogger: xsbti.Logger,
       moduleId: String,
       notifications: ServerNotificationsLogger
-      // TODO custom reporter, for BSP diagnostics
   ): Unit = {
 
-    // val classloader = this.getClass.getClassLoader
     val scalaLibraryJars = compileClasspath.filter { p =>
       (p.last.startsWith("scala-library-") || p.last.startsWith("scala3-library_3")) && p.last.endsWith(".jar")
     }

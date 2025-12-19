@@ -31,7 +31,7 @@ class DederCliServer(projectState: DederProjectState) {
       var clientId = 0
       while true do {
         // Accept client connection (blocking)
-        val clientChannel = serverChannel.accept() // TODO if null
+        val clientChannel = serverChannel.accept()
         clientId += 1
         val currentClientId = clientId
         println(s"Client #$currentClientId connected")

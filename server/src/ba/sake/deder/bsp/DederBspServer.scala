@@ -87,7 +87,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   override def buildInitialize(params: InitializeBuildParams): CompletableFuture[InitializeBuildResult] = {
-    println(s"BSP client connected: ${params}")
+    // println(s"BSP client connected: ${params}")
     val supportedLanguages = List("java", "scala")
     val capabilities = new BuildServerCapabilities()
     capabilities.setResourcesProvider(true)
@@ -128,7 +128,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           projectStateData.projectConfig.modules.asScala.map(m => buildTarget(m, projectStateData)).toList
       }
       val result = new WorkspaceBuildTargetsResult(buildTargets.asJava)
-      println(s"BSP workspaceBuildTargets called, returning: ${result}")
+      //println(s"BSP workspaceBuildTargets called, returning: ${result}")
       result
   }
 
@@ -158,10 +158,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           }
         }
       }
-      println(
+      /*println(
         s"BSP buildTargetSources called for ${params.getTargets.asScala.map(_.getUri)}," +
           s" returning: ${sourcesItems.toList}"
-      )
+      )*/
       new SourcesResult(sourcesItems.asJava)
     }
 
@@ -563,13 +563,13 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetRun(params: RunParams): CompletableFuture[RunResult] = {
     // TODO
-    println(s"BSP buildTargetRun called ${params}")
+   // println(s"BSP buildTargetRun called ${params}")
     CompletableFuture.failedFuture(new NotImplementedError("buildTargetRun is not supported in Deder BSP server"))
   }
 
   override def buildTargetTest(params: TestParams): CompletableFuture[TestResult] = {
     // TODO
-    println(s"BSP buildTargetTest called ${params}")
+    //println(s"BSP buildTargetTest called ${params}")
     CompletableFuture.failedFuture(new NotImplementedError("buildTargetRun is not supported in Deder BSP server"))
   }
 
@@ -580,7 +580,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def onRunReadStdin(params: ReadParams): Unit = {
     // TODO
-    println(s"BSP onRunReadStdin called ${params}")
+   // println(s"BSP onRunReadStdin called ${params}")
     throw new NotImplementedError("buildTargetRun is not supported in Deder BSP server")
   }
 
@@ -628,7 +628,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         buildTarget.setDataKind(BuildTargetDataKind.JVM)
       case m: DederProject.ScalaModule =>
         val binaryVersion = ScalaParameters(m.scalaVersion).scalaBinaryVersion
-        // TODO val jars = List("scala-compiler.jar", "scala-reflect.jar", "scala-library.jar").asJava
         val scalaBuildTarget =
           new ScalaBuildTarget("org.scala-lang", m.scalaVersion, binaryVersion, ScalaPlatform.JVM, List.empty.asJava)
         val jvmBuildTarget = new JvmBuildTarget()

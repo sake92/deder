@@ -72,7 +72,7 @@ public class Main {
 				System.err.println("Deder server not running. No need to shutdown.");
 				return;
 			}
-			startServer();
+			startServer(isBspClient);
 			while (!connected && (keepConnectingInfinitely
 					|| Duration.between(startedConnectingAt, Instant.now()).getSeconds() < maxConnectDurationSeconds)) {
 				try {
@@ -89,14 +89,14 @@ public class Main {
 		}
 	}
 
-	private static void startServer() throws Exception {
+	private static void startServer(boolean isBspClient) throws Exception {
 		System.err.println("Deder server not running, starting it...");
 		log("Deder server not running, starting it...");
 		ensureJavaInstalled();
 		// TODO download server.jar if not present
 		Files.copy(Path.of("../../out/server/assembly.dest/out.jar"), Path.of(".deder/server.jar"),
 				StandardCopyOption.REPLACE_EXISTING);
-		startServerProcess();
+		startServerProcess(isBspClient);
 		System.err.println("Deder server started.");
 		log("Deder server started.");
 	}
@@ -117,7 +117,7 @@ public class Main {
 		log("Java looks ok.");
 	}
 
-	private static void startServerProcess() throws Exception {
+	private static void startServerProcess(boolean isBspClient) throws Exception {
 		var cwd = Paths.get(".").toAbsolutePath();
 		var serverLogFile = Path.of(".deder/logs/server.log");
 		Files.writeString(serverLogFile, "=".repeat(50) + System.lineSeparator(), StandardCharsets.UTF_8,
@@ -159,6 +159,9 @@ public class Main {
 			System.err.println("Failed to start Deder server. Please check logs for details: ");
 			System.err.println(logFile.toAbsolutePath());
 			System.err.println(serverLogFile.toAbsolutePath());
+			if (isBspClient) {
+				System.err.println("Maybe BSP is disabled? Check .deder/server.properties");
+			}
 			System.exit(1);
 		}
 	}
