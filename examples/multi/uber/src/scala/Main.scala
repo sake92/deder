@@ -14,11 +14,9 @@ object Main {
     while ({
       print("Type something: ")
       val line = scala.io.StdIn.readLine()
-      println(s"You typed: $line")
-      Thread.sleep(2000)
+      println(s"You aaaaaaaaaa: $line")
       true
     }) {}
 
   }
 }
-

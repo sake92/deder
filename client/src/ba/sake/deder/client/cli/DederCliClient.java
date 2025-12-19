@@ -7,6 +7,7 @@ import java.nio.channels.Channels;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.concurrent.TimeUnit;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ba.sake.deder.client.DederClient;
 
@@ -45,6 +46,8 @@ public class DederCliClient implements DederClient {
 					serverRead(is);
 				} catch (IOException e) {
 					throw new UncheckedIOException(e);
+				} catch (InterruptedException e) {
+					// exit thread
 				}
 			}, "DederCliServerReadThread");
 			serverWriteThread.start();
@@ -108,10 +111,12 @@ public class DederCliClient implements DederClient {
 		// }
 	}
 
-	private void serverRead(InputStream is) throws IOException {
+	private void serverRead(InputStream is) throws InterruptedException, IOException {
 		// newline delimited JSON messages
+		Process runningSubprocess = null;
 		var reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
 		String messageJson = null;
+		Thread subprocessRunningThread = null;
 		while ((messageJson = reader.readLine()) != null) {
 			var message = jsonMapper.readValue(messageJson, ServerMessage.class);
 			if (message instanceof ServerMessage.Output output) {
@@ -119,19 +124,48 @@ public class DederCliClient implements DederClient {
 			} else if (message instanceof ServerMessage.Log log) {
 				System.err.println(log.text());
 			} else if (message instanceof ServerMessage.RunSubprocess runSubprocess) {
-				// TODO handle multiple messages, restart subprocess
-				var processBuilder = new ProcessBuilder(runSubprocess.cmd());
-				processBuilder.inheritIO();
-				var process = processBuilder.start();
-				try {
-					process.waitFor();
-				} catch (InterruptedException e) {
-					throw new RuntimeException(e);
+				if (subprocessRunningThread != null && subprocessRunningThread.isAlive()) {
+					log("Interrupting current subprocess...");
+					subprocessRunningThread.interrupt();
+					subprocessRunningThread.join();
 				}
+				subprocessRunningThread = createSubprocessRunningThread(runSubprocess.cmd());
+				subprocessRunningThread.start();
 			} else if (message instanceof ServerMessage.Exit exit) {
 				System.exit(exit.exitCode()); // TODO cleanup
 			}
 		}
+	}
+
+	private Thread createSubprocessRunningThread(String[] cmd) {
+		return new Thread(() -> {
+			Process runningSubprocess = null;
+			try {
+				var processBuilder = new ProcessBuilder(cmd);
+				processBuilder.inheritIO();
+				runningSubprocess = processBuilder.start();
+				runningSubprocess.waitFor();
+			} catch (IOException e) {
+				throw new UncheckedIOException(e);
+			} catch (InterruptedException e1) {
+				if (runningSubprocess != null) {
+					log("Killing previous subprocess...");
+					runningSubprocess.destroy();
+					if (runningSubprocess.isAlive()) {
+						try {
+							runningSubprocess.waitFor(5, TimeUnit.SECONDS);
+						} catch (InterruptedException e2) {
+							// ignore
+						} finally {
+							if (runningSubprocess.isAlive()) {
+								log("Forcibly killing previous subprocess...");
+								runningSubprocess.destroyForcibly();
+							}
+						}
+					}
+				}
+			}
+		}, "DederCliSubprocessRunningThread");
 	}
 
 	private void log(String message) {

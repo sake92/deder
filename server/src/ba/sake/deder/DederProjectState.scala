@@ -92,7 +92,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
         }
 
     serverNotificationsLogger.add(
-      ServerNotification.logInfo(s"Executing ${taskName} on modules ${selectedModuleIds}")
+      ServerNotification.logInfo(s"Executing ${taskName} on module(s): ${selectedModuleIds.mkString(", ")}")
     )
     if selectedModuleIds.isEmpty then {
       serverNotificationsLogger.add(
