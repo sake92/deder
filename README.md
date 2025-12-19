@@ -65,8 +65,13 @@ deder
 # execute compile explicitly, on all modules
 deder -t compile
 
-# execute compile explicitly, on uber module
+# execute run explicitly, on uber module
 deder -t run -m uber
+
+# execute run in watch mode
+deder -t run -m frontend --watch
+# even in multiple terminals at the same time!!!
+deder -t run -m backend --watch
 
 # execute test on uber-test module
 deder -t test -m uber-test
