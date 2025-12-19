@@ -71,12 +71,12 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
       moduleSelectors: Seq[String],
       taskName: String,
       args: Seq[String],
-      notificationCallback: ServerNotification => Unit,
+      serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean = false,
       json: Boolean = false,
-      watch: Boolean = false
+      startWatch: Boolean = false,
+      exitOnEnd: Boolean = true
   ): Unit = try {
-    val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
     val state = (if useLastGood then lastGood else current) match
       case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
       case Right(s)  => s
@@ -108,7 +108,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
           if json then
             val jsonRes = taskInstance.task.rw.write(taskRes)
             jsonValues = jsonValues.updated(moduleId, jsonRes)
-          if watch then {
+          if startWatch then {
             val affectingSourceFileTasks =
               state.executionPlanner.getAffectingSourceFileTasks(moduleId, taskName)
             val affectingConfigValueTasks =
@@ -120,6 +120,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
                 args,
                 serverNotificationsLogger,
                 useLastGood,
+                json,
                 affectingSourceFileTasks,
                 affectingConfigValueTasks
               )
@@ -130,7 +131,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
           }
         }
         if json then serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
-        if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
+        if exitOnEnd then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
       } catch {
         case e: TaskNotFoundException =>
           serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
@@ -139,8 +140,8 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
 
   } catch {
     case NonFatal(e) =>
-      notificationCallback(ServerNotification.logError(e.getMessage))
-      notificationCallback(ServerNotification.RequestFinished(success = false))
+      serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
+      serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
   }
 
   def executeTask[T](
@@ -222,7 +223,17 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
 
   def triggerFileWatchedTasks(changedPaths: Set[os.Path]): Unit = {
     watchedTasks.foreach { watchedTask =>
-      val affected = watchedTask.affectingSourceFileTasks.exists { taskInstance =>
+      println(
+        s"Checking if watched task is affected: ${watchedTask.taskInstance} by ${watchedTask.affectingConfigValueTasks}"
+      )
+      // the watched task itself may be a config value task!
+      val watchedTaskAsSourceTasks = watchedTask.taskInstance.task match {
+        case _: SourceFilesTask => Set(watchedTask.taskInstance)
+        case _: SourceFileTask  => Set(watchedTask.taskInstance)
+        case _                  => Set.empty
+      }
+      val taskInstancesToCheck = watchedTaskAsSourceTasks ++ watchedTask.affectingSourceFileTasks
+      val affected = taskInstancesToCheck.exists { taskInstance =>
         val sourceFiles = taskInstance.task match {
           case sourceFilesTask: SourceFilesTask =>
             executeTask(
@@ -266,9 +277,18 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
   def triggerConfigWatchedTasks(): Unit = {
     watchedTasks.foreach { watchedTask =>
       println(
-        s"Checking if watched task is affected: ${watchedTask.taskInstance.id} by ${watchedTask.affectingConfigValueTasks}"
+        s"Checking if watched task is affected: ${watchedTask.taskInstance} by ${watchedTask.affectingConfigValueTasks}"
       )
-      val affected = watchedTask.affectingConfigValueTasks.exists { taskInstance =>
+      // the watched task itself may be a config value task!
+      val watchedTaskAffected = watchedTask.taskInstance.task match {
+        case _: ConfigValueTask[?] => Set(watchedTask.taskInstance)
+        case _: SourceFilesTask    => Set(watchedTask.taskInstance) // source tasks usually depend on config values
+        case _: SourceFileTask     => Set(watchedTask.taskInstance)
+        case _                     => Set.empty
+      }
+      val taskInstancesToCheck = watchedTaskAffected ++ watchedTask.affectingConfigValueTasks
+      println(s"Checking if any of tasks changed: ${taskInstancesToCheck}")
+      val affected = taskInstancesToCheck.exists { taskInstance =>
         val (_, changed) = taskInstance.task match {
           case configValueTask: ConfigValueTask[?] =>
             executeTask(
@@ -284,12 +304,16 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
       }
       println(s"Affected: ${affected}")
       if affected then {
-        executeOne(
-          watchedTask.taskInstance.moduleId,
+        executeCLI(
+          watchedTask.clientId,
+          Seq(watchedTask.taskInstance.moduleId),
           watchedTask.taskInstance.task.name,
           watchedTask.args,
           watchedTask.serverNotificationsLogger,
-          watchedTask.useLastGood
+          watchedTask.useLastGood,
+          watchedTask.json,
+          startWatch = false,
+          exitOnEnd = false
         )
         watchedTask.serverNotificationsLogger.add(
           ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...")
@@ -322,6 +346,7 @@ case class WatchedTaskData(
     args: Seq[String],
     serverNotificationsLogger: ServerNotificationsLogger,
     useLastGood: Boolean,
+    json: Boolean,
     affectingSourceFileTasks: Set[TaskInstance],
     affectingConfigValueTasks: Set[TaskInstance]
 )

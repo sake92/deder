@@ -182,20 +182,22 @@ class DederCliServer(projectState: DederProjectState) {
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
             // println(s"Running $cliOptions")
-            val logCallback: ServerNotification => Unit = {
+            val notificationCallback: ServerNotification => Unit = {
               case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
               // skip
               case sn =>
                 CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
             }
+            val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
             projectState.executeCLI(
               clientId,
               cliOptions.modules,
               cliOptions.task,
               args = cliOptions.args.value,
-              logCallback,
+              serverNotificationsLogger,
               json = cliOptions.json.value,
-              watch = cliOptions.watch.value
+              startWatch = cliOptions.watch.value,
+              exitOnEnd = !cliOptions.watch.value
             )
         }
       case m: CliClientMessage.Clean =>
