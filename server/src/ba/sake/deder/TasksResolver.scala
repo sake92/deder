@@ -15,7 +15,7 @@ class TasksResolver(
   val modulesMap: Map[String, DederModule] =
     allModules.map(m => m.id -> m).toMap
 
-  val modulesGraph: SimpleDirectedGraph[DederModule, DefaultEdge] = {
+  lazy val modulesGraph: SimpleDirectedGraph[DederModule, DefaultEdge] = {
     val graph = new SimpleDirectedGraph[DederModule, DefaultEdge](classOf[DefaultEdge])
     allModules.foreach(graph.addVertex)
     allModules.foreach { m =>
@@ -30,7 +30,7 @@ class TasksResolver(
     graph
   }
 
-  val tasksPerModule: Map[String, Seq[TaskInstance]] = {
+  lazy val tasksPerModule: Map[String, Seq[TaskInstance]] = {
     // make Tasks graph
     allModules.map { module =>
       val taskInstances = tasksRegistry.resolve(module.`type`).map(t => TaskInstance(module, t))
@@ -39,7 +39,7 @@ class TasksResolver(
     }.toMap
   }
 
-  val tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge] = {
+  lazy val tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge] = {
     val graph = new SimpleDirectedGraph[TaskInstance, DefaultEdge](classOf[DefaultEdge])
     for module <- allModules do {
       val tasks = tasksPerModule(module.id)

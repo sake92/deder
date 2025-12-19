@@ -32,27 +32,33 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
 
   val lastRequestStartedAt = new java.util.concurrent.atomic.AtomicReference[Instant](null)
 
-  var watchedTasks = Seq.empty[WatchedTaskData]
+  // TODO concurrent?
+  private var watchedTasks = Seq.empty[WatchedTaskData]
 
-  refreshProjectState(err => println(s"Initial project state load error: ${err}"))
+  reloadProjectState()
 
   scheduleInactiveShutdownChecker()
 
-  def refreshProjectState(onError: String => Unit): Unit = current.synchronized {
+  def reloadProjectState(): Unit = current.synchronized {
     // TODO make sure no requests are running
     // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)
-    val newProjectConfig = configParser.parse(configFile)
-    newProjectConfig match {
-      case Left(errorMessage) =>
+    try {
+      val newProjectConfig = configParser.parse(configFile)
+      newProjectConfig match {
+        case Left(errorMessage) =>
+          current = Left(errorMessage)
+        case Right(newConfig) =>
+          val tasksResolver = TasksResolver(newConfig, tasksRegistry)
+          val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
+          val goodProjectStateData =
+            DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner)
+          lastGood = Right(goodProjectStateData)
+          current = Right(goodProjectStateData)
+      }
+    } catch {
+      case NonFatal(e) =>
+        val errorMessage = s"Error during project load: ${e.getMessage}"
         current = Left(errorMessage)
-        onError(errorMessage)
-      case Right(newConfig) =>
-        val tasksResolver = TasksResolver(newConfig, tasksRegistry)
-        val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
-        val goodProjectStateData =
-          DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner)
-        lastGood = Right(goodProjectStateData)
-        current = Right(goodProjectStateData)
     }
   }
 
@@ -68,10 +74,9 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
       watch: Boolean = false
   ): Unit = try {
     val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
-    refreshProjectState(errorMessage => throw TaskEvaluationException(s"Project state is invalid: ${errorMessage}"))
-    val state = (if useLastGood then lastGood else current).toOption.getOrElse(
-      throw TaskEvaluationException(s"Project state is not available (lastGood=${useLastGood})")
-    )
+    val state = (if useLastGood then lastGood else current) match
+      case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
+      case Right(s)  => s
 
     // TODO deduplicate unnecessary work !
     val allModuleIds = state.tasksResolver.allModules.map(_.id)
@@ -151,9 +156,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
     try {
       lastRequestStartedAt.set(Instant.now())
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
-      refreshProjectState(errorMessage =>
-        throw TaskEvaluationException(s"Project state is invalid during task execution: ${errorMessage}")
-      )
+
       val state = (if useLastGood then lastGood else current).toOption.getOrElse(
         throw TaskEvaluationException(s"Project state is not available (lastGood=${useLastGood})")
       )

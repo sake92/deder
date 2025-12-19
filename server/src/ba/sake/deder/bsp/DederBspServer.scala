@@ -115,7 +115,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   override def workspaceReload(): CompletableFuture[Object] = CompletableFuture.supplyAsync { () =>
-    projectState.refreshProjectState(err => client.onBuildShowMessage(new ShowMessageParams(MessageType.ERROR, err)))
+    // auto reloaded on file changes
     ().asInstanceOf[Object]
   }
 

@@ -9,6 +9,8 @@ import scala.util.Using
 import mainargs.*
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
+import scala.caps.cap
+import scala.util.control.NonFatal
 
 object ServerMain {
 
@@ -36,7 +38,7 @@ object ServerMain {
       println("Deder server is shutting down...")
       // TODO cleaner shutdown of threads
       tasksExecutorService.shutdownNow()
-      System.exit(0)
+      sys.exit(0)
     }
     val projectState = DederProjectState(tasksExecutorService, onShutdown)
 
@@ -53,17 +55,21 @@ object ServerMain {
 
     os.watch.watch(
       roots = Seq(projectRoot),
-      onEvent = paths => {
-        if paths.exists(isServerConfigFile) then
-          println(s"Server configuration file changed: ${paths}, restarting server...")
-          // TODO
-        else if paths.exists(isProjectConfigFile) then
-          println(s"Configuration file changed: ${paths}, reloading project...")
-          projectState.refreshProjectState(_ => ())
-        else if paths.exists(isTaskTriggerCandidate) then
-          println(s"Source files changed: ${paths}, triggering tasks...")
-          projectState.triggerFileWatchedTasks(paths)
-      }
+      onEvent = paths =>
+        try {
+          if paths.exists(isServerConfigFile) then
+            println(s"Server configuration file changed: ${paths}, restarting server...")
+            // TODO
+          else if paths.exists(isProjectConfigFile) then
+            println(s"Configuration file changed: ${paths}, reloading project...")
+            projectState.reloadProjectState()
+          else if paths.exists(isTaskTriggerCandidate) then
+            println(s"Source files changed: ${paths}, triggering tasks...")
+            projectState.triggerFileWatchedTasks(paths)
+        } catch {
+          case NonFatal(_) =>
+          // ignore, config might be bad, tasks might fail, etc
+        }
     )
 
     cliServerThread.join()
@@ -72,16 +78,14 @@ object ServerMain {
 
   private def acquireServerLock(projectRoot: os.Path): Unit = {
     val serverLockFile = projectRoot / ".deder/server.lock"
-
     os.makeDir.all(serverLockFile / os.up)
-
     val lockFileHandle = new RandomAccessFile(serverLockFile.toIO, "rw")
     val fileLock = lockFileHandle.getChannel.tryLock()
-    if fileLock == null then
+    if fileLock == null then {
       println("ERROR: Could not acquire server lock - another server instance is already running for this project")
       lockFileHandle.close()
       sys.exit(1)
-
+    }
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
       try {
         fileLock.release()
