@@ -104,22 +104,30 @@ class CoreTasks() {
     }
   )
 
-  val dependenciesTask = TaskBuilder
-    .make[Seq[deps.Dependency]](
-      name = "dependencies",
-      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA)
-    )
-    .dependsOn(scalaVersionTask)
-    .build { ctx =>
-      val scalaVersion = ctx.depResults._1
-      val depDeclarations = ctx.module match {
+  val depsTask = ConfigValueTask[Seq[String]](
+    name = "deps",
+    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA),
+    execute = { ctx =>
+      ctx.module match {
         case m: JavaModule      => m.deps.asScala.toSeq
         case m: ScalaModule     => m.deps.asScala.toSeq
         case m: ScalaTestModule => m.deps.asScala.toSeq
         case _                  => Seq.empty
       }
-      // println(s"Module: ${ctx.module.id} resolved deps: " + res)
-      depDeclarations.map(depDecl => Dependency.make(depDecl, scalaVersion))
+    }
+  )
+
+  // applied deps, with scala version resolved
+  val dependenciesTask = TaskBuilder
+    .make[Seq[deps.Dependency]](
+      name = "dependencies",
+      supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA)
+    )
+    .dependsOn(depsTask)
+    .dependsOn(scalaVersionTask)
+    .build { ctx =>
+      val (deps, scalaVersion) = ctx.depResults
+      deps.map(depDecl => Dependency.make(depDecl, scalaVersion))
     }
 
   val allDependenciesTask = TaskBuilder
@@ -446,6 +454,7 @@ class CoreTasks() {
     javacAnnotationProcessorsTask,
     scalacOptionsTask,
     scalacPluginsTask,
+    depsTask,
     dependenciesTask,
     allDependenciesTask,
     classesDirTask,

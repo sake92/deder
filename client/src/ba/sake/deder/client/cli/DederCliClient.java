@@ -119,6 +119,7 @@ public class DederCliClient implements DederClient {
 			} else if (message instanceof ServerMessage.Log log) {
 				System.err.println(log.text());
 			} else if (message instanceof ServerMessage.RunSubprocess runSubprocess) {
+				// TODO handle multiple messages, restart subprocess
 				var processBuilder = new ProcessBuilder(runSubprocess.cmd());
 				processBuilder.inheritIO();
 				var process = processBuilder.start();

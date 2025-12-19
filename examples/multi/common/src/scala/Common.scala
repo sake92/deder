@@ -7,6 +7,3 @@ object Common {
   val value = "common"
 }
 
-
-
-

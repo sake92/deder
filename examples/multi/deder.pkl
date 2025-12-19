@@ -6,7 +6,6 @@ local const baseModule = new ScalaModule {
   scalaVersion = "3.7.1"
 }
 
-
 local const common = (baseModule) {
   id = "common"
   deps {
@@ -25,7 +24,7 @@ local const backend = (baseModule) {
 }
 
 local const uber = (baseModule) {
-  id = "uber";
+  id = "uber"
   moduleDeps { frontend; backend }
   deps {
     "com.lihaoyi::pprint:0.9.5"
@@ -50,4 +49,3 @@ modules {
   uber
   uberTest
 }
-
