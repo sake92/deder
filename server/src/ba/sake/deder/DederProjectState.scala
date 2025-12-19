@@ -16,10 +16,9 @@ import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
 import org.checkerframework.checker.units.qual.s
 
-class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () => Unit) {
+class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorService, onShutdown: () => Unit) {
 
-  // TODO configurable
-  private val maxInactiveDuration = Duration.ofMinutes(10)
+  private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)
 
   @volatile private var shutdownStarted = false
 
@@ -64,8 +63,6 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
     }
   }
 
-  // TODO execute as one action, not per module
-  // merge plan graphs into one !
   def executeCLI(
       clientId: Int,
       moduleSelectors: Seq[String],
@@ -87,7 +84,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
       if moduleSelectors.isEmpty then allModuleIds
       else
         moduleSelectors.flatMap { selector =>
-          // TODO improve wildcard selection, e.g mymodule*jvm
+          // TODO improve wildcard selection, e.g mymodule%jvm
           allModuleIds.filter(_ == selector)
         }
 

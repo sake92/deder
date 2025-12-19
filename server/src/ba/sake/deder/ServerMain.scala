@@ -11,6 +11,7 @@ import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
 import scala.caps.cap
 import scala.util.control.NonFatal
+import java.{util => ju}
 
 object ServerMain {
 
@@ -31,25 +32,37 @@ object ServerMain {
 
     acquireServerLock(projectRoot)
 
-    // TODO read from server.properties file
+    val propFile = projectRoot / ".deder/server.properties"
+    val props = new ju.Properties()
+    var workerThreads = 10
+    var maxInactiveSeconds = 600
+    var bspEnabled = true
+    if (os.exists(propFile) && os.isFile(propFile)) {
+      val inputStream = os.read.inputStream(propFile)
+      props.load(inputStream)
+      maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "600").toInt
+      workerThreads = props.getProperty("workerThreads", "10").toInt
+      bspEnabled = props.getProperty("bspEnabled", "true").toBoolean
+    }
     // TODO maybe make it elastic ThreadPool with min/max threads for better memory usage?
-    val tasksExecutorService = Executors.newFixedThreadPool(10)
+    val tasksExecutorService = Executors.newFixedThreadPool(workerThreads)
     val onShutdown = () => {
       println("Deder server is shutting down...")
       // TODO cleaner shutdown of threads
       tasksExecutorService.shutdownNow()
       sys.exit(0)
     }
-    val projectState = DederProjectState(tasksExecutorService, onShutdown)
+    val projectState = DederProjectState(maxInactiveSeconds, tasksExecutorService, onShutdown)
 
     val cliServer = DederCliServer(projectState)
     val cliServerThread = new Thread(() => cliServer.start(), "DederCliServer")
-
-    // TODO make BSP configurable, no need in CI for example..
-    val bspProxyServer = DederBspProxyServer(projectState)
-    val bspProxyServerThread = new Thread(() => bspProxyServer.start(), "DederBspProxyServer")
     cliServerThread.start()
-    bspProxyServerThread.start()
+
+    if bspEnabled then {
+      val bspProxyServer = DederBspProxyServer(projectState)
+      val bspProxyServerThread = new Thread(() => bspProxyServer.start(), "DederBspProxyServer")
+      bspProxyServerThread.start()
+    }
 
     println("Deder server started.")
 
@@ -58,8 +71,10 @@ object ServerMain {
       onEvent = paths =>
         try {
           if paths.exists(isServerConfigFile) then
-            println(s"Server configuration file changed: ${paths}, restarting server...")
-            // TODO
+            println(
+              s"Server configuration file changed: ${paths}, you need to restart the server with 'deder restart'!"
+            )
+            // TODO implement restart in client
           else if paths.exists(isProjectConfigFile) then
             println(s"Configuration file changed: ${paths}, reloading project...")
             projectState.reloadProject()
@@ -71,9 +86,6 @@ object ServerMain {
           // ignore, config might be bad, tasks might fail, etc
         }
     )
-
-    cliServerThread.join()
-    bspProxyServerThread.join()
   }
 
   private def acquireServerLock(projectRoot: os.Path): Unit = {

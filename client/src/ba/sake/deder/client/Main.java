@@ -9,11 +9,20 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.stream.Collectors;
 import java.util.Properties;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import ba.sake.deder.client.cli.DederCliClient;
 import ba.sake.deder.client.bsp.DederBspProxyClient;
 
+/*
+* Main entry point for Deder clients.
+* - never use System.out coz BSP talks to this via stdin/stdout
+* - for BSP client we keep trying to reconnect to server indefinitely, 
+* because server might be restarting, or shut down due to inactivity
+* - for CLI client we try to reconnect for max 10 seconds, then give up
+*/
 public class Main {
 
 	private static Path logFile;
@@ -21,10 +30,10 @@ public class Main {
 
 	public static void main(String[] args) throws Exception {
 
-		var processHandle = ProcessHandle.current();
+		var thisProcess = ProcessHandle.current();
 
 		if (args.length == 2 && args[0].equals("bsp") && args[1].equals("install")) {
-			writeBspInstallScript(processHandle);
+			writeBspInstallScript(thisProcess);
 			return;
 		}
 
@@ -33,46 +42,47 @@ public class Main {
 			isBspClient = true;
 		}
 
-		var parentProcess = processHandle.parent();
+		var parentProcess = thisProcess.parent();
 		var logFileName = isBspClient ? "bsp-client" : "cli-client";
 		var timestamp = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS).toString().replaceAll("[^0-9]", "-");
-		logFile = Path.of(".deder/logs/client/" + logFileName + "_" + timestamp + "_" + processHandle.pid() + ".log");
+		logFile = Path.of(".deder/logs/client/" + logFileName + "_" + timestamp + "_" + thisProcess.pid() + ".log");
 		Files.createDirectories(logFile.getParent());
 		Files.createFile(logFile);
 
 		log("Deder client starting...");
 		log("Deder client type: " + (isBspClient ? "BSP" : "CLI"));
 		log("Arguments: " + String.join(" ", args));
-		log("PID: " + processHandle.pid());
+		log("PID: " + thisProcess.pid());
 		parentProcess.ifPresentOrElse(pp -> {
 			log("Parent PID: " + pp.pid());
 			pp.info().commandLine().ifPresent(cmd -> log("Parent Command: " + cmd));
 		}, () -> log("No parent process"));
 
 		DederClient client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(args, logFile);
-
-		var currentAttempt = 1;
+		var startedConnectingAt = Instant.now();
+		var maxConnectDurationSeconds = 10;
+		var keepConnectingInfinitely = isBspClient;
 		var connected = false;
 		try {
 			client.start();
 			connected = true;
-		} catch (Exception e) {
+		} catch (IOException e) {
 			if (args.length == 1 && args[0].equals("shutdown")) {
 				log("Deder server not running. No need to shutdown.");
 				System.err.println("Deder server not running. No need to shutdown.");
 				return;
 			}
 			startServer();
-			while (!connected && currentAttempt <= 100) {
+			while (!connected && (keepConnectingInfinitely
+					|| Duration.between(startedConnectingAt, Instant.now()).getSeconds() < maxConnectDurationSeconds)) {
 				try {
-					Thread.sleep(100);
-					//System.err.println("Attempting to reconnect to server, attempt " + currentAttempt + "...");
-					log("Attempting to reconnect to server, attempt " + currentAttempt + "...");
-					currentAttempt++;
+					var sleepMillis = isBspClient ? 1000 : 100;
+					Thread.sleep(sleepMillis);
+					log("Attempting to reconnect to server...");
 					client.stop();
 					client.start();
 					connected = true;
-				} catch (Exception ex) {
+				} catch (IOException ex) {
 					log("Error occurred while restarting client: " + ex.getMessage());
 				}
 			}
