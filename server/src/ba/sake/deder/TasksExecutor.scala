@@ -22,9 +22,9 @@ class TasksExecutor(
       stages: Seq[Seq[TaskInstance]],
       args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger
-  ): Any = {
+  ): (res: Any, changed: Boolean) = {
     var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
-    var finalTaskResult: Any = ()
+    var finalTaskResult: (res: Any, changed: Boolean) = (null, false)
     for (taskInstances, stageIndex) <- stages.zipWithIndex do {
       val taskExecutions: Seq[Callable[(String, TaskResult[?])]] = for taskInstance <- taskInstances yield {
         val allTaskDeps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
@@ -63,7 +63,7 @@ class TasksExecutor(
 
         () =>
           try {
-            val taskRes = taskInstance.task
+            val (taskRes, changed) = taskInstance.task
               .executeUnsafe(
                 projectConfig,
                 taskInstance.module,
@@ -72,7 +72,7 @@ class TasksExecutor(
                 args,
                 serverNotificationsLogger
               )
-            finalTaskResult = taskRes.value // in last stage, last task's result will be returned
+            finalTaskResult = (taskRes.value, changed) // in last stage, last task's result will be returned
             taskInstance.id -> taskRes
           } catch {
             case NonFatal(e) =>

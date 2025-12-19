@@ -14,6 +14,7 @@ import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
+import org.checkerframework.checker.units.qual.s
 
 class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () => Unit) {
 
@@ -35,11 +36,11 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
   // TODO concurrent?
   private var watchedTasks = Seq.empty[WatchedTaskData]
 
-  reloadProjectState()
+  reloadProject()
 
   scheduleInactiveShutdownChecker()
 
-  def reloadProjectState(): Unit = current.synchronized {
+  def reloadProject(): Unit = current.synchronized {
     // TODO make sure no requests are running
     // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)
     try {
@@ -54,6 +55,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
             DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner)
           lastGood = Right(goodProjectStateData)
           current = Right(goodProjectStateData)
+          triggerConfigWatchedTasks()
       }
     } catch {
       case NonFatal(e) =>
@@ -89,7 +91,9 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
           allModuleIds.filter(_ == selector)
         }
 
-    println(s"Running ${taskName} on modules ${selectedModuleIds}")
+    serverNotificationsLogger.add(
+      ServerNotification.logInfo(s"Executing ${taskName} on modules ${selectedModuleIds}")
+    )
     if selectedModuleIds.isEmpty then {
       serverNotificationsLogger.add(
         ServerNotification.logError(s"No modules found for selectors: ${moduleSelectors.mkString(", ")}")
@@ -100,7 +104,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
         var jsonValues = Map.empty[String, JValue]
         selectedModuleIds.foreach { moduleId =>
           val taskInstance = state.executionPlanner.getTaskInstance(moduleId, taskName)
-          val taskRes = executeTask(moduleId, taskInstance.task, args, serverNotificationsLogger, useLastGood)
+          val (taskRes, _) = executeTask(moduleId, taskInstance.task, args, serverNotificationsLogger, useLastGood)
           if json then
             val jsonRes = taskInstance.task.rw.write(taskRes)
             jsonValues = jsonValues.updated(moduleId, jsonRes)
@@ -145,8 +149,9 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
       args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean = false
-  ): T =
-    executeOne(moduleId, task.name, args, serverNotificationsLogger, useLastGood).asInstanceOf[T]
+  ): (res: T, changed: Boolean) =
+    val (resAny, changed) = executeOne(moduleId, task.name, args, serverNotificationsLogger, useLastGood)
+    (resAny.asInstanceOf[T], changed)
 
   def executeOne(
       moduleId: String,
@@ -154,7 +159,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
       args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean = false
-  ): Any =
+  ): (res: Any, changed: Boolean) =
     try {
       lastRequestStartedAt.set(Instant.now())
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
@@ -177,9 +182,6 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
         taskInstance.lock.lock()
       }
       try {
-        serverNotificationsLogger.add(
-          ServerNotification.logInfo(s"Executing ${moduleId}.${taskName}", Some(moduleId))
-        )
         tasksExecutor.execute(tasksExecStages, args, serverNotificationsLogger)
       } finally {
         allTaskInstances.reverse.foreach { taskInstance =>
@@ -229,7 +231,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
               watchedTask.args,
               watchedTask.serverNotificationsLogger,
               watchedTask.useLastGood
-            ).map(_.absPath)
+            ).res.map(_.absPath)
           case sourceFileTask: SourceFileTask =>
             Seq(
               executeTask(
@@ -238,7 +240,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
                 watchedTask.args,
                 watchedTask.serverNotificationsLogger,
                 watchedTask.useLastGood
-              ).absPath
+              ).res.absPath
             )
           case _ => Seq.empty
         }
@@ -246,6 +248,41 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
           changedPath.startsWith(sourceFile)
         }
       }
+      if affected then {
+        executeOne(
+          watchedTask.taskInstance.moduleId,
+          watchedTask.taskInstance.task.name,
+          watchedTask.args,
+          watchedTask.serverNotificationsLogger,
+          watchedTask.useLastGood
+        )
+        watchedTask.serverNotificationsLogger.add(
+          ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...")
+        )
+      }
+    }
+  }
+
+  def triggerConfigWatchedTasks(): Unit = {
+    watchedTasks.foreach { watchedTask =>
+      println(
+        s"Checking if watched task is affected: ${watchedTask.taskInstance.id} by ${watchedTask.affectingConfigValueTasks}"
+      )
+      val affected = watchedTask.affectingConfigValueTasks.exists { taskInstance =>
+        val (_, changed) = taskInstance.task match {
+          case configValueTask: ConfigValueTask[?] =>
+            executeTask(
+              taskInstance.moduleId,
+              configValueTask,
+              watchedTask.args,
+              watchedTask.serverNotificationsLogger,
+              watchedTask.useLastGood
+            )
+          case _ => ((), true) // should not happen
+        }
+        changed
+      }
+      println(s"Affected: ${affected}")
       if affected then {
         executeOne(
           watchedTask.taskInstance.moduleId,

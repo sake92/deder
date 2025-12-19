@@ -18,18 +18,9 @@
 - use proper logger for server, or at least add timestamps
 
 
-## Watch files
-- source task type
-- config input task type
-- watch whole project at once, always
-- if user runs -t compile --watch
-    - store this req as "in flight"
-    - if a file changes, find source tasks that depend on it
-        - if this compile task depends on it, rerun it
-
 ## BSP
 - java main classes cant be run..??
-- test run dosnt work, although Metals should cover DAP (same should work for Mill...)
+- test run doesnt work, although Metals should cover DAP (same should work for Mill...)
 - add BSP integration tests from Metals and testkit??
     - https://scalameta.org/metals/docs/integrations/new-build-tool/#automated-tests
 

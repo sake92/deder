@@ -92,7 +92,7 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
       transitiveResults: Seq[Seq[TaskResult[?]]],
       args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger
-  ): TaskResult[T]
+  ): (res: TaskResult[T], changed: Boolean)
 }
 
 class TaskImpl[T: JsonRW, Deps <: Tuple](
@@ -112,7 +112,7 @@ class TaskImpl[T: JsonRW, Deps <: Tuple](
       transitiveResults: Seq[Seq[TaskResult[?]]],
       args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger
-  ): TaskResult[T] = {
+  ): (res: TaskResult[T], changed: Boolean) = {
     serverNotificationsLogger.add(
       ServerNotification.logDebug(s"Executing ${name}", Some(module.id))
     )
@@ -134,7 +134,7 @@ class TaskImpl[T: JsonRW, Deps <: Tuple](
     serverNotificationsLogger.add(
       ServerNotification.logDebug(s"Computed result for ${name}", Some(module.id))
     )
-    taskResult
+    (taskResult, true)
   }
 
   override def toString(): String = s"TaskImpl($name)"
@@ -158,11 +158,9 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
       transitiveResults: Seq[Seq[TaskResult[?]]],
       args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger
-  ): TaskResult[T] = {
+  ): (res: TaskResult[T], changed: Boolean) = {
 
-    serverNotificationsLogger.add(
-      ServerNotification.logDebug(s"Executing ${name}", Some(module.id))
-    )
+    serverNotificationsLogger.add(ServerNotification.logDebug(s"Executing ${name}", Some(module.id)))
 
     val metadataFile = DederGlobals.projectRootDir / ".deder/out" / module.id / name / "metadata.json"
     val outDir = DederGlobals.projectRootDir / ".deder/out" / module.id / name
@@ -196,17 +194,14 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     if os.exists(metadataFile) then {
       val cachedTaskResult = os.read(metadataFile).parseJson[TaskResult[T]]
       val hasDeps = allDepResults.nonEmpty
-      if hasDeps && inputsHash == cachedTaskResult.inputsHash then
-        serverNotificationsLogger.add(
-          ServerNotification.logDebug(
-            s"Using cached result for ${name}",
-            Some(module.id)
-          )
-        )
+      val newRes = if hasDeps && inputsHash == cachedTaskResult.inputsHash then
+        serverNotificationsLogger.add(ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id)))
         cachedTaskResult
       else computeTaskResult()
+      val changed = newRes.outputHash != cachedTaskResult.outputHash
+      (newRes, changed)
     } else {
-      computeTaskResult()
+      (computeTaskResult(), true)
     }
   }
 

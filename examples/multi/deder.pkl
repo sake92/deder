@@ -6,6 +6,7 @@ local const baseModule = new ScalaModule {
   scalaVersion = "3.7.1"
 }
 
+
 local const common = (baseModule) {
   id = "common"
   deps {

@@ -62,7 +62,7 @@ object ServerMain {
             // TODO
           else if paths.exists(isProjectConfigFile) then
             println(s"Configuration file changed: ${paths}, reloading project...")
-            projectState.reloadProjectState()
+            projectState.reloadProject()
           else if paths.exists(isTaskTriggerCandidate) then
             println(s"Source files changed: ${paths}, triggering tasks...")
             projectState.triggerFileWatchedTasks(paths)
