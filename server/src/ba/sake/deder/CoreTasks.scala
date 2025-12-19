@@ -347,9 +347,11 @@ class CoreTasks() {
       name = "mainClasses",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA)
     )
+    .dependsOn(compileTask)
     .dependsOn(allClassesDirsTask)
     .build { ctx =>
-      MainClassesDiscovery.discover(ctx.depResults._1)
+      val (_, classesDir) = ctx.depResults
+      MainClassesDiscovery.discover(classesDir)
     }
 
   val mainClassTask = ConfigValueTask[Option[String]](

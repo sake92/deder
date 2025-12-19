@@ -4,6 +4,6 @@ package common
 //import scala.compiletime
 
 object Common {
-  val value = "common"
+  val value = "komon"
 }
 
