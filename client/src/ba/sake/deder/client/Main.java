@@ -120,6 +120,15 @@ public class Main {
 			javaOpts = props.getProperty("JAVA_OPTS", "");
 		}
 		var processArgs = new ArrayList<String>();
+		// detach server process so it keeps running after client exits
+		if (System.getProperty("os.name").toLowerCase().contains("win")) {
+			processArgs.add("cmd");
+			processArgs.add("/c");
+			processArgs.add("start");
+			processArgs.add("/B");
+		} else {
+			processArgs.add("setsid");
+		}
 		processArgs.add("java");
 		if (!javaOpts.isBlank()) {
 			processArgs.addAll(Arrays.asList(javaOpts.split(" ")));
@@ -140,7 +149,6 @@ public class Main {
 			System.err.println(serverLogFile.toAbsolutePath());
 			System.exit(1);
 		}
-		serverProcess.errorReader().lines().forEach(line -> log("SERVER: " + line));
 	}
 
 	private static void writeBspInstallScript(ProcessHandle processHandle) throws IOException {

@@ -65,6 +65,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
   // TODO execute as one action, not per module
   // merge plan graphs into one !
   def executeCLI(
+      clientId: Int,
       moduleSelectors: Seq[String],
       taskName: String,
       args: Seq[String],
@@ -110,6 +111,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
               state.executionPlanner.getAffectingConfigValueTasks(moduleId, taskName)
             watchedTasks = watchedTasks.appended(
               WatchedTaskData(
+                clientId,
                 taskInstance,
                 args,
                 serverNotificationsLogger,
@@ -119,7 +121,7 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
               )
             )
             serverNotificationsLogger.add(
-              ServerNotification.logInfo(s"Executing ${moduleId}.${taskName} in watch mode...")
+              ServerNotification.logInfo(s"⌚ Executing ${moduleId}.${taskName} in watch mode...")
             )
           }
         }
@@ -253,10 +255,15 @@ class DederProjectState(tasksExecutorService: ExecutorService, onShutdown: () =>
           watchedTask.useLastGood
         )
         watchedTask.serverNotificationsLogger.add(
-          ServerNotification.logInfo(s"Executing ${watchedTask.taskInstance.id} in watch mode...")
+          ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...")
         )
       }
     }
+  }
+
+  def removeWatchedTasks(clientId: Int): Unit = {
+    println(s"Removing watched tasks for client ${clientId}")
+    watchedTasks = watchedTasks.filterNot(_.clientId == clientId)
   }
 
   def shutdown(): Unit = {
@@ -273,6 +280,7 @@ case class DederProjectStateData(
 )
 
 case class WatchedTaskData(
+    clientId: Int,
     taskInstance: TaskInstance,
     args: Seq[String],
     serverNotificationsLogger: ServerNotificationsLogger,

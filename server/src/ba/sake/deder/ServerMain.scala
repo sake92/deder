@@ -106,7 +106,7 @@ object ServerMain {
   def isTaskTriggerCandidate(p: os.Path): Boolean =
     !isServerConfigFile(p) && (
       isProjectConfigFile(p) ||
-        !isDederArtifact(p) && !isDevArtifact(p)
+        !(isDederArtifact(p) || isDevArtifact(p))
     )
 
   def isDederArtifact(p: os.Path): Boolean = {

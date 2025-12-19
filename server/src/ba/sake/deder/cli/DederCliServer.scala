@@ -189,6 +189,7 @@ class DederCliServer(projectState: DederProjectState) {
                 CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
             }
             projectState.executeCLI(
+              clientId,
               cliOptions.modules,
               cliOptions.task,
               args = cliOptions.args.value,
@@ -240,6 +241,7 @@ class DederCliServer(projectState: DederProjectState) {
     } finally {
       println(s"Client ${clientId} disconnected... Bye!")
       clientChannel.close()
+      projectState.removeWatchedTasks(clientId)
     }
 
 }
