@@ -18,11 +18,9 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 21
-      - name: Generate config bindings
-        run: |
-          ./scripts/gen-config-bindings.sh
       - name: Build server and client
         run: |
+          ./scripts/gen-config-bindings.sh
           ./mill -i server.assembly
           ./mill -i client.assembly
           mkdir -p deder_bin
@@ -63,6 +61,7 @@ jobs:
           java-version: 21
       - name: Build Server and Client JARs
         run: |
+          ./scripts/gen-config-bindings.sh
           ./mill server.assembly
           ./mill client.assembly
       - name: Upload latest server artifact
