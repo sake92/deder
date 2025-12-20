@@ -284,6 +284,8 @@ object CliServerMessage {
       None
     case cd: ServerNotification.CompileDiagnostic =>
       None
+    case cs: ServerNotification.CompileFinished =>
+      None
     case rs: ServerNotification.RunSubprocess =>
       Some(CliServerMessage.RunSubprocess(rs.cmd))
     case ServerNotification.RequestFinished(success) =>

@@ -28,17 +28,17 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       targetId: Option[BuildTargetIdentifier] = None,
       taskId: Option[TaskId] = None
   ) = {
+    val contextParams =originId.zip(targetId).zip(taskId) 
     ServerNotificationsLogger {
       case n: ServerNotification.Log =>
-        // dont spam the client with debug/trace messages..
-        if n.level.ordinal <= ServerNotification.LogLevel.INFO.ordinal then client.onBuildLogMessage(toBspLogMessage(n))
+      // we have everything in server logs
       case tp: ServerNotification.TaskProgress =>
-        taskId.foreach { taskId =>
+        contextParams.foreach { case ((originId, targetId), taskId) =>
           val params = TaskProgressParams(taskId)
-          params.setOriginId(originId.orNull)
+          params.setOriginId(originId)
           params.setEventTime(System.currentTimeMillis())
           params.setDataKind("compile-progress") // TODO just used for compile now..
-          params.setData(new CompileTask(targetId.orNull))
+          params.setData(new CompileTask(targetId))
           params.setProgress(tp.progress)
           params.setTotal(tp.total)
           val percentage = tp.progress.toDouble / tp.total.toDouble * 100
@@ -46,11 +46,20 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           client.onBuildTaskProgress(params)
         }
       case cs: ServerNotification.CompileStarted =>
-        // reset diagnostics for these files
-        cs.files.foreach { file =>
-          val fileUri = TextDocumentIdentifier(file.toURI.toString)
-          val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List.empty.asJava, true)
-          client.onBuildPublishDiagnostics(params)
+        contextParams.foreach { case ((originId, targetId), taskId) =>
+          val taskStartParams = TaskStartParams(taskId)
+          taskStartParams.setEventTime(System.currentTimeMillis())
+          taskStartParams.setOriginId(originId)
+          taskStartParams.setMessage(s"Compiling ${cs.moduleId} ...")
+          taskStartParams.setDataKind(TaskStartDataKind.COMPILE_TASK)
+          taskStartParams.setData(new CompileTask(targetId))
+          client.onBuildTaskStart(taskStartParams)
+          // reset diagnostics for these files
+          cs.files.foreach { file =>
+            val fileUri = TextDocumentIdentifier(file.toURI.toString)
+            val params = PublishDiagnosticsParams(fileUri, targetId, List.empty.asJava, true)
+            client.onBuildPublishDiagnostics(params)
+          }
         }
       case cd: ServerNotification.CompileDiagnostic =>
         val file = cd.problem.position.sourceFile.get
@@ -77,9 +86,21 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         diagnostic.setSeverity(severity)
         diagnostic.setCode(problem.category())
         diagnostic.setSource("deder")
-        val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List(diagnostic).asJava, false)
-        client.onBuildPublishDiagnostics(params)
-
+        contextParams.foreach { case ((originId, targetId), taskId) =>
+          val params = PublishDiagnosticsParams(fileUri, targetId, List(diagnostic).asJava, false)
+          client.onBuildPublishDiagnostics(params)
+        }
+      case cf: ServerNotification.CompileFinished =>
+        contextParams.foreach { case ((originId, targetId), taskId) =>
+          val status = if cf.errors == 0 then StatusCode.OK else StatusCode.ERROR
+          val taskFinishParams = TaskFinishParams(taskId, status)
+          taskFinishParams.setEventTime(System.currentTimeMillis())
+          taskFinishParams.setOriginId(originId)
+          taskFinishParams.setMessage(s"Finished compiling ${cf.moduleId}")
+          taskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
+          taskFinishParams.setData(new CompileReport(targetId, cf.errors, cf.warnings))
+          client.onBuildTaskFinish(taskFinishParams)
+        }
       case n: ServerNotification.RequestFinished => // do nothing
       case n: ServerNotification.Output          => // do nothing
       case n: ServerNotification.RunSubprocess   => // do nothing
@@ -128,7 +149,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           projectStateData.projectConfig.modules.asScala.map(m => buildTarget(m, projectStateData)).toList
       }
       val result = new WorkspaceBuildTargetsResult(buildTargets.asJava)
-      //println(s"BSP workspaceBuildTargets called, returning: ${result}")
+      // println(s"BSP workspaceBuildTargets called, returning: ${result}")
       result
   }
 
@@ -207,24 +228,19 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] =
     CompletableFuture.supplyAsync { () =>
+      val taskId = TaskId(s"compile-${UUID.randomUUID}")
       var allCompileSucceeded = true
       withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets.asScala.foreach { targetId =>
           val moduleId = targetId.moduleId
-          val taskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
+          val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
+          subtaskId.setParents(List(taskId.getId()).asJava)
           val serverNotificationsLogger = makeServerNotificationsLogger(
             originId = Option(params.getOriginId),
             targetId = Some(targetId),
-            taskId = Some(taskId)
+            taskId = Some(subtaskId)
           )
-          val taskStartParams = TaskStartParams(taskId)
-          taskStartParams.setEventTime(System.currentTimeMillis())
-          taskStartParams.setOriginId(params.getOriginId)
-          taskStartParams.setMessage(s"Compiling ${moduleId} ...")
-          taskStartParams.setDataKind(TaskStartDataKind.COMPILE_TASK)
-          taskStartParams.setData(new CompileTask(targetId))
-          client.onBuildTaskStart(taskStartParams)
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           var currentModuleCompileSucceeded = true
           try {
@@ -233,15 +249,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             case e: TaskEvaluationException =>
               currentModuleCompileSucceeded = false
               allCompileSucceeded = false
-          } finally {
-            val status = if currentModuleCompileSucceeded then StatusCode.OK else StatusCode.ERROR
-            val taskFinishParams = TaskFinishParams(taskId, status)
-            taskFinishParams.setEventTime(System.currentTimeMillis())
-            taskFinishParams.setOriginId(params.getOriginId)
-            taskFinishParams.setMessage(s"Finished compiling ${moduleId}")
-            taskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
-            taskFinishParams.setData(new CompileReport(targetId, 0, 0)) // TODO warnings/errors count
-            client.onBuildTaskFinish(taskFinishParams)
           }
         }
       }
@@ -563,13 +570,13 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetRun(params: RunParams): CompletableFuture[RunResult] = {
     // TODO
-   // println(s"BSP buildTargetRun called ${params}")
+    // println(s"BSP buildTargetRun called ${params}")
     CompletableFuture.failedFuture(new NotImplementedError("buildTargetRun is not supported in Deder BSP server"))
   }
 
   override def buildTargetTest(params: TestParams): CompletableFuture[TestResult] = {
     // TODO
-    //println(s"BSP buildTargetTest called ${params}")
+    // println(s"BSP buildTargetTest called ${params}")
     CompletableFuture.failedFuture(new NotImplementedError("buildTargetRun is not supported in Deder BSP server"))
   }
 
@@ -580,7 +587,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def onRunReadStdin(params: ReadParams): Unit = {
     // TODO
-   // println(s"BSP onRunReadStdin called ${params}")
+    // println(s"BSP onRunReadStdin called ${params}")
     throw new NotImplementedError("buildTargetRun is not supported in Deder BSP server")
   }
 

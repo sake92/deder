@@ -136,15 +136,16 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
     val setup = getSetup(zincCacheFile.toNIO, reporter, moduleId, notifications)
     val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
 
-    // try {
-    notifications.add(ServerNotification.CompileStarted(moduleId, sources)) // so we can reset BSP diagnostics
-    val newResult = incrementalCompiler.compile(inputs, zincLogger)
-    analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
-    /*} catch {
+    try {
+      notifications.add(ServerNotification.CompileStarted(moduleId, sources)) // so we can reset BSP diagnostics
+      val newResult = incrementalCompiler.compile(inputs, zincLogger)
+      analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
+    } catch {
       case e: xsbti.CompileFailed =>
       // println("Noooooooooooooooooooooooooooooooooo")
       // e.printStackTrace()
-    }*/
+      throw e
+    }
   }
 
   private def getSetup(

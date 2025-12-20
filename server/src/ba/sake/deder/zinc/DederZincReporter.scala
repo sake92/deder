@@ -25,7 +25,15 @@ class DederZincReporter(
 
   override def hasWarnings(): Boolean = _hasWarnings
 
-  override def printSummary(): Unit = {}
+  override def printSummary(): Unit = {
+    notifications.add(
+      ServerNotification.CompileFinished(
+        moduleId,
+        _problems.count(_.severity == Severity.Error),
+        _problems.count(_.severity == Severity.Warn)
+      )
+    )
+  }
 
   override def problems(): Array[Problem] = _problems.toArray
 
