@@ -28,7 +28,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       targetId: Option[BuildTargetIdentifier] = None,
       taskId: Option[TaskId] = None
   ) = {
-    val contextParams =originId.zip(targetId).zip(taskId) 
+    val contextParams = originId.zip(targetId).zip(taskId)
     ServerNotificationsLogger {
       case n: ServerNotification.Log =>
       // we have everything in server logs

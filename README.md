@@ -14,35 +14,12 @@ THERE ARE ZERO TESTS! ZERO!!!
 - modules are "subprojects", like common/frontend/app..
 - modules have tasks defined for them
 
-See [examples](examples/multi/) for a realistic example project.
+See [examples/multi](examples/multi/) for a working example project.
 
 
-## Building locally
-
-Build the server and client:
+Example commands:
 ```shell
-./scripts/gen-config-bindings.sh
-./mill server.assembly
-
-# client executable JAR
-./mill client.assembly
-# or as native client
-./mill client-native.nativeImage
-
-# AND PUT CLIENT IN PATH !!! for example:
-cp out/client/assembly.dest/out.jar /usr/local/bin/deder
-cp out/client-native/nativeImage.dest/native-executable /usr/local/bin/deder
-```
-
-
-Run client:
-```shell
-# in another terminal, run commands:
-
-cd examples/multi
-./reset # copy the server JAR etc
-
-################ expore the build
+################ explore the build
 # list modules
 # supports flags: --json, --ascii, --dot
 deder modules
@@ -106,3 +83,28 @@ Currently working features:
 - run main scala classes (Java doesnt.. #todo-fixme )
 
 If you work on server code, after you build it you can run `./reset.sh` in examples/multi
+
+
+## Building locally
+
+Build the server and client:
+```shell
+./scripts/gen-config-bindings.sh
+./mill server.assembly
+
+# client executable JAR
+./mill client.assembly
+# or as native client
+./mill client-native.nativeImage
+
+# AND PUT CLIENT IN PATH !!! for example:
+cp out/client/assembly.dest/out.jar /usr/local/bin/deder
+cp out/client-native/nativeImage.dest/native-executable /usr/local/bin/deder
+
+# then you can run commands:
+cd examples/multi
+# start from clean state, copy the server JAR etc
+./reset 
+```
+
+

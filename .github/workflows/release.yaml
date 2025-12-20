@@ -10,18 +10,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # TODO java 21
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 21
       - name: Build Server JAR
         run: |
           ./mill -i server.assembly
-          cp out/server/assembly.dest/out.jar deder-server.jar
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: deder-server.jar
-          path: deder-server.jar
+        # TODO version etc
+          name: deder-server-v1.jar
+          path: out/server/assembly.dest/out.jar
+          overwrite: true
 
-  # TODO maybe add cli JAR too?
+  # TODO add cli JAR too, why not..
 
   build-cli-native-image:
     if: false # TODO make it work
