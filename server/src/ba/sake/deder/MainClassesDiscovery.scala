@@ -12,7 +12,7 @@ object MainClassesDiscovery {
   def discover(classpath: Seq[os.Path]): Seq[String] = {
 
     val cp = classpath.map(_.toNIO.toString()).mkString(File.pathSeparator)
-    println(s"Scanning for mainclasses: ${cp}")
+   // println(s"Scanning for mainclasses: ${cp}")
 
     val mainClasses = Using.resource(
       new ClassGraph()
@@ -35,7 +35,7 @@ object MainClassesDiscovery {
         .getNames()
     }
 
-    println(s"Found main classes: ${mainClasses}")
+   //println(s"Found main classes: ${mainClasses}")
     mainClasses.asScala.toList
   }
 
