@@ -53,7 +53,9 @@ jobs:
         run: |
           ./scripts/gen-config-bindings.sh
           ./mill server.assembly
+          cp out/server/assembly.dest/out.jar deder-server.jar
           ./mill client.assembly
+          cp out/client/assembly.dest/out.jar deder-client.jar
       - name: Release
         uses: jreleaser/release-action@v2
         with:

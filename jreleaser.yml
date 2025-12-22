@@ -28,10 +28,10 @@ distributions:
   deder-server-jar:
     type: SINGLE_JAR
     artifacts:
-      - path: out/server/assembly.dest/out.jar
+      - path: deder-server.jar
   deder-client-jar:
     type: SINGLE_JAR
     artifacts:
-      - path: out/client/assembly.dest/out.jar
+      - path: deder-client.jar
 
 
