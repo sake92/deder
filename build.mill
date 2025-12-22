@@ -9,7 +9,7 @@ trait VersionModule extends Module {
   def version = Task {
     val state = VcsVersion.vcsState()
     state.dirtyHash match {
-      case None => state.format()
+      case None => state.lastTag.getOrElse("0.0.0")
       case Some(_) =>
         val lt = state.lastTag.getOrElse("0.0.0")
         lt.split("\\.").toList match {
