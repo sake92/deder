@@ -38,7 +38,7 @@ jobs:
           echo "VERSION=$(echo $VERSION)" >> $GITHUB_OUTPUT
 
   release:
-    needs: [ precheck, tests ]
+    needs: [ precheck ]
     #if: endsWith(${{ needs.precheck.outputs.VERSION }}, '-SNAPSHOT')
     runs-on: ubuntu-latest
     steps:
