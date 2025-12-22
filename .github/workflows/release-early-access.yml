@@ -62,7 +62,7 @@ jobs:
         uses: jreleaser/release-action@v2
         with:
           arguments: full-release
-        env:
+        #env:
           #JRELEASER_PROJECT_VERSION: ${{ needs.precheck.outputs.VERSION }}
       - name: JReleaser output
         if: always()
