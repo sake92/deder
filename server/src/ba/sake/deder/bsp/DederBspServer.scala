@@ -77,10 +77,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             val range = {
               val pos = problem.position
               // Zinc's range starts at 1 whereas BSP at 0
-              val startLine = pos.startLine().get - 1
-              val startColumn = pos.startColumn().get - 1
-              val endLine = pos.endLine().get - 1
-              val endColumn = pos.endColumn().get - 1
+              val startLine = pos.startLine().orElse(1) - 1
+              val startColumn = pos.startColumn().orElse(1) - 1
+              val endLine = pos.endLine().orElse(1) - 1
+              val endColumn = pos.endColumn().orElse(1) - 1
               new bsp4j.Range(
                 new bsp4j.Position(startLine, startColumn),
                 new bsp4j.Position(endLine, endColumn)
@@ -272,7 +272,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               executeTask(serverNotificationsLogger, moduleId, coreTasks.compileTask)
             } catch {
               case e: TaskEvaluationException =>
-                e.printStackTrace()
                 currentModuleCompileSucceeded = false
                 allCompileSucceeded = false
             }
