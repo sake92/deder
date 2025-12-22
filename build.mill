@@ -8,15 +8,11 @@ import mill.util.VcsVersion
 trait VersionModule extends Module {
   def version = Task {
     val state = VcsVersion.vcsState()
-    state.dirtyHash match {
-      case None => state.lastTag.getOrElse("0.0.0")
-      case Some(_) =>
-        val lt = state.lastTag.getOrElse("0.0.0")
-        lt.split("\\.").toList match {
-          case List(major, minor, patch) =>
-            s"${major}.${minor}.${patch.toInt + 1}-SNAPSHOT"
-          case _ => "0.0.1-SNAPSHOT"
-        }
+    val lt = state.lastTag.getOrElse("0.0.0")
+    lt.split("\\.").toList match {
+      case List(major, minor, patch) =>
+        s"${major}.${minor}.${patch.toInt + 1}-SNAPSHOT"
+      case _ => "0.0.1-SNAPSHOT"
     }
   }
 }
