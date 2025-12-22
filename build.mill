@@ -3,8 +3,15 @@ package build
 
 import mill.*
 import mill.scalalib.*
+import mill.util.VcsVersion
 
-object server extends ScalaModule {
+trait VersionModule extends Module {
+  def version = Task {
+    VcsVersion.vcsState().format()
+  }
+}
+
+object server extends ScalaModule, VersionModule {
   def scalaVersion = "3.7.4"
   def mvnDeps = Seq(
     mvn"org.jgrapht:jgrapht-core:1.5.2",
@@ -38,14 +45,14 @@ object config extends JavaModule {
   )
 }
 
-object client extends JavaModule {
+object client extends JavaModule, VersionModule {
   def mainClass = Some("ba.sake.deder.client.Main")
   def mvnDeps = Seq(
     mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
   )
 }
 
-object `client-native` extends JavaModule, NativeImageModule {
+object `client-native` extends JavaModule, NativeImageModule, VersionModule {
   def moduleDir = client.moduleDir
   def mainClass = client.mainClass
   def mvnDeps = client.mvnDeps

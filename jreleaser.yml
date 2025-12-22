@@ -1,41 +1,37 @@
 
 project:
   name: deder-cli
-  description: Deder build tool CLI
+  description: Deder Build Tool
   authors:
     - Sakib Hadžiavdić
-  license: Apache2
   links:
     homepage: https://github.com/sake92/deder
+  license: Apache-2
+  inceptionYear: 2025
+  stereotype: CLI
+  languages:
+    java:
+      groupId: ba.sake.deder
 
 release:
   github:
     owner: sake92
     name: deder
     overwrite: true
+    changelog:
+      formatted: ALWAYS
+      preset: conventional-commits
+      contributors:
+        format: '- {{contributorName}}{{#contributorUsernameAsLink}} ({{.}}){{/contributorUsernameAsLink}}'
 
 distributions:
-  deder:
-    type: NATIVE_IMAGE
+  deder-server-jar:
+    type: SINGLE_JAR
     artifacts:
-      - path: target/{{distributionName}}-{{projectVersion}}-linux-x86_64
-        platform: linux-x86_64
-     #- path: target/{{distributionName}}-{{projectVersion}}-osx-x86_64
-     #  platform: osx-x86_64
-     #- path: target/{{distributionName}}-{{projectVersion}}-osx-aarch_64
-     #  platform: osx-aarch_64
-     #- path: target/{{distributionName}}-{{projectVersion}}-windows-x86_64.exe
-     #  platform: windows-x86_64
+      - path: out/server/assembly.dest/out.jar
+  deder-client-jar:
+    type: SINGLE_JAR
+    artifacts:
+      - path: out/client/assembly.dest/out.jar
 
-    #brew:
-    #  active: ALWAYS
-    #
-    #scoop:
-    #  active: ALWAYS
-    #  bucket:
-    #    owner: yourname
-    #    name: scoop-bucket
 
-# Tag and push
-#  git tag v1.0.0
-#  git push origin v1.0.0

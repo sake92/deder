@@ -1,0 +1,71 @@
+name: Early Access
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  JAVA_VERSION: '11'
+  JAVA_DISTRO: 'zulu'
+
+jobs:
+  precheck:
+    if: github.repository == 'sake92/deder' && startsWith(github.event.head_commit.message, 'Releasing version') != true
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.vars.outputs.VERSION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Cancel previous run
+        uses: styfle/cancel-workflow-action@0.12.1
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRO }}
+          cache: sbt
+      - name: Version
+        id: vars
+        shell: bash
+        run: |
+          VERSION=$(./mill show server.version | tr -d '"')
+          echo "VERSION=$(echo $VERSION)" >> $GITHUB_OUTPUT
+
+  release:
+    needs: [ precheck, tests ]
+    #if: endsWith(${{ needs.precheck.outputs.VERSION }}, '-SNAPSHOT')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRO }}
+          cache: sbt
+      - name: Build
+        run: |
+          ./scripts/gen-config-bindings.sh
+          ./mill server.assembly
+          ./mill client.assembly
+      - name: Release
+        uses: jreleaser/release-action@v2
+        with:
+          arguments: full-release
+        env:
+          JRELEASER_PROJECT_VERSION: ${{ needs.precheck.outputs.VERSION }}
+          JRELEASER_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: JReleaser output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jreleaser-release
+          path: |
+            out/jreleaser/trace.log
+            out/jreleaser/output.properties
