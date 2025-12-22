@@ -33,6 +33,8 @@ distributions:
     type: SINGLE_JAR
     artifacts:
       - path: deder-client.jar
+
+  # TODO graalvm native images + brew etc
   #deder-client-native:
   #  type: FLAT_BINARY
   #  artifacts:
