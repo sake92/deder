@@ -38,7 +38,8 @@ jobs:
     #      echo "VERSION=$(echo $VERSION)" >> $GITHUB_OUTPUT
 
   release:
-    needs: [ precheck ]
+    #needs: [ precheck ]
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} && github.repository == 'sake92/deder' && startsWith(github.event.head_commit.message, 'Releasing version') != true
     #if: endsWith(${{ needs.precheck.outputs.VERSION }}, '-SNAPSHOT')
     runs-on: ubuntu-latest
     steps:
