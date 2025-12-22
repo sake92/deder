@@ -14,39 +14,39 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      #- uses: actions/setup-java@v4
-      #  with:
-      #    distribution: 'zulu'
-      #    java-version: 21
-      #- name: Build server and client
-      #  run: |
-      #    ./scripts/gen-config-bindings.sh
-      #    ./mill -i server.assembly
-      #    ./mill -i client.assembly
-      #    mkdir -p deder_bin
-      #    cp out/client/assembly.dest/out.jar deder_bin/deder
-      #    echo "${{ github.workspace }}/deder_bin" >> $GITHUB_PATH
-      #- name: Exercise examples/multi
-      #  working-directory: ./examples/multi
-      #  run: |
-      #    deder version
-#
-      #    deder modules
-      #    deder modules --json
-      #    deder modules --ascii
-      #    deder modules --dot
-#
-      #    deder tasks
-#
-      #    deder plan -m common -t compile
-      #    deder plan -m uber -t compile --json
-#
-      #    deder -t compile
-      #    deder -t compile -m common
-#
-      #    deder -t test -m uber-test
-#
-      #    deder shutdown
-      
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: 21
+      - name: Build server and client
+        run: |
+          ./scripts/gen-config-bindings.sh
+          ./mill -i server.assembly
+          ./mill -i client.assembly
+          mkdir -p deder_bin
+          cp out/client/assembly.dest/out.jar deder_bin/deder
+          echo "${{ github.workspace }}/deder_bin" >> $GITHUB_PATH
+      - name: Exercise examples/multi
+        working-directory: ./examples/multi
+        run: |
+          deder version
+
+          deder modules
+          deder modules --json
+          deder modules --ascii
+          deder modules --dot
+
+          deder tasks
+
+          deder plan -m common -t compile
+          deder plan -m uber -t compile --json
+
+          deder -t compile
+          deder -t compile -m common
+
+          deder -t test -m uber-test
+
+          deder shutdown
+
       #- name: Test
       #  run: ./mill -i __.test
