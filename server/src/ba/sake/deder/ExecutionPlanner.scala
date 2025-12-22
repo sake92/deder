@@ -11,7 +11,7 @@ class ExecutionPlanner(
   // build independent exec stages (~toposort)
   // TODO better plan for skewed graphs (some tasks have many deps, some none)
   def execStages(moduleId: String, taskName: String): Seq[Seq[TaskInstance]] = {
-    val taskToExecute = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
+    val taskToExecute = tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName).getOrElse {
       throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
     }
     var stages = Map.empty[Int, Seq[TaskInstance]]
@@ -40,7 +40,7 @@ class ExecutionPlanner(
     val execTasksSet = Set.newBuilder[TaskInstance]
 
     def go(moduleId: String, taskName: String): Unit = {
-      val taskToExecute = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
+      val taskToExecute = tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName).getOrElse {
         throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
       }
       val deps = tasksGraph.outgoingEdgesOf(taskToExecute).asScala.toSeq
@@ -73,7 +73,7 @@ class ExecutionPlanner(
   private def getRootDepTasks(moduleId: String, taskName: String): Set[TaskInstance] = {
     val affectingTasks = Set.newBuilder[TaskInstance]
     def go(moduleId: String, taskName: String): Unit = {
-      val taskInstance = tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
+      val taskInstance = tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName).getOrElse {
         throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
       }
       val deps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
@@ -93,7 +93,7 @@ class ExecutionPlanner(
   }
 
   def getTaskInstance(moduleId: String, taskName: String): TaskInstance = {
-    tasksPerModule(moduleId).find(_.task.name == taskName).getOrElse {
+    tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName).getOrElse {
       throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
     }
   }

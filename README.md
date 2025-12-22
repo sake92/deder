@@ -18,7 +18,7 @@ See [examples/multi](examples/multi/) for a working example project.
 
 ## Installation
 
-1. download latest `deder-client.jar` from [releases](https://github.com/sake92/deder/releases)
+1. download `deder-client.jar` from [early release](https://github.com/sake92/deder/releases/tag/early-access)
 1. rename it to just `deder` 
 1. do `chmod +x deder`
 1. put it in `PATH`

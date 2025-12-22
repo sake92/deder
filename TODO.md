@@ -1,4 +1,7 @@
 
+## Config
+- host PKL files on gh pages
+
 ## Tests
 
 - optionally run as separate JVM process(es), for isolation etc..

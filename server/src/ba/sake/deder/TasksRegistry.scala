@@ -13,5 +13,5 @@ class TasksRegistry() {
   }
   // TODO ensure unique task names per module type
   
-  // TODO dynamic tasks added by plugins, at runtime or just restart server??
+  // TODO handle tasks dynamically added/removed by plugins
 }

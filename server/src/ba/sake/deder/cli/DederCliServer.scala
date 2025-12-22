@@ -129,6 +129,7 @@ class DederCliServer(projectState: DederProjectState) {
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
                   serverMessages.put(CliServerMessage.Exit(0))
                 } else {
+                  // TODO sort
                   val modulesWithTasks = state.tasksResolver.allModules.map { module =>
                     val moduleTasks = state.tasksResolver.tasksPerModule(module.id).map(t => s"  ${t.task.name}")
                     s"${module.id}:\n${moduleTasks.mkString("\n")}"
@@ -140,6 +141,7 @@ class DederCliServer(projectState: DederProjectState) {
         }
 
       case m: CliClientMessage.Plan =>
+        // TODO handle errors better, when task not found etc
         mainargs.Parser[DederCliPlanOptions].constructEither(m.args) match {
           case Left(error) =>
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
