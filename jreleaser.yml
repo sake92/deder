@@ -33,5 +33,9 @@ distributions:
     type: SINGLE_JAR
     artifacts:
       - path: deder-client.jar
-
-
+  #deder-client-native:
+  #  type: FLAT_BINARY
+  #  artifacts:
+  #    - path: deder-client-linux-amd64
+  #      extraProperties:
+  #          universal: true

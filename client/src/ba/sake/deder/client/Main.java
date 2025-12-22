@@ -97,12 +97,12 @@ public class Main {
 		ensureJavaInstalled();
 		var props = new Properties();
 		var propFileName = Paths.get(".deder/server.properties");
-		var serverVersion = "latest";
+		var serverVersion = "0.0.0-1-6b2da1";
 		var serverLocalPath = "";
 		if (Files.exists(propFileName) && Files.isRegularFile(propFileName)) {
 			try (FileInputStream inputStream = new FileInputStream(propFileName.toFile())) {
 				props.load(inputStream);
-				serverVersion = props.getProperty("version", "latest");
+				serverVersion = props.getProperty("version", "0.0.0-1-6b2da1");
 				serverLocalPath = props.getProperty("localPath", "");
 			}
 		}
@@ -212,7 +212,7 @@ public class Main {
 		if (response.statusCode() == 200) {
 			System.out.println("File downloaded successfully to: " + response.body());
 		} else {
-			System.out.println("Failed to download file. Status code: " + response.statusCode());
+			throw new RuntimeException("Failed to download '" + fileUrl + "'. Response: " + response);
 		}
 	}
 
