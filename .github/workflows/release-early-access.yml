@@ -1,8 +1,11 @@
 name: Early Access
 
 on:
-  push:
-    branches: [ main ]
+  workflow_run:
+    workflows: ["ci"]
+    branches: [main]
+    types: 
+      - completed
 
 env:
   JAVA_VERSION: '11'
@@ -10,7 +13,7 @@ env:
 
 jobs:
   precheck:
-    if: github.repository == 'sake92/deder' && startsWith(github.event.head_commit.message, 'Releasing version') != true
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} && github.repository == 'sake92/deder' && startsWith(github.event.head_commit.message, 'Releasing version') != true
     runs-on: ubuntu-latest
     outputs:
       VERSION: ${{ steps.vars.outputs.VERSION }}
