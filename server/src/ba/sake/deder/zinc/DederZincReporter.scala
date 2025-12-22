@@ -26,12 +26,10 @@ class DederZincReporter(
   override def hasWarnings(): Boolean = _hasWarnings
 
   override def printSummary(): Unit = {
+    val errorsCount = _problems.count(_.severity == Severity.Error)
+    val warningsCount = _problems.count(_.severity == Severity.Warn)
     notifications.add(
-      ServerNotification.CompileFinished(
-        moduleId,
-        _problems.count(_.severity == Severity.Error),
-        _problems.count(_.severity == Severity.Warn)
-      )
+      ServerNotification.CompileFinished(moduleId, errorsCount, warningsCount)
     )
   }
 

@@ -81,7 +81,14 @@ class TasksExecutor(
           }
       }
       val futures = taskExecutions.map(tasksExecutorService.submit)
-      val results = futures.map(_.get())
+      val results = try {
+        futures.map(f => f.get())
+      } catch {
+        case NonFatal(e) =>
+          // if one task fails, cancel all other tasks in this stage
+          futures.foreach(_.cancel(true))
+          throw e
+      }
       taskResults ++= results
     }
     finalTaskResult

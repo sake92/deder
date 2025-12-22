@@ -12,14 +12,14 @@ enum ServerNotification {
       moduleId: Option[String]
   )
 
+  case CompileStarted(moduleId: String, files: Seq[os.Path])
+
   case TaskProgress(
       moduleId: String,
       taskName: String,
       progress: Long,
       total: Long
   )
-
-  case CompileStarted(moduleId: String, files: Seq[os.Path])
 
   case CompileDiagnostic(moduleId: String, problem: xsbti.Problem)
 

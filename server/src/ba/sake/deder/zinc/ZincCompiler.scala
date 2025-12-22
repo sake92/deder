@@ -140,11 +140,13 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       notifications.add(ServerNotification.CompileStarted(moduleId, sources)) // so we can reset BSP diagnostics
       val newResult = incrementalCompiler.compile(inputs, zincLogger)
       analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
+      // trigger just in case, for BSP
+      if !newResult.hasModified() then notifications.add(ServerNotification.CompileFinished(moduleId, 0, 0))
     } catch {
       case e: xsbti.CompileFailed =>
-      // println("Noooooooooooooooooooooooooooooooooo")
-      // e.printStackTrace()
-      throw e
+        // println("Noooooooooooooooooooooooooooooooooo")
+        // e.printStackTrace()
+        throw e
     }
   }
 

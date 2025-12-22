@@ -46,7 +46,6 @@ class CoreTasks() {
         case m: ScalaTestModule => m.sources.asScala.toSeq
         case _                  => Seq.empty
       }
-      // println(s"Module: ${ctx.module.id} sources: " + sources)
       sources.map(s => DederPath(os.SubPath(s"${ctx.module.root}/${s}")))
     }
   )
@@ -62,7 +61,6 @@ class CoreTasks() {
         case m: ScalaTestModule => m.resources.asScala.toSeq
         case _                  => Seq.empty
       }
-      // println(s"Module: ${ctx.module.id} sources: " + sources)
       resources.map(s => DederPath(os.SubPath(s"${ctx.module.root}/${s}")))
     }
   )
@@ -274,13 +272,6 @@ class CoreTasks() {
         compilerDeps.map(d => Dependency.make(d, scalaVersion))
       )
 
-      /*println(s"Compiling module: ${ctx.module.id} with ${(
-          scalaVersion,
-          compilerJars,
-          compileClasspath,
-          classesDir
-        )}")*/
-
       val zincCacheFile = ctx.out / "inc_compile.zip"
       val zincLogger = new DederZincLogger(ctx.notifications, ctx.module.id)
       val finalJavacOptions = javacOptions ++
@@ -336,7 +327,6 @@ class CoreTasks() {
       }
       val depsJars = DependencyResolver.fetchFiles(mandatoryDeps ++ dependencies, Some(ctx.notifications))
 
-      // println(s"Resolved deps: " + depsJars)
       // classdirs that are last in each module are pushed last in final classpath
       val classesDirsAbs = Seq(classesDir).map(_.absPath)
       (classesDirsAbs ++ ctx.transitiveResults.flatten.flatten ++ depsJars).reverse.distinct.reverse
