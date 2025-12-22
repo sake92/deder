@@ -111,9 +111,8 @@ public class Main {
 			// handy for development, use local server build
 			Files.copy(Path.of(serverLocalPath), Path.of(".deder/server.jar"), StandardCopyOption.REPLACE_EXISTING);
 		} else {
-			// TODO github artifact..
-			download("https://repo1.maven.org/maven2/ba/sake/deder/server/" + serverVersion
-					+ "/server-" + serverVersion + ".jar", Path.of(".deder/server.jar"));
+			download("https://github.com/sake92/deder/releases/download/v" + serverVersion + "/deder-server.jar",
+					Path.of(".deder/server.jar"));
 		}
 
 		startServerProcess(isBspClient, props);
