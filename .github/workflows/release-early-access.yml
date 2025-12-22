@@ -32,7 +32,6 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
-          cache: sbt
       - name: Version
         id: vars
         shell: bash
@@ -54,7 +53,6 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
-          cache: sbt
       - name: Build
         run: |
           ./scripts/gen-config-bindings.sh

@@ -3,6 +3,8 @@ package ba.sake.deder.client;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.net.URI;
+import java.net.http.*;
 import java.util.concurrent.TimeUnit;
 import java.util.Arrays;
 import java.util.ArrayList;
@@ -93,9 +95,27 @@ public class Main {
 		System.err.println("Deder server not running, starting it...");
 		log("Deder server not running, starting it...");
 		ensureJavaInstalled();
-		// TODO download server.jar if not present
-		Files.copy(Path.of("../../out/server/assembly.dest/out.jar"), Path.of(".deder/server.jar"),
-				StandardCopyOption.REPLACE_EXISTING);
+		var props = new Properties();
+		var propFileName = Paths.get(".deder/server.properties");
+		var serverVersion = "latest";
+		var serverLocalPath = "";
+		if (Files.exists(propFileName) && Files.isRegularFile(propFileName)) {
+			try (FileInputStream inputStream = new FileInputStream(propFileName.toFile())) {
+				props.load(inputStream);
+				serverVersion = props.getProperty("version", "latest");
+				serverLocalPath = props.getProperty("localPath", "");
+			}
+		}
+
+		if (serverLocalPath != null && !serverLocalPath.isBlank()) {
+			// handy for development, use local server build
+			Files.copy(Path.of(serverLocalPath), Path.of(".deder/server.jar"), StandardCopyOption.REPLACE_EXISTING);
+		} else {
+			// TODO github artifact..
+			download("https://repo1.maven.org/maven2/ba/sake/deder/server/" + serverVersion
+					+ "/server-" + serverVersion + ".jar", Path.of(".deder/server.jar"));
+		}
+
 		startServerProcess(isBspClient);
 		System.err.println("Deder server started.");
 		log("Deder server started.");
@@ -117,20 +137,13 @@ public class Main {
 		log("Java looks ok.");
 	}
 
-	private static void startServerProcess(boolean isBspClient) throws Exception {
+	private static void startServerProcess(boolean isBspClient, Properties serverProps) throws Exception {
 		var cwd = Paths.get(".").toAbsolutePath();
 		var serverLogFile = Path.of(".deder/logs/server.log");
 		Files.writeString(serverLogFile, "=".repeat(50) + System.lineSeparator(), StandardCharsets.UTF_8,
 				StandardOpenOption.APPEND, StandardOpenOption.CREATE);
-		var props = new Properties();
 		var propFileName = Paths.get(".deder/server.properties");
-		var javaOpts = "";
-		if (Files.exists(propFileName) && Files.isRegularFile(propFileName)) {
-			try (FileInputStream inputStream = new FileInputStream(propFileName.toFile())) {
-				props.load(inputStream);
-				javaOpts = props.getProperty("JAVA_OPTS", "");
-			}
-		}
+		var javaOpts = serverProps.getProperty("JAVA_OPTS", "");
 		var processArgs = new ArrayList<String>();
 		// detach server process so it keeps running after client exits
 		if (System.getProperty("os.name").toLowerCase().contains("win")) {
@@ -189,6 +202,19 @@ public class Main {
 		Files.write(bspConfigPath, bspConfig.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE,
 				StandardOpenOption.TRUNCATE_EXISTING);
 		System.err.println("BSP config installed at " + bspConfigPath);
+	}
+
+	private static void download(String fileUrl, Path destination) throws IOException {
+		var client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+				.followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build();
+		var request = HttpRequest.newBuilder().uri(URI.create(fileUrl)).GET().build();
+		var response = client.send(request,
+				HttpResponse.BodyHandlers.ofFile(destination, StandardOpenOption.CREATE, StandardOpenOption.WRITE));
+		if (response.statusCode() == 200) {
+			System.out.println("File downloaded successfully to: " + response.body());
+		} else {
+			System.out.println("Failed to download file. Status code: " + response.statusCode());
+		}
 	}
 
 	private static void log(String message) {

@@ -18,7 +18,6 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 21
-          cache: sbt
       - name: Build server and client
         run: |
           ./scripts/gen-config-bindings.sh
