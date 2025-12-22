@@ -1,63 +1,93 @@
 name: Release
 
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+
+env:
+  JAVA_VERSION: '21'
+  JAVA_DISTRO: 'zulu'
 
 jobs:
-  build-server:
-    if: false # TODO make it work
+  precheck:
+    name: Precheck
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.vars.outputs.VERSION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Version
+        id: vars
+        shell: bash
+        run: |
+          VERSION=${{ github.event.inputs.version }}
+          ./mvnw -B versions:set versions:commit -DnewVersion=$VERSION
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Action"
+          git commit -a -m "Releasing version $VERSION"
+          git push origin main
+
+  release:
+    needs: [ precheck ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          distribution: 'zulu'
-          java-version: 21
-      - name: Build Server JAR
+          ref: main
+          fetch-depth: 0
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRO }}
+      - name: Build
         run: |
-          ./mill -i server.assembly
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+          ./scripts/gen-config-bindings.sh
+          ./mill server.assembly
+          cp out/server/assembly.dest/out.jar deder-server.jar
+          ./mill client.assembly
+          cp out/client/assembly.dest/out.jar deder-client.jar
+      - name: Release
+        uses: jreleaser/release-action@v2
         with:
-        # TODO version etc
-          name: deder-server-v1.jar
-          path: out/server/assembly.dest/out.jar
-          overwrite: true
-
-  # TODO add cli JAR too, why not..
-
-  build-cli-native-image:
-    if: false # TODO make it work
-    strategy:
-      matrix:
-        os:
-          - name: ubuntu-latest
-            ext: ""
-          - name: windows-latest
-            ext: ".exe"
-          # TODO macos-latest, windows-latest
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build CLI native image
-        run: |
-          ./mill -i cli.nativeImage
-          cp out/cli/nativeImage.dest/native-executable${{ matrix.os.ext }} deder
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: deder-cli-${{ matrix.os.name }}
-          path: deder${{ matrix.os.ext }}
-
-  release-cli:
-    if: false # TODO make it work
-    needs: build-cli-native-image
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-      - name: Release with JReleaser
-        run: echo "bla" # TODO mvn jreleaser:full-release
+          arguments: full-release
         env:
-          JRELEASER_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JRELEASER_PROJECT_VERSION: ${{ needs.precheck.outputs.VERSION }}
+          JRELEASER_GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+      - name: JReleaser output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jreleaser-release
+          path: |
+            out/jreleaser/trace.log
+            out/jreleaser/output.properties
+
+
+# TODO make it work
+#  build-cli-native-image:
+#    strategy:
+#      matrix:
+#        os:
+#          - name: ubuntu-latest
+#            ext: ""
+#          - name: windows-latest
+#            ext: ".exe"
+#          # TODO macos-latest, windows-latest
+#    runs-on: ${{ matrix.os }}
+#    steps:
+#      - uses: actions/checkout@v4
+#      - name: Build CLI native image
+#        run: |
+#          ./mill -i cli.nativeImage
+#          cp out/cli/nativeImage.dest/native-executable${{ matrix.os.ext }} deder
+#      - name: Upload artifact
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: deder-cli-${{ matrix.os.name }}
+#          path: deder${{ matrix.os.ext }}
