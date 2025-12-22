@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 env:
-  JAVA_VERSION: '11'
+  JAVA_VERSION: '21'
   JAVA_DISTRO: 'zulu'
 
 jobs:

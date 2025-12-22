@@ -116,7 +116,7 @@ public class Main {
 					+ "/server-" + serverVersion + ".jar", Path.of(".deder/server.jar"));
 		}
 
-		startServerProcess(isBspClient);
+		startServerProcess(isBspClient, props);
 		System.err.println("Deder server started.");
 		log("Deder server started.");
 	}
@@ -204,7 +204,7 @@ public class Main {
 		System.err.println("BSP config installed at " + bspConfigPath);
 	}
 
-	private static void download(String fileUrl, Path destination) throws IOException {
+	private static void download(String fileUrl, Path destination) throws Exception {
 		var client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
 				.followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build();
 		var request = HttpRequest.newBuilder().uri(URI.create(fileUrl)).GET().build();
