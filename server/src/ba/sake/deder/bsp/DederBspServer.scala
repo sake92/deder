@@ -39,9 +39,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           // e.g. mainClasses -> compile
           // or for dependent modules, we only care about the module being compiled directly!
           val isRelevantCompileNotification = isCompileTask && targetId.map(_.moduleId) == Some(cs.moduleId)
-          println(
-            s"Starting compilation of module: ${isCompileTask} ${targetId.map(_.moduleId)} ${cs.moduleId} ${isRelevantCompileNotification}"
-          )
           if isRelevantCompileNotification then {
             val taskStartParams = TaskStartParams(taskId.orNull)
             taskStartParams.setEventTime(System.currentTimeMillis())
@@ -103,9 +100,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           }
         case cf: ServerNotification.CompileFinished =>
           val isRelevantCompileNotification = isCompileTask && targetId.map(_.moduleId) == Some(cf.moduleId)
-          println(
-            s"Finishing compilation of module: ${isCompileTask} ${targetId.map(_.moduleId)} ${cf.moduleId} ${isRelevantCompileNotification}"
-          )
           if isRelevantCompileNotification then {
             val status = if cf.errors == 0 then StatusCode.OK else StatusCode.ERROR
             val taskFinishParams = TaskFinishParams(taskId.orNull, status)
