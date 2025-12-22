@@ -13,31 +13,33 @@ permissions:
 env:
   JAVA_VERSION: '21'
   JAVA_DISTRO: 'zulu'
+  JRELEASER_PROJECT_VERSION: 'early-access'
+  JRELEASER_GITHUB_TOKEN: ${{ secrets.GH_PAT }}
 
 jobs:
   precheck:
     if: ${{ github.event.workflow_run.conclusion == 'success' }} && github.repository == 'sake92/deder' && startsWith(github.event.head_commit.message, 'Releasing version') != true
     runs-on: ubuntu-latest
-    outputs:
-      VERSION: ${{ steps.vars.outputs.VERSION }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: ${{ env.JAVA_DISTRO }}
-      - name: Version
-        id: vars
-        shell: bash
-        run: |
-          VERSION=$(./mill show server.version | tr -d '"')
-          echo "VERSION=$(echo $VERSION)" >> $GITHUB_OUTPUT
+    #outputs:
+    #  VERSION: ${{ steps.vars.outputs.VERSION }}
+    #steps:
+    #  - name: Checkout
+    #    uses: actions/checkout@v4
+    #  - name: Setup Java
+    #    uses: actions/setup-java@v4
+    #    with:
+    #      java-version: ${{ env.JAVA_VERSION }}
+    #      distribution: ${{ env.JAVA_DISTRO }}
+    #  - name: Version
+    #    id: vars
+    #    shell: bash
+    #    run: |
+    #      VERSION=$(./mill show server.version | tr -d '"')
+    #      echo "VERSION=$(echo $VERSION)" >> $GITHUB_OUTPUT
 
   release:
     needs: [ precheck ]
-    if: endsWith(${{ needs.precheck.outputs.VERSION }}, '-SNAPSHOT')
+    #if: endsWith(${{ needs.precheck.outputs.VERSION }}, '-SNAPSHOT')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -61,8 +63,7 @@ jobs:
         with:
           arguments: full-release
         env:
-          JRELEASER_PROJECT_VERSION: ${{ needs.precheck.outputs.VERSION }}
-          JRELEASER_GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          #JRELEASER_PROJECT_VERSION: ${{ needs.precheck.outputs.VERSION }}
       - name: JReleaser output
         if: always()
         uses: actions/upload-artifact@v4
