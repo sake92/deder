@@ -16,8 +16,16 @@ THERE ARE ZERO TESTS! ZERO!!!
 
 See [examples/multi](examples/multi/) for a working example project.
 
+## Installation
 
-Example commands:
+1. download latest `deder-client.jar` from [releases](https://github.com/sake92/deder/releases)
+1. rename it to just `deder` 
+1. do `chmod +x deder`
+1. put it in `PATH`
+
+
+## Example commands
+
 ```shell
 ################ explore the build
 # list modules
