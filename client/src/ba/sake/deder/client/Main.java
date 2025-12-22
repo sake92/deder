@@ -110,6 +110,7 @@ public class Main {
 			// handy for development, use local server build
 			Files.copy(Path.of(serverLocalPath), Path.of(".deder/server.jar"), StandardCopyOption.REPLACE_EXISTING);
 		} else {
+			// TODO figure out server.jar current running version and avoid re-downloading if same version
 			download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
 					Path.of(".deder/server.jar"));
 		}

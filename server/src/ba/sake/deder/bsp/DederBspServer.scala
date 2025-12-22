@@ -26,84 +26,89 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   private def makeServerNotificationsLogger(
       originId: Option[String] = None,
       targetId: Option[BuildTargetIdentifier] = None,
-      taskId: Option[TaskId] = None
+      taskId: Option[TaskId] = None,
+      isCompileTask: Boolean = false
   ) = {
-    val contextParams = originId.zip(targetId).zip(taskId)
-    ServerNotificationsLogger {
-      case n: ServerNotification.Log =>
-      // we have everything in server logs
-      case tp: ServerNotification.TaskProgress =>
-        contextParams.foreach { case ((originId, targetId), taskId) =>
-          val params = TaskProgressParams(taskId)
-          params.setOriginId(originId)
-          params.setEventTime(System.currentTimeMillis())
-          params.setDataKind("compile-progress") // TODO just used for compile now..
-          params.setData(new CompileTask(targetId))
-          params.setProgress(tp.progress)
-          params.setTotal(tp.total)
-          val percentage = tp.progress.toDouble / tp.total.toDouble * 100
-          params.setMessage(f"${tp.moduleId}.${tp.taskName}: ${percentage}%.2f%%")
-          client.onBuildTaskProgress(params)
-        }
-      case cs: ServerNotification.CompileStarted =>
-        contextParams.foreach { case ((originId, targetId), taskId) =>
-          val taskStartParams = TaskStartParams(taskId)
-          taskStartParams.setEventTime(System.currentTimeMillis())
-          taskStartParams.setOriginId(originId)
-          taskStartParams.setMessage(s"Compiling ${cs.moduleId} ...")
-          taskStartParams.setDataKind(TaskStartDataKind.COMPILE_TASK)
-          taskStartParams.setData(new CompileTask(targetId))
-          client.onBuildTaskStart(taskStartParams)
-          // reset diagnostics for these files
-          cs.files.foreach { file =>
+    ServerNotificationsLogger { sn =>
+      //println(s"Notification (originId=$originId , targetId=$targetId, taskId=$taskId): ${sn}")
+      sn match {
+        case n: ServerNotification.Log =>
+        // we have everything in server logs
+        case tp: ServerNotification.TaskProgress =>
+          // dont send notification if compile was triggered transitively by another task
+          // e.g. mainClasses -> compile
+          if isCompileTask then {
+            val params = TaskProgressParams(taskId.orNull)
+            params.setOriginId(originId.orNull)
+            params.setEventTime(System.currentTimeMillis())
+            params.setDataKind("compile-progress") // TODO just used for compile now..
+            params.setData(new CompileTask(targetId.orNull))
+            params.setProgress(tp.progress)
+            params.setTotal(tp.total)
+            val percentage = tp.progress.toDouble / tp.total.toDouble * 100
+            params.setMessage(f"${tp.moduleId}.${tp.taskName}: ${percentage}%.2f%%")
+            client.onBuildTaskProgress(params)
+          }
+        case cs: ServerNotification.CompileStarted =>
+          if isCompileTask then {
+            val taskStartParams = TaskStartParams(taskId.orNull)
+            taskStartParams.setEventTime(System.currentTimeMillis())
+            taskStartParams.setOriginId(originId.orNull)
+            taskStartParams.setMessage(s"Compiling ${cs.moduleId} ...")
+            taskStartParams.setDataKind(TaskStartDataKind.COMPILE_TASK)
+            taskStartParams.setData(new CompileTask(targetId.orNull))
+            client.onBuildTaskStart(taskStartParams)
+            // reset diagnostics for these files
+            cs.files.foreach { file =>
+              val fileUri = TextDocumentIdentifier(file.toURI.toString)
+              val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List.empty.asJava, true)
+              client.onBuildPublishDiagnostics(params)
+            }
+          }
+        case cd: ServerNotification.CompileDiagnostic =>
+          if isCompileTask then {
+            val file = cd.problem.position.sourceFile.get
+            val problem = cd.problem
             val fileUri = TextDocumentIdentifier(file.toURI.toString)
-            val params = PublishDiagnosticsParams(fileUri, targetId, List.empty.asJava, true)
+            val range = {
+              val pos = problem.position
+              // Zinc's range starts at 1 whereas BSP at 0
+              val startLine = pos.startLine().get - 1
+              val startColumn = pos.startColumn().get - 1
+              val endLine = pos.endLine().get - 1
+              val endColumn = pos.endColumn().get - 1
+              new bsp4j.Range(
+                new bsp4j.Position(startLine, startColumn),
+                new bsp4j.Position(endLine, endColumn)
+              )
+            }
+            val severity = problem.severity() match {
+              case xsbti.Severity.Error => DiagnosticSeverity.ERROR
+              case xsbti.Severity.Warn  => DiagnosticSeverity.WARNING
+              case xsbti.Severity.Info  => DiagnosticSeverity.INFORMATION
+            }
+            val diagnostic = new Diagnostic(range, problem.message())
+            diagnostic.setSeverity(severity)
+            diagnostic.setCode(problem.category())
+            diagnostic.setSource("deder")
+            val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List(diagnostic).asJava, false)
             client.onBuildPublishDiagnostics(params)
           }
-        }
-      case cd: ServerNotification.CompileDiagnostic =>
-        val file = cd.problem.position.sourceFile.get
-        val problem = cd.problem
-        val fileUri = TextDocumentIdentifier(file.toURI.toString)
-        val range = {
-          val pos = problem.position
-          // Zinc's range starts at 1 whereas BSP at 0
-          val startLine = pos.startLine().get - 1
-          val startColumn = pos.startColumn().get - 1
-          val endLine = pos.endLine().get - 1
-          val endColumn = pos.endColumn().get - 1
-          new bsp4j.Range(
-            new bsp4j.Position(startLine, startColumn),
-            new bsp4j.Position(endLine, endColumn)
-          )
-        }
-        val severity = problem.severity() match {
-          case xsbti.Severity.Error => DiagnosticSeverity.ERROR
-          case xsbti.Severity.Warn  => DiagnosticSeverity.WARNING
-          case xsbti.Severity.Info  => DiagnosticSeverity.INFORMATION
-        }
-        val diagnostic = new Diagnostic(range, problem.message())
-        diagnostic.setSeverity(severity)
-        diagnostic.setCode(problem.category())
-        diagnostic.setSource("deder")
-        contextParams.foreach { case ((originId, targetId), taskId) =>
-          val params = PublishDiagnosticsParams(fileUri, targetId, List(diagnostic).asJava, false)
-          client.onBuildPublishDiagnostics(params)
-        }
-      case cf: ServerNotification.CompileFinished =>
-        contextParams.foreach { case ((originId, targetId), taskId) =>
-          val status = if cf.errors == 0 then StatusCode.OK else StatusCode.ERROR
-          val taskFinishParams = TaskFinishParams(taskId, status)
-          taskFinishParams.setEventTime(System.currentTimeMillis())
-          taskFinishParams.setOriginId(originId)
-          taskFinishParams.setMessage(s"Finished compiling ${cf.moduleId}")
-          taskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
-          taskFinishParams.setData(new CompileReport(targetId, cf.errors, cf.warnings))
-          client.onBuildTaskFinish(taskFinishParams)
-        }
-      case n: ServerNotification.RequestFinished => // do nothing
-      case n: ServerNotification.Output          => // do nothing
-      case n: ServerNotification.RunSubprocess   => // do nothing
+        case cf: ServerNotification.CompileFinished =>
+          if isCompileTask then {
+            val status = if cf.errors == 0 then StatusCode.OK else StatusCode.ERROR
+            val taskFinishParams = TaskFinishParams(taskId.orNull, status)
+            taskFinishParams.setEventTime(System.currentTimeMillis())
+            taskFinishParams.setOriginId(originId.orNull)
+            taskFinishParams.setMessage(s"Finished compiling ${cf.moduleId}")
+            taskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
+            taskFinishParams.setData(new CompileReport(targetId.orNull, cf.errors, cf.warnings))
+            client.onBuildTaskFinish(taskFinishParams)
+          }
+        case n: ServerNotification.RequestFinished => // do nothing
+        case n: ServerNotification.Output          => // do nothing
+        case n: ServerNotification.RunSubprocess   => // do nothing
+      }
     }
   }
 
@@ -155,9 +160,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetSources(params: SourcesParams): CompletableFuture[SourcesResult] =
     CompletableFuture.supplyAsync { () =>
-      val serverNotificationsLogger = makeServerNotificationsLogger()
       val sourcesItems = params.getTargets.asScala.flatMap { targetId =>
         val moduleId = targetId.moduleId
+        val taskId = TaskId(s"sources-${UUID.randomUUID}")
+        val serverNotificationsLogger = makeServerNotificationsLogger(targetId = Some(targetId), taskId = Some(taskId))
         withLastGoodState { projectStateData =>
           val coreTasks = projectStateData.tasksRegistry.coreTasks
           val sourceDirs = executeTask(serverNotificationsLogger, moduleId, coreTasks.sourcesTask)
@@ -205,9 +211,13 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetResources(params: ResourcesParams): CompletableFuture[ResourcesResult] =
     CompletableFuture.supplyAsync { () =>
-      val serverNotificationsLogger = makeServerNotificationsLogger()
+      val taskId = TaskId(s"resources-${UUID.randomUUID}")
       val resourcesItems = params.getTargets.asScala.flatMap { targetId =>
         val moduleId = targetId.moduleId
+        val subtaskId = TaskId(s"resources-${moduleId}-${UUID.randomUUID}")
+        subtaskId.setParents(List(taskId.getId()).asJava)
+        val serverNotificationsLogger =
+          makeServerNotificationsLogger(targetId = Some(targetId), taskId = Some(subtaskId))
         withLastGoodState { projectStateData =>
           val coreTasks = projectStateData.tasksRegistry.coreTasks
           val resourceDirs = executeTask(serverNotificationsLogger, moduleId, coreTasks.resourcesTask)
@@ -230,16 +240,19 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.supplyAsync { () =>
       val taskId = TaskId(s"compile-${UUID.randomUUID}")
       var allCompileSucceeded = true
+      println(s"BSP buildTargetCompile called for ${params}")
       withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         params.getTargets.asScala.foreach { targetId =>
           val moduleId = targetId.moduleId
           val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
           subtaskId.setParents(List(taskId.getId()).asJava)
+          println(s"BSP compiling subtaskId ${subtaskId}")
           val serverNotificationsLogger = makeServerNotificationsLogger(
             originId = Option(params.getOriginId),
             targetId = Some(targetId),
-            taskId = Some(subtaskId)
+            taskId = Some(subtaskId),
+            isCompileTask = true
           )
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
           var currentModuleCompileSucceeded = true
@@ -276,12 +289,16 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetDependencyModules(
       params: DependencyModulesParams
   ): CompletableFuture[DependencyModulesResult] = CompletableFuture.supplyAsync { () =>
-    val serverNotificationsLogger = makeServerNotificationsLogger()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
+      val taskId = TaskId(s"dependency-modules-${UUID.randomUUID}")
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
+        val subtaskId = TaskId(s"dependency-modules-${moduleId}-${UUID.randomUUID}")
+        subtaskId.setParents(List(taskId.getId()).asJava)
+        val serverNotificationsLogger =
+          makeServerNotificationsLogger(targetId = Some(targetId), taskId = Some(subtaskId))
         val dependencies = executeTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)
         val fetchRes = DependencyResolver.fetch(dependencies)
         // assuming that dependencies and artifacts are in the same order, 1:1 mapping
@@ -317,12 +334,16 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetDependencySources(
       params: DependencySourcesParams
   ): CompletableFuture[DependencySourcesResult] = CompletableFuture.supplyAsync { () =>
-    val serverNotificationsLogger = makeServerNotificationsLogger()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
+      val taskId = TaskId(s"dependency-sources-${UUID.randomUUID}")
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
+        val subtaskId = TaskId(s"dependency-sources-${moduleId}-${UUID.randomUUID}")
+        subtaskId.setParents(List(taskId.getId()).asJava)
+        val serverNotificationsLogger =
+          makeServerNotificationsLogger(targetId = Some(targetId), taskId = Some(subtaskId))
         val dependencies = executeTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)
         val fetchRes = DependencyResolver.fetch(dependencies)
         val depSources = fetchRes.getDependencies.asScala.map { dep =>
@@ -356,11 +377,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetJavacOptions(params: JavacOptionsParams): CompletableFuture[JavacOptionsResult] =
     CompletableFuture.supplyAsync { () =>
-      val serverNotificationsLogger = makeServerNotificationsLogger()
       val javacOptionsItems = withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
+        val taskId = TaskId(s"javac-options-${UUID.randomUUID}")
         params.getTargets().asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
+          val subtaskId = TaskId(s"javac-options-${moduleId}-${UUID.randomUUID}")
+          subtaskId.setParents(List(taskId.getId()).asJava)
+          val serverNotificationsLogger =
+            makeServerNotificationsLogger(targetId = Some(targetId), taskId = Some(subtaskId))
           val classesDir =
             executeTask(serverNotificationsLogger, moduleId, coreTasks.classesDirTask).toNIO.toUri.toString
           val javacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.javacOptionsTask)
@@ -387,9 +412,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetScalaMainClasses(
       params: ScalaMainClassesParams
   ): CompletableFuture[ScalaMainClassesResult] = CompletableFuture.supplyAsync { () =>
-    val serverNotificationsLogger = makeServerNotificationsLogger()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
+      val taskId = TaskId(s"scala-main-classes-${UUID.randomUUID}")
       params.getTargets().asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
@@ -398,6 +423,13 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           if module.isInstanceOf[DederProject.ScalaTestModule] then List.empty
           else
             try {
+              val subtaskId = TaskId(s"scala-main-classes-${moduleId}-${UUID.randomUUID}")
+              subtaskId.setParents(List(taskId.getId()).asJava)
+              val serverNotificationsLogger = makeServerNotificationsLogger(
+                originId = Option(params.getOriginId),
+                targetId = Some(targetId),
+                taskId = Some(subtaskId)
+              )
               executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask).map { mainClass =>
                 // TODO arguments + JVM opts
                 ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
@@ -419,15 +451,22 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetScalaTestClasses(
       params: ScalaTestClassesParams
   ): CompletableFuture[ScalaTestClassesResult] = CompletableFuture.supplyAsync { () =>
-    val serverNotificationsLogger = makeServerNotificationsLogger()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val testModules = projectStateData.projectConfig.modules.asScala.collect { case m: DederProject.ScalaTestModule =>
         m
       }
+      val taskId = TaskId(s"scala-test-classes-${UUID.randomUUID}")
       testModules.flatMap { module =>
         val targetId = buildTargetId(module)
         try {
+          val subtaskId = TaskId(s"scala-test-classes-${module.id}-${UUID.randomUUID}")
+          subtaskId.setParents(List(taskId.getId()).asJava)
+          val serverNotificationsLogger = makeServerNotificationsLogger(
+            originId = Option(params.getOriginId),
+            targetId = Some(targetId),
+            taskId = Some(subtaskId)
+          )
           val frameworkTests = executeTask(serverNotificationsLogger, module.id, coreTasks.testClassesTask)
           frameworkTests.map { ft =>
             val item = ScalaTestClassesItem(targetId, ft.testClasses.asJava)
@@ -446,11 +485,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetScalacOptions(params: ScalacOptionsParams): CompletableFuture[ScalacOptionsResult] =
     CompletableFuture.supplyAsync { () =>
-      val serverNotificationsLogger = makeServerNotificationsLogger()
       val scalacOptionsItems = withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
+        val taskId = TaskId(s"scalac-options-${UUID.randomUUID}")
         params.getTargets().asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
+          val subtaskId = TaskId(s"scalac-options-${moduleId}-${UUID.randomUUID}")
+          subtaskId.setParents(List(taskId.getId).asJava)
+          val serverNotificationsLogger =
+            makeServerNotificationsLogger(targetId = Some(targetId), taskId = Some(subtaskId))
           val scalaVersion = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalaVersionTask)
           val scalacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacOptionsTask)
           val scalacPlugins = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacPluginsTask)
@@ -479,11 +522,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetJvmCompileClasspath(
       params: JvmCompileClasspathParams
   ): CompletableFuture[JvmCompileClasspathResult] = CompletableFuture.supplyAsync { () =>
-    val serverNotificationsLogger = makeServerNotificationsLogger()
+    val taskId = TaskId(s"jvm-compile-classpath-${UUID.randomUUID}")
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
+        val subtaskId = TaskId(s"jvm-compile-classpath-${moduleId}-${UUID.randomUUID}")
+        subtaskId.setParents(List(taskId.getId()).asJava)
+        val serverNotificationsLogger =
+          makeServerNotificationsLogger(targetId = Some(targetId), taskId = Some(subtaskId))
         val compileClasspath =
           executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
             .map(_.toNIO.toUri.toString)
@@ -497,11 +544,18 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetJvmRunEnvironment(
       params: JvmRunEnvironmentParams
   ): CompletableFuture[JvmRunEnvironmentResult] = CompletableFuture.supplyAsync { () =>
-    val serverNotificationsLogger = makeServerNotificationsLogger()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
+      val taskId = TaskId(s"jvm-run-environment-${UUID.randomUUID}")
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
+        val subtaskId = TaskId(s"jvm-run-environment-${moduleId}-${UUID.randomUUID}")
+        subtaskId.setParents(List(taskId.getId()).asJava)
+        val serverNotificationsLogger = makeServerNotificationsLogger(
+          originId = Option(params.getOriginId),
+          targetId = Some(targetId),
+          taskId = Some(subtaskId)
+        )
         val mainClasses = executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)
         val classpath =
           executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
@@ -533,11 +587,18 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetJvmTestEnvironment(
       params: JvmTestEnvironmentParams
   ): CompletableFuture[JvmTestEnvironmentResult] = CompletableFuture.supplyAsync { () =>
-    val serverNotificationsLogger = makeServerNotificationsLogger()
+    val taskId = TaskId(s"jvm-test-environment-${UUID.randomUUID}")
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
+        val subtaskId = TaskId(s"jvm-test-environment-${moduleId}-${UUID.randomUUID}")
+        subtaskId.setParents(List(taskId.getId()).asJava)
+        val serverNotificationsLogger = makeServerNotificationsLogger(
+          originId = Option(params.getOriginId),
+          targetId = Some(targetId),
+          taskId = Some(subtaskId)
+        )
         val testClasses = executeTask(serverNotificationsLogger, moduleId, coreTasks.testClassesTask)
         val classpath =
           executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
