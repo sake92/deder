@@ -203,13 +203,14 @@ public class Main {
 	}
 
 	private static void download(String fileUrl, Path destination) throws Exception {
+		System.err.println("Starting download:  " + fileUrl);
 		var client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
 				.followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build();
 		var request = HttpRequest.newBuilder().uri(URI.create(fileUrl)).GET().build();
 		var response = client.send(request,
 				HttpResponse.BodyHandlers.ofFile(destination, StandardOpenOption.CREATE, StandardOpenOption.WRITE));
 		if (response.statusCode() == 200) {
-			System.out.println("File downloaded successfully to: " + response.body());
+			System.err.println("File downloaded successfully to: " + response.body());
 		} else {
 			throw new RuntimeException("Failed to download '" + fileUrl + "'. Response: " + response);
 		}
