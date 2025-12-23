@@ -18,6 +18,8 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Build
         env: 
           FLATMARK_BASE_URL: https://sake92.github.io/deder
@@ -25,8 +27,12 @@ jobs:
             FLATMARK_VERSION=0.0.27
             curl -L https://github.com/sake92/flatmark/releases/download/v${FLATMARK_VERSION}/flatmark-1.0.0.pkg -o flatmark.pkg
             sudo installer -verbose -pkg flatmark.pkg -target /
-            mkdir -p docs/static
-            cp config/*.pkl docs/static/
+            mkdir -p docs/static/config
+            cp config/*.pkl docs/static/config/
+            ls config
+            ls config/*.pkl
+            ls docs
+            ls docs/static/config
             flatmark build -i docs
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
