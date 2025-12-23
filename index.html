@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Untitled | My Site </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul></ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#deder">Deder</a>
+         <ul>
+          <li><a href="#concepts">Concepts</a></li>
+          <li><a href="#installation">Installation</a></li>
+          <li><a href="#example-commands">Example commands</a></li>
+          <li><a href="#ide-setup">IDE setup</a></li>
+          <li><a href="#building-locally">Building locally</a></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="deder">Deder<a href="#deder" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <h2 id="concepts">Concepts<a href="#concepts" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <ul>
+    <li>project is the root of your git repo</li>
+    <li>modules are "subprojects", like common/frontend/app..</li>
+    <li>modules have tasks defined for them</li>
+   </ul>
+   <p>See <a href="examples/multi/">examples/multi</a> for a working example project.</p>
+   <h2 id="installation">Installation<a href="#installation" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <ol>
+    <li>download <code>deder-client.jar</code> from <a href="https://github.com/sake92/deder/releases/tag/early-access">early release</a></li>
+    <li>rename it to just <code>deder</code></li>
+    <li>do <code>chmod +x deder</code></li>
+    <li>put it in <code>PATH</code></li>
+   </ol>
+   <h2 id="example-commands">Example commands<a href="#example-commands" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <pre>            <code class="language-shell hljs" data-highlighted="yes"><span class="hljs-meta prompt_">#</span><span class="language-bash"><span class="hljs-comment">############### explore the build</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">list modules</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --ascii, --dot</span>
+deder modules
+<span class="hljs-meta prompt_">
+#</span><span class="language-bash"><span class="hljs-comment">###############</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">list tasks</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --ascii, --dot</span>
+deder tasks
+<span class="hljs-meta prompt_">
+#</span><span class="language-bash"><span class="hljs-comment">###############</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash"><span class="hljs-built_in">print</span> execution plan <span class="hljs-keyword">for</span> a task</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --ascii, --dot</span>
+deder plan -m common -t compileClasspath
+<span class="hljs-meta prompt_">
+
+#</span><span class="language-bash"><span class="hljs-comment">############### run tasks</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">by default executes compile on all modules</span>
+deder
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">execute compile explicitly, on all modules</span>
+deder -t compile
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">execute run explicitly, on uber module</span>
+deder -t run -m uber
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">execute run <span class="hljs-keyword">in</span> watch mode</span>
+deder -t run -m frontend --watch
+<span class="hljs-meta prompt_"># </span><span class="language-bash">even <span class="hljs-keyword">in</span> multiple terminals at the same <span class="hljs-keyword">time</span>!!!</span>
+deder -t run -m backend --watch
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">execute <span class="hljs-built_in">test</span> on uber-test module</span>
+deder -t test -m uber-test
+<span class="hljs-meta prompt_">
+
+#</span><span class="language-bash"><span class="hljs-comment">############### BSP</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">write BSP config file <span class="hljs-keyword">for</span> current project</span>
+deder bsp install
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">start a BSP client <span class="hljs-keyword">for</span> current project</span>
+deder bsp
+<span class="hljs-meta prompt_">
+
+#</span><span class="language-bash"><span class="hljs-comment">############### Misc</span></span>
+
+deder version
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">shutdown server</span>
+deder shutdown
+
+</code>
+          </pre>
+   <h2 id="ide-setup">IDE setup<a href="#ide-setup" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Run <code>deder bsp install</code> and just open with VSCode or IntelliJ (open as a BSP project). The <code>reset.sh</code> script does this for you..</p>
+   <p>Currently working features:</p>
+   <ul>
+    <li>import of project</li>
+    <li>navigation</li>
+    <li>compilation and diagnostics</li>
+    <li>run main scala classes (Java doesnt.. #todo-fixme )</li>
+   </ul>
+   <p>If you work on server code, after you build it you can run <code>./reset.sh</code> in examples/multi</p>
+   <h2 id="building-locally">Building locally<a href="#building-locally" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Build the server and client:</p>
+   <pre>            <code class="language-shell hljs" data-highlighted="yes">./scripts/gen-config-bindings.sh
+./mill server.assembly
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">client executable JAR</span>
+./mill client.assembly
+<span class="hljs-meta prompt_"># </span><span class="language-bash">or as native client</span>
+./mill client-native.nativeImage
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">AND PUT CLIENT IN PATH !!! <span class="hljs-keyword">for</span> example:</span>
+cp out/client/assembly.dest/out.jar /usr/local/bin/deder
+cp out/client-native/nativeImage.dest/native-executable /usr/local/bin/deder
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash"><span class="hljs-keyword">then</span> you can run commands:</span>
+cd examples/multi
+<span class="hljs-meta prompt_"># </span><span class="language-bash">start from clean state, copy the server JAR etc</span>
+./reset 
+</code>
+          </pre>
+  </main>
+  <footer class="pico container">My Site</footer>
+ </body>
+</html>
