@@ -29,10 +29,6 @@ jobs:
             sudo installer -verbose -pkg flatmark.pkg -target /
             mkdir -p docs/static/config
             cp config/*.pkl docs/static/config/
-            ls config
-            ls config/*.pkl
-            ls docs
-            ls docs/static/config
             flatmark build -i docs
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
