@@ -1,4 +1,4 @@
-amends "../../config/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
 local const baseModule = new ScalaModule {
   // scalaVersion = "2.12.21" // TODO fix scala 2.12 support
