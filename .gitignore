@@ -26,3 +26,7 @@ pkl-codegen-java
 config/resources
 config/src
 
+
+_site/
+.flatmark-cache
+docs/static/**/*.pkl
