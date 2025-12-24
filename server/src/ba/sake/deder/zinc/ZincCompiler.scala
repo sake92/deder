@@ -99,7 +99,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       /*_javacOptions =*/ javacOptions.toArray,
       /*_maxErrors =*/ 100,
       /*_sourcePositionMapper =*/ null,
-      /*_order =*/ CompileOrder.Mixed
+      /*_order =*/ CompileOrder.JavaThenScala, // TODO make configurable
     )
 
     val analysisStore = ConsistentFileAnalysisStore.binary(
@@ -120,6 +120,19 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
     val reporter = new DederZincReporter(moduleId, notifications, zincLogger)
     val setup = getSetup(zincCacheFile.toNIO, reporter, moduleId, notifications)
     val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
+
+    logger.debug(
+      s"""Starting compilation
+         |  module: $moduleId
+         |  scalaVersion: $scalaVersion
+         |  compilerJars: ${compilerJars.mkString(", ")}
+         |  compileClasspath: ${compileClasspath.mkString(", ")}
+         |  sources: ${sources.size}
+         |  classesDir: $classesDir
+         |  scalacOptions: ${scalacOptions.mkString(" ")}
+         |  javacOptions: ${javacOptions.mkString(" ")}
+         |""".stripMargin
+    )
 
     try {
       notifications.add(ServerNotification.CompileStarted(moduleId, sources)) // so we can reset BSP diagnostics

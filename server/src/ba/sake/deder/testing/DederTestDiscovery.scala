@@ -11,6 +11,7 @@ case class DiscoveredFrameworkTests(framework: String, testClasses: Seq[String])
 
 class DederTestDiscovery(classLoader: ClassLoader, testClassesDir: File, logger: DederTestLogger) {
 
+  // TODO from config
   private val frameworkClassNames: Seq[String] = Seq(
     "org.scalatest.tools.Framework",
     "org.specs2.runner.Specs2Framework",

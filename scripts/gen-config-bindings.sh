@@ -4,7 +4,7 @@ rm -rf config/src
 rm -rf config/resources
 
 if [ ! -f pkl-codegen-java ]; then
-    curl -L -o pkl-codegen-java https://github.com/apple/pkl/releases/download/0.30.1/pkl-codegen-java
+    curl -L -o pkl-codegen-java https://github.com/apple/pkl/releases/download/0.30.2/pkl-codegen-java
 fi
 
 chmod +x pkl-codegen-java

@@ -40,39 +40,27 @@ abstract class DederModule {
 
 typealias ModuleType = "java" | "scala" | "scala-test"
 
-class JavaModule extends DederModule {
-  type: ModuleType = "java"
+open class JavaModule extends DederModule {
+  type = "java"
   resources: Listing<String> = new Listing { "resources" }
   javacOptions: Listing<String> = new Listing {}
   mainClass: String? = null
   deps: Listing<String> = new Listing {}
-  annotationProcessorsDeps: Listing<String> = new Listing {}
+  javacAnnotationProcessorDeps: Listing<String> = new Listing {}
   semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default
   javaSemanticdbVersion: String = "0.11.1"
 }
 
-class ScalaModule extends DederModule {
-  type: ModuleType = "scala"
+open class ScalaModule extends JavaModule {
+  type = "scala"
   scalaVersion: String
-  resources: Listing<String> = new Listing { "resources" }
-  javacOptions: Listing<String> = new Listing {}
   scalacOptions: Listing<String> = new Listing {}
-  mainClass: String? = null
-  deps: Listing<String> = new Listing {}
-  annotationProcessorDeps: Listing<String> = new Listing {} // for java
-  compilerPluginDeps: Listing<String> = new Listing {} // for scala
-  semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default
-  javaSemanticdbVersion: String = "0.11.1"
+  scalacPluginDeps: Listing<String> = new Listing {}
   scalaSemanticdbVersion: String = "4.13.9"
 }
 
-class ScalaTestModule extends DederModule {
-  type: ModuleType = "scala-test"
-  scalaVersion: String
-  resources: Listing<String> = new Listing { "resources" }
-  javacOptions: Listing<String> = new Listing {}
-  scalacOptions: Listing<String> = new Listing {}
-  deps: Listing<String> = new Listing {}
+class ScalaTestModule extends ScalaModule {
+  type = "scala-test"
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
