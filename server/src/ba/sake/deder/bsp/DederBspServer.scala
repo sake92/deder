@@ -659,12 +659,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     buildTarget.setDisplayName(module.id)
     buildTarget.setBaseDirectory(DederPath(module.root).absPath.toNIO.toUri.toString)
     module match {
-      case m: DederProject.JavaModule =>
-        val jvmBuildTarget = new JvmBuildTarget()
-        jvmBuildTarget.setJavaHome(scala.util.Properties.javaHome) // TODO configurable?
-        jvmBuildTarget.setJavaVersion(System.getProperty("java.version")) // TODO configurable?
-        buildTarget.setData(jvmBuildTarget)
-        buildTarget.setDataKind(BuildTargetDataKind.JVM)
       case m: DederProject.ScalaModule =>
         val binaryVersion = ScalaParameters(m.scalaVersion).scalaBinaryVersion
         val scalaBuildTarget =
@@ -675,6 +669,12 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         // scalaBuildTarget.setJvmBuildTarget(jvmBuildTarget)
         buildTarget.setData(scalaBuildTarget)
         buildTarget.setDataKind(BuildTargetDataKind.SCALA)
+      case m: DederProject.JavaModule =>
+        val jvmBuildTarget = new JvmBuildTarget()
+        jvmBuildTarget.setJavaHome(scala.util.Properties.javaHome) // TODO configurable?
+        jvmBuildTarget.setJavaVersion(System.getProperty("java.version")) // TODO configurable?
+        buildTarget.setData(jvmBuildTarget)
+        buildTarget.setDataKind(BuildTargetDataKind.JVM)
       case _ =>
     }
     buildTarget
