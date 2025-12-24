@@ -1,0 +1,13 @@
+amends "https://sake92.github.io/deder/config/DederProject.pkl"
+
+local const server = new ScalaModule {
+  scalaVersion = "3.7.1"
+  id = "server"
+  deps {
+    "ba.sake::sharaf-undertow:0.13.0"
+  }
+}
+
+modules {
+  server
+}

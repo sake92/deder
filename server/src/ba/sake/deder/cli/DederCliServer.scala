@@ -9,10 +9,11 @@ import java.nio.charset.StandardCharsets
 import java.nio.ByteBuffer
 import java.util.concurrent.{BlockingQueue, LinkedBlockingQueue}
 import scala.util.control.NonFatal
+import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.{*, given}
 import ba.sake.deder.*
 
-class DederCliServer(projectState: DederProjectState) {
+class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
   def start(): Unit = {
 
@@ -34,7 +35,7 @@ class DederCliServer(projectState: DederProjectState) {
         val clientChannel = serverChannel.accept()
         clientId += 1
         val currentClientId = clientId
-        println(s"Client #$currentClientId connected")
+        logger.info(s"Client #$currentClientId connected")
         val serverMessages = new LinkedBlockingQueue[CliServerMessage]()
         val clientReadThread = new Thread(
           () => clientRead(clientChannel, currentClientId, serverMessages),
@@ -49,7 +50,7 @@ class DederCliServer(projectState: DederProjectState) {
         // no join, just let them run
       }
     } finally {
-      println("Shutting down CLI server...")
+      logger.info("Shutting down CLI server...")
       serverChannel.close()
       Files.deleteIfExists(socketPath.toNIO)
     }
@@ -183,7 +184,7 @@ class DederCliServer(projectState: DederProjectState) {
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
-            // println(s"Running $cliOptions")
+            logger.debug(s"Executing $cliOptions")
             val notificationCallback: ServerNotification => Unit = {
               case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
               // skip
@@ -221,7 +222,7 @@ class DederCliServer(projectState: DederProjectState) {
             }
         }
       case _: CliClientMessage.Shutdown =>
-        // println(s"Client $clientId requested server shutdown.")
+        logger.info(s"Client $clientId requested server shutdown.")
         serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
         Thread.sleep(100) // let the message be sent
         projectState.shutdown()
@@ -243,7 +244,7 @@ class DederCliServer(projectState: DederProjectState) {
     } catch {
       case e: IOException => // all good, client disconnected..
     } finally {
-      println(s"Client ${clientId} disconnected... Bye!")
+      logger.info(s"Client ${clientId} disconnected... Bye!")
       clientChannel.close()
       projectState.removeWatchedTasks(clientId)
     }

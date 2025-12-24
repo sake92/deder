@@ -97,20 +97,19 @@ public class Main {
 		ensureJavaInstalled();
 		var props = new Properties();
 		var propFileName = Paths.get(".deder/server.properties");
-		var serverVersion = "early-access";
-		var serverLocalPath = "";
 		if (Files.exists(propFileName) && Files.isRegularFile(propFileName)) {
 			try (FileInputStream inputStream = new FileInputStream(propFileName.toFile())) {
 				props.load(inputStream);
-				serverVersion = props.getProperty("version", "early-access");
-				serverLocalPath = props.getProperty("localPath", "");
 			}
 		}
+		var serverVersion = props.getProperty("version", "early-access");
+		var serverLocalPath = props.getProperty("localPath", "");
 		if (serverLocalPath != null && !serverLocalPath.isBlank()) {
 			// handy for development, use local server build
 			Files.copy(Path.of(serverLocalPath), Path.of(".deder/server.jar"), StandardCopyOption.REPLACE_EXISTING);
 		} else {
-			// TODO figure out server.jar current running version and avoid re-downloading if same version
+			// TODO figure out server.jar current running version and avoid re-downloading
+			// if same version
 			download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
 					Path.of(".deder/server.jar"));
 		}

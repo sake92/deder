@@ -4,21 +4,23 @@ import java.io.File
 import java.util.UUID
 import java.util.concurrent.*
 import scala.jdk.CollectionConverters.*
+import com.typesafe.scalalogging.StrictLogging
 import ch.epfl.scala.bsp4j
 import ch.epfl.scala.bsp4j.*
 import org.eclipse.lsp4j.jsonrpc.Launcher
+import dependency.ScalaParameters
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.DependencyResolver
-import dependency.ScalaParameters
 import ba.sake.deder.config.DederProject.ModuleType
 
 class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     extends BuildServer,
       JvmBuildServer,
       JavaBuildServer,
-      ScalaBuildServer {
+      ScalaBuildServer,
+      StrictLogging {
 
   var client: BuildClient = null // set by DederBspProxyServer
 
@@ -30,7 +32,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       isCompileTask: Boolean = false
   ) = {
     ServerNotificationsLogger { sn =>
-      // println(s"Notification (originId=$originId , targetId=$targetId, taskId=$taskId): ${sn}")
       sn match {
         case n: ServerNotification.Log =>
         // we have everything in server logs
@@ -118,7 +119,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   override def buildInitialize(params: InitializeBuildParams): CompletableFuture[InitializeBuildResult] = {
-    // println(s"BSP client connected: ${params}")
+    logger.debug(s"BSP client connected: ${params}")
     val supportedLanguages = List("java", "scala")
     val capabilities = new BuildServerCapabilities()
     capabilities.setResourcesProvider(true)
@@ -159,7 +160,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           projectStateData.projectConfig.modules.asScala.map(m => buildTarget(m, projectStateData)).toList
       }
       val result = new WorkspaceBuildTargetsResult(buildTargets.asJava)
-      // println(s"BSP workspaceBuildTargets called, returning: ${result}")
+      logger.debug(s"BSP workspaceBuildTargets called, returning: ${result}")
       result
   }
 
@@ -189,10 +190,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           }
         }
       }
-      /*println(
+      logger.debug(
         s"BSP buildTargetSources called for ${params.getTargets.asScala.map(_.getUri)}," +
           s" returning: ${sourcesItems.toList}"
-      )*/
+      )
       new SourcesResult(sourcesItems.asJava)
     }
 
@@ -251,15 +252,14 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         taskStartParams.setMessage(s"Compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}")
         client.onBuildTaskStart(taskStartParams)
         var allCompileSucceeded = true
-        // println(s"BSP buildTargetCompile called for ${params}")
-        // TODO start task
+        logger.debug(s"BSP buildTargetCompile called for ${params}")
         withLastGoodState { projectStateData =>
           val coreTasks = projectStateData.tasksRegistry.coreTasks
           params.getTargets.asScala.foreach { targetId =>
             val moduleId = targetId.moduleId
             val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
             subtaskId.setParents(List(taskId.getId()).asJava)
-            // println(s"BSP compiling subtaskId ${subtaskId}")
+            logger.debug(s"BSP buildTargetCompile subtaskId ${subtaskId}")
             val serverNotificationsLogger = makeServerNotificationsLogger(
               originId = Option(params.getOriginId),
               targetId = Some(targetId),
@@ -286,7 +286,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           s"Finished compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}"
         )
         client.onBuildTaskFinish(taskFinishParams)
-        // println(s"BSP buildTargetCompile called for ${targetIds}, returning status: ${status}")
         val compileResult = new CompileResult(status)
         compileResult.setOriginId(params.getOriginId)
         compileResult
@@ -339,10 +338,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         DependencyModulesItem(targetId, depItems.asJava)
       }
     }
-    /*println(
+    logger.debug(
       s"BSP buildTargetDependencyModules called for ${params.getTargets.asScala.map(_.getUri)}," +
         s" returning: ${items.toList}"
-    )*/
+    )
     DependencyModulesResult(items.asJava)
   }
 
@@ -361,7 +360,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val depSources = fetchRes.getDependencies.asScala.map { dep =>
           dep.withClassifier("sources").withType("jar").withConfiguration("sources")
         }
-        // println(s"Fetching sources for dependencies: ${depSources.map(_.toString).mkString(", ")}")
+        logger.debug(s"Fetching sources for dependencies: ${depSources.map(_.toString).mkString(", ")}")
         val sourceArtifactFiles = DependencyResolver
           .doFetch(depSources.toSeq)
           .getArtifacts
@@ -445,7 +444,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     }
     val result = ScalaMainClassesResult(items.asJava)
     result.setOriginId(params.getOriginId)
-    // println(s"BSP buildTargetScalaMainClasses called, returning: ${result}")
+    logger.debug(s"BSP buildTargetScalaMainClasses called, returning: ${result}")
     result
   }
 
@@ -559,7 +558,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       }
     }
     val res = JvmRunEnvironmentResult(items.asJava)
-    // println(s"BSP buildTargetJvmRunEnvironment called, returning: ${res}")
+    logger.debug(s"BSP buildTargetJvmRunEnvironment called, returning: ${res}")
     res
   }
 
@@ -597,20 +596,20 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       }
     }
     val res = JvmTestEnvironmentResult(items.asJava)
-    // println(s"BSP buildTargetJvmTestEnvironment called, returning: ${res}")
+    logger.debug(s"BSP buildTargetJvmTestEnvironment called, returning: ${res}")
     res
   }
 
   override def buildTargetRun(params: RunParams): CompletableFuture[RunResult] = {
     // TODO
-    // println(s"BSP buildTargetRun called ${params}")
+    logger.debug(s"BSP buildTargetRun called ${params}")
     CompletableFuture.failedFuture(new NotImplementedError("buildTargetRun is not supported in Deder BSP server"))
   }
 
   override def buildTargetTest(params: TestParams): CompletableFuture[TestResult] = {
     // TODO
-    // println(s"BSP buildTargetTest called ${params}")
-    CompletableFuture.failedFuture(new NotImplementedError("buildTargetRun is not supported in Deder BSP server"))
+    logger.debug(s"BSP buildTargetTest called ${params}")
+    CompletableFuture.failedFuture(new NotImplementedError("buildTargetTest is not supported in Deder BSP server"))
   }
 
   override def debugSessionStart(params: DebugSessionParams): CompletableFuture[DebugSessionAddress] =
@@ -620,7 +619,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def onRunReadStdin(params: ReadParams): Unit = {
     // TODO
-    // println(s"BSP onRunReadStdin called ${params}")
+    logger.debug(s"BSP onRunReadStdin called ${params}")
     throw new NotImplementedError("buildTargetRun is not supported in Deder BSP server")
   }
 

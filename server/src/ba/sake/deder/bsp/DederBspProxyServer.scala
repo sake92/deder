@@ -7,10 +7,11 @@ import java.nio.file.{Files, Path, Paths}
 import java.nio.channels.Channels
 import org.eclipse.lsp4j.jsonrpc.Launcher
 import ch.epfl.scala.bsp4j._
+import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.DederProjectState
 import ba.sake.deder.DederGlobals
 
-class DederBspProxyServer(projectState: DederProjectState) {
+class DederBspProxyServer(projectState: DederProjectState) extends StrictLogging {
 
   def start(): Unit = {
     val relativeSocketPath = ".deder/server-bsp.sock"
@@ -44,7 +45,7 @@ class DederBspProxyServer(projectState: DederProjectState) {
     } finally {
       serverChannel.close()
       Files.deleteIfExists(socketPath.toNIO)
-      println("BSP proxy server shut down")
+      logger.info("BSP proxy server shut down")
     }
   }
 

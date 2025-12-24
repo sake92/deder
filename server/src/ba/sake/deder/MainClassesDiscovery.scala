@@ -4,15 +4,16 @@ import java.io.File
 import scala.jdk.CollectionConverters._
 import scala.util.Using
 import io.github.classgraph.ClassGraph
+import com.typesafe.scalalogging.StrictLogging
 
 // stolen from mill
 // https://github.com/com-lihaoyi/mill/blob/1.1.0-RC3/libs/javalib/classgraph-worker/src/mill/javalib/classgraph/impl/ClassgraphWorkerImpl.scala
-object MainClassesDiscovery {
+object MainClassesDiscovery extends StrictLogging {
 
   def discover(classpath: Seq[os.Path]): Seq[String] = {
 
     val cp = classpath.map(_.toNIO.toString()).mkString(File.pathSeparator)
-   // println(s"Scanning for mainclasses: ${cp}")
+    logger.debug(s"Scanning for mainclasses: ${cp}")
 
     val mainClasses = Using.resource(
       new ClassGraph()
@@ -35,7 +36,7 @@ object MainClassesDiscovery {
         .getNames()
     }
 
-   //println(s"Found main classes: ${mainClasses}")
+    logger.debug(s"Found main classes: ${mainClasses}")
     mainClasses.asScala.toList
   }
 

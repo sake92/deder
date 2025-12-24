@@ -6,6 +6,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import dependency.parser.DependencyParser
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
+import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.zinc.{DederZincLogger, ZincCompiler}
 import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, ScalaModule, ScalaTestModule}
@@ -14,7 +15,7 @@ import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.testing.*
 
-class CoreTasks() {
+class CoreTasks() extends StrictLogging {
 
   private def makeZincCompiler(scalaVersion: String) = {
     val dep =
@@ -383,7 +384,7 @@ class CoreTasks() {
       val (runClasspath, mainClass) = ctx.depResults
       val cp = runClasspath.map(_.toString)
       val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), mainClass) ++ ctx.args
-      // println(s"Running command: " + cmd)
+      logger.debug(s"Client should run command: ${cmd}")
       ctx.notifications.add(ServerNotification.RunSubprocess(cmd))
       cmd
     }

@@ -9,14 +9,15 @@ import scala.util.control.NonFatal
 import scala.compiletime.uninitialized
 import scala.jdk.CollectionConverters.*
 import org.typelevel.jawn.ast.JValue
+import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.toJson
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
-import org.checkerframework.checker.units.qual.s
 
-class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorService, onShutdown: () => Unit) {
+class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorService, onShutdown: () => Unit)
+    extends StrictLogging {
 
   private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)
 
@@ -203,13 +204,13 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
             val now = Instant.now()
             val inactiveDuration = Duration.between(lastStarted, now)
             if inactiveDuration.compareTo(maxInactiveDuration) > 0 then {
-              println(s"No requests in flight for ${inactiveDuration.toMinutes} minutes, shutting down server.")
+              logger.info(s"No requests in flight for ${inactiveDuration.toMinutes} minutes, shutting down server.")
               shutdown()
             }
           }
         } catch {
           case NonFatal(e) =>
-            println(s"Error in inactive shutdown checker: ${e.getMessage}")
+            logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
         }
       },
       1,
@@ -220,7 +221,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
 
   def triggerFileWatchedTasks(changedPaths: Set[os.Path]): Unit = {
     watchedTasks.foreach { watchedTask =>
-      println(
+      logger.debug(
         s"Checking if watched task is affected: ${watchedTask.taskInstance} by ${watchedTask.affectingConfigValueTasks}"
       )
       // the watched task itself may be a config value task!
@@ -273,7 +274,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
 
   def triggerConfigWatchedTasks(): Unit = {
     watchedTasks.foreach { watchedTask =>
-      println(
+      logger.debug(
         s"Checking if watched task is affected: ${watchedTask.taskInstance} by ${watchedTask.affectingConfigValueTasks}"
       )
       // the watched task itself may be a config value task!
@@ -284,7 +285,6 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
         case _                     => Set.empty
       }
       val taskInstancesToCheck = watchedTaskAffected ++ watchedTask.affectingConfigValueTasks
-      println(s"Checking if any of tasks changed: ${taskInstancesToCheck}")
       val affected = taskInstancesToCheck.exists { taskInstance =>
         val (_, changed) = taskInstance.task match {
           case configValueTask: ConfigValueTask[?] =>
@@ -299,8 +299,8 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
         }
         changed
       }
-      println(s"Affected: ${affected}")
       if affected then {
+        logger.debug(s"Deps watched task ${watchedTask.taskInstance.id} have changed, re-executing...")
         executeCLI(
           watchedTask.clientId,
           Seq(watchedTask.taskInstance.moduleId),
@@ -320,7 +320,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
   }
 
   def removeWatchedTasks(clientId: Int): Unit = {
-    println(s"Removing watched tasks for client ${clientId}")
+    logger.debug(s"Removing watched tasks for client ${clientId}")
     watchedTasks = watchedTasks.filterNot(_.clientId == clientId)
   }
 

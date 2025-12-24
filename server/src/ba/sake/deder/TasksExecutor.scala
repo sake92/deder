@@ -1,22 +1,22 @@
 package ba.sake.deder
 
-import scala.jdk.CollectionConverters.*
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
-import ba.sake.deder.config.DederProject
-import ba.sake.deder.config.DederProject.DederModule
-import org.jgrapht.graph.{DefaultEdge, SimpleDirectedGraph}
-
 import java.util
 import java.util.Collections
 import java.util.concurrent.{Callable, CopyOnWriteArrayList, ExecutorService}
 import scala.util.control.NonFatal
+import scala.jdk.CollectionConverters.*
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import org.jgrapht.graph.{DefaultEdge, SimpleDirectedGraph}
+import com.typesafe.scalalogging.StrictLogging
+import ba.sake.deder.config.DederProject
+import ba.sake.deder.config.DederProject.DederModule
 
 class TasksExecutor(
     projectConfig: DederProject,
     modulesGraph: SimpleDirectedGraph[DederModule, DefaultEdge],
     tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge],
     tasksExecutorService: ExecutorService
-) {
+) extends StrictLogging {
 
   def execute(
       stages: Seq[Seq[TaskInstance]],
@@ -76,19 +76,20 @@ class TasksExecutor(
             taskInstance.id -> taskRes
           } catch {
             case NonFatal(e) =>
-              println(s"Error during execution of task ${taskInstance.id}: ${e.getMessage}")
+              logger.error(s"Error during execution of task ${taskInstance.id}", e)
               throw e
           }
       }
       val futures = taskExecutions.map(tasksExecutorService.submit)
-      val results = try {
-        futures.map(f => f.get())
-      } catch {
-        case NonFatal(e) =>
-          // if one task fails, cancel all other tasks in this stage
-          futures.foreach(_.cancel(true))
-          throw e
-      }
+      val results =
+        try {
+          futures.map(f => f.get())
+        } catch {
+          case NonFatal(e) =>
+            // if one task fails, cancel all other tasks in this stage
+            futures.foreach(_.cancel(true))
+            throw e
+        }
       taskResults ++= results
     }
     finalTaskResult

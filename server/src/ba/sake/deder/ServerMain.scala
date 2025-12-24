@@ -4,16 +4,19 @@ import java.io.RandomAccessFile
 import java.nio.channels.FileLock
 import java.nio.channels.OverlappingFileLockException
 import java.util.concurrent.Executors
+import java.{util => ju}
+import scala.util.control.NonFatal
 import scala.util.Properties
 import scala.util.Using
+import com.typesafe.scalalogging.StrictLogging
 import mainargs.*
+import org.slf4j.LoggerFactory
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
-import scala.caps.cap
-import scala.util.control.NonFatal
-import java.{util => ju}
 
-object ServerMain {
+object ServerMain extends StrictLogging {
 
   def main(args: Array[String]): Unit = Parser(this).runOrExit(args)
 
@@ -22,7 +25,7 @@ object ServerMain {
   ): Unit = {
 
     val projectRootDir = rootDir.getOrElse(".")
-    println(s"Deder server starting for project root dir: $projectRootDir")
+    logger.info(s"Deder server starting for project root dir: $projectRootDir")
 
     // 21 because unix sockets locking bug, i'd have to use bytebuffers for 17 and 18.. meh
     if !Properties.isJavaAtLeast(21) then throw DederException("Must run with Java 21+")
@@ -34,20 +37,23 @@ object ServerMain {
 
     val propFile = projectRoot / ".deder/server.properties"
     val props = new ju.Properties()
-    var workerThreads = 10
-    var maxInactiveSeconds = 600
-    var bspEnabled = true
     if (os.exists(propFile) && os.isFile(propFile)) {
       val inputStream = os.read.inputStream(propFile)
       props.load(inputStream)
-      maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "600").toInt
-      workerThreads = props.getProperty("workerThreads", "10").toInt
-      bspEnabled = props.getProperty("bspEnabled", "true").toBoolean
     }
+
+    val logLevel = props.getProperty("logLevel", "INFO").toUpperCase
+    val maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "600").toInt
+    val workerThreads = props.getProperty("workerThreads", "10").toInt
+    val bspEnabled = props.getProperty("bspEnabled", "true").toBoolean
+
+    val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger]
+    rootLogger.setLevel(Level.toLevel(logLevel))
+
     // TODO maybe make it elastic ThreadPool with min/max threads for better memory usage?
     val tasksExecutorService = Executors.newFixedThreadPool(workerThreads)
     val onShutdown = () => {
-      println("Deder server is shutting down...")
+      logger.info("Deder server is shutting down...")
       // TODO cleaner shutdown of threads
       tasksExecutorService.shutdownNow()
       sys.exit(0)
@@ -64,22 +70,23 @@ object ServerMain {
       bspProxyServerThread.start()
     }
 
-    println("Deder server started.")
+    logger.info("Deder server started.")
 
     os.watch.watch(
       roots = Seq(projectRoot),
       onEvent = paths =>
         try {
           if paths.exists(isServerConfigFile) then
-            println(
-              s"Server configuration file changed: ${paths}, you need to restart the server with 'deder restart'!"
+            logger.debug(
+              s"Server configuration file changed: ${paths}, you need to shutdown the server with 'deder shutdown' and start it again!"
             )
-            // TODO implement restart in client
+            // TODO maybe implement restart in client ?
+            // or even in server, but that is trickier..
           else if paths.exists(isProjectConfigFile) then
-            println(s"Configuration file changed: ${paths}, reloading project...")
+            logger.debug(s"Configuration file changed: ${paths}, reloading project...")
             projectState.reloadProject()
           else if paths.exists(isTaskTriggerCandidate) then
-            println(s"Source files changed: ${paths}, triggering tasks...")
+            logger.debug(s"Source files changed: ${paths}, triggering tasks...")
             projectState.triggerFileWatchedTasks(paths)
         } catch {
           case NonFatal(_) =>
@@ -94,7 +101,7 @@ object ServerMain {
     val lockFileHandle = new RandomAccessFile(serverLockFile.toIO, "rw")
     val fileLock = lockFileHandle.getChannel.tryLock()
     if fileLock == null then {
-      println("ERROR: Could not acquire server lock - another server instance is already running for this project")
+      logger.error("ERROR: Could not acquire server lock - another server process is already running for this project")
       lockFileHandle.close()
       sys.exit(1)
     }

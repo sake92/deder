@@ -24,6 +24,7 @@ import xsbti.compile.{
   PreviousResult,
   Setup
 }
+import com.typesafe.scalalogging.StrictLogging
 import sbt.internal.inc.ScalaInstance
 import ba.sake.deder.ServerNotificationsLogger
 import ba.sake.deder.ServerNotification
@@ -33,7 +34,7 @@ object ZincCompiler {
     new ZincCompiler(compilerBridgeJar)
 }
 
-class ZincCompiler(compilerBridgeJar: os.Path) {
+class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
 
   private val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
 
@@ -68,22 +69,6 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       (compilerJars ++ scalaLibraryJars).map(_.toNIO.toUri.toURL).toArray,
       parentClassloader
     )
-    /*
-    println(
-      s"""Zinc compile:
-        |compilerBridgeJar = $compilerBridgeJar
-        |
-        |scalacOptions = $scalacOptions
-        |
-        |javacOptions = $javacOptions
-        |
-        |compileClasspath = ${compileClasspath.mkString("\n")}
-        |
-        |compilerJars = ${compilerJars.mkString("\n")}
-        |
-        |scalaLibraryJars = ${scalaLibraryJars.mkString("\n")}
-        |""".stripMargin
-    )*/
 
     val scalaInstance = new ScalaInstance(
       version = scalaVersion,
@@ -144,8 +129,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) {
       if !newResult.hasModified() then notifications.add(ServerNotification.CompileFinished(moduleId, 0, 0))
     } catch {
       case e: xsbti.CompileFailed =>
-        // println("Noooooooooooooooooooooooooooooooooo")
-        // e.printStackTrace()
+        logger.debug("Compile failed", e)
         throw e
     }
   }

@@ -34,7 +34,6 @@ class TasksResolver(
     // make Tasks graph
     allModules.map { module =>
       val taskInstances = tasksRegistry.resolve(module.`type`).map(t => TaskInstance(module, t))
-      // println(taskInstances)
       module.id -> taskInstances
     }.toMap
   }
