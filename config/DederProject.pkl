@@ -46,6 +46,9 @@ class JavaModule extends DederModule {
   javacOptions: Listing<String> = new Listing {}
   mainClass: String? = null
   deps: Listing<String> = new Listing {}
+  annotationProcessorsDeps: Listing<String> = new Listing {}
+  semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default
+  javaSemanticdbVersion: String = "0.11.1"
 }
 
 class ScalaModule extends DederModule {
@@ -56,6 +59,11 @@ class ScalaModule extends DederModule {
   scalacOptions: Listing<String> = new Listing {}
   mainClass: String? = null
   deps: Listing<String> = new Listing {}
+  annotationProcessorDeps: Listing<String> = new Listing {} // for java
+  compilerPluginDeps: Listing<String> = new Listing {} // for scala
+  semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default
+  javaSemanticdbVersion: String = "0.11.1"
+  scalaSemanticdbVersion: String = "4.13.9"
 }
 
 class ScalaTestModule extends DederModule {
@@ -65,4 +73,14 @@ class ScalaTestModule extends DederModule {
   javacOptions: Listing<String> = new Listing {}
   scalacOptions: Listing<String> = new Listing {}
   deps: Listing<String> = new Listing {}
+  testFrameworks: Listing<String> = new Listing {
+    "com.novocode.junit.JUnitFramework"
+    "com.github.sbt.junit.jupiter.api.JupiterFramework"
+    "org.scalatest.tools.Framework"
+    "org.specs2.runner.Specs2Framework"
+    "munit.Framework"
+    "utest.runner.Framework"
+    "zio.test.sbt.ZTestFramework"
+    "weaver.framework.CatsEffect"
+  }
 }

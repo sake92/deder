@@ -1,4 +1,7 @@
-amends "https://sake92.github.io/deder/config/DederProject.pkl"
+
+amends "../../config/DederProject.pkl"
+
+//amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
 local const server = new ScalaModule {
   scalaVersion = "3.7.1"

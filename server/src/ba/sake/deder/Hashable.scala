@@ -19,6 +19,11 @@ object Hashable {
     def hashStr(value: String): String = HashUtils.hashStr(value)
   }
 
+  given Hashable[Boolean] with {
+    def hashStr(value: Boolean): String =
+      HashUtils.hashStr(ByteBuffer.allocate(1).put((if value then 1 else 0).toByte).array())
+  }
+
   given Hashable[os.Path] with {
     // TODO add file path into hash
     def hashStr(value: os.Path): String = {

@@ -187,35 +187,76 @@ class CoreTasks() extends StrictLogging {
       (otherTransitiveClassesDirs ++ depsJars).reverse.distinct.reverse
     }
 
-  // TODO make configurable
+  val semanticdbEnabledTask = ConfigValueTask[Boolean](
+    name = "semanticdbEnabled",
+    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
+    execute = { ctx =>
+      ctx.module match {
+        case m: JavaModule  => m.semanticdbEnabled
+        case m: ScalaModule => m.semanticdbEnabled
+        case _              => false
+      }
+    }
+  )
+
+  val javaSemanticdbVersionTask = ConfigValueTask[String](
+    name = "javaSemanticdbVersion",
+    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.JAVA),
+    execute = { ctx =>
+      ctx.module match {
+        case m: JavaModule  => m.javaSemanticdbVersion
+        case m: ScalaModule => m.javaSemanticdbVersion
+        case _              => "0.11.1"
+      }
+    }
+  )
+
+  val scalaSemanticdbVersionTask = ConfigValueTask[String](
+    name = "scalaSemanticdbVersion",
+    supportedModuleTypes = Set(ModuleType.SCALA),
+    execute = { ctx =>
+      ctx.module match {
+        case m: ScalaModule => m.scalaSemanticdbVersion
+        case _              => "4.13.9"
+      }
+    }
+  )
+
   val javacAnnotationProcessorsTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "javacAnnotationProcessors",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA)
     )
     .dependsOn(scalaVersionTask)
+    .dependsOn(semanticdbEnabledTask)
+    .dependsOn(javaSemanticdbVersionTask)
     .build { ctx =>
-      val scalaVersion = ctx.depResults._1
+      val (scalaVersion, semanticdbEnabled, javaSemanticdbVersion) = ctx.depResults
       val processorJars = DependencyResolver.fetchFiles(
-        Seq(Dependency.make("com.sourcegraph:semanticdb-javac:0.11.1", scalaVersion)),
+        Option
+          .when(semanticdbEnabled)(
+            Dependency.make(s"com.sourcegraph:semanticdb-javac:${javaSemanticdbVersion}", scalaVersion)
+          )
+          .toSeq,
         Some(ctx.notifications)
       )
       processorJars
     }
 
-  // TODO make configurable
   val scalacPluginsTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "scalacPlugins",
       supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.JAVA)
     )
     .dependsOn(scalaVersionTask)
+    .dependsOn(semanticdbEnabledTask)
+    .dependsOn(scalaSemanticdbVersionTask)
     .build { ctx =>
-      val scalaVersion = ctx.depResults._1
-      // TODO make configurable on/off + version
+      val (scalaVersion, semanticdbEnabled, scalaSemanticdbVersion) = ctx.depResults
+      println(s"SemanticDB enabled on ${ctx.module.id}: ${semanticdbEnabled}")
       val semanticDbDeps =
         if scalaVersion.startsWith("3.") then Seq.empty
-        else Seq("org.scalameta:::semanticdb-scalac:4.13.9")
+        else Option.when(semanticdbEnabled)(s"org.scalameta:::semanticdb-scalac:${scalaSemanticdbVersion}").toSeq
       val pluginJars = DependencyResolver.fetchFiles(
         semanticDbDeps.map(d => Dependency.make(d, scalaVersion)),
         Some(ctx.notifications)
@@ -237,6 +278,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(classesDirTask)
     .dependsOn(scalacPluginsTask)
     .dependsOn(javacAnnotationProcessorsTask)
+    .dependsOn(semanticdbEnabledTask)
     .build { ctx =>
       val (
         sourceDirs,
@@ -246,7 +288,8 @@ class CoreTasks() extends StrictLogging {
         compileClasspath,
         classesDir,
         scalacPlugins,
-        javacAnnotationProcessors
+        javacAnnotationProcessors,
+        semanticdbEnabled
       ) = ctx.depResults
 
       val sourceFiles = sourceDirs
@@ -278,16 +321,19 @@ class CoreTasks() extends StrictLogging {
       val finalJavacOptions = javacOptions ++
         Seq(
           "-processorpath",
-          javacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator),
+          javacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator)
+        ) ++ Option.when(semanticdbEnabled)(
           s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir}"
         )
       val semanticDbScalacOpts =
-        if scalaVersion.startsWith("3.") then
-          Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}") ++
-            scalacPlugins.map(p => s"-Xplugin:${p.toString}")
-        else
-          Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
-            scalacPlugins.map(p => s"-Xplugin:${p.toString}")
+        if semanticdbEnabled then
+          if scalaVersion.startsWith("3.") then
+            Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}") ++
+              scalacPlugins.map(p => s"-Xplugin:${p.toString}")
+          else
+            Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
+              scalacPlugins.map(p => s"-Xplugin:${p.toString}")
+        else Seq.empty
 
       val finalScalacOptions = scalacOptions ++ semanticDbScalacOpts
       getZincCompiler(scalaVersion).compile(
@@ -444,6 +490,9 @@ class CoreTasks() extends StrictLogging {
     scalaVersionTask,
     resourcesTask,
     javacOptionsTask,
+    semanticdbEnabledTask,
+    javaSemanticdbVersionTask,
+    scalaSemanticdbVersionTask,
     javacAnnotationProcessorsTask,
     scalacOptionsTask,
     scalacPluginsTask,
