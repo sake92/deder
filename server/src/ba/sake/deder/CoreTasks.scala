@@ -473,8 +473,8 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(compileTask)
     .dependsOn(runClasspathTask)
     .build { ctx =>
-      val (classesDir, classpath) = ctx.depResults
-      val testClasspath = Seq(classesDir.absPath) ++ classpath
+      val (classesDir, runClasspath) = ctx.depResults
+      val testClasspath = (Seq(classesDir.absPath) ++ runClasspath).reverse.distinct.reverse
       val urls = testClasspath.map(_.toURI.toURL).toArray
       val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
       val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
@@ -496,7 +496,7 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(compileTask)
     .dependsOn(runClasspathTask)
-    // TODO testClassesTask
+    // cant reuse testClassesTask coz Framework is not Json-able...
     .build { ctx =>
       val (classesDir, runClasspath) = ctx.depResults
       val testClasspath = (Seq(classesDir.absPath) ++ runClasspath).reverse.distinct.reverse

@@ -61,7 +61,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             val params = TaskProgressParams(taskId.orNull)
             params.setOriginId(originId.orNull)
             params.setEventTime(System.currentTimeMillis())
-            params.setDataKind("compile-progress") // TODO just used for compile now..
+            params.setDataKind("compile-progress")
             params.setData(new CompileTask(targetId.orNull))
             params.setProgress(tp.progress)
             params.setTotal(tp.total)

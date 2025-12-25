@@ -1,6 +1,6 @@
 
 ## Config
-- host PKL files on gh pages
+
 
 ## Tests
 
@@ -10,6 +10,8 @@
 
 ## CLI
 - autocomplete
+- --mermaid diagrams
+    - modules as subgraphs https://mermaid.js.org/syntax/flowchart.html#subgraphs
 
 ## Misc
 
@@ -55,7 +57,9 @@ Locally would be interesting to have a dashboard with nice overview:
 
 ## Plugins
 
-https://github.com/pf4j/pf4j
+https://github.com/pf4j/pf4j ?
+
+- maybe just use a simple ServiceLoader with start() + configure(): Seq[Task[?]] + stop()
 
 - just give it CoreTasks so it can make deps
 - add `runsBefore` so that graph can be made properly

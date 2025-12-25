@@ -27,6 +27,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
   private val configParser = ConfigParser()
   private val configFile = DederGlobals.projectRootDir / "deder.pkl"
 
+  // TODO atomicref?
   @volatile var current: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
   // used for BSP
   @volatile var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
