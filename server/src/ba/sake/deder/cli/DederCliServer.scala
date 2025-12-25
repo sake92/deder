@@ -67,8 +67,47 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
     var reader =
       new BufferedReader(new InputStreamReader(Channels.newInputStream(clientChannel), StandardCharsets.UTF_8), 1)
     var messageJson: String = reader.readLine()
-    val message = messageJson.parseJson[CliClientMessage]
+    try {
+      val message =
+        try messageJson.parseJson[CliClientMessage]
+        catch {
+          case e: TupsonException =>
+            serverMessages.put(CliServerMessage.Log(s"Failed to parse client message: $messageJson", LogLevel.ERROR))
+            CliClientMessage.Help(Seq.empty)
+        }
+      handleClientMessage(clientId, message, serverMessages)
+    } catch {
+      case NonFatal(e) =>
+        logger.error(s"Error handling client $clientId message: $messageJson", e)
+        serverMessages.put(CliServerMessage.Log(s"Error handling client message: ${e.getMessage}", LogLevel.ERROR))
+        serverMessages.put(CliServerMessage.Exit(1))
+    }
+  }
+
+  private def handleClientMessage(
+      clientId: Int,
+      message: CliClientMessage,
+      serverMessages: BlockingQueue[CliServerMessage]
+  ): Unit = {
     message match {
+      case m: CliClientMessage.Help =>
+        // TODO print help for specific command
+        val helpText =
+          """Deder Build Tool Help:
+            |
+            |Available commands:
+            |  version                 Show server version
+            |  modules [options]       List modules
+            |  tasks [options]         List tasks
+            |  plan [options]          Show execution plan for a task
+            |  exec [options]          Execute a task
+            |  clean [options]         Clean modules
+            |  shutdown                Shutdown the server
+            |
+            |Use help <command> with each command for more details.
+            |""".stripMargin
+        serverMessages.put(CliServerMessage.Output(helpText))
+        serverMessages.put(CliServerMessage.Exit(0))
       case m: CliClientMessage.Version =>
         serverMessages.put(CliServerMessage.Output(s"Server version: 0.0.1"))
         serverMessages.put(CliServerMessage.Exit(0))
@@ -252,6 +291,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 }
 
 enum CliClientMessage derives JsonRW {
+  case Help(args: Seq[String])
   case Version()
   case Modules(args: Seq[String])
   case Tasks(args: Seq[String])

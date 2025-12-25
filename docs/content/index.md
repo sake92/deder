@@ -21,6 +21,17 @@ See [examples/multi](examples/multi/) for a working example project.
 ## Example commands
 
 ```shell
+################ basic commands
+# prints help
+deder
+
+# prints version
+deder version
+
+# shutdown server
+deder shutdown
+
+
 ################ explore the build
 # list modules
 # supports flags: --json, --ascii, --dot
@@ -39,21 +50,21 @@ deder plan -m common -t compileClasspath
 
 ################ run tasks
 # by default executes compile on all modules
-deder
+deder exec
 
 # execute compile explicitly, on all modules
-deder -t compile
+deder exec -t compile
 
 # execute run explicitly, on uber module
-deder -t run -m uber
+deder exec -t run -m uber
 
 # execute run in watch mode
-deder -t run -m frontend --watch
+deder exec -t run -m frontend --watch
 # even in multiple terminals at the same time!!!
-deder -t run -m backend --watch
+deder exec -t run -m backend --watch
 
 # execute test on uber-test module
-deder -t test -m uber-test
+deder exec -t test -m uber-test
 
 
 ################ BSP
@@ -62,14 +73,6 @@ deder bsp install
 
 # start a BSP client for current project
 deder bsp
-
-
-################ Misc
-
-deder version
-
-# shutdown server
-deder shutdown
 
 ```
 

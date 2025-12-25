@@ -4,7 +4,8 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
-@JsonSubTypes({ @JsonSubTypes.Type(value = ClientMessage.Version.class, name = "Version"),
+@JsonSubTypes({ @JsonSubTypes.Type(value = ClientMessage.Help.class, name = "Help"),
+		@JsonSubTypes.Type(value = ClientMessage.Version.class, name = "Version"),
 		@JsonSubTypes.Type(value = ClientMessage.Clean.class, name = "Clean"),
 		@JsonSubTypes.Type(value = ClientMessage.Modules.class, name = "Modules"),
 		@JsonSubTypes.Type(value = ClientMessage.Tasks.class, name = "Tasks"),
@@ -12,6 +13,9 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 		@JsonSubTypes.Type(value = ClientMessage.Plan.class, name = "Plan"),
 		@JsonSubTypes.Type(value = ClientMessage.Shutdown.class, name = "Shutdown") })
 public sealed interface ClientMessage {
+
+	record Help(String[] args) implements ClientMessage {
+	}
 
 	record Version() implements ClientMessage {
 	}

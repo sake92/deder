@@ -96,14 +96,17 @@ public class DederCliClient implements DederClient {
 			case "plan":
 				message = new ClientMessage.Plan(leftoverArgs);
 				break;
+			case "exec":
+				message = new ClientMessage.Exec(leftoverArgs);
+				break;
 			case "shutdown":
 				message = new ClientMessage.Shutdown();
 				break;
 			default:
-				message = new ClientMessage.Exec(args);
+				message = new ClientMessage.Help(args);
 			}
 		} else {
-			message = new ClientMessage.Exec(args);
+			message = new ClientMessage.Help(args);
 		}
 		var messageJson = jsonMapper.writeValueAsString(message);
 		log("Sending message to server: " + messageJson);

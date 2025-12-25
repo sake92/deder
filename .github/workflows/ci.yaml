@@ -29,6 +29,10 @@ jobs:
       - name: Exercise examples/multi
         working-directory: ./examples/multi
         run: |
+          # starts the deder server in the background
+          # and prints help
+          deder
+
           deder version
 
           deder modules
@@ -41,10 +45,10 @@ jobs:
           deder plan -m common -t compile
           deder plan -m uber -t compile --json
 
-          deder -t compile
-          deder -t compile -m common
+          deder exec -t compile
+          deder exec -t compile -m common
 
-          deder -t test -m uber-test
+          deder exec -t test -m uber-test
 
           deder shutdown
 
