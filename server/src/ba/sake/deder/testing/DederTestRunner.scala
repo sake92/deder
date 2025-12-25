@@ -19,7 +19,7 @@ class DederTestRunner(
 
   def run(options: DederTestOptions = DederTestOptions()): DederTestResults = {
     val res = if (tests.isEmpty) {
-      logger.warn("No test frameworks found on classpath")
+      logger.warn("No tests found on the classpath.")
       DederTestResults.empty
     } else {
       logger.info(s"Found ${tests.size} test framework(s): ${tests.map(_._1.name()).mkString(", ")}")

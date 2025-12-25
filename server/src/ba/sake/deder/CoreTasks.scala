@@ -477,9 +477,11 @@ class CoreTasks() extends StrictLogging {
       val testClasspath = Seq(classesDir.absPath) ++ classpath
       val urls = testClasspath.map(_.toURI.toURL).toArray
       val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
+      val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
       val testDiscovery = DederTestDiscovery(
         classLoader = classLoader,
         testClassesDir = classesDir.absPath.toIO,
+        frameworkClassNames = frameworkClassNames,
         logger = DederTestLogger(ctx.notifications, ctx.module.id)
       )
       testDiscovery.discover().map { case (framework, tests) =>
@@ -500,9 +502,11 @@ class CoreTasks() extends StrictLogging {
       val testClasspath = (Seq(classesDir.absPath) ++ runClasspath).reverse.distinct.reverse
       val urls = testClasspath.map(_.toURI.toURL).toArray
       val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
+      val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
       val testDiscovery = DederTestDiscovery(
         classLoader = classLoader,
         testClassesDir = classesDir.absPath.toIO,
+        frameworkClassNames = frameworkClassNames,
         logger = DederTestLogger(ctx.notifications, ctx.module.id)
       )
       val frameworkTests = testDiscovery.discover()

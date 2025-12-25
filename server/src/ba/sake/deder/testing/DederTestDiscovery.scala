@@ -9,16 +9,12 @@ import ba.sake.tupson.JsonRW
 
 case class DiscoveredFrameworkTests(framework: String, testClasses: Seq[String]) derives JsonRW
 
-class DederTestDiscovery(classLoader: ClassLoader, testClassesDir: File, logger: DederTestLogger) {
-
-  // TODO from config
-  private val frameworkClassNames: Seq[String] = Seq(
-    "org.scalatest.tools.Framework",
-    "org.specs2.runner.Specs2Framework",
-    "munit.Framework",
-    "utest.runner.Framework",
-    "zio.test.sbt.ZTestFramework"
-  )
+class DederTestDiscovery(
+    classLoader: ClassLoader,
+    testClassesDir: File,
+    frameworkClassNames: Seq[String],
+    logger: DederTestLogger
+) {
 
   def discover(): Seq[(Framework, Seq[(String, Fingerprint)])] =
     discoverFrameworks().map { framework =>
@@ -27,7 +23,7 @@ class DederTestDiscovery(classLoader: ClassLoader, testClassesDir: File, logger:
     }
 
   private def discoverFrameworks(): Seq[Framework] =
-    frameworkClassNames.flatMap { className =>
+    val frameworks = frameworkClassNames.flatMap { className =>
       try {
         val cls = classLoader.loadClass(className)
         Some(cls.getDeclaredConstructor().newInstance().asInstanceOf[Framework])
@@ -38,6 +34,16 @@ class DederTestDiscovery(classLoader: ClassLoader, testClassesDir: File, logger:
           None
       }
     }
+    if (frameworks.isEmpty) {
+      logger.warn(
+        "No test frameworks found on the classpath. Tried to load the following frameworks: " +
+          frameworkClassNames.mkString(", ")
+      )
+    } else {
+      logger.debug(s"Discovered test frameworks: ${frameworks.map(_.name()).mkString(", ")}")
+    }
+    frameworks
+  end discoverFrameworks
 
   private def discoverTests(framework: Framework): Seq[(String, Fingerprint)] = {
     val fingerprints = framework.fingerprints()
