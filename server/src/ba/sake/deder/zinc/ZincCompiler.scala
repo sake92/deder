@@ -142,7 +142,21 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       if !newResult.hasModified() then notifications.add(ServerNotification.CompileFinished(moduleId, 0, 0))
     } catch {
       case e: xsbti.CompileFailed =>
-        logger.debug("Compile failed", e)
+        val problems = reporter.problems()
+        if problems.isEmpty then {
+          //logger.error(s"Compilation failed but no problems reported by Zinc reporter!")
+          notifications.add(ServerNotification.logError(
+            s"Compilation failed but no diagnostic messages were reported by the compiler. This may indicate a compiler crash or configuration issue.",
+            Some(moduleId)
+          ))
+        } else {
+          val problemsSummary = problems.map(_.message()).mkString("\n")
+          //logger.error(s"Compilation failed: ${problemsSummary}", e)
+          notifications.add(ServerNotification.logError(
+            s"Compilation failed: ${problemsSummary}",
+            Some(moduleId)
+          ))
+        }
         throw e
     }
   }

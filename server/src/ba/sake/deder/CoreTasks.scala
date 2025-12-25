@@ -42,10 +42,8 @@ class CoreTasks() extends StrictLogging {
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       val sources = ctx.module match {
-        case m: ScalaTestModule => m.sources.asScala.toSeq
-        case m: ScalaModule     => m.sources.asScala.toSeq
-        case m: JavaModule      => m.sources.asScala.toSeq
-        case _                  => Seq.empty
+        case m: JavaModule => m.sources.asScala.toSeq
+        case _             => Seq.empty
       }
       sources.map(s => DederPath(os.SubPath(s"${ctx.module.root}/${s}")))
     }
@@ -57,7 +55,7 @@ class CoreTasks() extends StrictLogging {
       name = "generatedSources",
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
-    .build{ ctx => ctx.out }
+    .build { ctx => ctx.out }
 
   /** resource folders */
   val resourcesTask = SourceFilesTask(
@@ -65,10 +63,8 @@ class CoreTasks() extends StrictLogging {
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       val resources = ctx.module match {
-        case m: ScalaTestModule => m.resources.asScala.toSeq
-        case m: ScalaModule     => m.resources.asScala.toSeq
-        case m: JavaModule      => m.resources.asScala.toSeq
-        case _                  => Seq.empty
+        case m: JavaModule => m.resources.asScala.toSeq
+        case _             => Seq.empty
       }
       resources.map(s => DederPath(os.SubPath(s"${ctx.module.root}/${s}")))
     }
@@ -79,22 +75,19 @@ class CoreTasks() extends StrictLogging {
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       ctx.module match {
-        case m: ScalaTestModule => m.javacOptions.asScala.toSeq
-        case m: ScalaModule     => m.javacOptions.asScala.toSeq
-        case m: JavaModule      => m.javacOptions.asScala.toSeq
-        case _                  => Seq.empty
+        case m: JavaModule => m.javacOptions.asScala.toSeq
+        case _             => Seq.empty
       }
     }
   )
 
   val scalacOptionsTask = ConfigValueTask[Seq[String]](
     name = "scalacOptions",
-    supportedModuleTypes = Set(ModuleType.SCALA, ModuleType.SCALA_TEST),
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       ctx.module match {
-        case m: ScalaTestModule => m.scalacOptions.asScala.toSeq
-        case m: ScalaModule     => m.scalacOptions.asScala.toSeq
-        case _                  => Seq.empty
+        case m: ScalaModule => m.scalacOptions.asScala.toSeq
+        case _              => Seq.empty
       }
     }
   )
@@ -104,9 +97,8 @@ class CoreTasks() extends StrictLogging {
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       ctx.module match {
-        case m: ScalaTestModule => m.scalaVersion
-        case m: ScalaModule     => m.scalaVersion
-        case _                  => "2.13.17" // dummy default scala version
+        case m: ScalaModule => m.scalaVersion
+        case _              => "2.13.17" // dummy default scala version
       }
     }
   )
@@ -116,10 +108,8 @@ class CoreTasks() extends StrictLogging {
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       ctx.module match {
-        case m: ScalaTestModule => m.deps.asScala.toSeq
-        case m: ScalaModule     => m.deps.asScala.toSeq
-        case m: JavaModule      => m.deps.asScala.toSeq
-        case _                  => Seq.empty
+        case m: JavaModule => m.deps.asScala.toSeq
+        case _             => Seq.empty
       }
     }
   )
@@ -180,9 +170,9 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(classesDirTask)
     .dependsOn(allClassesDirsTask)
     .build { ctx =>
+      // we feed even this module's classes dir because of javac annotation processing,
+      // it can generate java sources.. and then scala sources can depend on them
       val (scalacOptions, scalaVersion, dependencies, classesDir, allClassesDirs) = ctx.depResults
-      // dirty hack to get class dirs, all except for this module.. :/
-      val otherTransitiveClassesDirs = allClassesDirs.filterNot(_ == classesDir)
       val scalaLibDep =
         if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
         else s"org.scala-lang:scala-library:${scalaVersion}"
@@ -192,36 +182,34 @@ class CoreTasks() extends StrictLogging {
           Some(ctx.notifications)
         )
       // val additionalCompileClasspath = ctx.transitiveResults.flatten.flatten ++ depsJars
-      (otherTransitiveClassesDirs ++ depsJars).reverse.distinct.reverse
+      (allClassesDirs ++ depsJars).reverse.distinct.reverse
     }
 
   val semanticdbEnabledTask = ConfigValueTask[Boolean](
     name = "semanticdbEnabled",
-    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       ctx.module match {
-        case m: ScalaModule => m.semanticdbEnabled
-        case m: JavaModule  => m.semanticdbEnabled
-        case _              => false
+        case m: JavaModule => m.semanticdbEnabled
+        case _             => false
       }
     }
   )
 
   val javaSemanticdbVersionTask = ConfigValueTask[String](
     name = "javaSemanticdbVersion",
-    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       ctx.module match {
-        case m: ScalaModule => m.javaSemanticdbVersion
-        case m: JavaModule  => m.javaSemanticdbVersion
-        case _              => "0.11.1"
+        case m: JavaModule => m.javaSemanticdbVersion
+        case _             => "0.11.1"
       }
     }
   )
 
   val scalaSemanticdbVersionTask = ConfigValueTask[String](
     name = "scalaSemanticdbVersion",
-    supportedModuleTypes = Set(ModuleType.SCALA),
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       ctx.module match {
         case m: ScalaModule => m.scalaSemanticdbVersion
@@ -232,12 +220,11 @@ class CoreTasks() extends StrictLogging {
 
   val javacAnnotationProcessorDepsTask = ConfigValueTask[Seq[String]](
     name = "javacAnnotationProcessorDeps",
-    supportedModuleTypes = Set(ModuleType.SCALA,  ModuleType.JAVA),
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       ctx.module match {
-        case m: ScalaModule => m.javacAnnotationProcessorDeps.asScala.toSeq
-        case m: JavaModule  => m.javacAnnotationProcessorDeps.asScala.toSeq
-        case _              => Seq.empty
+        case m: JavaModule => m.javacAnnotationProcessorDeps.asScala.toSeq
+        case _             => Seq.empty
       }
     }
   )
@@ -264,7 +251,7 @@ class CoreTasks() extends StrictLogging {
 
   val scalacPluginDepsTask = ConfigValueTask[Seq[String]](
     name = "scalacPluginDeps",
-    supportedModuleTypes = Set(ModuleType.SCALA),
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       ctx.module match {
         case m: ScalaModule => m.scalacPluginDeps.asScala.toSeq
@@ -325,7 +312,8 @@ class CoreTasks() extends StrictLogging {
         semanticdbEnabled
       ) = ctx.depResults
 
-      val sourceFiles = sourceDirs.map(_.absPath)
+      val sourceFiles = sourceDirs
+        .map(_.absPath)
         .flatMap { sourceDir =>
           os.walk(
             sourceDir,
@@ -337,7 +325,7 @@ class CoreTasks() extends StrictLogging {
           )
         }
         .filter(os.isFile)
-      
+
       // annotation processors need generated sources dir to exist
       os.makeDir.all(generatedSourcesDir)
 
@@ -355,24 +343,28 @@ class CoreTasks() extends StrictLogging {
       val zincCacheFile = ctx.out / "inc_compile.zip"
       val zincLogger = new DederZincLogger(ctx.notifications, ctx.module.id)
 
-      val finalJavacOptions = javacOptions ++ 
-      Option.when(javacAnnotationProcessors.nonEmpty)(
-        Seq(
-          "-s", generatedSourcesDir.toString,
-          "-processorpath",
-          javacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator)
-        )).toSeq.flatten ++ Option.when(semanticdbEnabled)(
+      val finalJavacOptions = javacOptions ++
+        Option
+          .when(javacAnnotationProcessors.nonEmpty)(
+            Seq(
+              "-s",
+              generatedSourcesDir.toString,
+              "-processorpath",
+              javacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator)
+            )
+          )
+          .toSeq
+          .flatten ++ Option.when(semanticdbEnabled)(
           s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir}"
         )
 
       val semanticDbScalacOpts =
         if semanticdbEnabled then
-          if scalaVersion.startsWith("3.") then
-            Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}")
-          else
-            Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}")
+          if scalaVersion.startsWith("3.") then Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}")
+          else Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}")
         else Seq.empty
-      val finalScalacOptions = scalacOptions ++ scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++ semanticDbScalacOpts
+      val finalScalacOptions =
+        scalacOptions ++ scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++ semanticDbScalacOpts
 
       getZincCompiler(scalaVersion).compile(
         scalaVersion,
@@ -408,7 +400,7 @@ class CoreTasks() extends StrictLogging {
             else s"org.scala-lang:scala-library:${scalaVersion}"
           Seq(Dependency.make(scalaLibDep, scalaVersion))
         case m: JavaModule => Seq.empty
-        case _ => Seq.empty
+        case _             => Seq.empty
       }
       val depsJars = DependencyResolver.fetchFiles(mandatoryDeps ++ dependencies, Some(ctx.notifications))
 

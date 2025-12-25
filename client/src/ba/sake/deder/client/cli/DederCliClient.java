@@ -132,6 +132,7 @@ public class DederCliClient implements DederClient {
 				}
 				subprocessRunningThread = createSubprocessRunningThread(runSubprocess.cmd());
 				subprocessRunningThread.start();
+				// TODO when subprocess ends, exit with its exit code
 			} else if (message instanceof ServerMessage.Exit exit) {
 				if (subprocessRunningThread != null && subprocessRunningThread.isAlive()) {
 					// TODO is this logic sound? :/

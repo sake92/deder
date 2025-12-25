@@ -189,6 +189,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
       }
     } catch {
       case NonFatal(e) =>
+        // send notification about failure to client
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage, Some(moduleId)))
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         throw TaskEvaluationException(s"Error during execution of task '${taskName}': ${e.getMessage}", e)
