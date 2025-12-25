@@ -102,7 +102,14 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
         var jsonValues = Map.empty[String, JValue]
         selectedModuleIds.foreach { moduleId =>
           val taskInstance = state.executionPlanner.getTaskInstance(moduleId, taskName)
-          val (taskRes, _) = executeTask(moduleId, taskInstance.task, args, serverNotificationsLogger, useLastGood)
+          val (taskRes, _) = executeTask(
+            moduleId,
+            taskInstance.task,
+            args,
+            serverNotificationsLogger,
+            watch = startWatch,
+            useLastGood = useLastGood
+          )
           if json then
             val jsonRes = taskInstance.task.rw.write(taskRes)
             jsonValues = jsonValues.updated(moduleId, jsonRes)
@@ -135,7 +142,6 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
           serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
       }
-
   } catch {
     case NonFatal(e) =>
       serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
