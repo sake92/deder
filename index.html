@@ -68,7 +68,18 @@
     <li>put it in <code>PATH</code></li>
    </ol>
    <h2 id="example-commands">Example commands<a href="#example-commands" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <pre>            <code class="language-shell hljs" data-highlighted="yes"><span class="hljs-meta prompt_">#</span><span class="language-bash"><span class="hljs-comment">############### explore the build</span></span>
+   <pre>            <code class="language-shell hljs" data-highlighted="yes"><span class="hljs-meta prompt_">#</span><span class="language-bash"><span class="hljs-comment">############### basic commands</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">prints <span class="hljs-built_in">help</span></span>
+deder
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">prints version</span>
+deder version
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">shutdown server</span>
+deder shutdown
+<span class="hljs-meta prompt_">
+
+#</span><span class="language-bash"><span class="hljs-comment">############### explore the build</span></span>
 <span class="hljs-meta prompt_"># </span><span class="language-bash">list modules</span>
 <span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --ascii, --dot</span>
 deder modules
@@ -86,21 +97,21 @@ deder plan -m common -t compileClasspath
 
 #</span><span class="language-bash"><span class="hljs-comment">############### run tasks</span></span>
 <span class="hljs-meta prompt_"># </span><span class="language-bash">by default executes compile on all modules</span>
-deder
+deder exec
 <span class="hljs-meta prompt_">
 # </span><span class="language-bash">execute compile explicitly, on all modules</span>
-deder -t compile
+deder exec -t compile
 <span class="hljs-meta prompt_">
 # </span><span class="language-bash">execute run explicitly, on uber module</span>
-deder -t run -m uber
+deder exec -t run -m uber
 <span class="hljs-meta prompt_">
 # </span><span class="language-bash">execute run <span class="hljs-keyword">in</span> watch mode</span>
-deder -t run -m frontend --watch
+deder exec -t run -m frontend --watch
 <span class="hljs-meta prompt_"># </span><span class="language-bash">even <span class="hljs-keyword">in</span> multiple terminals at the same <span class="hljs-keyword">time</span>!!!</span>
-deder -t run -m backend --watch
+deder exec -t run -m backend --watch
 <span class="hljs-meta prompt_">
 # </span><span class="language-bash">execute <span class="hljs-built_in">test</span> on uber-test module</span>
-deder -t test -m uber-test
+deder exec -t test -m uber-test
 <span class="hljs-meta prompt_">
 
 #</span><span class="language-bash"><span class="hljs-comment">############### BSP</span></span>
@@ -109,14 +120,6 @@ deder bsp install
 <span class="hljs-meta prompt_">
 # </span><span class="language-bash">start a BSP client <span class="hljs-keyword">for</span> current project</span>
 deder bsp
-<span class="hljs-meta prompt_">
-
-#</span><span class="language-bash"><span class="hljs-comment">############### Misc</span></span>
-
-deder version
-<span class="hljs-meta prompt_">
-# </span><span class="language-bash">shutdown server</span>
-deder shutdown
 
 </code>
           </pre>
