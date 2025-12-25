@@ -75,6 +75,7 @@ case class TaskExecContext[T, Deps <: Tuple](
     depResults: TaskDepResults[Deps],
     transitiveResults: Seq[Seq[T]], // results from dependent modules
     args: Seq[String], // external args, like run args
+    watch: Boolean,
     notifications: ServerNotificationsLogger,
     out: os.Path
 )(using ev: TaskDeps[Deps] =:= true)
@@ -91,6 +92,7 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
       depResults: Seq[TaskResult[?]],
       transitiveResults: Seq[Seq[TaskResult[?]]],
       args: Seq[String],
+      watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger
   ): (res: TaskResult[T], changed: Boolean)
 }
@@ -111,6 +113,7 @@ class TaskImpl[T: JsonRW, Deps <: Tuple](
       depResults: Seq[TaskResult[?]],
       transitiveResults: Seq[Seq[TaskResult[?]]],
       args: Seq[String],
+      watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger
   ): (res: TaskResult[T], changed: Boolean) = {
     serverNotificationsLogger.add(
@@ -126,6 +129,7 @@ class TaskImpl[T: JsonRW, Deps <: Tuple](
         depResultsUnsafe,
         transitiveResultsUnsafe.map(_.map(_.value)),
         args,
+        watch,
         serverNotificationsLogger,
         outDir
       )
@@ -157,6 +161,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
       depResults: Seq[TaskResult[?]],
       transitiveResults: Seq[Seq[TaskResult[?]]],
       args: Seq[String],
+      watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger
   ): (res: TaskResult[T], changed: Boolean) = {
 
@@ -178,6 +183,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
           depResultsUnsafe,
           transitiveResultsUnsafe.map(_.map(_.value)),
           args,
+          watch,
           serverNotificationsLogger,
           outDir
         )

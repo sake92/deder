@@ -26,7 +26,7 @@ enum ServerNotification {
   case CompileFinished(moduleId: String, errors: Int, warnings: Int)
 
   // tell client to run this subprocess
-  case RunSubprocess(cmd: Seq[String])
+  case RunSubprocess(cmd: Seq[String], watch: Boolean)
 
   // tell client to exit
   case RequestFinished(success: Boolean)

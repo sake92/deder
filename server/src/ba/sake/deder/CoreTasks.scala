@@ -461,7 +461,7 @@ class CoreTasks() extends StrictLogging {
       val cp = runClasspath.map(_.toString)
       val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), mainClass) ++ ctx.args
       logger.debug(s"Client should run command: ${cmd}")
-      ctx.notifications.add(ServerNotification.RunSubprocess(cmd))
+      ctx.notifications.add(ServerNotification.RunSubprocess(cmd, ctx.watch))
       cmd
     }
 

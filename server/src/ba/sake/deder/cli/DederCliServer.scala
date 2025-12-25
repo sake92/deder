@@ -264,7 +264,7 @@ enum CliClientMessage derives JsonRW {
 enum CliServerMessage derives JsonRW {
   case Output(text: String)
   case Log(text: String, level: LogLevel)
-  case RunSubprocess(cmd: Seq[String])
+  case RunSubprocess(cmd: Seq[String], watch: Boolean)
   case Exit(exitCode: Int)
 }
 
@@ -290,7 +290,7 @@ object CliServerMessage {
     case cs: ServerNotification.CompileFinished =>
       None
     case rs: ServerNotification.RunSubprocess =>
-      Some(CliServerMessage.RunSubprocess(rs.cmd))
+      Some(CliServerMessage.RunSubprocess(rs.cmd, rs.watch))
     case ServerNotification.RequestFinished(success) =>
       Some(CliServerMessage.Exit(if success then 0 else 1))
   }

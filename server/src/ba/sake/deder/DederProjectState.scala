@@ -147,15 +147,17 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
       task: Task[T, ?],
       args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger,
+      watch: Boolean = false,
       useLastGood: Boolean = false
   ): (res: T, changed: Boolean) =
-    val (resAny, changed) = executeOne(moduleId, task.name, args, serverNotificationsLogger, useLastGood)
+    val (resAny, changed) = executeOne(moduleId, task.name, args, watch, serverNotificationsLogger, useLastGood)
     (resAny.asInstanceOf[T], changed)
 
   def executeOne(
       moduleId: String,
       taskName: String,
       args: Seq[String],
+      watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean = false
   ): (res: Any, changed: Boolean) =
@@ -181,7 +183,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
         taskInstance.lock.lock()
       }
       try {
-        tasksExecutor.execute(tasksExecStages, args, serverNotificationsLogger)
+        tasksExecutor.execute(tasksExecStages, args, watch, serverNotificationsLogger)
       } finally {
         allTaskInstances.reverse.foreach { taskInstance =>
           taskInstance.lock.unlock()
@@ -263,6 +265,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
           watchedTask.taskInstance.moduleId,
           watchedTask.taskInstance.task.name,
           watchedTask.args,
+          true, // tell client we are in watch mode
           watchedTask.serverNotificationsLogger,
           watchedTask.useLastGood
         )

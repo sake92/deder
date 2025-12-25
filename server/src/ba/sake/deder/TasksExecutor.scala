@@ -21,6 +21,7 @@ class TasksExecutor(
   def execute(
       stages: Seq[Seq[TaskInstance]],
       args: Seq[String],
+      watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger
   ): (res: Any, changed: Boolean) = {
     var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
@@ -70,6 +71,7 @@ class TasksExecutor(
                 depResults,
                 transitiveResults,
                 args,
+                watch,
                 serverNotificationsLogger
               )
             finalTaskResult = (taskRes.value, changed) // in last stage, last task's result will be returned

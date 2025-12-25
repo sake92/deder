@@ -113,13 +113,13 @@ public class DederCliClient implements DederClient {
 
 	private void serverRead(InputStream is) throws InterruptedException, IOException {
 		// newline delimited JSON messages
-		Process runningSubprocess = null;
 		var reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
 		String messageJson = null;
-		Thread subprocessRunningThread = null;
-		while ((messageJson = reader.readLine()) != null) {
+		SubprocessRunningThread subprocessRunningThread = null;
+		var running = true;
+		while (running && (messageJson = reader.readLine()) != null) {
 			var message = jsonMapper.readValue(messageJson, ServerMessage.class);
-			//System.out.println("Received message from server: " + messageJson);
+			// System.err.println("Received message from server: " + messageJson);
 			if (message instanceof ServerMessage.Output output) {
 				System.out.println(output.text());
 			} else if (message instanceof ServerMessage.Log log) {
@@ -130,49 +130,24 @@ public class DederCliClient implements DederClient {
 					subprocessRunningThread.interrupt();
 					subprocessRunningThread.join();
 				}
-				subprocessRunningThread = createSubprocessRunningThread(runSubprocess.cmd());
+				subprocessRunningThread = new SubprocessRunningThread(runSubprocess.cmd(), this::log);
 				subprocessRunningThread.start();
-				// TODO when subprocess ends, exit with its exit code
+				if (!runSubprocess.watch()) {
+					subprocessRunningThread.join();
+					running = false;
+					System.exit(subprocessRunningThread.getExitCode());
+				}
+				// else just let it run.. either new message will kill it, or user with CTRL+C
 			} else if (message instanceof ServerMessage.Exit exit) {
 				if (subprocessRunningThread != null && subprocessRunningThread.isAlive()) {
 					// TODO is this logic sound? :/
 					log("Subprocess still running, not exiting...");
 				} else {
+					running = false;
 					System.exit(exit.exitCode()); // TODO cleanup
 				}
 			}
 		}
-	}
-
-	private Thread createSubprocessRunningThread(String[] cmd) {
-		return new Thread(() -> {
-			Process runningSubprocess = null;
-			try {
-				var processBuilder = new ProcessBuilder(cmd);
-				processBuilder.inheritIO();
-				runningSubprocess = processBuilder.start();
-				runningSubprocess.waitFor();
-			} catch (IOException e) {
-				throw new UncheckedIOException(e);
-			} catch (InterruptedException e1) {
-				if (runningSubprocess != null) {
-					log("Killing previous subprocess...");
-					runningSubprocess.destroy();
-					if (runningSubprocess.isAlive()) {
-						try {
-							runningSubprocess.waitFor(5, TimeUnit.SECONDS);
-						} catch (InterruptedException e2) {
-							// ignore
-						} finally {
-							if (runningSubprocess.isAlive()) {
-								log("Forcibly killing previous subprocess...");
-								runningSubprocess.destroyForcibly();
-							}
-						}
-					}
-				}
-			}
-		}, "DederCliSubprocessRunningThread");
 	}
 
 	private void log(String message) {

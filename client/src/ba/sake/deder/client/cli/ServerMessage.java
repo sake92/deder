@@ -18,7 +18,7 @@ public sealed interface ServerMessage {
 	record Log(String text, LogLevel level) implements ServerMessage {
 	}
 
-	record RunSubprocess(String[] cmd) implements ServerMessage {
+	record RunSubprocess(String[] cmd, boolean watch) implements ServerMessage {
 	}
 
 	record Exit(int exitCode) implements ServerMessage {
