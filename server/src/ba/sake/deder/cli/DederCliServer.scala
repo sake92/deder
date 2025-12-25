@@ -67,21 +67,13 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
     var reader =
       new BufferedReader(new InputStreamReader(Channels.newInputStream(clientChannel), StandardCharsets.UTF_8), 1)
     var messageJson: String = reader.readLine()
-    try {
-      val message =
-        try messageJson.parseJson[CliClientMessage]
-        catch {
-          case e: TupsonException =>
-            serverMessages.put(CliServerMessage.Log(s"Failed to parse client message: $messageJson", LogLevel.ERROR))
-            CliClientMessage.Help(Seq.empty)
-        }
-      handleClientMessage(clientId, message, serverMessages)
-    } catch {
-      case NonFatal(e) =>
-        logger.error(s"Error handling client $clientId message: $messageJson", e)
-        serverMessages.put(CliServerMessage.Log(s"Error handling client message: ${e.getMessage}", LogLevel.ERROR))
-        serverMessages.put(CliServerMessage.Exit(1))
-    }
+    val message =
+      try messageJson.parseJson[CliClientMessage]
+      catch {
+        case e: TupsonException =>
+          CliClientMessage.Help(Seq.empty)
+      }
+    handleClientMessage(clientId, message, serverMessages)
   }
 
   private def handleClientMessage(
@@ -89,10 +81,10 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
       message: CliClientMessage,
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
+    println(s"Handling client message: $message")
     message match {
       case m: CliClientMessage.Help =>
-        // TODO print help for specific command
-        val helpText =
+        val defaultHelpText =
           """Deder Build Tool Help:
             |
             |Available commands:
@@ -104,9 +96,42 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             |  clean [options]         Clean modules
             |  shutdown                Shutdown the server
             |
-            |Use help <command> with each command for more details.
+            |Use help -c <command> for more details about each command.
             |""".stripMargin
-        serverMessages.put(CliServerMessage.Output(helpText))
+
+        mainargs.Parser[DederCliHelpOptions].constructEither(m.args) match {
+          case Left(_) =>
+            serverMessages.put(CliServerMessage.Output(defaultHelpText))
+          case Right(cliOptions) =>
+            cliOptions.command match {
+              case "version" =>
+                serverMessages.put(CliServerMessage.Output("Shows the Deder version."))
+              case "modules" =>
+                serverMessages.put(
+                  CliServerMessage.Output(mainargs.Parser[DederCliModulesOptions].helpText())
+                )
+              case "tasks" =>
+                serverMessages.put(
+                  CliServerMessage.Output(mainargs.Parser[DederCliTasksOptions].helpText())
+                )
+              case "plan" =>
+                serverMessages.put(
+                  CliServerMessage.Output(mainargs.Parser[DederCliPlanOptions].helpText())
+                )
+              case "exec" =>
+                serverMessages.put(
+                  CliServerMessage.Output(mainargs.Parser[DederCliExecOptions].helpText())
+                )
+              case "clean" =>
+                serverMessages.put(
+                  CliServerMessage.Output(mainargs.Parser[DederCliCleanOptions].helpText())
+                )
+              case "shutdown" =>
+                serverMessages.put(CliServerMessage.Output("Shuts down the Deder server."))
+              case _ =>
+                serverMessages.put(CliServerMessage.Output(defaultHelpText))
+            }
+        }
         serverMessages.put(CliServerMessage.Exit(0))
       case m: CliClientMessage.Version =>
         serverMessages.put(CliServerMessage.Output(s"Server version: 0.0.1"))

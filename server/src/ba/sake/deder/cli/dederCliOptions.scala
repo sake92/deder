@@ -9,6 +9,12 @@ given TokensReader.Simple[LogLevel]{
 }
 
 @main
+case class DederCliHelpOptions(
+    @arg(doc = "Command to get help for", short = 'c')
+    command: String
+)
+
+@main("modules command", "List modules and their dependencies")
 case class DederCliModulesOptions(
     @arg(doc = "Output result as JSON")
     json: Flag,
@@ -18,7 +24,7 @@ case class DederCliModulesOptions(
     dot: Flag
 )
 
-@main
+@main("tasks command", "List tasks per module")
 case class DederCliTasksOptions(
     @arg(doc = "Output result as JSON")
     json: Flag,
@@ -31,10 +37,10 @@ case class DederCliTasksOptions(
     // print first deps levels only?
 )
 
-@main
+@main("plan command", "Plan for task execution in a module")
 case class DederCliPlanOptions(
-    @arg(doc = "Module IDs to plan", short = 'm')
-    module: String, // TODO Seq[String], currently unsupported
+    @arg(doc = "Module ID to plan", short = 'm')
+    module: String, // Seq[String] unsupported, would be weird/hard
     @arg(doc = "The task to plan", short = 't')
     task: String,
     @arg(doc = "Output result as JSON")
@@ -45,13 +51,13 @@ case class DederCliPlanOptions(
     dot: Flag
 )
 
-@main
+@main("clean command", "Clean build artifacts for module(s)")
 case class DederCliCleanOptions(
     @arg(doc = "Module IDs to clean", short = 'm')
     modules: Seq[String], // cant have a default.. :/
 )
 
-@main
+@main("exec command", "Execute a task in module(s)")
 case class DederCliExecOptions(
     @arg(doc = "The task to execute", short = 't')
     task: String = "compile",

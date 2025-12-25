@@ -43,14 +43,20 @@ object server extends ScalaModule, VersionModule {
   def moduleDeps = Seq(config)
 
   def mainClass = Some("ba.sake.deder.ServerMain")
+  // Pkl requires to be multi-release jar to support Java 8+
   def manifest = super.manifest().add("Multi-Release" -> "true")
 
   def scalacOptions = super.scalacOptions() ++ Seq("-Yretain-trees")
+
+  object test extends ScalaTests {
+    def mvnDeps = Seq(mvn"org.scalameta::munit:1.2.1")
+    def testFramework = "munit.Framework"
+  }
 }
 
 object config extends JavaModule {
   def mvnDeps = Seq(
-    mvn"org.pkl-lang:pkl-config-java:0.30.1"
+    mvn"org.pkl-lang:pkl-config-java:0.30.2"
   )
 }
 

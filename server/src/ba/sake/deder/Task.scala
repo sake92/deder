@@ -82,6 +82,7 @@ case class TaskExecContext[T, Deps <: Tuple](
 
 sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] =:= true) {
   def name: String
+  def description: String
   def supportedModuleTypes: Set[ModuleType]
   def transitive: Boolean
   def taskDeps: Deps
@@ -104,7 +105,8 @@ class TaskImpl[T: JsonRW, Deps <: Tuple](
     // if it triggers upstream modules task with same name
     // the only way to reference a task across modules
     val transitive: Boolean = false,
-    val supportedModuleTypes: Set[ModuleType] = Set.empty
+    val supportedModuleTypes: Set[ModuleType] = Set.empty,
+    val description: String = ""
 )(using ev: TaskDeps[Deps] =:= true)
     extends Task[T, Deps] {
   override private[deder] def executeUnsafe(
@@ -151,7 +153,8 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     // if it triggers upstream modules task with same name
     // the only way to reference a task across modules
     val transitive: Boolean = false,
-    val supportedModuleTypes: Set[ModuleType] = Set.empty
+    val supportedModuleTypes: Set[ModuleType] = Set.empty,
+    val description: String = ""
 )(using ev: TaskDeps[Deps] =:= true)
     extends Task[T, Deps] {
 
@@ -220,13 +223,15 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
 class SourceFileTask(
     name: String,
     supportedModuleTypes: Set[ModuleType] = Set.empty,
-    execute: TaskExecContext[DederPath, EmptyTuple] => DederPath
+    execute: TaskExecContext[DederPath, EmptyTuple] => DederPath,
+    description: String = ""
 ) extends CachedTask[DederPath, EmptyTuple](
       name,
       execute,
       taskDeps = EmptyTuple,
       transitive = false,
-      supportedModuleTypes
+      supportedModuleTypes,
+      description
     ) {
   override def toString(): String = s"SourceFileTask($name)"
 }
@@ -234,13 +239,15 @@ class SourceFileTask(
 class SourceFilesTask(
     name: String,
     execute: TaskExecContext[Seq[DederPath], EmptyTuple] => Seq[DederPath],
-    supportedModuleTypes: Set[ModuleType] = Set.empty
+    supportedModuleTypes: Set[ModuleType] = Set.empty,
+    description: String = ""
 ) extends CachedTask[Seq[DederPath], EmptyTuple](
       name,
       execute,
       taskDeps = EmptyTuple,
       transitive = false,
-      supportedModuleTypes
+      supportedModuleTypes,
+      description
     ) {
   override def toString(): String = s"SourceFilesTask($name)"
 }
@@ -248,8 +255,9 @@ class SourceFilesTask(
 class ConfigValueTask[T: JsonRW: Hashable](
     name: String,
     execute: TaskExecContext[T, EmptyTuple] => T,
-    supportedModuleTypes: Set[ModuleType] = Set.empty
-) extends CachedTask[T, EmptyTuple](name, execute, taskDeps = EmptyTuple, transitive = false, supportedModuleTypes) {
+    supportedModuleTypes: Set[ModuleType] = Set.empty,
+    description: String = ""
+) extends CachedTask[T, EmptyTuple](name, execute, taskDeps = EmptyTuple, transitive = false, supportedModuleTypes, description) {
   override def toString(): String = s"ConfigValueTask($name)"
 }
 

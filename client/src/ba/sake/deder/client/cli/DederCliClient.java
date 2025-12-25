@@ -102,6 +102,9 @@ public class DederCliClient implements DederClient {
 			case "shutdown":
 				message = new ClientMessage.Shutdown();
 				break;
+			case "help", "--help", "-h":
+				message = new ClientMessage.Help(leftoverArgs);
+				break;
 			default:
 				message = new ClientMessage.Help(args);
 			}
