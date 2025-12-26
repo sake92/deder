@@ -3,7 +3,7 @@
     <file>.deder/logs/server.log</file>
     <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
         <!-- daily rollover -->
-        <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.gz</fileNamePattern>
+        <fileNamePattern>.deder/logs/server.log.%d{yyyy-MM-dd}.gz</fileNamePattern>
         <!-- max 30 days -->
         <maxHistory>30</maxHistory>
         <totalSizeCap>1GB</totalSizeCap>

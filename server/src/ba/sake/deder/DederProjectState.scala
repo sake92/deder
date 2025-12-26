@@ -187,6 +187,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
         )
       val allTaskInstances = tasksExecStages.flatten.sortBy(_.id) // essential!!
       allTaskInstances.foreach { taskInstance =>
+        // TODO timed wait
         taskInstance.lock.lock()
       }
       try {
