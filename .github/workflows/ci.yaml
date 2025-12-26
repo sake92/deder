@@ -52,5 +52,5 @@ jobs:
 
           deder shutdown
 
-      #- name: Test
-      #  run: ./mill -i __.test
+      - name: Test
+        run: ./mill __.test
