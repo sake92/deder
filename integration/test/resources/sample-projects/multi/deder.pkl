@@ -1,0 +1,50 @@
+amends "https://sake92.github.io/deder/config/DederProject.pkl"
+
+local const baseModule = new ScalaModule {
+  scalaVersion = "3.7.1"
+}
+
+local const common = (baseModule) {
+  id = "common"
+  deps {
+    "org.jsoup:jsoup:1.21.1"
+  }
+}
+
+local const frontend = (baseModule) {
+  id = "frontend"
+  moduleDeps { common }
+}
+
+local const backend = (baseModule) {
+  id = "backend"
+  moduleDeps { common }
+}
+
+local const uber = (baseModule) {
+  id = "uber"
+  moduleDeps { frontend; backend }
+  deps {
+    "com.lihaoyi::pprint:0.9.5"
+  }
+  mainClass = "uber.Main"
+}
+
+// TODO how to DRY this ?
+local const uberTest = new ScalaTestModule {
+  id = "uber-test"
+  root = "uber/test"
+  scalaVersion = "3.7.1"
+  moduleDeps { uber }
+  deps {
+    "org.scalameta::munit:1.2.1"
+  }
+}
+
+modules {
+  common
+  frontend
+  backend
+  uber
+  uberTest
+}

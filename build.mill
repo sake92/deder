@@ -54,6 +54,21 @@ object server extends ScalaModule, VersionModule {
   }
 }
 
+// integration tests
+object integration extends ScalaModule {
+  def scalaVersion = "3.7.4"
+  def mvnDeps = Seq(mvn"org.scalameta::munit:1.2.1")
+  def testFramework = "munit.Framework"
+
+  object test extends ScalaTests {
+    def mvnDeps = Seq(
+      mvn"org.scalameta::munit:1.2.1",
+      mvn"com.lihaoyi::os-lib:0.11.6"
+    )
+    def testFramework = "munit.Framework"
+  }
+}
+
 object config extends JavaModule {
   def mvnDeps = Seq(
     mvn"org.pkl-lang:pkl-config-java:0.30.2"

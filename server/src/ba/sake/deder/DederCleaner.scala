@@ -5,6 +5,8 @@ import scala.util.control.NonFatal
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.config.DederProject
 
+// TODO move to DederProjectState?
+// and lock all module tasks while cleaning!!!
 object DederCleaner extends StrictLogging {
   def cleanModules(moduleIds: Seq[String]): Boolean =
     moduleIds.forall { moduleId =>

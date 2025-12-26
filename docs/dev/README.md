@@ -1,4 +1,12 @@
 
+
+## Running integration tests
+
+export DEDER_CLIENT_PATH="$(realpath out/client/assembly.dest/out.jar)"
+export DEDER_SERVER_PATH="$(realpath out/server/assembly.dest/out.jar)"
+
+./mill integration.test
+
 ## Architecture
 
 ![](deder_architecture.svg)

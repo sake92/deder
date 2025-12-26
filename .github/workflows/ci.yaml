@@ -64,3 +64,8 @@ jobs:
           deder exec -t test -m uber-test
 
           deder shutdown
+      - name: Integration Test Suite
+        run: ./mill integration.test
+        env:
+          DEDER_CLIENT_PATH: deder
+          DEDER_SERVER_PATH: out/server/assembly.dest/out.jar
