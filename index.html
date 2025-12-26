@@ -41,8 +41,8 @@
           <li><a href="#concepts">Concepts</a></li>
           <li><a href="#installation">Installation</a></li>
           <li><a href="#example-commands">Example commands</a></li>
+          <li><a href="#dependencies">Dependencies</a></li>
           <li><a href="#ide-setup">IDE setup</a></li>
-          <li><a href="#building-locally">Building locally</a></li>
          </ul></li>
        </ul>
       </div>
@@ -123,6 +123,10 @@ deder bsp
 
 </code>
           </pre>
+   <h2 id="dependencies">Dependencies<a href="#dependencies" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Dependencies are written using Coursier's Dependency syntax.
+    <br>
+    See <a href="https://github.com/coursier/dependency">https://github.com/coursier/dependency</a> for more details</p>
    <h2 id="ide-setup">IDE setup<a href="#ide-setup" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Run <code>deder bsp install</code> and just open with VSCode or IntelliJ (open as a BSP project). The <code>reset.sh</code> script does this for you..</p>
    <p>Currently working features:</p>
@@ -132,27 +136,6 @@ deder bsp
     <li>compilation and diagnostics</li>
     <li>run main scala classes (Java doesnt.. #todo-fixme )</li>
    </ul>
-   <p>If you work on server code, after you build it you can run <code>./reset.sh</code> in examples/multi</p>
-   <h2 id="building-locally">Building locally<a href="#building-locally" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <p>Build the server and client:</p>
-   <pre>            <code class="language-shell hljs" data-highlighted="yes">./scripts/gen-config-bindings.sh
-./mill server.assembly
-<span class="hljs-meta prompt_">
-# </span><span class="language-bash">client executable JAR</span>
-./mill client.assembly
-<span class="hljs-meta prompt_"># </span><span class="language-bash">or as native client</span>
-./mill client-native.nativeImage
-<span class="hljs-meta prompt_">
-# </span><span class="language-bash">AND PUT CLIENT IN PATH !!! <span class="hljs-keyword">for</span> example:</span>
-cp out/client/assembly.dest/out.jar /usr/local/bin/deder
-cp out/client-native/nativeImage.dest/native-executable /usr/local/bin/deder
-<span class="hljs-meta prompt_">
-# </span><span class="language-bash"><span class="hljs-keyword">then</span> you can run commands:</span>
-cd examples/multi
-<span class="hljs-meta prompt_"># </span><span class="language-bash">start from clean state, copy the server JAR etc</span>
-./reset 
-</code>
-          </pre>
   </main>
   <footer class="pico container">My Site</footer>
  </body>
