@@ -30,7 +30,7 @@ class TasksResolver(
     graph
   }
 
-  lazy val tasksPerModule: Map[String, Seq[TaskInstance]] = {
+  lazy val taskInstancesPerModule: Map[String, Seq[TaskInstance]] = {
     // make Tasks graph
     allModules.map { module =>
       val taskInstances = tasksRegistry.resolve(module.`type`).map(t => TaskInstance(module, t))
@@ -38,27 +38,27 @@ class TasksResolver(
     }.toMap
   }
 
-  lazy val tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge] = {
+  lazy val taskInstancesGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge] = {
     val graph = new SimpleDirectedGraph[TaskInstance, DefaultEdge](classOf[DefaultEdge])
     for module <- allModules do {
-      val tasks = tasksPerModule(module.id)
-      val tasksMap = tasks.map(t => t.id -> t).toMap
-      tasks.foreach { task =>
-        graph.addVertex(task)
-        task.task.taskDeps.toList.asInstanceOf[List[Task[?, ?]]].foreach { taskDep =>
+      val taskInstances = taskInstancesPerModule(module.id)
+      val tasksMap = taskInstances.map(t => t.id -> t).toMap
+      taskInstances.foreach { taskInstance =>
+        graph.addVertex(taskInstance)
+        taskInstance.task.taskDeps.toList.asInstanceOf[List[Task[?, ?]]].foreach { taskDep =>
           val taskDepId = s"${module.id}.${taskDep.name}"
           val taskDepInstance = tasksMap.getOrElse(
             taskDepId,
-            throw DederException(s"Task referenced by '${task.id}' not found: '${taskDepId}'")
+            throw DederException(s"Task referenced by '${taskInstance.id}' not found: '${taskDepId}'")
           )
-          graph.addEdge(task, taskDepInstance)
+          graph.addEdge(taskInstance, taskDepInstance)
         }
         // if this task triggers a task in depending module, e.g. compile->compile
-        if task.task.transitive then
+        if taskInstance.task.transitive then
           module.moduleDeps.asScala.foreach { moduleDep =>
-            tasksPerModule(moduleDep.id).find(_.task.name == task.task.name).foreach { moduleDepTask =>
+            taskInstancesPerModule(moduleDep.id).find(_.task.name == taskInstance.task.name).foreach { moduleDepTask =>
               graph.addVertex(moduleDepTask) // add if not already
-              graph.addEdge(task, moduleDepTask)
+              graph.addEdge(taskInstance, moduleDepTask)
             }
           }
       }

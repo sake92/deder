@@ -179,25 +179,25 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
                 if cliOptions.json.value then {
-                  val tasksPerModule = state.tasksResolver.tasksPerModule.map { case (moduleId, tasks) =>
+                  val taskNamesPerModule = state.tasksResolver.taskInstancesPerModule.map { case (moduleId, tasks) =>
                     moduleId -> tasks.map(_.task.name)
                   }
-                  serverMessages.put(CliServerMessage.Output(tasksPerModule.toJson))
+                  serverMessages.put(CliServerMessage.Output(taskNamesPerModule.toJson))
                   serverMessages.put(CliServerMessage.Exit(0))
                 } else if cliOptions.dot.value then {
                   val dot =
-                    GraphUtils.generateDOT(state.tasksResolver.tasksGraph, v => v.id, v => Map("label" -> v.id))
+                    GraphUtils.generateDOT(state.tasksResolver.taskInstancesGraph, v => v.id, v => Map("label" -> v.id))
                   serverMessages.put(CliServerMessage.Output(dot))
                   serverMessages.put(CliServerMessage.Exit(0))
                 } else if cliOptions.ascii.value then {
-                  val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.tasksGraph, v => v.id)
+                  val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.taskInstancesGraph, v => v.id)
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
                   serverMessages.put(CliServerMessage.Exit(0))
                 } else {
                   // TODO sort
                   val modulesWithTasks = state.tasksResolver.allModules.map { module =>
-                    val moduleTasks = state.tasksResolver.tasksPerModule(module.id).map(t => s"  ${t.task.name}")
-                    s"${module.id}:\n${moduleTasks.mkString("\n")}"
+                    val moduleTaskNames = state.tasksResolver.taskInstancesPerModule(module.id).map(t => s"  ${t.task.name}")
+                    s"${module.id}:\n${moduleTaskNames.mkString("\n")}"
                   }
                   serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
                   serverMessages.put(CliServerMessage.Exit(0))

@@ -51,7 +51,8 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
           current = Left(errorMessage)
         case Right(newConfig) =>
           val tasksResolver = TasksResolver(newConfig, tasksRegistry)
-          val executionPlanner = ExecutionPlanner(tasksResolver.tasksGraph, tasksResolver.tasksPerModule)
+          val executionPlanner =
+            ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
           val goodProjectStateData =
             DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner)
           lastGood = Right(goodProjectStateData)
@@ -182,7 +183,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
         TasksExecutor(
           state.projectConfig,
           state.tasksResolver.modulesGraph,
-          state.tasksResolver.tasksGraph,
+          state.tasksResolver.taskInstancesGraph,
           tasksExecutorService
         )
       val allTaskInstances = tasksExecStages.flatten.sortBy(_.id) // essential!!

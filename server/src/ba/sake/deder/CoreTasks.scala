@@ -168,12 +168,11 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(scalacOptionsTask)
     .dependsOn(scalaVersionTask)
     .dependsOn(allDependenciesTask)
-    .dependsOn(classesDirTask)
     .dependsOn(allClassesDirsTask)
     .build { ctx =>
       // we feed even this module's classes dir because of javac annotation processing,
       // it can generate java sources.. and then scala sources can depend on them
-      val (scalacOptions, scalaVersion, dependencies, classesDir, allClassesDirs) = ctx.depResults
+      val (scalacOptions, scalaVersion, dependencies, allClassesDirs) = ctx.depResults
       val scalaLibDep =
         if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
         else s"org.scala-lang:scala-library:${scalaVersion}"
@@ -427,7 +426,6 @@ class CoreTasks() extends StrictLogging {
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
     execute = { ctx =>
       ctx.module match {
-        case m: ScalaModule => Option(m.mainClass)
         case m: JavaModule  => Option(m.mainClass)
         case _              => None
       }
