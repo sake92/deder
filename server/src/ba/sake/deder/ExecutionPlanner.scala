@@ -80,6 +80,7 @@ class ExecutionPlanner(
     subgraph
   }
 
+  // used for watch mode - find which source files affect the given task
   def getAffectingSourceFileTasks(moduleId: String, taskName: String): Set[TaskInstance] =
     getRootDepTasks(moduleId, taskName).filter(_.task match {
       case _: SourceFileTask  => true
@@ -87,6 +88,7 @@ class ExecutionPlanner(
       case _                  => false
     })
 
+  // used for watch mode - find which config values affect the given task
   def getAffectingConfigValueTasks(moduleId: String, taskName: String): Set[TaskInstance] =
     getRootDepTasks(moduleId, taskName).filter(_.task match {
       case _: ConfigValueTask[?] => true

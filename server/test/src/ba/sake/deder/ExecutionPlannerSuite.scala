@@ -24,7 +24,6 @@ class ExecutionPlannerSuite extends munit.FunSuite {
     locally {
       val stages = executionPlanner.getExecStages(commonModule.id, "compileClasspath")
       val stageTaskIds = stages.map(stage => stage.map(_.id).toSet).toSeq
-      println(stageTaskIds)
       assertEquals(
         stageTaskIds,
         Seq(
@@ -68,4 +67,84 @@ class ExecutionPlannerSuite extends munit.FunSuite {
       )
     }
   }
+
+  test("ExecutionPlanner returns correct tasks for getAffectingSourceFileTasks") {
+    val projectPath = os.resource / "sample-projects/multi"
+    val projectConfigStr = os.read(projectPath / "deder.pkl")
+    val configParser = ConfigParser()
+    val parsedConfig = configParser.parse(projectConfigStr)
+    val projectConfig = parsedConfig.toOption.get
+    val tasksRegistry = TasksRegistry()
+    val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
+    val executionPlanner = ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
+    val modules = tasksResolver.allModules.map(_.asInstanceOf[ScalaModule])
+    val uberModule = modules.find(_.id == "uber").get
+    locally {
+      val affectingSourceFileTasks = executionPlanner.getAffectingSourceFileTasks(uberModule.id, "compile")
+      val taskIds = affectingSourceFileTasks.map(_.id).toSet
+      assertEquals(
+        taskIds,
+        Set("common.sources", "frontend.sources", "backend.sources", "uber.sources")
+      )
+    }
+  }
+
+  test("ExecutionPlanner returns correct tasks for getAffectingConfigValueTasks") {
+    val projectPath = os.resource / "sample-projects/multi"
+    val projectConfigStr = os.read(projectPath / "deder.pkl")
+    val configParser = ConfigParser()
+    val parsedConfig = configParser.parse(projectConfigStr)
+    val projectConfig = parsedConfig.toOption.get
+    val tasksRegistry = TasksRegistry()
+    val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
+    val executionPlanner = ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
+    val modules = tasksResolver.allModules.map(_.asInstanceOf[ScalaModule])
+    val uberModule = modules.find(_.id == "uber").get
+    locally {
+      val affectingConfigValueTasks = executionPlanner.getAffectingConfigValueTasks(uberModule.id, "compile")
+      val taskIds = affectingConfigValueTasks.map(_.id).toSet
+      assertEquals(
+        taskIds,
+        Set(
+          "common.deps",
+          "common.javacAnnotationProcessorDeps",
+          "common.javacOptions",
+          "common.javaSemanticdbVersion",
+          "common.scalacOptions",
+          "common.scalacPluginDeps",
+          "common.scalaSemanticdbVersion",
+          "common.scalaVersion",
+          "common.semanticdbEnabled",
+          "backend.deps",
+          "backend.javacAnnotationProcessorDeps",
+          "backend.javacOptions",
+          "backend.javaSemanticdbVersion",
+          "backend.scalacOptions",
+          "backend.scalacPluginDeps",
+          "backend.scalaSemanticdbVersion",
+          "backend.scalaVersion",
+          "backend.semanticdbEnabled",
+          "frontend.deps",
+          "frontend.javacAnnotationProcessorDeps",
+          "frontend.javacOptions",
+          "frontend.javaSemanticdbVersion",
+          "frontend.scalacOptions",
+          "frontend.scalacPluginDeps",
+          "frontend.scalaSemanticdbVersion",
+          "frontend.scalaVersion",
+          "frontend.semanticdbEnabled",
+          "uber.deps",
+          "uber.javacAnnotationProcessorDeps",
+          "uber.javacOptions",
+          "uber.javaSemanticdbVersion",
+          "uber.scalacOptions",
+          "uber.scalacPluginDeps",
+          "uber.scalaSemanticdbVersion",
+          "uber.scalaVersion",
+          "uber.semanticdbEnabled"
+        )
+      )
+    }
+  }
+
 }
