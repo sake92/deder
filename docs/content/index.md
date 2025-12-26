@@ -90,3 +90,14 @@ Currently working features:
 - compilation and diagnostics
 - run main scala classes (Java doesnt.. #todo-fixme )
 
+
+
+
+## Tips & Tricks
+
+deder plan -m common -t compileClasspath --dot | dot -Tsvg > bla.svg
+
+
+
+
+

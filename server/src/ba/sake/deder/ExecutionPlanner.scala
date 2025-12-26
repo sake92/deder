@@ -9,33 +9,56 @@ class ExecutionPlanner(
 ) {
 
   // build independent exec stages (~toposort)
-  // TODO better plan for skewed graphs (some tasks have many deps, some none)
-  def execStages(moduleId: String, taskName: String): Seq[Seq[TaskInstance]] = {
+  def getExecStages(moduleId: String, taskName: String): Seq[Seq[TaskInstance]] = {
     val taskToExecute = tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName).getOrElse {
       throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
     }
-    var stages = Map.empty[Int, Seq[TaskInstance]]
-    var maxDepth = 0
 
-    def go(task: TaskInstance, depth: Int): Unit = {
-      if depth > maxDepth then maxDepth = depth
-      stages = stages.updatedWith(depth) {
-        case Some(values) => Some(if values.exists(_.id == task.id) then values else values.appended(task))
-        case None         => Some(Seq(task))
-      }
-      val depEdges = tasksGraph.outgoingEdgesOf(task).asScala.toSeq
-      depEdges.foreach { depEdge =>
-        val d = tasksGraph.getEdgeTarget(depEdge)
-        go(d, depth + 1)
-      }
+    val execSubgraph = getExecSubgraph(moduleId, taskName)
+
+    def findStartTaskInstances(task: TaskInstance): Seq[TaskInstance] = {
+      val depEdges = execSubgraph.outgoingEdgesOf(task).asScala.toSeq
+      if depEdges.isEmpty then Seq(task)
+      else
+        depEdges.flatMap { depEdge =>
+          val d = execSubgraph.getEdgeTarget(depEdge)
+          findStartTaskInstances(d)
+        }
     }
 
-    go(taskToExecute, 0)
-    val reversedStages = for i <- 0 to maxDepth yield stages(i)
-    reversedStages.reverse
+    // Kahn's algorithm variant
+    // start from leaves and go backwards
+    var currentTaskInstances = findStartTaskInstances(taskToExecute).distinct.sortBy(_.id)
+    var visitedTaskIds = currentTaskInstances.map(_.id).toSet
+    var stages = Seq(currentTaskInstances)
+
+    def getStages(currentTaskInstances: Seq[TaskInstance]) = {
+      val res = currentTaskInstances.flatMap { currentTI =>
+        val incomingEdges = execSubgraph.incomingEdgesOf(currentTI).asScala.toSet
+        incomingEdges.flatMap { inEdge =>
+          val dependingTI = execSubgraph.getEdgeSource(inEdge)
+          val dependingTIDepIds = execSubgraph.outgoingEdgesOf(dependingTI).asScala.toSet
+          val allDepsSatisfied = dependingTIDepIds.forall { outEdge =>
+            val targetTI = execSubgraph.getEdgeTarget(outEdge)
+            visitedTaskIds.contains(targetTI.id)
+          }
+          Option.when(allDepsSatisfied)(dependingTI)
+        }
+      }
+      visitedTaskIds = visitedTaskIds ++ res.map(_.id)
+      res.distinct.sortBy(_.id) // keep order, for test stability
+    }
+
+    while currentTaskInstances.nonEmpty do {
+      val nextTaskInstances = getStages(currentTaskInstances)
+      if nextTaskInstances.nonEmpty then stages = stages.appended(nextTaskInstances)
+      currentTaskInstances = nextTaskInstances
+    }
+
+    stages.toSeq
   }
 
-  // this is just for debugging at the moment
+  // plan execution
   def getExecSubgraph(moduleId: String, taskName: String): AsSubgraph[TaskInstance, DefaultEdge] = {
     val execTasksSet = Set.newBuilder[TaskInstance]
 

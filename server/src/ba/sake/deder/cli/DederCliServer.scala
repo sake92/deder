@@ -219,7 +219,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
               case Right(state) =>
                 val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(cliOptions.module, cliOptions.task)
                 if cliOptions.json.value then {
-                  val tasksExecStages = state.executionPlanner.execStages(cliOptions.module, cliOptions.task)
+                  val tasksExecStages = state.executionPlanner.getExecStages(cliOptions.module, cliOptions.task)
                   serverMessages.put(CliServerMessage.Output(tasksExecStages.map(_.map(_.id)).toJson))
                   serverMessages.put(CliServerMessage.Exit(0))
                 } else if cliOptions.dot.value then {
@@ -231,7 +231,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
                   serverMessages.put(CliServerMessage.Exit(0))
                 } else {
-                  val tasksExecStages = state.executionPlanner.execStages(cliOptions.module, cliOptions.task)
+                  val tasksExecStages = state.executionPlanner.getExecStages(cliOptions.module, cliOptions.task)
                   val stagesStr = tasksExecStages.zipWithIndex
                     .map { case (stage, idx) =>
                       s"Stage #${idx}:\n" + stage.map(ti => s"  ${ti.id}").mkString("\n")

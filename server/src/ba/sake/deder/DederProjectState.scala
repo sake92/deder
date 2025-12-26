@@ -32,7 +32,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
   // used for BSP
   @volatile var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
 
-  val lastRequestStartedAt = new java.util.concurrent.atomic.AtomicReference[Instant](null)
+  private val lastRequestStartedAt = new java.util.concurrent.atomic.AtomicReference[Instant](null)
 
   // TODO concurrent?
   private var watchedTasks = Seq.empty[WatchedTaskData]
@@ -178,7 +178,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
       )
 
       val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(moduleId, taskName)
-      val tasksExecStages = state.executionPlanner.execStages(moduleId, taskName)
+      val tasksExecStages = state.executionPlanner.getExecStages(moduleId, taskName)
       val tasksExecutor =
         TasksExecutor(
           state.projectConfig,
