@@ -2,7 +2,12 @@ package ba.sake.deder
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Properties
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 import ba.sake.tupson.*
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
+import java.util.concurrent.atomic.AtomicReference
 
 class IntegrationSuite extends munit.FunSuite {
 
@@ -67,7 +72,6 @@ class IntegrationSuite extends munit.FunSuite {
       locally {
         val dederRes = executeDederCommand(projectPath, "plan -m common -t compile")
         val dederOutput = dederRes.out.text()
-        println(dederOutput)
         assertEquals(
           dederOutput,
           """|Stage #0:
@@ -100,11 +104,71 @@ class IntegrationSuite extends munit.FunSuite {
     }
   }
 
+  test("deder should compile multimodule project") {
+    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+      locally {
+        // default command is compile
+        // and the logs go to stderr!
+        val dederOutput = executeDederCommand(projectPath, "exec").err.text()
+        assert(dederOutput.contains("Executing compile on module(s): backend, common, frontend, uber, uber-test"))
+        val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
+        assertEquals(compilingCount, 5)
+      }
+      locally {
+        val dederOutput = executeDederCommand(projectPath, "exec").err.text()
+        assert(dederOutput.contains("Executing compile on module(s): backend, common, frontend, uber, uber-test"))
+        val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
+        assertEquals(compilingCount, 0) // all compiled already
+      }
+      locally {
+        os.write.append(projectPath / "common/src/Common.scala", "\n// some change to trigger recompilation\n")
+        val dederOutput = executeDederCommand(projectPath, "exec").err.text()
+        assert(dederOutput.contains("Executing compile on module(s): backend, common, frontend, uber, uber-test"))
+        val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
+        assertEquals(compilingCount, 1)
+      }
+    }
+  }
+
+  test("deder should run multimodule project") {
+    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+      locally {
+        val dederOutput = executeDederCommand(projectPath, "exec -t run -m uber arg1 arg2 arg3").out.text()
+        assert(dederOutput.contains("Hello from uber module!"))
+        assert(dederOutput.contains("Args = arg1, arg2, arg3"))
+      }
+      locally {
+        // concurrent runs, non-blocking, client side
+        val startTime = System.currentTimeMillis()
+        val totalRuns = 10
+        val results = new AtomicReference[Map[Int, String]](Map.empty)
+        val threads = (1 to totalRuns).map { i =>
+          new Thread(() => {
+            val output = executeDederCommand(projectPath, s"exec -t run -m uber arg$i").out.text()
+            results.updateAndGet(_ + (i -> output))
+            ()
+          })
+        }
+        threads.foreach(_.start())
+        threads.foreach(_.join())
+        val endTime = System.currentTimeMillis()
+        val duration = endTime - startTime
+        println(s"Running ${totalRuns} subprocesses took $duration ms")
+        (1 to totalRuns).map { i =>
+          val output = results.get()(i)
+          assert(output.contains("Hello from uber module!"), s"Run #$i did not produce expected output")
+          assert(output.contains(s"Args = arg$i"), s"Run #$i did not receive correct argument")
+        }
+        assert(duration < 5000, s"Expected concurrent execution to be under 5 seconds, but took $duration ms")
+      }
+    }
+  }
+
   test("deder should write a BSP config file") {
     withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
       val bspConfigPath = projectPath / ".bsp/deder-bsp.json"
       assert(!os.exists(bspConfigPath))
-      val dederRes = executeDederCommand(projectPath, "bsp install")
+      executeDederCommand(projectPath, "bsp install")
       assert(os.exists(bspConfigPath))
       case class BspConfig(
           name: String,
@@ -135,13 +199,13 @@ class IntegrationSuite extends munit.FunSuite {
       testCode(tempDir)
     } finally {
       executeDederCommand(tempDir, "shutdown")
-      //os.remove.all(tempDir)
+      // os.remove.all(tempDir)
     }
   }
 
   private def executeDederCommand(projectPath: os.Path, command: String): os.CommandResult = {
     val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
     val cmd = shell ++ Seq(s"$dederClientPath $command")
-    os.proc(cmd).call(cwd = projectPath)
+    os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe)
   }
 }

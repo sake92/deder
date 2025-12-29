@@ -315,14 +315,16 @@ class CoreTasks() extends StrictLogging {
       val sourceFiles = sourceDirs
         .map(_.absPath)
         .flatMap { sourceDir =>
-          os.walk(
-            sourceDir,
-            skip = p => {
-              if os.isDir(p) then false
-              else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
-              else true
-            }
-          )
+          if os.exists(sourceDir) then
+            os.walk(
+              sourceDir,
+              skip = p => {
+                if os.isDir(p) then false
+                else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
+                else true
+              }
+            )
+          else Seq.empty
         }
         .filter(os.isFile)
 
@@ -426,8 +428,8 @@ class CoreTasks() extends StrictLogging {
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
     execute = { ctx =>
       ctx.module match {
-        case m: JavaModule  => Option(m.mainClass)
-        case _              => None
+        case m: JavaModule => Option(m.mainClass)
+        case _             => None
       }
     }
   )
