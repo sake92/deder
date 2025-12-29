@@ -27,7 +27,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   // fresh one for each BSP request!
   private def makeServerNotificationsLogger(
       originId: Option[String] = None,
-      targetId: Option[BuildTargetIdentifier] = None,
       taskId: Option[TaskId] = None,
       isCompileTask: Boolean = false
   ) = {
@@ -39,7 +38,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           // dont send notification if compile was triggered transitively by another task
           // e.g. mainClasses -> compile
           // or for dependent modules, we only care about the module being compiled directly!
-          val isRelevantCompileNotification = isCompileTask && targetId.map(_.moduleId) == Some(cs.moduleId)
+          val targetId = resolveModule(cs.moduleId).map(buildTargetId)
+          val isRelevantCompileNotification = isCompileTask
           if isRelevantCompileNotification then {
             val taskStartParams = TaskStartParams(taskId.orNull)
             taskStartParams.setEventTime(System.currentTimeMillis())
@@ -56,7 +56,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             }
           }
         case tp: ServerNotification.TaskProgress =>
-          val isRelevantCompileNotification = isCompileTask && targetId.map(_.moduleId) == Some(tp.moduleId)
+          val targetId = resolveModule(tp.moduleId).map(buildTargetId)
+          val isRelevantCompileNotification = isCompileTask
           if isRelevantCompileNotification then {
             val params = TaskProgressParams(taskId.orNull)
             params.setOriginId(originId.orNull)
@@ -70,7 +71,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             client.onBuildTaskProgress(params)
           }
         case cd: ServerNotification.CompileDiagnostic =>
-          val isRelevantCompileNotification = isCompileTask && targetId.map(_.moduleId) == Some(cd.moduleId)
+          val targetId = resolveModule(cd.moduleId).map(buildTargetId)
+          val isRelevantCompileNotification = isCompileTask
           if isRelevantCompileNotification then {
             val file = cd.problem.position.sourceFile.get
             val problem = cd.problem
@@ -96,11 +98,13 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             diagnostic.setSeverity(severity)
             diagnostic.setCode(problem.category())
             diagnostic.setSource("deder")
+            val targetId = resolveModule(cd.moduleId).map(buildTargetId)
             val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List(diagnostic).asJava, false)
             client.onBuildPublishDiagnostics(params)
           }
         case cf: ServerNotification.CompileFinished =>
-          val isRelevantCompileNotification = isCompileTask && targetId.map(_.moduleId) == Some(cf.moduleId)
+          val targetId = resolveModule(cf.moduleId).map(buildTargetId)
+          val isRelevantCompileNotification = isCompileTask
           if isRelevantCompileNotification then {
             val status = if cf.errors == 0 then StatusCode.OK else StatusCode.ERROR
             val taskFinishParams = TaskFinishParams(taskId.orNull, status)
@@ -168,7 +172,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     CompletableFuture.supplyAsync { () =>
       val sourcesItems = params.getTargets.asScala.flatMap { targetId =>
         val moduleId = targetId.moduleId
-        val serverNotificationsLogger = makeServerNotificationsLogger(targetId = Some(targetId))
+        val serverNotificationsLogger = makeServerNotificationsLogger()
         withLastGoodState { projectStateData =>
           val coreTasks = projectStateData.tasksRegistry.coreTasks
           val sourceDirs = executeTask(serverNotificationsLogger, moduleId, coreTasks.sourcesTask)
@@ -262,7 +266,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             logger.debug(s"BSP buildTargetCompile subtaskId ${subtaskId}")
             val serverNotificationsLogger = makeServerNotificationsLogger(
               originId = Option(params.getOriginId),
-              targetId = Some(targetId),
               taskId = Some(subtaskId),
               isCompileTask = true
             )
@@ -707,6 +710,11 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     BuildTargetIdentifier(
       DederPath(module.root).absPath.toNIO.toUri.toString + "#" + module.id
     )
+
+  private def resolveModule(moduleId: String): Option[DederModule] =
+    withLastGoodState { projectStateData =>
+      projectStateData.tasksResolver.modulesMap.get(moduleId)
+    }
 
   private def withLastGoodState[T](onError: String => T)(f: DederProjectStateData => T): T =
     withLastGoodState(Some(onError))(f)

@@ -7,7 +7,7 @@ object Main {
     pprint.pprintln(s"Hello from uber module!")
     println(s"Args = ${args.toList}")
     println(frontend.Frontend.value)
-    println(backend.Backend.sdfsfs)
+    println(backend.Backend.value)
 
     // org.jsoup.Jsoup.connect("https://example.com").get()
 
