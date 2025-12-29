@@ -314,7 +314,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
-        val dependencies = executeTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)
+        val dependencies =
+          try executeTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)
+          catch case e: TaskEvaluationException => Seq.empty
         val fetchRes = DependencyResolver.fetch(dependencies)
         // assuming that dependencies and artifacts are in the same order, 1:1 mapping
         val depsWithArtifacts = fetchRes.getDependencies.asScala
@@ -355,7 +357,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
-        val dependencies = executeTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)
+        val dependencies =
+          try executeTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)
+          catch case e: TaskEvaluationException => Seq.empty
         val fetchRes = DependencyResolver.fetch(dependencies)
         val depSources = fetchRes.getDependencies.asScala.map { dep =>
           dep.withClassifier("sources").withType("jar").withConfiguration("sources")
@@ -397,7 +401,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             executeTask(serverNotificationsLogger, moduleId, coreTasks.classesDirTask).toNIO.toUri.toString
           val javacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.javacOptionsTask)
           val javacAnnotationProcessors =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.javacAnnotationProcessorsTask)
+            try executeTask(serverNotificationsLogger, moduleId, coreTasks.javacAnnotationProcessorsTask)
+            catch case e: TaskEvaluationException => Seq.empty
           val finalJavacOptions = javacOptions ++
             Seq(
               "-processorpath",
@@ -405,9 +410,11 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir}"
             )
           val compileClasspath =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
-              .map(_.toNIO.toUri.toString)
-              .toList
+            try
+              executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
+                .map(_.toNIO.toUri.toString)
+                .toList
+            catch case e: TaskEvaluationException => List.empty
           val javacOptionsItem =
             JavacOptionsItem(targetId, finalJavacOptions.asJava, compileClasspath.asJava, classesDir)
           List(javacOptionsItem)
@@ -460,7 +467,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       testModules.flatMap { module =>
         val targetId = buildTargetId(module)
         try {
-          val frameworkTests = executeTask(serverNotificationsLogger, module.id, coreTasks.testClassesTask)
+          val frameworkTests =
+            try executeTask(serverNotificationsLogger, module.id, coreTasks.testClassesTask)
+            catch case e: TaskEvaluationException => Seq.empty
           frameworkTests.map { ft =>
             val item = ScalaTestClassesItem(targetId, ft.testClasses.asJava)
             item.setFramework(ft.framework)
@@ -485,7 +494,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val moduleId = targetId.moduleId
           val scalaVersion = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalaVersionTask)
           val scalacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacOptionsTask)
-          val scalacPlugins = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacPluginsTask)
+          val scalacPlugins =
+            try executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacPluginsTask)
+            catch case e: TaskEvaluationException => Seq.empty
           val semanticdbOptions =
             if scalaVersion.startsWith("3.") then
               scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++
@@ -495,9 +506,11 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
                 scalacPlugins.map(p => s"-Xplugin:${p.toString}")
           val finalScalacOptions = scalacOptions ++ semanticdbOptions
           val compileClasspath =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
-              .map(_.toNIO.toUri.toString)
-              .toList
+            try
+              executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
+                .map(_.toNIO.toUri.toString)
+                .toList
+            catch case e: TaskEvaluationException => List.empty
           val classesDir =
             executeTask(serverNotificationsLogger, moduleId, coreTasks.classesDirTask).toNIO.toUri.toString
           val scalacOptionsItem =
@@ -517,9 +530,11 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val compileClasspath =
-          executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
-            .map(_.toNIO.toUri.toString)
-            .toList
+          try
+            executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
+              .map(_.toNIO.toUri.toString)
+              .toList
+          catch case e: TaskEvaluationException => List.empty
         JvmCompileClasspathItem(targetId, compileClasspath.asJava)
       }
     }
@@ -534,11 +549,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
-        val mainClasses = executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)
+        val mainClasses =
+          try executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)
+          catch case e: TaskEvaluationException => Seq.empty
         val classpath =
-          executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
-            .map(_.toNIO.toUri.toString)
-            .toList
+          try
+            executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
+              .map(_.toNIO.toUri.toString)
+              .toList
+          catch case e: TaskEvaluationException => List.empty
         val jvmOptions = List.empty[String] // TODO: Get JVM options
         val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
         val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
@@ -570,11 +589,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
-        val testClasses = executeTask(serverNotificationsLogger, moduleId, coreTasks.testClassesTask)
+        val testClasses =
+          try executeTask(serverNotificationsLogger, moduleId, coreTasks.testClassesTask)
+          catch case e: TaskEvaluationException => Seq.empty
         val classpath =
-          executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
-            .map(_.toNIO.toUri.toString)
-            .toList
+          try
+            executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
+              .map(_.toNIO.toUri.toString)
+              .toList
+          catch case e: TaskEvaluationException => List.empty
         val jvmOptions = List.empty[String] // TODO: Get JVM options
         val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
         val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
