@@ -68,13 +68,13 @@ public class Main {
 		try {
 			client.start();
 			connected = true;
-		} catch (IOException e) {
+		} catch (Exception e) {
 			if (args.length == 1 && args[0].equals("shutdown")) {
 				log("Deder server not running. No need to shutdown.");
 				System.err.println("Deder server not running. No need to shutdown.");
 				return;
 			}
-			startServer(isBspClient);
+			startServer(isBspClient); // TODO maybe try start periodically if in BSP mode?
 			while (!connected && (keepConnectingInfinitely
 					|| Duration.between(startedConnectingAt, Instant.now()).getSeconds() < maxConnectDurationSeconds)) {
 				try {
@@ -84,7 +84,7 @@ public class Main {
 					client.stop();
 					client.start();
 					connected = true;
-				} catch (IOException ex) {
+				} catch (Exception ex) {
 					log("Error occurred while restarting client: " + ex.getMessage());
 				}
 			}

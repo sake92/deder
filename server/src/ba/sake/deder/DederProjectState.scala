@@ -91,8 +91,9 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
           allModuleIds.filter(_ == selector)
         }
 
+    val plural = if selectedModuleIds.size > 1 then "s" else ""
     serverNotificationsLogger.add(
-      ServerNotification.logInfo(s"Executing ${taskName} on module(s): ${selectedModuleIds.mkString(", ")}")
+      ServerNotification.logInfo(s"Executing ${taskName} on module${plural}: ${selectedModuleIds.mkString(", ")}")
     )
     if selectedModuleIds.isEmpty then {
       serverNotificationsLogger.add(

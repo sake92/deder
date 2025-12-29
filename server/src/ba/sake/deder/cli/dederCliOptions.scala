@@ -69,7 +69,7 @@ case class DederCliExecOptions(
     logLevel: LogLevel = LogLevel.INFO,
     @arg(doc = "Output result as JSON")
     json: Flag,
-    @arg(doc = "Watch mode - re-execute task on source changes")
+    @arg(doc = "Watch mode - re-execute task on source changes", short = 'w')
     watch: Flag,
     args: Leftover[String]
 )
