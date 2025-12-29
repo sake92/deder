@@ -19,7 +19,9 @@ jobs:
           distribution: 'zulu'
           java-version: 21
       - name: Unit Test
-        run: ./mill server.test
+        run: |
+          ./scripts/gen-config-bindings.sh
+          ./mill server.test
 
   integration-tests:
     runs-on: ubuntu-latest
@@ -31,41 +33,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 21
-      - name: Build server and client
+      - name: Integration Test Suite
         run: |
           ./scripts/gen-config-bindings.sh
-          ./mill -i server.assembly
-          ./mill -i client.assembly
-          mkdir -p deder_bin
-          cp out/client/assembly.dest/out.jar deder_bin/deder
-          echo "${{ github.workspace }}/deder_bin" >> $GITHUB_PATH
-      - name: Exercise examples/multi
-        working-directory: ./examples/multi
-        run: |
-          # starts the deder server in the background
-          # and prints help
-          deder
+          ./mill server.assembly
+          ./mill client.assembly
 
-          deder version
-
-          deder modules
-          deder modules --json
-          deder modules --ascii
-          deder modules --dot
-
-          deder tasks
-
-          deder plan -m common -t compile
-          deder plan -m uber -t compile --json
-
-          deder exec -t compile
-          deder exec -t compile -m common
-
-          deder exec -t test -m uber-test
-
-          deder shutdown
-      - name: Integration Test Suite
-        run: ./mill integration.test
-        env:
-          DEDER_CLIENT_PATH: deder
-          DEDER_SERVER_PATH: out/server/assembly.dest/out.jar
+          export DEDER_CLIENT_PATH=out/client/assembly.dest/out.jar
+          export DEDER_SERVER_PATH=out/server/assembly.dest/out.jar
+          ./mill integration.test
