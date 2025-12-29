@@ -194,8 +194,14 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
                   serverMessages.put(CliServerMessage.Exit(0))
                 } else {
-                  // TODO sort
-                  val modulesWithTasks = state.tasksResolver.allModules.map { module =>
+                  // TODO sort somehow
+                  val modules = cliOptions.module match {
+                    case Some(moduleId) =>
+                      state.tasksResolver.allModules.filter(_.id == moduleId)
+                    case None =>
+                      state.tasksResolver.allModules
+                  }
+                  val modulesWithTasks = modules.map { module =>
                     val moduleTaskNames = state.tasksResolver.taskInstancesPerModule(module.id).map(t => s"  ${t.task.name}")
                     s"${module.id}:\n${moduleTaskNames.mkString("\n")}"
                   }

@@ -26,6 +26,8 @@ case class DederCliModulesOptions(
 
 @main("tasks command", "List tasks per module")
 case class DederCliTasksOptions(
+    @arg(doc = "Filter tasks by Module ID", short = 'm')
+    module: Option[String],
     @arg(doc = "Output result as JSON")
     json: Flag,
     @arg(doc = "Output result as ASCII graph")

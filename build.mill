@@ -63,7 +63,8 @@ object integration extends ScalaModule {
   object test extends ScalaTests {
     def mvnDeps = Seq(
       mvn"org.scalameta::munit:1.2.1",
-      mvn"com.lihaoyi::os-lib:0.11.6"
+      mvn"com.lihaoyi::os-lib:0.11.6",
+      mvn"ba.sake::tupson:0.18.0",
     )
     def testFramework = "munit.Framework"
   }
