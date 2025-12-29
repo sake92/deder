@@ -7,6 +7,7 @@
 - optionally run as separate JVM process(es), for isolation etc..
 - on first run just randomly distribute between workers, record stats per test/suite
 - on next run use stats to figure out how to exec more performantly
+- use sqlite for coordination
 
 ## CLI
 - autocomplete
@@ -38,6 +39,7 @@
 
 ## Tracing
 - otel
+- https://grafana.com/docs/opentelemetry/docker-lgtm/
 - jaeger
 
 ## Web server dashboard

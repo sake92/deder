@@ -1,12 +1,11 @@
 # deder
 
 
-Config based client-server build tool
+Config based, concurrent-first client-server build tool
 
 See [dev docs](docs/dev/README.md) for more technical details
 
-EXPERIMENTAL!  
-THERE ARE VERY FEW TESTS!
+☢️ EXPERIMENTAL! ☢️
 
 
 ## Concepts
