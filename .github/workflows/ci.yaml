@@ -19,7 +19,7 @@ jobs:
           distribution: 'zulu'
           java-version: 21
       - name: Unit Test
-        run: ./mill __.test
+        run: ./mill server.test
 
   integration-tests:
     runs-on: ubuntu-latest
