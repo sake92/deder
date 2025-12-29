@@ -35,10 +35,10 @@ jobs:
           java-version: 21
       - name: Integration Test Suite
         run: |
-          ./scripts/gen-config-bindings.sh
-          ./mill server.assembly
-          ./mill client.assembly
-
-          export DEDER_CLIENT_PATH=out/client/assembly.dest/out.jar
           export DEDER_SERVER_PATH=out/server/assembly.dest/out.jar
-          ./mill integration.test
+          export DEDER_CLIENT_PATH=out/client/assembly.dest/out.jar
+
+          ./scripts/gen-config-bindings.sh
+          ./mill -i server.assembly
+          ./mill -i client.assembly          
+          ./mill -i integration.test
