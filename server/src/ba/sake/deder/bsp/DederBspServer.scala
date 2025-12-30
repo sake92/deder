@@ -126,7 +126,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   override def buildInitialize(params: InitializeBuildParams): CompletableFuture[InitializeBuildResult] = {
-    logger.debug(s"BSP client initializing connection: ${params}")
+    logger.debug(s"buildInitialize: ${params}")
     ensureRunning()
     val supportedLanguages = List("java", "scala")
     val capabilities = new BuildServerCapabilities()
@@ -163,7 +163,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def workspaceBuildTargets(): CompletableFuture[WorkspaceBuildTargetsResult] = CompletableFuture.supplyAsync {
     () =>
-      logger.info("workspaceBuildTargets called, running = " + running.get())
+      logger.debug("workspaceBuildTargets called")
       ensureRunning()
       val buildTargets = projectState.lastGood match {
         case Left(errorMessage) =>
@@ -172,7 +172,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           projectStateData.projectConfig.modules.asScala.map(m => buildTarget(m, projectStateData)).toList
       }
       val result = new WorkspaceBuildTargetsResult(buildTargets.asJava)
-      logger.debug(s"BSP workspaceBuildTargets called, returning: ${result}")
+      logger.debug(s"workspaceBuildTargets called, returning: ${result}")
       result
   }
 
@@ -204,7 +204,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         }
       }
       logger.debug(
-        s"BSP buildTargetSources called for ${params.getTargets.asScala.map(_.getUri)}," +
+        s"buildTargetSources called for ${params.getTargets.asScala.map(_.getUri)}," +
           s" returning: ${sourcesItems.toList}"
       )
       new SourcesResult(sourcesItems.asJava)
@@ -268,14 +268,14 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         taskStartParams.setMessage(s"Compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}")
         client.onBuildTaskStart(taskStartParams)
         var allCompileSucceeded = true
-        logger.debug(s"BSP buildTargetCompile called for ${params}")
+        logger.debug(s"buildTargetCompile called for ${params}")
         withLastGoodState { projectStateData =>
           val coreTasks = projectStateData.tasksRegistry.coreTasks
           params.getTargets.asScala.foreach { targetId =>
             val moduleId = targetId.moduleId
             val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
             subtaskId.setParents(List(taskId.getId()).asJava)
-            logger.debug(s"BSP buildTargetCompile subtaskId ${subtaskId}")
+            logger.debug(s"buildTargetCompile subtaskId ${subtaskId}")
             val serverNotificationsLogger = makeServerNotificationsLogger(
               originId = Option(params.getOriginId),
               taskId = Some(subtaskId),
@@ -358,7 +358,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       }
     }
     logger.debug(
-      s"BSP buildTargetDependencyModules called for ${params.getTargets.asScala.map(_.getUri)}," +
+      s"buildTargetDependencyModules called for ${params.getTargets.asScala.map(_.getUri)}," +
         s" returning: ${items.toList}"
     )
     DependencyModulesResult(items.asJava)
@@ -415,7 +415,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       val javacOptionsItems = withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         val serverNotificationsLogger = makeServerNotificationsLogger()
-        params.getTargets().asScala.flatMap { targetId =>
+        params.getTargets.asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
           val classesDir =
             executeTask(serverNotificationsLogger, moduleId, coreTasks.classesDirTask).toNIO.toUri.toString
@@ -472,7 +472,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     }
     val result = ScalaMainClassesResult(items.asJava)
     result.setOriginId(params.getOriginId)
-    logger.debug(s"BSP buildTargetScalaMainClasses called, returning: ${result}")
+    logger.debug(s"buildTargetScalaMainClasses called, returning: ${result}")
     result
   }
 
@@ -602,7 +602,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       }
     }
     val res = JvmRunEnvironmentResult(items.asJava)
-    logger.debug(s"BSP buildTargetJvmRunEnvironment called, returning: ${res}")
+    logger.debug(s"buildTargetJvmRunEnvironment called, returning: ${res}")
     res
   }
 
@@ -645,20 +645,64 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       }
     }
     val res = JvmTestEnvironmentResult(items.asJava)
-    logger.debug(s"BSP buildTargetJvmTestEnvironment called, returning: ${res}")
+    logger.debug(s"buildTargetJvmTestEnvironment called, returning: ${res}")
     res
   }
 
-  override def buildTargetRun(params: RunParams): CompletableFuture[RunResult] = {
-    // TODO
-    logger.debug(s"BSP buildTargetRun called ${params}")
-    CompletableFuture.failedFuture(new NotImplementedError("buildTargetRun is not supported in Deder BSP server"))
+  override def buildTargetRun(params: RunParams): CompletableFuture[RunResult] = CompletableFuture.supplyAsync { () =>
+    logger.debug(s"buildTargetRun called ${params}")
+    ensureRunning()
+    val res = withLastGoodState { projectStateData =>
+      val coreTasks = projectStateData.tasksRegistry.coreTasks
+      val serverNotificationsLogger = makeServerNotificationsLogger(isCompileTask = true)
+      val moduleId = params.getTarget.moduleId
+      val isRunnable = hasMainClass(resolveModule(moduleId).get)
+      if !isRunnable then throw DederException(s"Module ${moduleId} does not have a main class to run")
+      val args = Option(params.getArguments).map(_.asScala.toSeq).getOrElse(Seq.empty)
+      val runCmd =
+        try executeTask(serverNotificationsLogger, moduleId, coreTasks.runTask, args = args)
+        catch case e: TaskEvaluationException => Seq.empty
+      if runCmd.isEmpty then {
+        logger.error(s"Failed to run module ${moduleId} via BSP")
+        RunResult(StatusCode.ERROR)
+      } else {
+        val wd = Option(params.getWorkingDirectory).map(os.Path(_)).getOrElse(os.pwd)
+        val runRes = os.proc(runCmd).call(cwd = wd, stdin = os.Pipe, stdout = os.Pipe, stderr = os.Pipe)
+        val status = if runRes.exitCode == 0 then StatusCode.OK else StatusCode.ERROR
+        RunResult(status)
+      }
+    }
+    res.setOriginId(params.getOriginId)
+    res
   }
 
-  override def buildTargetTest(params: TestParams): CompletableFuture[TestResult] = {
-    // TODO
-    logger.debug(s"BSP buildTargetTest called ${params}")
-    CompletableFuture.failedFuture(new NotImplementedError("buildTargetTest is not supported in Deder BSP server"))
+  override def buildTargetTest(params: TestParams): CompletableFuture[TestResult] = CompletableFuture.supplyAsync {
+    () =>
+      logger.debug(s"buildTargetTest called ${params}")
+      ensureRunning()
+      val res = withLastGoodState { projectStateData =>
+        val coreTasks = projectStateData.tasksRegistry.coreTasks
+        val serverNotificationsLogger = makeServerNotificationsLogger(isCompileTask = true)
+        var allTestsSucceeded = true
+        val targets = params.getTargets.asScala
+        val untestableTargets = targets.filterNot { targetId =>
+          val module = projectStateData.tasksResolver.modulesMap(targetId.moduleId)
+          isTestModule(module)
+        }
+        if untestableTargets.nonEmpty then
+          throw DederException(s"Targets are not testable: ${untestableTargets.map(_.moduleId).mkString(", ")}")
+        targets.foreach { targetId =>
+          val moduleId = targetId.moduleId
+          try {
+            val testRes = executeTask(serverNotificationsLogger, moduleId, coreTasks.testTask)
+            if !testRes.success then allTestsSucceeded = false
+          } catch case e: TaskEvaluationException => allTestsSucceeded = false
+        }
+        val status = if allTestsSucceeded then StatusCode.OK else StatusCode.ERROR
+        TestResult(status)
+      }
+      res.setOriginId(params.getOriginId)
+      res
   }
 
   override def debugSessionStart(params: DebugSessionParams): CompletableFuture[DebugSessionAddress] =
@@ -668,13 +712,13 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def onRunReadStdin(params: ReadParams): Unit = {
     // TODO
-    logger.debug(s"BSP onRunReadStdin called ${params}")
-    throw new NotImplementedError("buildTargetRun is not supported in Deder BSP server")
+    logger.debug(s"onRunReadStdin called ${params}")
+    throw new NotImplementedError("onRunReadStdin is not supported in Deder BSP server")
   }
 
   override def buildShutdown(): CompletableFuture[Object] = CompletableFuture.supplyAsync { () =>
     ensureRunning()
-    logger.info("BSP server is shutting down...")
+    logger.info("server is shutting down...")
     running.set(false)
     null.asInstanceOf[Object]
   }
@@ -684,24 +728,27 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     ensureRunning()
 
   private def ensureRunning(): Unit = {
-    if !running.get then 
-      logger.info("BSP server is shut down, not accepting more requests")
-      throw DederException("BSP server is shut down, not accepting more requests")
+    if !running.get then throw DederException("BSP server is shut down, not accepting more requests")
   }
+
+  private def isTestModule(module: DederModule): Boolean =
+    val testModuleTypes = Set(ModuleType.SCALA_TEST)
+    testModuleTypes.contains(module.`type`)
+
+  private def hasMainClass(module: DederModule): Boolean =
+    module match {
+      case m: DederProject.JavaModule => m.mainClass != null
+      case _                          => false
+    }
 
   private def buildTarget(module: DederModule, projectStateData: DederProjectStateData): BuildTarget = {
     val id = buildTargetId(module)
-    val testModuleTypes = Set(ModuleType.SCALA_TEST)
-    val isTestModule = testModuleTypes.contains(module.`type`)
-    val isAppModule = module match {
-      case m: DederProject.ScalaModule => m.mainClass != null
-      case m: DederProject.JavaModule  => m.mainClass != null
-      case _                           => false
-    }
+    val isTestable = isTestModule(module)
+    val isAppModule = hasMainClass(module)
     val tags = List(
-      List(BuildTargetTag.TEST).filter(_ => isTestModule),
+      List(BuildTargetTag.TEST).filter(_ => isTestable),
       List(BuildTargetTag.APPLICATION).filter(_ => isAppModule),
-      List(BuildTargetTag.LIBRARY).filter(_ => !isTestModule && !isAppModule)
+      List(BuildTargetTag.LIBRARY).filter(_ => !isTestable && !isAppModule)
     ).flatten
     val languageIds = module.`type` match {
       case ModuleType.SCALA | ModuleType.SCALA_TEST => List("scala", "java")
@@ -711,7 +758,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     val capabilities = new BuildTargetCapabilities()
     capabilities.setCanCompile(true)
     capabilities.setCanRun(isAppModule)
-    capabilities.setCanTest(isTestModule)
+    capabilities.setCanTest(isTestable)
     capabilities.setCanDebug(false) // Metals does it for us https://github.com/scalameta/metals/issues/5928
     val buildTarget = new BuildTarget(id, tags.asJava, languageIds.asJava, dependencies.asJava, capabilities)
     buildTarget.setDisplayName(module.id)

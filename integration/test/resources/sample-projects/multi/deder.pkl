@@ -7,7 +7,7 @@ local const baseModule = new ScalaModule {
 local const common = (baseModule) {
   id = "common"
   deps {
-    "org.jsoup:jsoup:1.21.1"
+    //"org.jsoup:jsoup:1.21.1"
   }
 }
 
@@ -25,7 +25,7 @@ local const uber = (baseModule) {
   id = "uber"
   moduleDeps { frontend; backend }
   deps {
-    "com.lihaoyi::pprint:0.9.5"
+    //"com.lihaoyi::pprint:0.9.5"
   }
   mainClass = "uber.Main"
 }

@@ -49,7 +49,9 @@ object server extends ScalaModule, VersionModule {
   def scalacOptions = super.scalacOptions() ++ Seq("-Yretain-trees")
 
   object test extends ScalaTests {
-    def mvnDeps = Seq(mvn"org.scalameta::munit:1.2.1")
+    def mvnDeps = Seq(
+      mvn"org.scalameta::munit:1.2.1"
+    )
     def testFramework = "munit.Framework"
   }
 }
@@ -57,14 +59,13 @@ object server extends ScalaModule, VersionModule {
 // integration tests
 object integration extends ScalaModule {
   def scalaVersion = "3.7.4"
-  def mvnDeps = Seq(mvn"org.scalameta::munit:1.2.1")
-  def testFramework = "munit.Framework"
-
   object test extends ScalaTests {
+    def moduleDeps = Seq(server)
     def mvnDeps = Seq(
       mvn"org.scalameta::munit:1.2.1",
       mvn"com.lihaoyi::os-lib:0.11.6",
       mvn"ba.sake::tupson:0.18.0",
+      mvn"ch.epfl.scala::bsp-testkit:2.2.0-M2".withDottyCompat(integration.scalaVersion())
     )
     def testFramework = "munit.Framework"
   }
