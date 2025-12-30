@@ -14,6 +14,7 @@ import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.config.DederProject.ModuleType
+import java.util.concurrent.atomic.AtomicBoolean
 
 class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     extends BuildServer,
@@ -23,6 +24,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       StrictLogging {
 
   var client: BuildClient = null // set by DederBspProxyServer
+
+  private val running = AtomicBoolean(true)
 
   // fresh one for each BSP request!
   private def makeServerNotificationsLogger(
@@ -123,7 +126,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   override def buildInitialize(params: InitializeBuildParams): CompletableFuture[InitializeBuildResult] = {
-    logger.debug(s"BSP client connected: ${params}")
+    logger.debug(s"BSP client initializing connection: ${params}")
+    ensureRunning()
     val supportedLanguages = List("java", "scala")
     val capabilities = new BuildServerCapabilities()
     capabilities.setResourcesProvider(true)
@@ -146,17 +150,21 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   override def onBuildInitialized(): Unit = {
+    ensureRunning()
     // we dont trigger compile immediately
     // coz there is no progress seen in metals.. just "importing"
   }
 
   override def workspaceReload(): CompletableFuture[Object] = CompletableFuture.supplyAsync { () =>
+    ensureRunning()
     // auto reloaded on file changes
     ().asInstanceOf[Object]
   }
 
   override def workspaceBuildTargets(): CompletableFuture[WorkspaceBuildTargetsResult] = CompletableFuture.supplyAsync {
     () =>
+      logger.info("workspaceBuildTargets called, running = " + running.get())
+      ensureRunning()
       val buildTargets = projectState.lastGood match {
         case Left(errorMessage) =>
           List.empty
@@ -170,6 +178,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetSources(params: SourcesParams): CompletableFuture[SourcesResult] =
     CompletableFuture.supplyAsync { () =>
+      ensureRunning()
       val sourcesItems = params.getTargets.asScala.flatMap { targetId =>
         val moduleId = targetId.moduleId
         val serverNotificationsLogger = makeServerNotificationsLogger()
@@ -203,6 +212,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetInverseSources(params: InverseSourcesParams): CompletableFuture[InverseSourcesResult] =
     CompletableFuture.supplyAsync { () =>
+      ensureRunning()
       val serverNotificationsLogger = makeServerNotificationsLogger()
       val targetIds = withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
@@ -220,6 +230,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetResources(params: ResourcesParams): CompletableFuture[ResourcesResult] =
     CompletableFuture.supplyAsync { () =>
+      ensureRunning()
       val serverNotificationsLogger = makeServerNotificationsLogger()
       val resourcesItems = params.getTargets.asScala.flatMap { targetId =>
         val moduleId = targetId.moduleId
@@ -243,6 +254,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] =
     CompletableFuture.supplyAsync { () =>
+      ensureRunning()
       if (params.getTargets.isEmpty) {
         // no need to start a task, it would confuse IDE
         val compileResult = new CompileResult(StatusCode.OK)
@@ -297,6 +309,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetCleanCache(params: CleanCacheParams): CompletableFuture[CleanCacheResult] =
     CompletableFuture.supplyAsync { () =>
+      ensureRunning()
       withLastGoodState(_ => CleanCacheResult(false)) { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         val cleaned = params.getTargets.asScala.forall { targetId =>
@@ -311,6 +324,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetDependencyModules(
       params: DependencyModulesParams
   ): CompletableFuture[DependencyModulesResult] = CompletableFuture.supplyAsync { () =>
+    ensureRunning()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
@@ -354,6 +368,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetDependencySources(
       params: DependencySourcesParams
   ): CompletableFuture[DependencySourcesResult] = CompletableFuture.supplyAsync { () =>
+    ensureRunning()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
@@ -384,6 +399,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   // hidden/ignored/output dirs
   override def buildTargetOutputPaths(params: OutputPathsParams): CompletableFuture[OutputPathsResult] =
     CompletableFuture.supplyAsync { () =>
+      ensureRunning()
       val excludedDirNames = Seq(".deder", ".bsp", ".metals", ".idea", ".vscode")
       val outputPathsItems = for {
         dirName <- excludedDirNames
@@ -395,6 +411,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetJavacOptions(params: JavacOptionsParams): CompletableFuture[JavacOptionsResult] =
     CompletableFuture.supplyAsync { () =>
+      ensureRunning()
       val javacOptionsItems = withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         val serverNotificationsLogger = makeServerNotificationsLogger()
@@ -429,6 +446,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetScalaMainClasses(
       params: ScalaMainClassesParams
   ): CompletableFuture[ScalaMainClassesResult] = CompletableFuture.supplyAsync { () =>
+    ensureRunning()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
@@ -461,6 +479,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetScalaTestClasses(
       params: ScalaTestClassesParams
   ): CompletableFuture[ScalaTestClassesResult] = CompletableFuture.supplyAsync { () =>
+    ensureRunning()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val testModules = projectStateData.projectConfig.modules.asScala.collect { case m: DederProject.ScalaTestModule =>
@@ -490,6 +509,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def buildTargetScalacOptions(params: ScalacOptionsParams): CompletableFuture[ScalacOptionsResult] =
     CompletableFuture.supplyAsync { () =>
+      ensureRunning()
       val scalacOptionsItems = withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         val serverNotificationsLogger = makeServerNotificationsLogger()
@@ -527,6 +547,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetJvmCompileClasspath(
       params: JvmCompileClasspathParams
   ): CompletableFuture[JvmCompileClasspathResult] = CompletableFuture.supplyAsync { () =>
+    ensureRunning()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
@@ -547,6 +568,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetJvmRunEnvironment(
       params: JvmRunEnvironmentParams
   ): CompletableFuture[JvmRunEnvironmentResult] = CompletableFuture.supplyAsync { () =>
+    ensureRunning()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
@@ -587,6 +609,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   override def buildTargetJvmTestEnvironment(
       params: JvmTestEnvironmentParams
   ): CompletableFuture[JvmTestEnvironmentResult] = CompletableFuture.supplyAsync { () =>
+    ensureRunning()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
@@ -649,13 +672,22 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     throw new NotImplementedError("buildTargetRun is not supported in Deder BSP server")
   }
 
-  override def buildShutdown(): CompletableFuture[Object] = {
-    // dont care, this is a long running server
-    CompletableFuture.completedFuture(null.asInstanceOf[Object])
+  override def buildShutdown(): CompletableFuture[Object] = CompletableFuture.supplyAsync { () =>
+    ensureRunning()
+    logger.info("BSP server is shutting down...")
+    running.set(false)
+    null.asInstanceOf[Object]
   }
 
   override def onBuildExit(): Unit =
     onExit() // just closes the unix socket connection
+    ensureRunning()
+
+  private def ensureRunning(): Unit = {
+    if !running.get then 
+      logger.info("BSP server is shut down, not accepting more requests")
+      throw DederException("BSP server is shut down, not accepting more requests")
+  }
 
   private def buildTarget(module: DederModule, projectStateData: DederProjectStateData): BuildTarget = {
     val id = buildTargetId(module)
