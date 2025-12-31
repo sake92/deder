@@ -7,13 +7,13 @@ import ba.sake.tupson.*
 
 class IntegrationSuite extends munit.FunSuite {
 
+  // first compile can take a while
+  override def munitTimeout = 1.minute
+  
   private val testResourceDir = os.Path(System.getenv("MILL_TEST_RESOURCE_DIR"))
   private val dederClientPath = System.getenv("DEDER_CLIENT_PATH")
   private val dederServerPath = System.getenv("DEDER_SERVER_PATH")
-
-  // first compile can take a while
-  override def munitTimeout = 1.minute
-
+  
   test("deder should work with multimodule project") {
     withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
       // deder version
@@ -105,24 +105,20 @@ class IntegrationSuite extends munit.FunSuite {
 
   test("deder should compile multimodule project") {
     withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
-      println("1")
       locally {
         // default command is compile
         // and the logs go to stderr!
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
-        println("1.1")
         assert(dederOutput.contains("Executing compile on modules: backend, common, frontend, uber, uber-test"))
         val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
         assertEquals(compilingCount, 5)
       }
-      println("2")
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
         assert(dederOutput.contains("Executing compile on modules: backend, common, frontend, uber, uber-test"))
         val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
         assertEquals(compilingCount, 0) // all compiled already
       }
-      println("3")
       locally {
         os.write.append(projectPath / "common/src/Common.scala", "\n// some change to trigger recompilation\n")
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
@@ -155,7 +151,6 @@ class IntegrationSuite extends munit.FunSuite {
         threads.foreach(_.join())
         val endTime = System.currentTimeMillis()
         val duration = endTime - startTime
-        println(s"Running ${totalRuns} subprocesses took $duration ms")
         (1 to totalRuns).foreach { i =>
           val output = results.get()(i)
           assert(output.contains(s"Args = arg$i"), s"Run #$i did not receive correct argument")

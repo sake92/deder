@@ -3,21 +3,21 @@ package ba.sake.deder.bsp
 // adapted from
 // https://github.com/build-server-protocol/build-server-protocol/blob/v2.2.0-M2/tests/src/test/scala/tests/MockClientSuite.scala
 
-import java.net.URI
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.{Files, Path}
 import java.util.Collections
 import java.util.concurrent.Executors
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.util.{Failure, Success, Try}
 import scala.util.Properties
 import com.google.common.collect.Lists
 import ch.epfl.scala.bsp.testkit.client.TestClient
 import ch.epfl.scala.bsp4j.*
-import ch.epfl.scala.bsp.testkit.mock.MockServer
-import ch.epfl.scala.bsp.testkit.mock.MockServer.LocalMockServer
 
 class BspIntegrationSuite extends munit.FunSuite {
+
+  // first compile can take a while
+  override def munitTimeout = 2.minutes
 
   private val testResourceDir = os.Path(System.getenv("MILL_TEST_RESOURCE_DIR"))
   private val dederClientPath = System.getenv("DEDER_CLIENT_PATH")
