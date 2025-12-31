@@ -23,7 +23,7 @@ class BspIntegrationSuite extends munit.FunSuite {
   private val dederClientPath = System.getenv("DEDER_CLIENT_PATH")
   private val dederServerPath = System.getenv("DEDER_SERVER_PATH")
 
-  private val testDirectory = Files.createTempDirectory("bsp.BspIntegrationSuite")
+  private val testDirectory = Files.createTempDirectory("BspIntegrationSuite").toAbsolutePath
   os.copy(
     testResourceDir / "sample-projects/multi",
     os.Path(testDirectory),
@@ -32,7 +32,7 @@ class BspIntegrationSuite extends munit.FunSuite {
   )
   os.write.over(
     os.Path(testDirectory) / ".deder/server.properties",
-    s"localPath=$dederServerPath\n",
+    s"localPath=$dederServerPath\nlogLevel=DEBUG\n",
     createFolders = true
   )
 
@@ -47,7 +47,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       new BuildClientCapabilities(Collections.singletonList("scala"))
     )
 
-  private val baseUri = testDirectory.toFile.getCanonicalFile.toURI
+  private val baseUri = testDirectory.toUri.toString
   private given ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
 
   private val languageIds = List("scala").asJava
@@ -143,11 +143,19 @@ class BspIntegrationSuite extends munit.FunSuite {
     }
   )
 
-  private val allTargetIds = List(commonTargetId, frontendTargetId, backendTargetId, uberTargetId, uberTestTargetId)
+  private val allTargets = List(commonTarget, frontendTarget, backendTarget, uberTarget, uberTestTarget)
+  private val allTargetIds = allTargets.map(_.getId)
 
   test("Initialize connection followed by its shutdown") {
     client.testInitializeAndShutdown()
   }
+
+  /*
+  test("Workspace Build Targets") {
+    val targets = allTargets.asJava
+    val workspaceBuildTargetsResult = new WorkspaceBuildTargetsResult(targets)
+    client.testCompareWorkspaceTargetsResults(workspaceBuildTargetsResult)
+  }*/
 
   test("Initial imports") {
     client.testResolveProject()
@@ -269,77 +277,106 @@ class BspIntegrationSuite extends munit.FunSuite {
     )
   }
 
-  /*
   test("Run scalacOptions") {
-    val classDirectory = "file:" + testDirectory.resolve("out").toString
-    val scalacOptionsItems = List(
-      new ScalacOptionsItem(
-        targetId1,
-        Collections.emptyList(),
-        List("scala-library.jar").asJava,
-        classDirectory
-      ),
-      new ScalacOptionsItem(
-        targetId2,
-        Collections.emptyList(),
-        List("scala-library.jar").asJava,
-        classDirectory
-      ),
-      new ScalacOptionsItem(
-        targetId3,
-        Collections.emptyList(),
-        List("scala-library.jar").asJava,
-        classDirectory
-      )
+    def classDirectory(moduleId: String) =
+      testDirectory.resolve(s".deder/out/${moduleId}/classes").toUri.toString
+
+    def options(moduleId: String) = List(
+      "-Xsemanticdb",
+      "-sourceroot",
+      testDirectory.toString
     ).asJava
 
+    val scalacOptionsItems = List(
+      new ScalacOptionsItem(
+        commonTargetId,
+        options("common"),
+        List(
+          classDirectory("common"),
+          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
+          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
+        ).asJava,
+        classDirectory("common")
+      ),
+      new ScalacOptionsItem(
+        frontendTargetId,
+        options("frontend"),
+        List(
+          classDirectory("frontend"),
+          classDirectory("common"),
+          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
+          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
+        ).asJava,
+        classDirectory("frontend")
+      ),
+      new ScalacOptionsItem(
+        backendTargetId,
+        options("backend"),
+        List(
+          classDirectory("backend"),
+          classDirectory("common"),
+          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
+          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
+        ).asJava,
+        classDirectory("backend")
+      ),
+      new ScalacOptionsItem(
+        uberTargetId,
+        options("uber"),
+        List(
+          classDirectory("uber"),
+          classDirectory("backend"),
+          classDirectory("frontend"),
+          classDirectory("common"),
+          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
+          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
+        ).asJava,
+        classDirectory("uber")
+      ),
+      new ScalacOptionsItem(
+        uberTestTargetId,
+        options("uber-test"),
+        List(
+          classDirectory("uber-test"),
+          classDirectory("uber"),
+          classDirectory("backend"),
+          classDirectory("frontend"),
+          classDirectory("common"),
+          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
+          coursierCachedFile("org/scalameta/munit_3/1.2.1/munit_3-1.2.1.jar").toUri.toString,
+          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString,
+          coursierCachedFile("org/scalameta/junit-interface/1.2.1/junit-interface-1.2.1.jar").toUri.toString,
+          coursierCachedFile("org/scalameta/munit-diff_3/1.2.1/munit-diff_3-1.2.1.jar").toUri.toString,
+          coursierCachedFile("junit/junit/4.13.2/junit-4.13.2.jar").toUri.toString,
+          coursierCachedFile("org/scala-sbt/test-interface/1.0/test-interface-1.0.jar").toUri.toString,
+          coursierCachedFile("org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar").toUri.toString
+        ).asJava,
+        classDirectory("uber-test")
+      )
+    ).asJava
     client.testScalacOptions(
-      new ScalacOptionsParams(Collections.emptyList()),
+      new ScalacOptionsParams(allTargetIds.asJava),
       new ScalacOptionsResult(scalacOptionsItems)
     )
   }
 
-  test("Run cppOptions") {
-    val copts = List("-Iexternal/gtest/include").asJava
-    val defines = List("BOOST_FALLTHROUGH").asJava
-    val linkopts = List("-pthread").asJava
-    val item = new CppOptionsItem(targetId4, copts, defines, linkopts)
-    val cppOptionsItem = List(item).asJava
-
-    client.testCppOptions(
-      new CppOptionsParams(Collections.emptyList()),
-      new CppOptionsResult(cppOptionsItem)
-    )
-  }
-
-  test("Run pythonOptions") {
-    val interpreterOptions = List("-E").asJava
-    val item = new PythonOptionsItem(targetId5, interpreterOptions)
-    val pythonOptionsItem = List(item).asJava
-
-    client.testPythonOptions(
-      new PythonOptionsParams(Collections.emptyList()),
-      new PythonOptionsResult(pythonOptionsItem)
-    )
-  }
-
   test("Run Scala Test Classes") {
-    val classes1 = List("class1").asJava
-    val classes2 = List("class2").asJava
-    val testClassesItems = List(
-      new ScalaTestClassesItem(targetId1, classes1),
-      new ScalaTestClassesItem(targetId2, classes2)
-    ).asJava
+    val classes1 = List("uber.MyTest").asJava
+    val item1 = new ScalaTestClassesItem(uberTestTargetId, classes1)
+    item1.setFramework("munit")
+    val testClassesItems = List(item1).asJava
     val result = new ScalaTestClassesResult(testClassesItems)
     client.testScalaTestClasses(
-      new ScalaTestClassesParams(Collections.emptyList()),
+      new ScalaTestClassesParams(Lists.newArrayList(uberTestTargetId)),
       result
     )
   }
 
+  // TODO as soon as one fails, none other tests works :/
+  /*
   test("Scala Test Classes with less items should fail") {
-    val classes1 = List("class1").asJava
-    val testClassesItems = List(new ScalaTestClassesItem(targetId1, classes1)).asJava
+    val classes1 = List("uber.MyTest").asJava
+    val testClassesItems = List(new ScalaTestClassesItem(uberTestTargetId, classes1)).asJava
     val result = new ScalaTestClassesResult(testClassesItems)
     Try(
       client.testScalaTestClasses(
@@ -347,34 +384,34 @@ class BspIntegrationSuite extends munit.FunSuite {
         result
       )
     ) match {
-      case Failure(_) =>
+      case Failure(_) => assert(true)
       case Success(_) => fail("Test Classes should expect all item classes to be defined!")
     }
-  }
+  }*/
 
   test("Run Scala Main Classes") {
     val classes1 = List(
-      new ScalaMainClass("class1", List("arg1", "arg2").asJava, List("-deprecated").asJava)
-    ).asJava
-    val classes2 = List(
-      new ScalaMainClass("class2", List("arg1", "arg2").asJava, List("-deprecated").asJava)
+      new ScalaMainClass("uber.Main", List().asJava, List().asJava)
     ).asJava
     val mainClassesItems = List(
-      new ScalaMainClassesItem(targetId1, classes1),
-      new ScalaMainClassesItem(targetId1, classes2)
+      new ScalaMainClassesItem(uberTargetId, classes1)
     ).asJava
     val result = new ScalaMainClassesResult(mainClassesItems)
     client.testScalaMainClasses(
-      new ScalaMainClassesParams(Collections.emptyList()),
+      new ScalaMainClassesParams(Lists.newArrayList(uberTargetId)),
       result
     )
   }
 
-  test("Scala Main Classes with less items should fail") {
+
+  // TODO as soon as one fails, none other tests works :/
+  /*test("Scala Main Classes with less items should fail") {
     val classes1 = List(
-      new ScalaMainClass("class1", List("arg1", "arg2").asJava, List("-deprecated").asJava)
+      new ScalaMainClass("uber.Main", List().asJava, List().asJava)
     ).asJava
-    val mainClassesItems = List(new ScalaMainClassesItem(targetId1, classes1)).asJava
+    val mainClassesItems = List(
+      new ScalaMainClassesItem(uberTargetId, classes1)
+    ).asJava
     val result = new ScalaMainClassesResult(mainClassesItems)
     Try(
       client.testScalaMainClasses(
@@ -382,65 +419,12 @@ class BspIntegrationSuite extends munit.FunSuite {
         result
       )
     ) match {
-      case Failure(_) =>
+      case Failure(_) => assert(true)
       case Success(_) => fail("Test Classes should expect all item classes to be defined!")
     }
-  }
+  }*/
 
-  test("Workspace Build Targets") {
-    val targets = List(target1, target2, target3, target4, target5).asJava
-    val javaHome = sys.props.get("java.home").map(p => Paths.get(p).toUri.toString)
-    val javaVersion = sys.props.get("java.vm.specification.version")
-    val jvmBuildTarget = new JvmBuildTarget()
-    jvmBuildTarget.setJavaVersion(javaVersion.get)
-    jvmBuildTarget.setJavaHome(javaHome.get)
-    val scalaJars = List("scala-compiler.jar", "scala-reflect.jar", "scala-library.jar").asJava
-    val scalaBuildTarget =
-      new ScalaBuildTarget("org.scala-lang", "2.12.7", "2.12", ScalaPlatform.JVM, scalaJars)
-    scalaBuildTarget.setJvmBuildTarget(jvmBuildTarget)
-    val autoImports = List("task-key").asJava
-    val children = List(targetId3).asJava
-    val sbtBuildTarget =
-      new SbtBuildTarget("1.0.0", autoImports, scalaBuildTarget, children)
-    val cppBuildTarget =
-      new CppBuildTarget()
-    cppBuildTarget.setVersion("C++11")
-    cppBuildTarget.setCompiler("gcc")
-    cppBuildTarget.setCCompiler("/usr/bin/gcc")
-    cppBuildTarget.setCppCompiler("/usr/bin/g++")
-    val pythonBuildTarget =
-      new PythonBuildTarget()
-    pythonBuildTarget.setInterpreter("/usr/bin/python")
-    pythonBuildTarget.setVersion("3.9")
-
-    target1.setDisplayName("target 1")
-    target1.setBaseDirectory(targetId1.getUri)
-    target1.setDataKind(BuildTargetDataKind.SCALA)
-    target1.setData(scalaBuildTarget)
-
-    target2.setDisplayName("target 2")
-    target2.setBaseDirectory(targetId2.getUri)
-    target2.setDataKind(BuildTargetDataKind.JVM)
-    target2.setData(jvmBuildTarget)
-
-    target3.setDisplayName("target 3")
-    target3.setBaseDirectory(targetId3.getUri)
-    target3.setDataKind(BuildTargetDataKind.SBT)
-    target3.setData(sbtBuildTarget)
-
-    target4.setDisplayName("target 4")
-    target4.setBaseDirectory(targetId4.getUri)
-    target4.setDataKind(BuildTargetDataKind.CPP)
-    target4.setData(cppBuildTarget)
-
-    target5.setDisplayName("target 5")
-    target5.setBaseDirectory(targetId5.getUri)
-    target5.setDataKind(BuildTargetDataKind.PYTHON)
-    target5.setData(pythonBuildTarget)
-
-    val workspaceBuildTargetsResult = new WorkspaceBuildTargetsResult(targets)
-    client.testCompareWorkspaceTargetsResults(workspaceBuildTargetsResult)
-  }
+  /*
 
   private def environmentItem(testing: Boolean) = {
     val classpath = List("scala-library.jar").asJava

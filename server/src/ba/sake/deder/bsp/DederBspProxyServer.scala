@@ -26,20 +26,22 @@ class DederBspProxyServer(projectState: DederProjectState) extends StrictLogging
 
     try {
       while true do {
-        val clientChannel = serverChannel.accept() // TODO finally close
-        val localServer = new DederBspServer(projectState, () => clientChannel.close())
-        val os = Channels.newOutputStream(clientChannel)
-        val is = Channels.newInputStream(clientChannel)
-        val launcher = new Launcher.Builder[BuildClient]()
-          .setOutput(os)
-          .setInput(is)
-          .setLocalService(localServer)
-          .setRemoteInterface(classOf[BuildClient])
-          .create()
-        localServer.client = launcher.getRemoteProxy
-        launcher.startListening().get() // listen until BSP session is over
-        if (clientChannel.isOpen) {
-          clientChannel.close()
+        var clientChannel: SocketChannel = null
+        try {
+          clientChannel = serverChannel.accept()
+          val localServer = new DederBspServer(projectState, () => clientChannel.close())
+          val os = Channels.newOutputStream(clientChannel)
+          val is = Channels.newInputStream(clientChannel)
+          val launcher = new Launcher.Builder[BuildClient]()
+            .setOutput(os)
+            .setInput(is)
+            .setLocalService(localServer)
+            .setRemoteInterface(classOf[BuildClient])
+            .create()
+          localServer.client = launcher.getRemoteProxy
+          launcher.startListening().get() // listen until BSP session is over
+        } finally {
+          if clientChannel != null && clientChannel.isOpen then clientChannel.close()
         }
       }
     } finally {

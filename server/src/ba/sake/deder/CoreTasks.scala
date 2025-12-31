@@ -417,10 +417,10 @@ class CoreTasks() extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
     )
     .dependsOn(compileTask)
-    .dependsOn(allClassesDirsTask)
+    .dependsOn(classesDirTask)
     .build { ctx =>
       val (_, classesDir) = ctx.depResults
-      MainClassesDiscovery.discover(classesDir)
+      MainClassesDiscovery.discover(Seq(classesDir))
     }
 
   val mainClassTask = ConfigValueTask[Option[String]](
