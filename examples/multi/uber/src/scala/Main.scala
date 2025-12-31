@@ -18,8 +18,6 @@ object Main {
       true
     }) {}
 
-
   }
 }
-
 

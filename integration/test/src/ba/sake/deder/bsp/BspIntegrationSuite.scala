@@ -188,7 +188,7 @@ class BspIntegrationSuite extends munit.FunSuite {
     )
   }
 
-  // TODO faila
+  // TODO fails
   /*
   test("Run Tests") {
     client.testTargetsTestSuccessfully(

@@ -16,19 +16,11 @@
 
 ## Misc
 
-- maybe use "CI" env var to disable BSP/semanticdb in CI runners?
-    - and enable locally by default..
-
 - temp override of settings, say scalacOptions when running BSP request??? hmmm
-
 - use proper logger for server, or at least add timestamps
-
 
 ## BSP
 - java main classes cant be run..??
-- test run doesnt work, although Metals should cover DAP (same should work for Mill...)
-- add BSP integration tests from Metals and testkit??
-    - https://scalameta.org/metals/docs/integrations/new-build-tool/#automated-tests
 
 
 ## Packaging, publishing
@@ -62,7 +54,6 @@ Locally would be interesting to have a dashboard with nice overview:
 https://github.com/pf4j/pf4j ?
 
 - maybe just use a simple ServiceLoader with start() + configure(): Seq[Task[?]] + stop()
-
 - just give it CoreTasks so it can make deps
 - add `runsBefore` so that graph can be made properly
 - define its config in Pkl and distribute in its JAR or??

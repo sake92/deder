@@ -57,18 +57,22 @@ deder plan -m common -t compileClasspath
 # by default executes compile on all modules
 deder exec
 
-# execute compile explicitly, on all modules
+# execute "compile" task explicitly, on all modules
 deder exec -t compile
+# compile the "common" module
+deder exec -t compile -m common
+# compile modules that start with "uber"
+deder exec -t compile -m uber%
 
-# execute run explicitly, on uber module
+# run the "uber" module
 deder exec -t run -m uber
 
-# execute run in watch mode
+# execute "run" in watch mode
 deder exec -t run -m frontend --watch
 # even in multiple terminals at the same time!!!
 deder exec -t run -m backend --watch
 
-# execute test on uber-test module
+# execute tests on "uber-test" module
 deder exec -t test -m uber-test
 
 

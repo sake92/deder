@@ -81,15 +81,9 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
       case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
       case Right(s)  => s
 
-    // TODO deduplicate unnecessary work !
+    // TODO deduplicate unnecessary work!? figure out if parent transitively runs dependent module task
     val allModuleIds = state.tasksResolver.allModules.map(_.id)
-    val selectedModuleIds =
-      if moduleSelectors.isEmpty then allModuleIds
-      else
-        moduleSelectors.flatMap { selector =>
-          // TODO improve wildcard selection, e.g mymodule%jvm
-          allModuleIds.filter(_ == selector)
-        }
+    val selectedModuleIds = WildcardUtils.getMatches(allModuleIds, moduleSelectors)
 
     val plural = if selectedModuleIds.size > 1 then "s" else ""
     serverNotificationsLogger.add(
