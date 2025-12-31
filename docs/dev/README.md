@@ -2,10 +2,12 @@
 
 ## Running integration tests
 
-export DEDER_CLIENT_PATH="$(realpath out/client/assembly.dest/out.jar)"
-export DEDER_SERVER_PATH="$(realpath out/server/assembly.dest/out.jar)"
-
-./mill integration.test
+```shell
+# run all
+./scripts/run-it-tests.sh
+# or just one
+./scripts/run-it-tests.sh ba.sake.deder.bsp.BspIntegrationSuite
+```
 
 ## Architecture
 

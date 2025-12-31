@@ -23,6 +23,7 @@ class ServerNotificationsLogger(callback: ServerNotification => Unit) extends St
       case _: ServerNotification.CompileStarted    =>
       case _: ServerNotification.CompileDiagnostic =>
       case _: ServerNotification.CompileFinished   =>
+      case _: ServerNotification.CompileFailed   =>
       case _: ServerNotification.RunSubprocess     =>
       case _: ServerNotification.RequestFinished   =>
     }

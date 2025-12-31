@@ -31,6 +31,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   private def makeServerNotificationsLogger(
       originId: Option[String] = None,
       taskId: Option[TaskId] = None,
+      moduleId: Option[String] = None,
       isCompileTask: Boolean = false
   ) = {
     ServerNotificationsLogger { sn =>
@@ -42,7 +43,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           // e.g. mainClasses -> compile
           // or for dependent modules, we only care about the module being compiled directly!
           val targetId = resolveModule(cs.moduleId).map(buildTargetId)
-          val isRelevantCompileNotification = isCompileTask
+          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cs.moduleId)
           if isRelevantCompileNotification then {
             val taskStartParams = TaskStartParams(taskId.orNull)
             taskStartParams.setEventTime(System.currentTimeMillis())
@@ -60,7 +61,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           }
         case tp: ServerNotification.TaskProgress =>
           val targetId = resolveModule(tp.moduleId).map(buildTargetId)
-          val isRelevantCompileNotification = isCompileTask
+          val isRelevantCompileNotification = isCompileTask && moduleId.contains(tp.moduleId)
           if isRelevantCompileNotification then {
             val params = TaskProgressParams(taskId.orNull)
             params.setOriginId(originId.orNull)
@@ -75,7 +76,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           }
         case cd: ServerNotification.CompileDiagnostic =>
           val targetId = resolveModule(cd.moduleId).map(buildTargetId)
-          val isRelevantCompileNotification = isCompileTask
+          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cd.moduleId)
           if isRelevantCompileNotification then {
             val file = cd.problem.position.sourceFile.get
             val problem = cd.problem
@@ -107,10 +108,22 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           }
         case cf: ServerNotification.CompileFinished =>
           val targetId = resolveModule(cf.moduleId).map(buildTargetId)
-          val isRelevantCompileNotification = isCompileTask
+          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cf.moduleId)
           if isRelevantCompileNotification then {
             val status = if cf.errors == 0 then StatusCode.OK else StatusCode.ERROR
             val taskFinishParams = TaskFinishParams(taskId.orNull, status)
+            taskFinishParams.setEventTime(System.currentTimeMillis())
+            taskFinishParams.setOriginId(originId.orNull)
+            taskFinishParams.setMessage(s"Finished compiling ${cf.moduleId}")
+            taskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
+            taskFinishParams.setData(new CompileReport(targetId.orNull, cf.errors, cf.warnings))
+            client.onBuildTaskFinish(taskFinishParams)
+          }
+        case cf: ServerNotification.CompileFailed =>
+          val targetId = resolveModule(cf.moduleId).map(buildTargetId)
+          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cf.moduleId)
+          if isRelevantCompileNotification then {
+            val taskFinishParams = TaskFinishParams(taskId.orNull, StatusCode.ERROR)
             taskFinishParams.setEventTime(System.currentTimeMillis())
             taskFinishParams.setOriginId(originId.orNull)
             taskFinishParams.setMessage(s"Finished compiling ${cf.moduleId}")
@@ -288,6 +301,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             val serverNotificationsLogger = makeServerNotificationsLogger(
               originId = Option(params.getOriginId),
               taskId = Some(subtaskId),
+              moduleId = Some(moduleId),
               isCompileTask = true
             )
             val module = projectStateData.tasksResolver.modulesMap(moduleId)
@@ -406,7 +420,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         DependencySourcesItem(targetId, sourceArtifactFiles.map(f => f.toURI.toString).asJava)
       }
     }
-    val result= DependencySourcesResult(items.asJava)
+    val result = DependencySourcesResult(items.asJava)
     logger.debug(s"buildTargetDependencySources for params ${params} return: ${result}")
     result
   }
@@ -459,7 +473,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           List(javacOptionsItem)
         }
       }
-      val result= JavacOptionsResult(javacOptionsItems.asJava)
+      val result = JavacOptionsResult(javacOptionsItems.asJava)
       logger.debug(s"buildTargetJavacOptions for params ${params} return: ${result}")
       result
     }
@@ -476,18 +490,16 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
         val items =
-          if !isAppModule(module) then List.empty
-          else
-            try {
-              executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask).map { mainClass =>
-                // TODO arguments + JVM opts
-                ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
-              }
-            } catch {
-              case e: TaskEvaluationException =>
-                // module failed to compile for example
-                List.empty
+          try {
+            executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask).map { mainClass =>
+              // TODO arguments + JVM opts
+              ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
             }
+          } catch {
+            case e: TaskEvaluationException =>
+              // module failed to compile for example
+              List.empty
+          }
         ScalaMainClassesItem(targetId, items.asJava)
       }
     }
@@ -526,7 +538,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         }
       }
     }
-    val result= ScalaTestClassesResult(items.asJava)
+    val result = ScalaTestClassesResult(items.asJava)
     logger.debug(s"buildTargetScalaTestClasses for params ${params} return: ${result}")
     result
   }
@@ -566,7 +578,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           List(scalacOptionsItem)
         }
       }
-      val result= ScalacOptionsResult(scalacOptionsItems.asJava)
+      val result = ScalacOptionsResult(scalacOptionsItems.asJava)
       logger.debug(s"buildTargetScalacOptions for params ${params} return: ${result}")
       result
     }
@@ -590,7 +602,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         JvmCompileClasspathItem(targetId, compileClasspath.asJava)
       }
     }
-    val result= JvmCompileClasspathResult(items.asJava)
+    val result = JvmCompileClasspathResult(items.asJava)
     logger.debug(s"buildTargetJvmCompileClasspath for params ${params} return: ${result}")
     result
   }
@@ -686,8 +698,12 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     ensureRunning()
     val result = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
-      val serverNotificationsLogger = makeServerNotificationsLogger(isCompileTask = true)
       val moduleId = params.getTarget.moduleId
+      val serverNotificationsLogger = makeServerNotificationsLogger(
+        originId = Option(params.getOriginId),
+        moduleId = Some(moduleId),
+        isCompileTask = true
+      )
       val isRunnable = isAppModule(resolveModule(moduleId).get)
       if !isRunnable then throw DederException(s"Module ${moduleId} does not have a main class to run")
       val args = Option(params.getArguments).map(_.asScala.toSeq).getOrElse(Seq.empty)
@@ -715,7 +731,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       ensureRunning()
       val result = withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
-        val serverNotificationsLogger = makeServerNotificationsLogger(isCompileTask = true)
+        val serverNotificationsLogger =
+          makeServerNotificationsLogger(originId = Option(params.getOriginId), isCompileTask = true)
         var allTestsSucceeded = true
         val targets = params.getTargets.asScala
         val untestableTargets = targets.filterNot { targetId =>

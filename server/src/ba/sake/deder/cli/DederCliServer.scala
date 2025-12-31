@@ -360,6 +360,8 @@ object CliServerMessage {
       None
     case cs: ServerNotification.CompileFinished =>
       None
+    case cf: ServerNotification.CompileFailed =>
+      None
     case rs: ServerNotification.RunSubprocess =>
       Some(CliServerMessage.RunSubprocess(rs.cmd, rs.watch))
     case ServerNotification.RequestFinished(success) =>

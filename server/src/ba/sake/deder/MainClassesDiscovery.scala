@@ -11,10 +11,8 @@ import com.typesafe.scalalogging.StrictLogging
 object MainClassesDiscovery extends StrictLogging {
 
   def discover(classpath: Seq[os.Path]): Seq[String] = {
-
     val cp = classpath.map(_.toNIO.toString()).mkString(File.pathSeparator)
-    logger.debug(s"Scanning for mainclasses: ${cp}")
-
+    logger.debug(s"Scanning for main classes: ${cp}")
     val mainClasses = Using.resource(
       new ClassGraph()
         .overrideClasspath(cp)
@@ -22,18 +20,18 @@ object MainClassesDiscovery extends StrictLogging {
         .scan()
     ) { scan =>
       scan
-        .getAllClasses()
+        .getAllClasses
         .filter { classInfo =>
           val mainMethods = classInfo.getMethodInfo().filter { m =>
-            m.getName() == "main" && m.isPublic() && m.isStatic() && {
-              val ps = m.getParameterInfo()
+            m.getName == "main" && m.isPublic && m.isStatic && {
+              val ps = m.getParameterInfo
               ps.length == 1 &&
-              ps(0).getTypeSignatureOrTypeDescriptor().toString() == "java.lang.String[]"
+              ps(0).getTypeSignatureOrTypeDescriptor.toString == "java.lang.String[]"
             }
           }
-          !mainMethods.isEmpty()
+          !mainMethods.isEmpty
         }
-        .getNames()
+        .getNames
     }
 
     logger.debug(s"Found main classes: ${mainClasses}")

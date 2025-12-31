@@ -24,6 +24,8 @@ enum ServerNotification {
   case CompileDiagnostic(moduleId: String, problem: xsbti.Problem)
 
   case CompileFinished(moduleId: String, errors: Int, warnings: Int)
+  
+  case CompileFailed(moduleId: String, errors: Int, warnings: Int)
 
   // tell client to run this subprocess
   case RunSubprocess(cmd: Seq[String], watch: Boolean)

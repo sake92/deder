@@ -1,6 +1,6 @@
 package uber
 
-import org.jsoup.Jsoup // testing deps
+import org.jsoup.Jsoup
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -14,9 +14,10 @@ object Main {
     while ({
       print("Type something: ")
       val line = scala.io.StdIn.readLine()
-      println(s"You aaaaaaaaaa: $line")
+      println(s"You said: $line")
       true
     }) {}
+
 
   }
 }
