@@ -58,7 +58,10 @@ object ServerMain extends StrictLogging {
       tasksExecutorService.shutdownNow()
       sys.exit(0)
     }
-    val projectState = DederProjectState(maxInactiveSeconds, tasksExecutorService, onShutdown)
+
+    val coreTasks = CoreTasks()
+    val tasksRegistry = TasksRegistry(coreTasks)
+    val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
 
     val cliServer = DederCliServer(projectState)
     val cliServerThread = new Thread(() => cliServer.start(), "DederCliServer")

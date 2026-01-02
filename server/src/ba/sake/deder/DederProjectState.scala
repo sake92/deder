@@ -16,14 +16,17 @@ import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
 
-class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorService, onShutdown: () => Unit)
-    extends StrictLogging {
+class DederProjectState(
+    tasksRegistry: TasksRegistry,
+    maxInactiveSeconds: Int,
+    tasksExecutorService: ExecutorService,
+    onShutdown: () => Unit
+) extends StrictLogging {
 
   private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)
 
   @volatile private var shutdownStarted = false
 
-  private val tasksRegistry = TasksRegistry()
   private val configParser = ConfigParser()
   private val configFile = DederGlobals.projectRootDir / "deder.pkl"
 
@@ -83,7 +86,8 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
 
     // TODO deduplicate unnecessary work!? figure out if parent transitively runs dependent module task
     val allModuleIds = state.tasksResolver.allModules.map(_.id)
-    val selectedModuleIds = if moduleSelectors.isEmpty then allModuleIds else WildcardUtils.getMatches(allModuleIds, moduleSelectors)
+    val selectedModuleIds =
+      if moduleSelectors.isEmpty then allModuleIds else WildcardUtils.getMatches(allModuleIds, moduleSelectors)
 
     val plural = if selectedModuleIds.size > 1 then "s" else ""
     serverNotificationsLogger.add(
@@ -168,9 +172,9 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
       lastRequestStartedAt.set(Instant.now())
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
 
-      val state = (if useLastGood then lastGood else current).toOption.getOrElse(
-        throw TaskEvaluationException(s"Project state is not available (lastGood=${useLastGood})")
-      )
+      val state = (if useLastGood then lastGood else current) match
+        case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
+        case Right(s)  => s
 
       val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(moduleId, taskName)
       val tasksExecStages = state.executionPlanner.getExecStages(moduleId, taskName)

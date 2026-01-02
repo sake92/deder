@@ -13,7 +13,8 @@ class TasksResolverSuite extends munit.FunSuite {
     val parsedConfig = configParser.parse(projectConfigStr)
     assert(parsedConfig.isRight, parsedConfig.left.get)
     val projectConfig = parsedConfig.toOption.get
-    val tasksRegistry = TasksRegistry()
+    val coreTasks = CoreTasks()
+    val tasksRegistry = TasksRegistry(coreTasks)
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
     val modules = tasksResolver.allModules.map(_.asInstanceOf[ScalaModule])
 

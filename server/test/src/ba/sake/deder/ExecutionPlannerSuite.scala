@@ -12,7 +12,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
     val configParser = ConfigParser()
     val parsedConfig = configParser.parse(projectConfigStr)
     val projectConfig = parsedConfig.toOption.get
-    val tasksRegistry = TasksRegistry()
+    val tasksRegistry = TasksRegistry(CoreTasks())
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
     val executionPlanner = ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
     val modules = tasksResolver.allModules.map(_.asInstanceOf[ScalaModule])
@@ -74,7 +74,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
     val configParser = ConfigParser()
     val parsedConfig = configParser.parse(projectConfigStr)
     val projectConfig = parsedConfig.toOption.get
-    val tasksRegistry = TasksRegistry()
+    val tasksRegistry = TasksRegistry(CoreTasks())
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
     val executionPlanner = ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
     val modules = tasksResolver.allModules.map(_.asInstanceOf[ScalaModule])
@@ -95,7 +95,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
     val configParser = ConfigParser()
     val parsedConfig = configParser.parse(projectConfigStr)
     val projectConfig = parsedConfig.toOption.get
-    val tasksRegistry = TasksRegistry()
+    val tasksRegistry = TasksRegistry(CoreTasks())
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
     val executionPlanner = ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
     val modules = tasksResolver.allModules.map(_.asInstanceOf[ScalaModule])
