@@ -83,7 +83,7 @@ class DederProjectState(maxInactiveSeconds: Int, tasksExecutorService: ExecutorS
 
     // TODO deduplicate unnecessary work!? figure out if parent transitively runs dependent module task
     val allModuleIds = state.tasksResolver.allModules.map(_.id)
-    val selectedModuleIds = WildcardUtils.getMatches(allModuleIds, moduleSelectors)
+    val selectedModuleIds = if moduleSelectors.isEmpty then allModuleIds else WildcardUtils.getMatches(allModuleIds, moduleSelectors)
 
     val plural = if selectedModuleIds.size > 1 then "s" else ""
     serverNotificationsLogger.add(

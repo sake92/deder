@@ -32,7 +32,7 @@ abstract class DederModule {
       true
 
   hidden rootValidation = (value: String) ->
-    if (!value.matches(Regex("^[a-zA-Z0-9/_-]+$")))
+    if (!value.matches(Regex("^[.a-zA-Z0-9/_-]+$")))
       throw("Root must be alphanumeric and can contain '_', '-', and '/' but got: " + value)
     else
       true

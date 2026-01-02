@@ -460,7 +460,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             Seq(
               "-processorpath",
               javacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator),
-              s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir}"
+              s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir} -build-tool:sbt"
             )
           val compileClasspath =
             try

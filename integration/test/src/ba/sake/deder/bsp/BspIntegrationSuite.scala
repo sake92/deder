@@ -199,15 +199,15 @@ class BspIntegrationSuite extends munit.FunSuite {
   test("Run javacOptions") {
     def classDirectory(moduleId: String) =
       testDirectory.resolve(s".deder/out/${moduleId}/classes").toUri.toString
-    def options(moduleId: String) = List(
+    def javacOptions(moduleId: String) = List(
       "-processorpath",
       coursierCachedFile("com/sourcegraph/semanticdb-javac/0.11.1/semanticdb-javac-0.11.1.jar").toString,
-      s"-Xplugin:semanticdb -sourceroot:${testDirectory} -targetroot:${classDirectory(moduleId)}"
+      s"-Xplugin:semanticdb -sourceroot:${testDirectory} -targetroot:${classDirectory(moduleId)} -build-tool:sbt"
     ).asJava
     val javacOptionsItems = List(
       new JavacOptionsItem(
         commonTargetId,
-        options("common"),
+        javacOptions("common"),
         List(
           classDirectory("common"),
           coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
@@ -217,7 +217,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       ),
       new JavacOptionsItem(
         frontendTargetId,
-        options("frontend"),
+        javacOptions("frontend"),
         List(
           classDirectory("frontend"),
           classDirectory("common"),
@@ -228,7 +228,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       ),
       new JavacOptionsItem(
         backendTargetId,
-        options("backend"),
+        javacOptions("backend"),
         List(
           classDirectory("backend"),
           classDirectory("common"),
@@ -239,7 +239,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       ),
       new JavacOptionsItem(
         uberTargetId,
-        options("uber"),
+        javacOptions("uber"),
         List(
           classDirectory("uber"),
           classDirectory("backend"),
@@ -252,7 +252,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       ),
       new JavacOptionsItem(
         uberTestTargetId,
-        options("uber-test"),
+        javacOptions("uber-test"),
         List(
           classDirectory("uber-test"),
           classDirectory("uber"),

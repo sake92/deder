@@ -357,7 +357,8 @@ class CoreTasks() extends StrictLogging {
           )
           .toSeq
           .flatten ++ Option.when(semanticdbEnabled)(
-          s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir}"
+            // https://github.com/sourcegraph/scip-java/issues/390
+          s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir} -build-tool:sbt"
         )
 
       val semanticDbScalacOpts =

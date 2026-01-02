@@ -4,7 +4,8 @@ import java.io.File
 import java.nio.file.Path
 import java.util.Optional
 import java.util.function.Supplier
-import sbt.internal.inc.{FileAnalysisStore, PlainVirtualFileConverter, ZincUtil}
+import sbt.internal.inc.{FileAnalysisStore, MappedFileConverter, ZincUtil}
+import sbt.internal.inc.Locate
 import sbt.internal.inc.consistent.ConsistentFileAnalysisStore
 import sbt.internal.util.ManagedLogger
 import sbt.util.LoggerContext
@@ -28,6 +29,7 @@ import com.typesafe.scalalogging.StrictLogging
 import sbt.internal.inc.ScalaInstance
 import ba.sake.deder.ServerNotificationsLogger
 import ba.sake.deder.ServerNotification
+import ba.sake.deder.DederGlobals
 
 object ZincCompiler {
   def apply(compilerBridgeJar: os.Path): ZincCompiler =
@@ -83,16 +85,16 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
 
     val classpathOptions = ClasspathOptionsUtil.auto()
     val scalaCompiler = ZincUtil.scalaCompiler(scalaInstance, compilerBridgeJar.toIO, classpathOptions)
-    val javaHome = os.Path(scala.util.Properties.javaHome) // TODO customize?
+    val javaHome = Option.empty[Path]// Some(os.Path(scala.util.Properties.javaHome).toNIO) // TODO customize?
     val compilers =
-      ZincUtil.compilers(scalaInstance, classpathOptions, javaHome = Some(javaHome.toNIO), scalac = scalaCompiler)
+      ZincUtil.compilers(scalaInstance, classpathOptions, javaHome, scalac = scalaCompiler)
 
-    val converter = PlainVirtualFileConverter.converter
+    val converter = MappedFileConverter.empty
     val sourcesVFs = sources.map(s => converter.toVirtualFile(s.toNIO)).toArray
-    val classpath = compileClasspath.map(f => converter.toVirtualFile(f.toNIO)).toArray
+    val classpathVFs = compileClasspath.map(f => converter.toVirtualFile(f.toNIO)).toArray
 
     val compileOptions = CompileOptions.of(
-      /*_classpath =*/ classpath,
+      /*_classpath =*/ classpathVFs,
       /*_sources =*/ sourcesVFs,
       /*_classesDirectory =*/ classesDir.toNIO,
       /*_scalacOptions =*/ scalacOptions.toArray,
@@ -177,10 +179,12 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       notifications: ServerNotificationsLogger
   ): Setup = {
     val perClasspathEntryLookup: PerClasspathEntryLookup = new PerClasspathEntryLookup {
-      override def analysis(x$0: xsbti.VirtualFile): java.util.Optional[CompileAnalysis] =
+      override def analysis(classpathEntry: xsbti.VirtualFile): java.util.Optional[CompileAnalysis] =
+        // TODO
         Optional.empty[CompileAnalysis]
 
-      override def definesClass(x$0: xsbti.VirtualFile): DefinesClass = (className: String) => true
+      override def definesClass(classpathEntry: xsbti.VirtualFile): DefinesClass = (className: String) => 
+        Locate.definesClass(classpathEntry).apply(className)
     }
 
     val skip: Boolean = false
