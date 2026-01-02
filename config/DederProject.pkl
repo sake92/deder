@@ -32,7 +32,7 @@ abstract class DederModule {
       true
 
   hidden rootValidation = (value: String) ->
-    if (!value.matches(Regex("^[a-zA-Z0-9/_-]+$")))
+    if (!value.matches(Regex("^[.a-zA-Z0-9/_-]+$")))
       throw("Root must be alphanumeric and can contain '_', '-', and '/' but got: " + value)
     else
       true
@@ -43,6 +43,9 @@ typealias ModuleType = "java" | "scala" | "scala-test"
 open class JavaModule extends DederModule {
   type = "java"
   resources: Listing<String> = new Listing { "resources" }
+  javaHome: String?
+  jvmOptions: Listing<String> = new Listing {}
+  javaVersion: String?
   javacOptions: Listing<String> = new Listing {}
   mainClass: String? = null
   deps: Listing<String> = new Listing {}
