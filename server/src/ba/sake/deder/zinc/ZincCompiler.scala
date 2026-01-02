@@ -1,6 +1,7 @@
 package ba.sake.deder.zinc
 
 import java.io.File
+import java.net.URLClassLoader
 import java.nio.file.Path
 import java.util.Optional
 import java.util.function.Supplier
@@ -41,6 +42,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
   private val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
 
   def compile(
+      javaHome: Option[Path],
       scalaVersion: String,
       compilerJars: Seq[os.Path], // compiler + reflect
       compileClasspath: Seq[os.Path],
@@ -59,15 +61,15 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
     }
 
     val parentClassloader = this.getClass.getClassLoader
-    val libraryClassloader = new java.net.URLClassLoader(
+    val libraryClassloader = new URLClassLoader(
       scalaLibraryJars.map(_.toNIO.toUri.toURL).toArray,
       parentClassloader
     )
-    val compilerClassloader = new java.net.URLClassLoader(
+    val compilerClassloader = new URLClassLoader(
       compilerJars.map(_.toNIO.toUri.toURL).toArray,
       libraryClassloader
     )
-    val allJarsClassloader = new java.net.URLClassLoader(
+    val allJarsClassloader = new URLClassLoader(
       (compilerJars ++ scalaLibraryJars).map(_.toNIO.toUri.toURL).toArray,
       parentClassloader
     )
@@ -85,7 +87,6 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
 
     val classpathOptions = ClasspathOptionsUtil.auto()
     val scalaCompiler = ZincUtil.scalaCompiler(scalaInstance, compilerBridgeJar.toIO, classpathOptions)
-    val javaHome = Option.empty[Path]// Some(os.Path(scala.util.Properties.javaHome).toNIO) // TODO customize?
     val compilers =
       ZincUtil.compilers(scalaInstance, classpathOptions, javaHome, scalac = scalaCompiler)
 
@@ -179,7 +180,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       notifications: ServerNotificationsLogger
   ): Setup = {
     val perClasspathEntryLookup: PerClasspathEntryLookup = new PerClasspathEntryLookup {
-      override def analysis(classpathEntry: xsbti.VirtualFile): java.util.Optional[CompileAnalysis] =
+      override def analysis(classpathEntry: xsbti.VirtualFile): Optional[CompileAnalysis] =
         // TODO
         Optional.empty[CompileAnalysis]
 

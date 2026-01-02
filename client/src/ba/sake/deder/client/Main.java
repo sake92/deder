@@ -74,16 +74,10 @@ public class Main {
 				System.err.println("Deder server not running. No need to shutdown.");
 				return;
 			}
-			var lastServerStartAttemptAt = Instant.now();
-			startServer(isBspClient); // TODO maybe try start periodically if in BSP mode?
+			startServer(isBspClient);
 			while (!connected && (keepConnectingInfinitely
 					|| Duration.between(startedConnectingAt, Instant.now()).getSeconds() < maxConnectDurationSeconds)) {
 				try {
-					if (Duration.between(lastServerStartAttemptAt, Instant.now()).getSeconds() >= 10) {
-						log("Retrying to start server...");
-						startServer(isBspClient);
-						lastServerStartAttemptAt = Instant.now();
-					}
 					var sleepMillis = isBspClient ? 1000 : 100;
 					Thread.sleep(sleepMillis);
 					log("Attempting to reconnect to server...");

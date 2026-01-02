@@ -95,6 +95,7 @@ Currently working features:
 - navigation
 - compilation and diagnostics
 - run main scala classes (Java doesnt.. #todo-fixme )
+- run tests
 
 If you work on server code, after you build it you can run `./reset.sh` in examples/multi
 

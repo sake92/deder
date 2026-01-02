@@ -71,6 +71,28 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
+  val javaHomeTask = ConfigValueTask[Option[os.Path]](
+    name = "javaHome",
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
+    execute = { ctx =>
+      ctx.module match {
+        case m: JavaModule => Option(m.javaHome).map(p => os.Path(p))
+        case _             => None
+      }
+    }
+  )
+
+  val javaVersionTask = ConfigValueTask[Option[String]](
+    name = "javaVersion",
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
+    execute = { ctx =>
+      ctx.module match {
+        case m: JavaModule => Option(m.javaVersion)
+        case _             => None
+      }
+    }
+  )
+
   val javacOptionsTask = ConfigValueTask[Seq[String]](
     name = "javacOptions",
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
@@ -290,6 +312,8 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(sourcesTask)
     .dependsOn(generatedSourcesTask)
+    .dependsOn(javaHomeTask)
+    .dependsOn(javaVersionTask)
     .dependsOn(javacOptionsTask)
     .dependsOn(scalacOptionsTask)
     .dependsOn(scalaVersionTask)
@@ -302,6 +326,8 @@ class CoreTasks() extends StrictLogging {
       val (
         sourceDirs,
         generatedSourcesDir,
+        javaHome,
+        javaVersion,
         javacOptions,
         scalacOptions,
         scalaVersion,
@@ -356,8 +382,10 @@ class CoreTasks() extends StrictLogging {
             )
           )
           .toSeq
-          .flatten ++ Option.when(semanticdbEnabled)(
-            // https://github.com/sourcegraph/scip-java/issues/390
+          .flatten ++
+        javaVersion.map(v => Seq("--release", v)).getOrElse(Seq.empty) ++
+        Option.when(semanticdbEnabled)(
+          // https://github.com/sourcegraph/scip-java/issues/390
           s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir} -build-tool:sbt"
         )
 
@@ -370,20 +398,33 @@ class CoreTasks() extends StrictLogging {
         scalacOptions ++ scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++ semanticDbScalacOpts
 
       getZincCompiler(scalaVersion).compile(
-        scalaVersion,
-        compilerJars,
-        compileClasspath,
-        zincCacheFile,
-        sourceFiles,
-        classesDir,
-        finalScalacOptions,
-        finalJavacOptions,
-        zincLogger,
+        javaHome = javaHome.map(_.toNIO),
+        scalaVersion = scalaVersion,
+        compilerJars = compilerJars,
+        compileClasspath = compileClasspath,
+        zincCacheFile = zincCacheFile,
+        sources = sourceFiles,
+        classesDir = classesDir,
+        scalacOptions = finalScalacOptions,
+        javacOptions = finalJavacOptions,
+        zincLogger = zincLogger,
         moduleId = ctx.module.id,
         notifications = ctx.notifications
       )
       DederPath(classesDir)
     }
+
+
+  val jvmOptionsTask = ConfigValueTask[Seq[String]](
+    name = "jvmOptions",
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
+    execute = { ctx =>
+      ctx.module match {
+        case m: JavaModule => m.jvmOptions.asScala.toSeq
+        case _             => Seq.empty
+      }
+    }
+  )
 
   val runClasspathTask = TaskBuilder
     .make[Seq[os.Path]](
@@ -458,10 +499,11 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(runClasspathTask)
     .dependsOn(finalMainClassTask)
+    .dependsOn(jvmOptionsTask)
     .build { ctx =>
-      val (runClasspath, mainClass) = ctx.depResults
+      val (runClasspath, mainClass, jvmOptions) = ctx.depResults
       val cp = runClasspath.map(_.toString)
-      val cmd = Seq("java", "-cp", cp.mkString(File.pathSeparator), mainClass) ++ ctx.args
+      val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp.mkString(File.pathSeparator), mainClass) ++ ctx.args
       logger.debug(s"Client should run command: ${cmd}")
       ctx.notifications.add(ServerNotification.RunSubprocess(cmd, ctx.watch))
       cmd
@@ -524,6 +566,8 @@ class CoreTasks() extends StrictLogging {
   val all: Seq[Task[?, ?]] = Seq(
     sourcesTask,
     generatedSourcesTask,
+    javaHomeTask,
+    javaVersionTask,
     scalaVersionTask,
     resourcesTask,
     javacOptionsTask,
@@ -542,6 +586,7 @@ class CoreTasks() extends StrictLogging {
     allClassesDirsTask,
     compileClasspathTask,
     compileTask,
+    jvmOptionsTask,
     runClasspathTask,
     mainClassTask,
     mainClassesTask,

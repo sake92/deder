@@ -150,7 +150,7 @@ public class DederCliClient implements DederClient {
 					log("Subprocess still running, not exiting...");
 				} else {
 					running = false;
-					System.exit(exit.exitCode()); // TODO cleanup
+					System.exit(exit.exitCode());
 				}
 			}
 		}

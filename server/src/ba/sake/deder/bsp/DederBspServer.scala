@@ -626,7 +626,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               .map(_.toNIO.toUri.toString)
               .toList
           catch case e: TaskEvaluationException => List.empty
-        val jvmOptions = List.empty[String] // TODO: Get JVM options
+        val jvmOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)
         val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
         val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
         val item = JvmEnvironmentItem(
@@ -637,8 +637,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           environmentVariables.asJava
         )
         val mainClassItems = mainClasses.map { mainClass =>
-          // TODO what are the arguments???
-          JvmMainClass(mainClass, List.empty.asJava)
+          val args = List.empty[String] // TODO
+          JvmMainClass(mainClass, args.asJava)
         }
         item.setMainClasses(mainClassItems.asJava)
         item
@@ -668,7 +668,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               .map(_.toNIO.toUri.toString)
               .toList
           catch case e: TaskEvaluationException => List.empty
-        val jvmOptions = List.empty[String] // TODO: Get JVM options
+        val jvmOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)
         val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
         val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
         val item = JvmEnvironmentItem(
@@ -680,8 +680,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         )
         val testClassItems = testClasses.flatMap { ft =>
           ft.testClasses.map { testClass =>
-            // TODO what are the arguments???
-            JvmMainClass(testClass, List.empty.asJava)
+            val args = List.empty[String] // TODO
+            JvmMainClass(testClass, args.asJava)
           }
         }
         item.setMainClasses(testClassItems.asJava)
@@ -824,15 +824,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val scalaBuildTarget =
           new ScalaBuildTarget("org.scala-lang", m.scalaVersion, binaryVersion, ScalaPlatform.JVM, List.empty.asJava)
         val jvmBuildTarget = new JvmBuildTarget()
-        jvmBuildTarget.setJavaHome(scala.util.Properties.javaHome) // TODO configurable?
-        jvmBuildTarget.setJavaVersion(System.getProperty("java.version")) // TODO configurable?
+        jvmBuildTarget.setJavaHome(m.javaHome)
+        jvmBuildTarget.setJavaVersion(m.javaVersion)
         // scalaBuildTarget.setJvmBuildTarget(jvmBuildTarget)
         buildTarget.setData(scalaBuildTarget)
         buildTarget.setDataKind(BuildTargetDataKind.SCALA)
       case m: DederProject.JavaModule =>
         val jvmBuildTarget = new JvmBuildTarget()
-        jvmBuildTarget.setJavaHome(scala.util.Properties.javaHome) // TODO configurable?
-        jvmBuildTarget.setJavaVersion(System.getProperty("java.version")) // TODO configurable?
+        jvmBuildTarget.setJavaHome(m.javaHome)
+        jvmBuildTarget.setJavaVersion(m.javaVersion)
         buildTarget.setData(jvmBuildTarget)
         buildTarget.setDataKind(BuildTargetDataKind.JVM)
       case _ =>
