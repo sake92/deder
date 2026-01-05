@@ -77,7 +77,9 @@ class IntegrationSuite extends munit.FunSuite {
              |  common.classes
              |  common.deps
              |  common.generatedSources
+             |  common.javaHome
              |  common.javaSemanticdbVersion
+             |  common.javaVersion
              |  common.javacAnnotationProcessorDeps
              |  common.javacOptions
              |  common.scalaSemanticdbVersion
