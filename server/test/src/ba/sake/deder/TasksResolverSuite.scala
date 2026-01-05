@@ -62,6 +62,9 @@ class TasksResolverSuite extends munit.FunSuite {
       assertEquals(
         commonModuleTaskInstances.map(_.task.name).toSet,
         Set(
+          "javaHome",
+          "javaVersion",
+          "jvmOptions",
           "sources",
           "generatedSources",
           "scalaVersion",
@@ -93,6 +96,9 @@ class TasksResolverSuite extends munit.FunSuite {
       assertEquals(
         uberTestModuleTasks.map(_.task.name).toSet,
         Set(
+          "javaHome",
+          "javaVersion",
+          "jvmOptions",
           "sources",
           "generatedSources",
           "scalaVersion",
@@ -158,6 +164,7 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.mainClasses", s"${moduleId}.classes"),
       (s"${moduleId}.finalMainClass", s"${moduleId}.mainClasses"),
       (s"${moduleId}.finalMainClass", s"${moduleId}.mainClass"),
+      (s"${moduleId}.run", s"${moduleId}.jvmOptions"),
       (s"${moduleId}.run", s"${moduleId}.runClasspath"),
       (s"${moduleId}.run", s"${moduleId}.finalMainClass")
     )
@@ -190,6 +197,8 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.scalacPlugins", s"${moduleId}.scalacPluginDeps"),
       (s"${moduleId}.compile", s"${moduleId}.sources"),
       (s"${moduleId}.compile", s"${moduleId}.generatedSources"),
+      (s"${moduleId}.compile", s"${moduleId}.javaHome"),
+      (s"${moduleId}.compile", s"${moduleId}.javaVersion"),
       (s"${moduleId}.compile", s"${moduleId}.javacOptions"),
       (s"${moduleId}.compile", s"${moduleId}.scalacOptions"),
       (s"${moduleId}.compile", s"${moduleId}.scalaVersion"),
