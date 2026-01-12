@@ -6,7 +6,7 @@
 - modules are "subprojects", like common/frontend/app..
 - modules have tasks defined for them
 
-See [examples/multi](examples/multi/) for a working example project.
+See [examples/multi](https://github.com/sake92/deder/tree/main/examples/multi) for a working example project.
 
 ## Installation
 
