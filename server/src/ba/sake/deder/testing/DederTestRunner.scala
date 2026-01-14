@@ -17,14 +17,21 @@ class DederTestRunner(
     logger: DederTestLogger
 ) {
 
-  def run(options: DederTestOptions = DederTestOptions()): DederTestResults = {
+  def run(options: DederTestOptions): DederTestResults = {
     val res = if (tests.isEmpty) {
       logger.warn("No tests found on the classpath.")
       DederTestResults.empty
     } else {
-      logger.info(s"Found ${tests.size} test framework(s): ${tests.map(_._1.name()).mkString(", ")}")
+      logger.debug(s"Found ${tests.size} test framework(s): ${tests.map(_._1.name()).mkString(", ")}")
       val allResults = tests.flatMap { case (framework, testClasses) =>
-        runFramework(framework, testClasses, options)
+        val testClassNames = testClasses.map(_._1)
+        val selectedTestClassNames =
+          if options.testSuiteSelectors.isEmpty then testClassNames
+          else WildcardUtils.getMatches(testClassNames, options.testSuiteSelectors)
+        val selectedTestClasses = testClasses.filter { case (c, _) =>
+          selectedTestClassNames.contains(c)
+        }
+        runFramework(framework, selectedTestClasses, options)
       }
       DederTestResults.aggregate(allResults)
     }
@@ -49,7 +56,7 @@ class DederTestRunner(
       Array.empty[String], // remoteArgs
       classLoader
     )
-    val tasks = testClasses.map { case (className, fingerprint) =>
+    val tasks = testClasses.flatMap { case (className, fingerprint) =>
       val taskDef = new TaskDef(
         className,
         fingerprint,
@@ -57,7 +64,7 @@ class DederTestRunner(
         Array(new SuiteSelector) // selectors
       )
       runner.tasks(Array(taskDef))
-    }.flatten
+    }
     val handler = DederTestEventHandler(logger)
     executeTasks(tasks, handler)
     val summary = runner.done()
@@ -76,9 +83,7 @@ class DederTestRunner(
 }
 
 case class DederTestOptions(
-    parallel: Boolean = false,
-    tags: Set[String] = Set.empty,
-    excludeTags: Set[String] = Set.empty
+    testSuiteSelectors: Seq[String]
 )
 
 class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {

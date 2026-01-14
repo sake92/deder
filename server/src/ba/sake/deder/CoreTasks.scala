@@ -559,7 +559,8 @@ class CoreTasks() extends StrictLogging {
         classLoader = classLoader,
         logger = DederTestLogger(ctx.notifications, ctx.module.id)
       )
-      testRunner.run()
+      val testOptions = DederTestOptions(ctx.args)
+      testRunner.run(testOptions)
     }
 
   // order matters for dependency resolution!!

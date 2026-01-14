@@ -72,9 +72,14 @@ deder exec -t run -m frontend --watch
 # even in multiple terminals at the same time!!!
 deder exec -t run -m backend --watch
 
+# execute all tests on all test modules
+deder exec -t test
 # execute tests on "uber-test" module
 deder exec -t test -m uber-test
-
+# execute a specific test suite
+deder exec -t test uber.MyTestSuite1
+# execute test suites that start with "uber"
+deder exec -t test uber.%
 
 ################ BSP
 # write BSP config file for current project
