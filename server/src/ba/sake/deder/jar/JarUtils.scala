@@ -28,7 +28,7 @@ object JarUtils {
   def create(
                  jar: os.Path,
                  inputPaths: Seq[os.Path],
-                 manifest: JarManifest = JarManifest.Empty,
+                 manifest: JarManifest = JarManifest.Default,
                  fileFilter: (os.Path, os.RelPath) => Boolean = (_, _) => true,
                  includeDirs: Boolean = true,
                  timestamp: Option[Long] = None

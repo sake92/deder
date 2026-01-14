@@ -47,7 +47,7 @@ object JarManifest {
 
   final val Empty: JarManifest = JarManifest()
 
-  final val MillDefault: JarManifest = JarManifest(
+  final val Default: JarManifest = JarManifest(
     main = Map[String, String](
       java.util.jar.Attributes.Name.MANIFEST_VERSION.toString -> "1.0",
       "Created-By" -> s"Deder build tool",

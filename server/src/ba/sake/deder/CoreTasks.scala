@@ -13,7 +13,7 @@ import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, S
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
-import ba.sake.deder.jar.JarUtils
+import ba.sake.deder.jar.{JarManifest, JarUtils}
 import ba.sake.deder.testing.*
 
 class CoreTasks() extends StrictLogging {
@@ -402,7 +402,13 @@ class CoreTasks() extends StrictLogging {
       val semanticDbScalacOpts =
         if semanticdbEnabled then
           if scalaVersion.startsWith("3.") then
-            Seq("-Xsemanticdb", s"-sourceroot", DederGlobals.projectRootDir.toString, "-semanticdb-target:", semanticdbDir.toString)
+            Seq(
+              "-Xsemanticdb",
+              s"-sourceroot",
+              DederGlobals.projectRootDir.toString,
+              "-semanticdb-target:",
+              semanticdbDir.toString
+            )
           else
             Seq(
               "-Yrangepos",
@@ -586,13 +592,20 @@ class CoreTasks() extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
     )
     .dependsOn(compileTask)
+    .dependsOn(mainClassTask)
     .build { ctx =>
-      val localClasspath = ctx.depResults._1
+      val (localClasspath, mainClass) = ctx.depResults
       val jarPath = ctx.out / "out.jar"
       val jarInputPaths = Seq(localClasspath.absPath)
+      val manifest = mainClass match {
+        case Some(mc) =>
+          JarManifest.Default.add(java.util.jar.Attributes.Name.MAIN_CLASS.toString -> mc)
+        case None => JarManifest.Default
+      }
       JarUtils.create(
         jarPath,
-        jarInputPaths
+        jarInputPaths,
+        manifest
       )
     }
 
