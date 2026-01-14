@@ -486,21 +486,24 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
-      params.getTargets.asScala.map { targetId =>
+      params.getTargets.asScala.flatMap { targetId =>
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
-        val items =
-          try {
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask).map { mainClass =>
-              // TODO arguments + JVM opts
-              ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
+        // metals sometimes requires it even for test modules.. sigh
+        Option.when(isAppModule(module)) {
+          val items =
+            try {
+              executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask).map { mainClass =>
+                // TODO arguments + JVM opts
+                ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
+              }
+            } catch {
+              case e: TaskEvaluationException =>
+                // module failed to compile for example
+                List.empty
             }
-          } catch {
-            case e: TaskEvaluationException =>
-              // module failed to compile for example
-              List.empty
-          }
-        ScalaMainClassesItem(targetId, items.asJava)
+          ScalaMainClassesItem(targetId, items.asJava)
+        }
       }
     }
     val result = ScalaMainClassesResult(items.asJava)
@@ -615,33 +618,37 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
-      params.getTargets.asScala.map { targetId =>
+      params.getTargets.asScala.flatMap { targetId =>
         val moduleId = targetId.moduleId
-        val mainClasses =
-          try executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)
-          catch case e: TaskEvaluationException => Seq.empty
-        val classpath =
-          try
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
-              .map(_.toNIO.toUri.toString)
-              .toList
-          catch case e: TaskEvaluationException => List.empty
-        val jvmOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)
-        val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
-        val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
-        val item = JvmEnvironmentItem(
-          targetId,
-          classpath.asJava,
-          jvmOptions.asJava,
-          workingDirectory,
-          environmentVariables.asJava
-        )
-        val mainClassItems = mainClasses.map { mainClass =>
-          val args = List.empty[String] // TODO
-          JvmMainClass(mainClass, args.asJava)
+        val module = projectStateData.tasksResolver.modulesMap(moduleId)
+        // metals sometimes requires it even for test modules.. sigh
+        Option.when(isAppModule(module)) {
+          val mainClasses =
+            try executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)
+            catch case e: TaskEvaluationException => Seq.empty
+          val classpath =
+            try
+              executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
+                .map(_.toNIO.toUri.toString)
+                .toList
+            catch case e: TaskEvaluationException => List.empty
+          val jvmOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)
+          val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
+          val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
+          val item = JvmEnvironmentItem(
+            targetId,
+            classpath.asJava,
+            jvmOptions.asJava,
+            workingDirectory,
+            environmentVariables.asJava
+          )
+          val mainClassItems = mainClasses.map { mainClass =>
+            val args = List.empty[String] // TODO
+            JvmMainClass(mainClass, args.asJava)
+          }
+          item.setMainClasses(mainClassItems.asJava)
+          item
         }
-        item.setMainClasses(mainClassItems.asJava)
-        item
       }
     }
     val result = JvmRunEnvironmentResult(items.asJava)
