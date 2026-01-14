@@ -89,60 +89,67 @@ class DederProjectState(
     val selectedModuleIds =
       if moduleSelectors.isEmpty then allModuleIds else WildcardUtils.getMatches(allModuleIds, moduleSelectors)
 
-    val plural = if selectedModuleIds.size > 1 then "s" else ""
-    serverNotificationsLogger.add(
-      ServerNotification.logInfo(s"Executing ${taskName} on module${plural}: ${selectedModuleIds.mkString(", ")}")
-    )
     if selectedModuleIds.isEmpty then {
       serverNotificationsLogger.add(
         ServerNotification.logError(s"No modules found for selectors: ${moduleSelectors.mkString(", ")}")
       )
       serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
-    } else
-      try {
-        var jsonValues = Map.empty[String, JValue]
-        selectedModuleIds.foreach { moduleId =>
-          val taskInstance = state.executionPlanner.getTaskInstance(moduleId, taskName)
-          val (taskRes, _) = executeTask(
-            moduleId,
-            taskInstance.task,
-            args,
-            serverNotificationsLogger,
-            watch = startWatch,
-            useLastGood = useLastGood
-          )
-          if json then
-            val jsonRes = taskInstance.task.rw.write(taskRes)
-            jsonValues = jsonValues.updated(moduleId, jsonRes)
-          if startWatch then {
-            val affectingSourceFileTasks =
-              state.executionPlanner.getAffectingSourceFileTasks(moduleId, taskName)
-            val affectingConfigValueTasks =
-              state.executionPlanner.getAffectingConfigValueTasks(moduleId, taskName)
-            watchedTasks = watchedTasks.appended(
-              WatchedTaskData(
-                clientId,
-                taskInstance,
-                args,
-                serverNotificationsLogger,
-                useLastGood,
-                json,
-                affectingSourceFileTasks,
-                affectingConfigValueTasks
-              )
-            )
-            serverNotificationsLogger.add(
-              ServerNotification.logInfo(s"⌚ Executing ${moduleId}.${taskName} in watch mode...")
-            )
-          }
+    } else {
+
+      var jsonValues = Map.empty[String, JValue]
+      var success = true
+      val relevantModuleAndTasks = selectedModuleIds.flatMap { moduleId =>
+        state.executionPlanner.getTaskInstanceOpt(moduleId, taskName).map { taskInstance =>
+          moduleId -> taskInstance
         }
-        if json then serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
-        if exitOnEnd then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
-      } catch {
-        case e: TaskNotFoundException =>
-          serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
-          serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
       }
+      if relevantModuleAndTasks.isEmpty then {
+        success = false
+        serverNotificationsLogger.add(ServerNotification.logError(s"No '${taskName}' tasks found for modules: ${selectedModuleIds.mkString(", ")}"))
+      } else {
+        val plural = if relevantModuleAndTasks.size > 1 then "s" else ""
+        serverNotificationsLogger.add(
+          ServerNotification.logInfo(s"Executing '${taskName}' task on module${plural}: ${relevantModuleAndTasks.map(_._1).mkString(", ")}")
+        )
+      }
+      relevantModuleAndTasks.foreach { case (moduleId, taskInstance) =>
+        val (taskRes, _) = executeTask(
+          moduleId,
+          taskInstance.task,
+          args,
+          serverNotificationsLogger,
+          watch = startWatch,
+          useLastGood = useLastGood
+        )
+        if json then
+          val jsonRes = taskInstance.task.rw.write(taskRes)
+          jsonValues = jsonValues.updated(moduleId, jsonRes)
+        if startWatch then {
+          val affectingSourceFileTasks =
+            state.executionPlanner.getAffectingSourceFileTasks(moduleId, taskName)
+          val affectingConfigValueTasks =
+            state.executionPlanner.getAffectingConfigValueTasks(moduleId, taskName)
+          watchedTasks = watchedTasks.appended(
+            WatchedTaskData(
+              clientId,
+              taskInstance,
+              args,
+              serverNotificationsLogger,
+              useLastGood,
+              json,
+              affectingSourceFileTasks,
+              affectingConfigValueTasks
+            )
+          )
+          serverNotificationsLogger.add(
+            ServerNotification.logInfo(s"⌚ Executing ${moduleId}.${taskName} in watch mode...")
+          )
+        }
+      }
+      if json then serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
+      if exitOnEnd then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = success))
+    }
+
   } catch {
     case NonFatal(e) =>
       serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))

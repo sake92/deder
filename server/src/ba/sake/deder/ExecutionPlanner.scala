@@ -117,9 +117,12 @@ class ExecutionPlanner(
     affectingTasks.result()
   }
 
-  def getTaskInstance(moduleId: String, taskName: String): TaskInstance = {
-    tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName).getOrElse {
+  def getTaskInstanceOpt(moduleId: String, taskName: String): Option[TaskInstance] =
+    tasksPerModule.get(moduleId).flatMap(_.find(_.task.name == taskName))
+  
+  def getTaskInstance(moduleId: String, taskName: String): TaskInstance =
+    getTaskInstanceOpt(moduleId, taskName).getOrElse {
       throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
     }
-  }
+  
 }
