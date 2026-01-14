@@ -452,6 +452,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val moduleId = targetId.moduleId
           val classesDir =
             executeTask(serverNotificationsLogger, moduleId, coreTasks.classesDirTask).toNIO.toUri.toString
+          val semanticdbDir =
+              executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask).toNIO.toUri.toString
           val javacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.javacOptionsTask)
           val javacAnnotationProcessors =
             try executeTask(serverNotificationsLogger, moduleId, coreTasks.javacAnnotationProcessorsTask)
@@ -460,7 +462,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             Seq(
               "-processorpath",
               javacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator),
-              s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir} -build-tool:sbt"
+              s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${semanticdbDir} -build-tool:sbt"
             )
           val compileClasspath =
             try
@@ -557,15 +559,17 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val moduleId = targetId.moduleId
           val scalaVersion = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalaVersionTask)
           val scalacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacOptionsTask)
+          val semanticdbDir =
+            executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask).toNIO.toUri.toString
           val scalacPlugins =
             try executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacPluginsTask)
             catch case e: TaskEvaluationException => Seq.empty
           val semanticdbOptions =
             if scalaVersion.startsWith("3.") then
               scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++
-                Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}")
+                Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}",  "-semanticdb-target:", semanticdbDir.toString)
             else
-              Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}") ++
+              Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}",s"-P:semanticdb:targetroot:${semanticdbDir}") ++
                 scalacPlugins.map(p => s"-Xplugin:${p.toString}")
           val finalScalacOptions = scalacOptions ++ semanticdbOptions
           val compileClasspath =

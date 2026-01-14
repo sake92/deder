@@ -13,6 +13,7 @@ import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, S
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
+import ba.sake.deder.jar.JarUtils
 import ba.sake.deder.testing.*
 
 class CoreTasks() extends StrictLogging {
@@ -169,6 +170,13 @@ class CoreTasks() extends StrictLogging {
     )
     .build { ctx => ctx.out }
 
+  val semanticdbDirTask = TaskBuilder
+    .make[os.Path](
+      name = "semanticdb",
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
+    )
+    .build { ctx => ctx.out }
+
   // this is localRunClasspath in mill ??
   val allClassesDirsTask = TaskBuilder
     .make[Seq[os.Path]](
@@ -319,6 +327,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(scalaVersionTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(classesDirTask)
+    .dependsOn(semanticdbDirTask)
     .dependsOn(scalacPluginsTask)
     .dependsOn(javacAnnotationProcessorsTask)
     .dependsOn(semanticdbEnabledTask)
@@ -333,6 +342,7 @@ class CoreTasks() extends StrictLogging {
         scalaVersion,
         compileClasspath,
         classesDir,
+        semanticdbDir,
         scalacPlugins,
         javacAnnotationProcessors,
         semanticdbEnabled
@@ -386,13 +396,19 @@ class CoreTasks() extends StrictLogging {
         javaVersion.map(v => Seq("--release", v)).getOrElse(Seq.empty) ++
         Option.when(semanticdbEnabled)(
           // https://github.com/sourcegraph/scip-java/issues/390
-          s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${classesDir} -build-tool:sbt"
+          s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${semanticdbDir} -build-tool:sbt"
         )
 
       val semanticDbScalacOpts =
         if semanticdbEnabled then
-          if scalaVersion.startsWith("3.") then Seq("-Xsemanticdb", s"-sourceroot", s"${DederGlobals.projectRootDir}")
-          else Seq("-Yrangepos", s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}")
+          if scalaVersion.startsWith("3.") then
+            Seq("-Xsemanticdb", s"-sourceroot", DederGlobals.projectRootDir.toString, "-semanticdb-target:", semanticdbDir.toString)
+          else
+            Seq(
+              "-Yrangepos",
+              s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}",
+              s"-P:semanticdb:targetroot:${semanticdbDir}"
+            )
         else Seq.empty
       val finalScalacOptions =
         scalacOptions ++ scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++ semanticDbScalacOpts
@@ -413,7 +429,6 @@ class CoreTasks() extends StrictLogging {
       )
       DederPath(classesDir)
     }
-
 
   val jvmOptionsTask = ConfigValueTask[Seq[String]](
     name = "jvmOptions",
@@ -563,6 +578,24 @@ class CoreTasks() extends StrictLogging {
       testRunner.run(testOptions)
     }
 
+  // TODO manifest
+
+  val jarTask = TaskBuilder
+    .make[os.Path](
+      name = "jar",
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+    )
+    .dependsOn(compileTask)
+    .build { ctx =>
+      val localClasspath = ctx.depResults._1
+      val jarPath = ctx.out / "out.jar"
+      val jarInputPaths = Seq(localClasspath.absPath)
+      JarUtils.create(
+        jarPath,
+        jarInputPaths
+      )
+    }
+
   // order matters for dependency resolution!!
   val all: Seq[Task[?, ?]] = Seq(
     sourcesTask,
@@ -584,6 +617,7 @@ class CoreTasks() extends StrictLogging {
     dependenciesTask,
     allDependenciesTask,
     classesDirTask,
+    semanticdbDirTask,
     allClassesDirsTask,
     compileClasspathTask,
     compileTask,
@@ -594,7 +628,8 @@ class CoreTasks() extends StrictLogging {
     finalMainClassTask,
     runTask,
     testClassesTask,
-    testTask
+    testTask,
+    jarTask
   )
 
   private val allNames = all.map(_.name)

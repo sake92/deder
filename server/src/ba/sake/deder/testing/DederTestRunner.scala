@@ -35,6 +35,7 @@ class DederTestRunner(
                   matchedClassNames.flatMap { n =>
                      testClasses.find(_._1 == n)
                   }.map(tc => (tc._1, tc._2, new TestSelector(testSelector)))
+                  // TODO add TestWildcardSelector? hmm just a substring
                 case _ =>
                   val matchedClassNames = WildcardUtils.getMatches(testClassNames, ts)
                   matchedClassNames.flatMap { n =>
@@ -62,6 +63,7 @@ class DederTestRunner(
       logger.warn(s"No tests found for ${framework.name()}")
       return Seq.empty
     }
+    // TODO handle tags, framework specific..
     val runner = framework.runner(
       Array.empty[String], // framework args
       Array.empty[String], // remoteArgs
