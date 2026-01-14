@@ -25,13 +25,25 @@ class DederTestRunner(
       logger.debug(s"Found ${tests.size} test framework(s): ${tests.map(_._1.name()).mkString(", ")}")
       val allResults = tests.flatMap { case (framework, testClasses) =>
         val testClassNames = testClasses.map(_._1)
-        val selectedTestClassNames =
-          if options.testSuiteSelectors.isEmpty then testClassNames
-          else WildcardUtils.getMatches(testClassNames, options.testSuiteSelectors)
-        val selectedTestClasses = testClasses.filter { case (c, _) =>
-          selectedTestClassNames.contains(c)
-        }
-        runFramework(framework, selectedTestClasses, options)
+        val selectedTestClasses: Seq[(String, Fingerprint, Selector)] =
+          if options.testSelectors.isEmpty then testClasses.map(tc => (tc._1, tc._2, new SuiteSelector))
+          else {
+            options.testSelectors.flatMap { ts =>
+              ts.split("#") match {
+                case Array(classNameSelector, testSelector) =>
+                  val matchedClassNames = WildcardUtils.getMatches(testClassNames, classNameSelector)
+                  matchedClassNames.flatMap { n =>
+                     testClasses.find(_._1 == n)
+                  }.map(tc => (tc._1, tc._2, new TestSelector(testSelector)))
+                case _ =>
+                  val matchedClassNames = WildcardUtils.getMatches(testClassNames, ts)
+                  matchedClassNames.flatMap { n =>
+                    testClasses.find(_._1 == n)
+                  }.map(tc => (tc._1, tc._2, new SuiteSelector))
+              }
+            }
+          }
+        runFramework(framework, selectedTestClasses)
       }
       DederTestResults.aggregate(allResults)
     }
@@ -43,8 +55,7 @@ class DederTestRunner(
 
   private def runFramework(
       framework: Framework,
-      testClasses: Seq[(String, Fingerprint)],
-      options: DederTestOptions
+      testClasses: Seq[(String, Fingerprint, Selector)],
   ): Seq[DederTestResult] = {
     logger.info(s"Running tests with ${framework.name()}")
     if (testClasses.isEmpty) {
@@ -56,12 +67,12 @@ class DederTestRunner(
       Array.empty[String], // remoteArgs
       classLoader
     )
-    val tasks = testClasses.flatMap { case (className, fingerprint) =>
+    val tasks = testClasses.flatMap { case (className, fingerprint, selector) =>
       val taskDef = new TaskDef(
         className,
         fingerprint,
         false, // explicitly specified
-        Array(new SuiteSelector) // selectors
+        Array(selector)
       )
       runner.tasks(Array(taskDef))
     }
@@ -83,7 +94,7 @@ class DederTestRunner(
 }
 
 case class DederTestOptions(
-    testSuiteSelectors: Seq[String]
+    testSelectors: Seq[String]
 )
 
 class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {

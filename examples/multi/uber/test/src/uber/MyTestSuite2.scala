@@ -1,7 +1,7 @@
 package uber
 
-class MyTestSuite1 extends munit.FunSuite {
-  test("suite 1 test 1") {
+class MyTestSuite2 extends munit.FunSuite {
+  test("suite2_test1") {
     println ("running test 123")
     val x = 1 + 1
     assertEquals(x, 2)

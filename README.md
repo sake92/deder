@@ -80,6 +80,8 @@ deder exec -t test -m uber-test
 deder exec -t test uber.MyTestSuite1
 # execute test suites that start with "uber"
 deder exec -t test uber.%
+# execute specific test called "test1" in suite uber.MyTestSuite1
+deder exec -t test uber.MyTestSuite1#test1
 
 ################ BSP
 # write BSP config file for current project
