@@ -38,7 +38,8 @@ object server extends ScalaModule, VersionModule {
     mvn"ch.epfl.scala:bsp4j:2.2.0-M2",
     mvn"com.github.blemale::scaffeine:5.3.0",
     mvn"com.typesafe.scala-logging::scala-logging:3.9.5",
-    mvn"ch.qos.logback:logback-classic:1.5.23"
+    mvn"ch.qos.logback:logback-classic:1.5.23",
+    mvn"com.eed3si9n.jarjarabrams::jarjar-abrams-core:1.16.0"
   )
   def moduleDeps = Seq(config)
 

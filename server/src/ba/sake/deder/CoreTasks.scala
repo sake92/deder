@@ -459,13 +459,12 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (scalaVersion, dependencies, classesDir) = ctx.depResults
       val mandatoryDeps = ctx.module match {
-        case _: (ScalaModule | ScalaTestModule) =>
+        case _: ScalaModule =>
           val scalaLibDep =
             if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
             else s"org.scala-lang:scala-library:${scalaVersion}"
           Seq(Dependency.make(scalaLibDep, scalaVersion))
-        case m: JavaModule => Seq.empty
-        case _             => Seq.empty
+        case _ => Seq.empty
       }
       val depsJars = DependencyResolver.fetchFiles(mandatoryDeps ++ dependencies, Some(ctx.notifications))
 
@@ -584,8 +583,7 @@ class CoreTasks() extends StrictLogging {
       testRunner.run(testOptions)
     }
 
-  // TODO manifest
-
+  // TODO manifest config
   val jarTask = TaskBuilder
     .make[os.Path](
       name = "jar",
@@ -595,18 +593,71 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(mainClassTask)
     .build { ctx =>
       val (localClasspath, mainClass) = ctx.depResults
-      val jarPath = ctx.out / "out.jar"
+      val resultJarPath = ctx.out / s"${ctx.module.id}.jar"
       val jarInputPaths = Seq(localClasspath.absPath)
       val manifest = mainClass match {
         case Some(mc) =>
           JarManifest.Default.add(java.util.jar.Attributes.Name.MAIN_CLASS.toString -> mc)
         case None => JarManifest.Default
       }
-      JarUtils.create(
-        jarPath,
+      JarUtils.createJar(
+        resultJarPath,
         jarInputPaths,
         manifest
       )
+      resultJarPath
+    }
+
+  val allJarsTask = TaskBuilder
+    .make[Seq[os.Path]](
+      name = "allJars",
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+      transitive = true
+    )
+    .dependsOn(jarTask)
+    .build { ctx =>
+      val jar = ctx.depResults._1
+      ctx.transitiveResults.flatten.flatten.prepended(jar).reverse.distinct.reverse
+    }
+
+  val assemblyTask = TaskBuilder
+    .make[os.Path](
+      name = "assembly",
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+    )
+    .dependsOn(scalaVersionTask)
+    .dependsOn(mainClassTask)
+    .dependsOn(allDependenciesTask)
+    .dependsOn(allJarsTask)
+    .build { ctx =>
+      val (scalaVersion, mainClass, dependencies, allModulesJars) = ctx.depResults
+      // TODO mandatoryDeps task..
+      val mandatoryDeps = ctx.module match {
+        case _: ScalaModule =>
+          val scalaLibDep =
+            if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
+            else s"org.scala-lang:scala-library:${scalaVersion}"
+          Seq(Dependency.make(scalaLibDep, scalaVersion))
+        case _ => Seq.empty
+      }
+      val depsJars = DependencyResolver.fetchFiles(mandatoryDeps ++ dependencies, Some(ctx.notifications))
+      val tmpDir = ctx.out / "jars"
+      os.makeDir.all(tmpDir)
+      allModulesJars.zipWithIndex.foreach { case (jar, index) =>
+        val jarName = s"${index + 1}-${jar.last}"
+        os.copy.over(jar, tmpDir / jarName)
+      }
+      val allJars = os.list(tmpDir) ++ depsJars
+      val manifest = mainClass match {
+        case Some(mc) =>
+          JarManifest.Default.add(java.util.jar.Attributes.Name.MAIN_CLASS.toString -> mc)
+        case None => JarManifest.Default
+      }
+      val mergedJar = ctx.out / "mergedJar.jar"
+      JarUtils.mergeJars(mergedJar, allJars, manifest)
+      val resultJarPath = ctx.out / "out.jar"
+      JarUtils.createAssemblyJar(resultJarPath, mergedJar)
+      resultJarPath
     }
 
   // order matters for dependency resolution!!
@@ -642,7 +693,9 @@ class CoreTasks() extends StrictLogging {
     runTask,
     testClassesTask,
     testTask,
-    jarTask
+    jarTask,
+    allJarsTask,
+    assemblyTask
   )
 
   private val allNames = all.map(_.name)

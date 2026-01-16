@@ -72,6 +72,10 @@ deder exec -t run -m frontend --watch
 # even in multiple terminals at the same time!!!
 deder exec -t run -m backend --watch
 
+# generate an "uber" jar, assembly of all deps and your code
+deder exec -t assembly -m uber
+java -jar .deder/out/uber/assembly/out.jar
+
 # execute all tests on all test modules
 deder exec -t test
 # execute tests on "uber-test" module
