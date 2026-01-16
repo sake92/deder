@@ -52,6 +52,7 @@ open class JavaModule extends DederModule {
   javacAnnotationProcessorDeps: Listing<String> = new Listing {}
   semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default
   javaSemanticdbVersion: String = "0.11.1"
+  // TODO manifest entries
 }
 
 open class ScalaModule extends JavaModule {
