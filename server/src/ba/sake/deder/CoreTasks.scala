@@ -506,7 +506,9 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (mainClass, mainClasses) = ctx.depResults
       mainClass
-        .orElse(mainClasses.headOption)
+        .orElse {
+          Option.when(mainClasses.length == 1)( mainClasses.head)
+        }
         .getOrElse(
           throw new Exception(s"No main class found for module: ${ctx.module.id}")
         )
@@ -590,7 +592,7 @@ class CoreTasks() extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
     )
     .dependsOn(compileTask)
-    .dependsOn(mainClassTask)
+    .dependsOn(finalMainClassTask)
     .build { ctx =>
       val (localClasspath, mainClass) = ctx.depResults
       val resultJarPath = ctx.out / s"${ctx.module.id}.jar"
@@ -626,7 +628,7 @@ class CoreTasks() extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
     )
     .dependsOn(scalaVersionTask)
-    .dependsOn(mainClassTask)
+    .dependsOn(finalMainClassTask)
     .dependsOn(allDependenciesTask)
     .dependsOn(allJarsTask)
     .build { ctx =>
