@@ -3,9 +3,9 @@ package ba.sake.deder.cli
 import mainargs.*
 import ba.sake.deder.ServerNotification.LogLevel
 
-given TokensReader.Simple[LogLevel]{
-    def shortName = "logLevel"
-    def read(strs: Seq[String]) = Right(LogLevel.valueOf(strs.head.toUpperCase))
+given TokensReader.Simple[LogLevel] with {
+  def shortName = "logLevel"
+  def read(strs: Seq[String]) = Right(LogLevel.valueOf(strs.head.toUpperCase))
 }
 
 @main
@@ -56,7 +56,7 @@ case class DederCliPlanOptions(
 @main("clean command", "Clean build artifacts for module(s)")
 case class DederCliCleanOptions(
     @arg(doc = "Module IDs to clean", short = 'm')
-    modules: Seq[String], // cant have a default.. :/
+    modules: Seq[String] // cant have a default.. :/
 )
 
 @main("exec command", "Execute a task in module(s)")
@@ -72,4 +72,18 @@ case class DederCliExecOptions(
     @arg(doc = "Watch mode - re-execute task on source changes", short = 'w')
     watch: Flag,
     args: Leftover[String]
+)
+
+enum ImportBuildTool:
+  case sbt
+
+given TokensReader.Simple[ImportBuildTool] with {
+  def shortName = "importBuildTool"
+  def read(strs: Seq[String]) = Right(ImportBuildTool.valueOf(strs.head.toLowerCase))
+}
+
+@main("import command", "Import from another build tool")
+case class DederCliImportOptions(
+    @arg(doc = "From which build tool to import")
+    from: ImportBuildTool
 )

@@ -21,7 +21,7 @@ import ba.sake.deder.client.bsp.DederBspProxyClient;
 /*
 * Main entry point for Deder clients.
 * - never use System.out coz BSP talks to this via stdin/stdout
-* - for BSP client we keep trying to reconnect to server indefinitely, 
+* - for BSP client we keep trying to reconnect to server indefinitely,
 * because server might be restarting, or shut down due to inactivity
 * - for CLI client we try to reconnect for max 10 seconds, then give up
 */
@@ -39,12 +39,9 @@ public class Main {
 			return;
 		}
 
-		var isBspClient = false;
-		if (args.length == 1 && args[0].equals("bsp")) {
-			isBspClient = true;
-		}
+		var isBspClient = args.length == 1 && args[0].equals("bsp");
 
-		var parentProcess = thisProcess.parent();
+        var parentProcess = thisProcess.parent();
 		var logFileName = isBspClient ? "bsp-client" : "cli-client";
 		var timestamp = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS).toString().replaceAll("[^0-9]", "-");
 		logFile = Path.of(".deder/logs/client/" + logFileName + "_" + timestamp + "_" + thisProcess.pid() + ".log");
@@ -63,11 +60,8 @@ public class Main {
 		DederClient client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(args, logFile);
 		var startedConnectingAt = Instant.now();
 		var maxConnectDurationSeconds = 10;
-		var keepConnectingInfinitely = isBspClient;
-		var connected = false;
-		try {
+        try {
 			client.start();
-			connected = true;
 		} catch (Exception e) {
 			if (args.length == 1 && args[0].equals("shutdown")) {
 				log("Deder server not running. No need to shutdown.");
@@ -75,7 +69,8 @@ public class Main {
 				return;
 			}
 			startServer(isBspClient);
-			while (!connected && (keepConnectingInfinitely
+			var connected = false;
+			while (!connected && (isBspClient
 					|| Duration.between(startedConnectingAt, Instant.now()).getSeconds() < maxConnectDurationSeconds)) {
 				try {
 					var sleepMillis = isBspClient ? 1000 : 100;
@@ -104,14 +99,15 @@ public class Main {
 		}
 		var serverVersion = props.getProperty("version", "early-access");
 		var serverLocalPath = props.getProperty("localPath", "");
-		if (serverLocalPath != null && !serverLocalPath.isBlank()) {
+        Path serverJarPath = Path.of(".deder/server.jar");
+        if (serverLocalPath != null && !serverLocalPath.isBlank()) {
 			// handy for development, use local server build
-			Files.copy(Path.of(serverLocalPath), Path.of(".deder/server.jar"), StandardCopyOption.REPLACE_EXISTING);
+			Files.copy(Path.of(serverLocalPath), serverJarPath, StandardCopyOption.REPLACE_EXISTING);
 		} else {
 			// TODO figure out server.jar current running version and avoid re-downloading
 			// if same version
 			download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
-					Path.of(".deder/server.jar"));
+                    serverJarPath);
 		}
 		startServerProcess(isBspClient, props);
 		System.err.println("Deder server started.");
@@ -196,7 +192,7 @@ public class Main {
 				}
 				""".formatted(commandLineArgsJson);
 		var bspConfigPath = Path.of(".bsp/deder-bsp.json");
-		Files.write(bspConfigPath, bspConfig.getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE,
+		Files.writeString(bspConfigPath, bspConfig, StandardOpenOption.CREATE,
 				StandardOpenOption.TRUNCATE_EXISTING);
 		System.err.println("BSP config installed at " + bspConfigPath);
 	}

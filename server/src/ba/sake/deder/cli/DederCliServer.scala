@@ -12,6 +12,7 @@ import scala.util.control.NonFatal
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.{*, given}
 import ba.sake.deder.*
+import ba.sake.deder.migrating.importing.Importer
 
 class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
@@ -81,7 +82,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
       message: CliClientMessage,
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
-    println(s"Handling client message: $message")
+    //println(s"Handling client message: $message")
     message match {
       case m: CliClientMessage.Help =>
         val defaultHelpText =
@@ -94,6 +95,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             |  plan [options]          Show execution plan for a task
             |  exec [options]          Execute a task
             |  clean [options]         Clean modules
+            |  import [options]        Import from other build tool
             |  shutdown                Shutdown the server
             |
             |Use help -c <command> for more details about each command.
@@ -125,6 +127,10 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
               case "clean" =>
                 serverMessages.put(
                   CliServerMessage.Output(mainargs.Parser[DederCliCleanOptions].helpText())
+                )
+              case "import" =>
+                serverMessages.put(
+                  CliServerMessage.Output(mainargs.Parser[DederCliImportOptions].helpText())
                 )
               case "shutdown" =>
                 serverMessages.put(CliServerMessage.Output("Shuts down the Deder server."))
@@ -291,6 +297,21 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                 serverMessages.put(CliServerMessage.Exit(0))
             }
         }
+      case m: CliClientMessage.Import =>
+        mainargs.Parser[DederCliImportOptions].constructEither(m.args) match {
+          case Left(error) =>
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          case Right(cliOptions) =>
+            val notificationCallback: ServerNotification => Unit = { sn =>
+                CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
+            }
+            val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
+            val importer = new Importer(serverNotificationsLogger)
+            val success = importer.doImport(cliOptions.from)
+            val exitCode = if success then 0 else 1
+            serverMessages.put(CliServerMessage.Exit(exitCode))
+        }
       case _: CliClientMessage.Shutdown =>
         logger.info(s"Client $clientId requested server shutdown.")
         serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
@@ -329,6 +350,7 @@ enum CliClientMessage derives JsonRW {
   case Plan(args: Seq[String])
   case Exec(args: Seq[String])
   case Clean(args: Seq[String])
+  case Import(args: Seq[String])
   case Shutdown()
 }
 

@@ -54,6 +54,12 @@
     "allDeclaredConstructors": true
   },
   {
+    "name": "ba.sake.deder.client.cli.ClientMessage$Import",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
     "name": "ba.sake.deder.client.cli.ClientMessage$Shutdown",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,

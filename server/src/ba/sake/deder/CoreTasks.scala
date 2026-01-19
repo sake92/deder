@@ -497,21 +497,18 @@ class CoreTasks() extends StrictLogging {
   )
 
   val finalMainClassTask = TaskBuilder
-    .make[String](
+    .make[Option[String]](
       name = "finalMainClass",
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
     )
     .dependsOn(mainClassTask)
     .dependsOn(mainClassesTask)
     .build { ctx =>
-      val (mainClass, mainClasses) = ctx.depResults
+      val (mainClass, discoveredMainClasses) = ctx.depResults
       mainClass
         .orElse {
-          Option.when(mainClasses.length == 1)( mainClasses.head)
+          Option.when(discoveredMainClasses.length == 1)(discoveredMainClasses.head)
         }
-        .getOrElse(
-          throw new Exception(s"No main class found for module: ${ctx.module.id}")
-        )
     }
 
   val runTask = TaskBuilder
@@ -524,11 +521,17 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(jvmOptionsTask)
     .build { ctx =>
       val (runClasspath, mainClass, jvmOptions) = ctx.depResults
-      val cp = runClasspath.map(_.toString)
-      val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp.mkString(File.pathSeparator), mainClass) ++ ctx.args
-      logger.debug(s"Client should run command: ${cmd}")
-      ctx.notifications.add(ServerNotification.RunSubprocess(cmd, ctx.watch))
-      cmd
+      mainClass match {
+        case Some(mc) =>
+          val cp = runClasspath.map(_.toString)
+          val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp.mkString(File.pathSeparator), mc) ++ ctx.args
+          logger.debug(s"Client should run command: ${cmd}")
+          ctx.notifications.add(ServerNotification.RunSubprocess(cmd, ctx.watch))
+          cmd
+        case None =>
+          // TODO ability to set one..
+          throw new Exception(s"No main class specified for module: ${ctx.module.id}")
+      }
     }
 
   val testClassesTask = TaskBuilder
