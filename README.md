@@ -37,6 +37,10 @@ deder version
 deder shutdown
 
 
+################ import existing sbt project
+deder import --from sbt
+
+
 ################ explore the build
 # list modules
 # supports flags: --json, --ascii, --dot
