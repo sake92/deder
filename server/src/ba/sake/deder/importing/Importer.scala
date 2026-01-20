@@ -1,8 +1,8 @@
-package ba.sake.deder.migrating.importing
+package ba.sake.deder.importing
 
 import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
 import ba.sake.deder.cli.ImportBuildTool
-import ba.sake.deder.migrating.importing.sbt.SbtImporter
+import ba.sake.deder.importing.sbt.SbtImporter
 
 class Importer(
     serverNotificationsLogger: ServerNotificationsLogger

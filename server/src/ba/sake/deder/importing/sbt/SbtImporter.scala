@@ -1,4 +1,4 @@
-package ba.sake.deder.migrating.importing.sbt
+package ba.sake.deder.importing.sbt
 
 import scala.jdk.CollectionConverters.*
 import ba.sake.tupson.parseJson
@@ -53,26 +53,32 @@ class SbtImporter(
         os.read(mf).parseJson[ProjectExport]
       }
       .filterNot(_.base == os.pwd.toString) // skip root aggregating project.. TODO better heuristic
-    val modules = exportedSbtModules.flatMap { sbtProjectExport =>
-      Seq(
-        getModule(sbtProjectExport, "compile")
-      ) ++ Option.when(sbtProjectExport.testSourceDirs.nonEmpty)(
-        getModule(sbtProjectExport, "test")
-      )
-    }
+    val modules = exportedSbtModules
+      .flatMap { sbtProjectExport =>
+        Seq(
+          getModule(sbtProjectExport, "compile"),
+          getModule(sbtProjectExport, "test")
+        )
+      }
+      .filterNot(_._3.sources.isEmpty)
+      .filterNot(_._1.externalDependencies.exists (_.organization == "org.scala-js" )) // ScalaJS unsupported for now
+    serverNotificationsLogger.add(ServerNotification.logInfo(s"Discovered ${modules.length} modules"))
     val finalModules = modules.map { case (spe, config, m, moduleDeps) =>
-      val moduleDependencies = moduleDeps.flatMap { md =>
-        modules.find(_._1.id == md.project && md.configuration == config).map(_._3)
+      val moduleDependencies = moduleDeps.flatMap { moduleDepId =>
+        modules
+          .find(_._3.id == moduleDepId)
+          .map(_._3)
       }
       m.withModuleDeps(moduleDependencies.asJava)
     }
     new DederProject(finalModules.asJava)
   }
 
+  // (projectExport, config, dederModule, dederModuleDeps)
   private def getModule(
       sbtProjectExport: ProjectExport,
       config: String
-  ): (ProjectExport, String, JavaModule, Seq[InterProjectDependencyExport]) = {
+  ): (ProjectExport, String, JavaModule, Seq[String]) = {
     val isTest = config == "test"
     val id = if isTest then s"${sbtProjectExport.id}Test" else sbtProjectExport.id
     var rootAbsPath = os.Path(sbtProjectExport.base)
@@ -99,7 +105,6 @@ class SbtImporter(
         else if ed.crossVersion == "binary" then s"${ed.organization}::${ed.name}:${ed.revision}"
         else s"${ed.organization}:${ed.name}:${ed.revision}"
       }
-    val moduleDeps = sbtProjectExport.interProjectDependencies
     val module =
       if isTest then
         new ScalaTestModule(
@@ -146,6 +151,10 @@ class SbtImporter(
           List.empty.asJava, // scalacPluginDeps
           "4.13.9" // scalaSemanticdbVersion
         )
+
+    val moduleDeps = sbtProjectExport.interProjectDependencies.map { ipde =>
+      if ipde.configuration == "test" then s"${ipde.project}Test" else ipde.project
+    } ++ Option.when(isTest)(sbtProjectExport.id)
     (sbtProjectExport, config, module, moduleDeps)
   }
 
@@ -159,37 +168,32 @@ class SbtImporter(
           .when(deps.nonEmpty) {
             s"""deps {
                |${deps.map(d => s"  ${d}").mkString("\n")}
-               |}
-               |""".stripMargin.indent(2)
+               |}""".stripMargin.indent(2).stripTrailing
           }
-          .getOrElse("")
         val sources = m.sources.asScala.map(s => s""" "$s" """.trim)
         val sourcesOpt = Option
           .when(sources.nonEmpty) {
-            s"""sources {
+            s"""sources = new Listing {
                |${sources.map(d => s"  ${d}").mkString("\n")}
-               |}
-               |""".stripMargin.indent(2)
+               |}""".stripMargin.indent(2).stripTrailing
           }
-          .getOrElse("")
-        val moduleDeps = m.moduleDeps.asScala.map { mDep =>
-          s"""  ${mDep.id}"""
-        }
+        val moduleDeps = m.moduleDeps.asScala.map(_.id)
         val moduleDepsOpt = Option
           .when(moduleDeps.nonEmpty) {
             s"""moduleDeps {
                |${moduleDeps.map(d => s"  ${d}").mkString("\n")}
-               |}
-               |""".stripMargin.indent(2)
+               |}""".stripMargin.indent(2).stripTrailing
           }
-          .getOrElse("")
-        s"""|local const ${m.id} = new ScalaModule {
+        val optionals = List(sourcesOpt, moduleDepsOpt, depsOpt).flatten.mkString("\n")
+        val moduleType = m match {
+          case module: ScalaTestModule => "ScalaTestModule"
+          case _                       => "ScalaModule"
+        }
+        s"""|local const ${m.id} = new ${moduleType} {
             |  id = "${m.id}"
             |  root = "${m.root}"
-            |${sourcesOpt}
             |  scalaVersion = "${m.scalaVersion}"
-            |${moduleDepsOpt}
-            |${depsOpt}
+            |${optionals}
             |}
             |""".stripMargin
 

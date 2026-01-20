@@ -1,4 +1,4 @@
-package ba.sake.deder.migrating.importing.sbt
+package ba.sake.deder.importing.sbt
 
 import ba.sake.tupson.JsonRW
 

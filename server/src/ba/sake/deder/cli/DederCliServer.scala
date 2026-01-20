@@ -12,7 +12,7 @@ import scala.util.control.NonFatal
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.{*, given}
 import ba.sake.deder.*
-import ba.sake.deder.migrating.importing.Importer
+import ba.sake.deder.importing.Importer
 
 class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
