@@ -6,6 +6,7 @@ import ba.sake.deder.ServerNotification
 import ba.sake.deder.ServerNotificationsLogger
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, ScalaModule, ScalaTestModule}
+import ba.sake.deder.importing.ImportingUtils
 import org.pkl.core.{EvaluatorBuilder, ModuleSource, ValueConverter, ValueRenderer, ValueRenderers}
 
 class SbtImporter(
@@ -48,11 +49,12 @@ class SbtImporter(
 
   private def parseSbtBuild(): DederProject = {
     val exportedSbtModuleFiles = os.list(os.pwd / "target/build-export").filter(_.ext == "json")
-    val exportedSbtModules = exportedSbtModuleFiles
+    var exportedSbtModules = exportedSbtModuleFiles
       .map { mf =>
         os.read(mf).parseJson[ProjectExport]
       }
-      .filterNot(_.base == os.pwd.toString) // skip root aggregating project.. TODO better heuristic
+    // skip root aggregating project.. TODO better heuristic
+    if exportedSbtModules.length > 1 then exportedSbtModules = exportedSbtModules.filterNot(_.base == os.pwd.toString)
     val modules = exportedSbtModules
       .flatMap { sbtProjectExport =>
         Seq(
@@ -61,7 +63,7 @@ class SbtImporter(
         )
       }
       .filterNot(_._3.sources.isEmpty)
-      .filterNot(_._1.externalDependencies.exists (_.organization == "org.scala-js" )) // ScalaJS unsupported for now
+      .filterNot(_._1.externalDependencies.exists(_.organization == "org.scala-js")) // ScalaJS unsupported for now
     serverNotificationsLogger.add(ServerNotification.logInfo(s"Discovered ${modules.length} modules"))
     val finalModules = modules.map { case (spe, config, m, moduleDeps) =>
       val moduleDependencies = moduleDeps.flatMap { moduleDepId =>
@@ -80,7 +82,8 @@ class SbtImporter(
       config: String
   ): (ProjectExport, String, JavaModule, Seq[String]) = {
     val isTest = config == "test"
-    val id = if isTest then s"${sbtProjectExport.id}Test" else sbtProjectExport.id
+    val originalId = if isTest then s"${sbtProjectExport.id}Test" else sbtProjectExport.id
+    val id = ImportingUtils.sanitizeId(originalId)
     var rootAbsPath = os.Path(sbtProjectExport.base)
     val isCrossProject = Set("jvm", "js", "native").contains(rootAbsPath.last)
     if isCrossProject then rootAbsPath = rootAbsPath / os.up // dirty hack to have proper subpaths
@@ -105,11 +108,12 @@ class SbtImporter(
         else if ed.crossVersion == "binary" then s"${ed.organization}::${ed.name}:${ed.revision}"
         else s"${ed.organization}:${ed.name}:${ed.revision}"
       }
+    val dederModuleRoot = if root.toString.isEmpty then "." else root.toString
     val module =
       if isTest then
         new ScalaTestModule(
           id,
-          root.toString,
+          dederModuleRoot,
           sources.asJava,
           List.empty.asJava, // moduleDeps, filled in next pass..
           tpe,
@@ -132,7 +136,7 @@ class SbtImporter(
       else
         new ScalaModule(
           id,
-          root.toString,
+          dederModuleRoot,
           sources.asJava,
           List.empty.asJava, // moduleDeps, filled in next pass..
           tpe,
@@ -152,9 +156,10 @@ class SbtImporter(
           "4.13.9" // scalaSemanticdbVersion
         )
 
-    val moduleDeps = sbtProjectExport.interProjectDependencies.map { ipde =>
+    val originalModuleDeps = sbtProjectExport.interProjectDependencies.map { ipde =>
       if ipde.configuration == "test" then s"${ipde.project}Test" else ipde.project
     } ++ Option.when(isTest)(sbtProjectExport.id)
+    val moduleDeps = originalModuleDeps.map(ImportingUtils.sanitizeId)
     (sbtProjectExport, config, module, moduleDeps)
   }
 
@@ -184,7 +189,19 @@ class SbtImporter(
                |${moduleDeps.map(d => s"  ${d}").mkString("\n")}
                |}""".stripMargin.indent(2).stripTrailing
           }
-        val optionals = List(sourcesOpt, moduleDepsOpt, depsOpt).flatten.mkString("\n")
+        val javacOptionsOpt = Option
+          .when(!m.javacOptions.isEmpty) {
+            s"""javacOptions {
+               |${m.javacOptions.asScala.map(d => s"  ${d}").mkString("\n")}
+               |}""".stripMargin.indent(2).stripTrailing
+          }
+        val scalacOptionsOpt = Option
+          .when(!m.scalacOptions.isEmpty) {
+            s"""scalacOptions {
+               |${m.scalacOptions.asScala.map(d => s"""  "${d}"""").mkString("\n")}
+               |}""".stripMargin.indent(2).stripTrailing
+          }
+        val optionals = List(sourcesOpt, moduleDepsOpt, depsOpt, scalacOptionsOpt).flatten.mkString("\n")
         val moduleType = m match {
           case module: ScalaTestModule => "ScalaTestModule"
           case _                       => "ScalaModule"
@@ -196,7 +213,6 @@ class SbtImporter(
             |${optionals}
             |}
             |""".stripMargin
-
       }
     s"""amends "https://sake92.github.io/deder/config/DederProject.pkl"
        |

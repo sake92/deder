@@ -78,12 +78,22 @@ enum ImportBuildTool:
   case sbt
 
 given TokensReader.Simple[ImportBuildTool] with {
-  def shortName = "importBuildTool"
-  def read(strs: Seq[String]) = Right(ImportBuildTool.valueOf(strs.head.toLowerCase))
+  def shortName = "buildTool"
+  def read(strs: Seq[String]) = {
+    val strValue = strs.head.toLowerCase
+    try Right(ImportBuildTool.valueOf(strValue))
+    catch {
+      case e: IllegalArgumentException =>
+        throw new IllegalArgumentException(
+          s"Build tool '${strValue}' not supported, must be one of: ${ImportBuildTool.values.mkString(", ")}",
+          e
+        )
+    }
+  }
 }
 
 @main("import command", "Import from another build tool")
 case class DederCliImportOptions(
-    @arg(doc = "From which build tool to import")
+    @arg(doc = "Build tool to import from")
     from: ImportBuildTool
 )
