@@ -95,6 +95,13 @@ class SbtImporter(
         Option.when(os.exists(sourceDirPath))(sourceDirPath.relativeTo(rootAbsPath))
       }
       .map(_.toString)
+    val resourceDirs = if isTest then sbtProjectExport.testResourceDirs else sbtProjectExport.resourceDirs
+    val resources = resourceDirs
+      .flatMap { d =>
+        val resourceDirPath = os.Path(d)
+        Option.when(os.exists(resourceDirPath))(resourceDirPath.relativeTo(rootAbsPath))
+      }
+      .map(_.toString)
     val tpe = if isTest then ModuleType.SCALA_TEST else ModuleType.SCALA // TODO
     val deps = sbtProjectExport.externalDependencies
       .filter { d =>
@@ -117,7 +124,7 @@ class SbtImporter(
           sources.asJava,
           List.empty.asJava, // moduleDeps, filled in next pass..
           tpe,
-          sbtProjectExport.resourceDirs.asJava,
+          resources.asJava,
           null, // javaHome
           List.empty.asJava, // jvmOptions
           null, // javaVersion
@@ -140,7 +147,7 @@ class SbtImporter(
           sources.asJava,
           List.empty.asJava, // moduleDeps, filled in next pass..
           tpe,
-          sbtProjectExport.resourceDirs.asJava,
+          resources.asJava,
           null, // javaHome
           List.empty.asJava, // jvmOptions
           null, // javaVersion
@@ -168,18 +175,25 @@ class SbtImporter(
     val moduleIds = dederProject.modules.asScala.map(_.id)
     val moduleDefs = dederProject.modules.asScala
       .map { case m: ScalaModule =>
-        val deps = m.deps.asScala.map(d => s""" "$d" """.trim)
+        val deps = m.deps.asScala.map(d => s""" "$d" """.trim).distinct
         val depsOpt = Option
           .when(deps.nonEmpty) {
             s"""deps {
                |${deps.map(d => s"  ${d}").mkString("\n")}
                |}""".stripMargin.indent(2).stripTrailing
           }
-        val sources = m.sources.asScala.map(s => s""" "$s" """.trim)
+        val sources = m.sources.asScala.map(s => s""" "$s" """.trim).distinct
         val sourcesOpt = Option
           .when(sources.nonEmpty) {
             s"""sources = new Listing {
                |${sources.map(d => s"  ${d}").mkString("\n")}
+               |}""".stripMargin.indent(2).stripTrailing
+          }
+        val resources = m.resources.asScala.map(s => s""" "$s" """.trim).distinct
+        val resourcesOpt = Option
+          .when(resources.nonEmpty) {
+            s"""resources = new Listing {
+               |${resources.map(d => s"  ${d}").mkString("\n")}
                |}""".stripMargin.indent(2).stripTrailing
           }
         val moduleDeps = m.moduleDeps.asScala.map(_.id)
@@ -201,7 +215,7 @@ class SbtImporter(
                |${m.scalacOptions.asScala.map(d => s"""  "${d}"""").mkString("\n")}
                |}""".stripMargin.indent(2).stripTrailing
           }
-        val optionals = List(sourcesOpt, moduleDepsOpt, depsOpt, scalacOptionsOpt).flatten.mkString("\n")
+        val optionals = List(sourcesOpt, resourcesOpt, moduleDepsOpt, depsOpt, scalacOptionsOpt).flatten.mkString("\n")
         val moduleType = m match {
           case module: ScalaTestModule => "ScalaTestModule"
           case _                       => "ScalaModule"

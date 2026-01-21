@@ -82,7 +82,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
       message: CliClientMessage,
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
-    //println(s"Handling client message: $message")
+    // println(s"Handling client message: $message")
     message match {
       case m: CliClientMessage.Help =>
         val defaultHelpText =
@@ -208,7 +208,8 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                       state.tasksResolver.allModules
                   }
                   val modulesWithTasks = modules.map { module =>
-                    val moduleTaskNames = state.tasksResolver.taskInstancesPerModule(module.id).map(t => s"  ${t.task.name}")
+                    val moduleTaskNames =
+                      state.tasksResolver.taskInstancesPerModule(module.id).map(t => s"  ${t.task.name}")
                     s"${module.id}:\n${moduleTaskNames.mkString("\n")}"
                   }
                   serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
@@ -304,7 +305,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
             val notificationCallback: ServerNotification => Unit = { sn =>
-                CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
+              CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
             }
             val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
             val importer = new Importer(serverNotificationsLogger)
@@ -326,17 +327,19 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit =
     try {
-      val os = Channels.newOutputStream(clientChannel)
-      while true do {
+      val outputStream = Channels.newOutputStream(clientChannel)
+      var running = true
+      while running do {
         // newline delimited JSON messages
         val message = serverMessages.take()
-        os.write((message.toJson + '\n').getBytes(StandardCharsets.UTF_8))
+        outputStream.write((message.toJson + '\n').getBytes(StandardCharsets.UTF_8))
+        running = !message.isInstanceOf[CliServerMessage.Exit] // to exit this thread..
       }
     } catch {
       case e: IOException => // all good, client disconnected..
     } finally {
       logger.info(s"Client ${clientId} disconnected... Bye!")
-      clientChannel.close()
+      if clientChannel.isOpen then clientChannel.close()
       projectState.removeWatchedTasks(clientId)
     }
 
