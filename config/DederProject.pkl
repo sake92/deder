@@ -60,7 +60,7 @@ open class ScalaModule extends JavaModule {
   scalaVersion: String
   scalacOptions: Listing<String> = new Listing {}
   scalacPluginDeps: Listing<String> = new Listing {}
-  scalaSemanticdbVersion: String = "4.13.9"
+  scalaSemanticdbVersion: String?
 }
 
 class ScalaTestModule extends ScalaModule {
