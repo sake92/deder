@@ -237,16 +237,37 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
-  val scalaSemanticdbVersionTask = ConfigValueTask[String](
-    name = "scalaSemanticdbVersion",
-    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
-    execute = { ctx =>
+  val scalaSemanticdbVersionTask = TaskBuilder
+    .make[String](
+      name = "scalaSemanticdbVersion",
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
+      transitive = true
+    )
+    .dependsOn(scalaVersionTask)
+    .build { ctx =>
+      val scalaVersion = ctx.depResults._1
       ctx.module match {
-        case m: ScalaModule => m.scalaSemanticdbVersion
-        case _              => "4.13.9"
+        case m: ScalaModule =>
+          Option(m.scalaSemanticdbVersion).getOrElse {
+            scalaVersion match {
+              case s"2.13.${minor}" =>
+                val minorNum = minor.toInt
+                if minorNum == 1 then "4.6.0"
+                else if minorNum < 8 then "4.8.4"
+                else if minorNum == 8 then "4.8.9"
+                else if minorNum == 9 then "4.9.0"
+                else if minorNum == 10 then "4.9.3"
+                else if minorNum == 11 then "4.9.9"
+                else if minorNum == 12 then "4.12.3"
+                else if minorNum == 13 then "4.13.9"
+                else if minorNum == 14 then "4.14.1"
+                else "4.14.5"
+              case _ => "4.14.5"
+            }
+          }
+        case _ => "4.14.5"
       }
     }
-  )
 
   val javacAnnotationProcessorDepsTask = ConfigValueTask[Seq[String]](
     name = "javacAnnotationProcessorDeps",
@@ -456,8 +477,9 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(scalaVersionTask)
     .dependsOn(allDependenciesTask)
     .dependsOn(compileTask)
+    .dependsOn(resourcesTask)
     .build { ctx =>
-      val (scalaVersion, dependencies, classesDir) = ctx.depResults
+      val (scalaVersion, dependencies, classesDir, resourceDirs) = ctx.depResults
       val mandatoryDeps = ctx.module match {
         case _: ScalaModule =>
           val scalaLibDep =
@@ -470,7 +492,8 @@ class CoreTasks() extends StrictLogging {
 
       // classdirs that are last in each module are pushed last in final classpath
       val classesDirsAbs = Seq(classesDir).map(_.absPath)
-      (classesDirsAbs ++ ctx.transitiveResults.flatten.flatten ++ depsJars).reverse.distinct.reverse
+      val resources = resourceDirs.map(_.absPath)
+      (classesDirsAbs ++ resources ++ ctx.transitiveResults.flatten.flatten ++ depsJars).reverse.distinct.reverse
     }
 
   val mainClassesTask = TaskBuilder
