@@ -1,4 +1,7 @@
 
+
+- handle no deder.pkl present
+
 ## Config
 
 
@@ -10,6 +13,7 @@
 - use sqlite for coordination
 
 ## CLI
+- cancel compile and other tasks..
 - autocomplete
 - --mermaid diagrams
     - modules as subgraphs https://mermaid.js.org/syntax/flowchart.html#subgraphs
@@ -17,7 +21,6 @@
 ## Misc
 
 - temp override of settings, say scalacOptions when running BSP request??? hmmm
-- use proper logger for server, or at least add timestamps
 
 ## BSP
 - java main classes cant be run..??
@@ -25,8 +28,6 @@
 
 ## Packaging, publishing
 
-- jar
-- uber assembly
 - publish
 
 ## Tracing

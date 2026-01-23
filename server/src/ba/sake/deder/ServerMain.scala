@@ -4,7 +4,7 @@ import java.io.RandomAccessFile
 import java.nio.channels.FileLock
 import java.nio.channels.OverlappingFileLockException
 import java.util.concurrent.Executors
-import java.{util => ju}
+import java.util as ju
 import scala.util.control.NonFatal
 import scala.util.Properties
 import scala.util.Using
@@ -15,6 +15,7 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
+import io.opentelemetry.context.Context
 
 object ServerMain extends StrictLogging {
 
@@ -51,7 +52,9 @@ object ServerMain extends StrictLogging {
     rootLogger.setLevel(Level.toLevel(logLevel))
 
     // TODO maybe make it elastic ThreadPool with min/max threads for better memory usage?
-    val tasksExecutorService = Executors.newFixedThreadPool(workerThreads)
+    val originalTasksExecutorService = Executors.newFixedThreadPool(workerThreads)
+    // automatically propagate OTEL context, parent span
+    val tasksExecutorService = Context.taskWrapping(originalTasksExecutorService)
     val onShutdown = () => {
       logger.info("Deder server is shutting down...")
       // TODO cleaner shutdown of threads

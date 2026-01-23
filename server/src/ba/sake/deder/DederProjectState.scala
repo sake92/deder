@@ -15,6 +15,9 @@ import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.zinc.ZincCompiler
+import io.opentelemetry.api.trace.StatusCode
+
+import scala.util.Using
 
 class DederProjectState(
     tasksRegistry: TasksRegistry,
@@ -105,11 +108,15 @@ class DederProjectState(
       }
       if relevantModuleAndTasks.isEmpty then {
         success = false
-        serverNotificationsLogger.add(ServerNotification.logError(s"No '${taskName}' tasks found for modules: ${selectedModuleIds.mkString(", ")}"))
+        serverNotificationsLogger.add(
+          ServerNotification.logError(s"No '${taskName}' tasks found for modules: ${selectedModuleIds.mkString(", ")}")
+        )
       } else {
         val plural = if relevantModuleAndTasks.size > 1 then "s" else ""
         serverNotificationsLogger.add(
-          ServerNotification.logInfo(s"Executing '${taskName}' task on module${plural}: ${relevantModuleAndTasks.map(_._1).mkString(", ")}")
+          ServerNotification.logInfo(
+            s"Executing '${taskName}' task on module${plural}: ${relevantModuleAndTasks.map(_._1).mkString(", ")}"
+          )
         )
       }
       relevantModuleAndTasks.foreach { case (moduleId, taskInstance) =>
@@ -163,9 +170,21 @@ class DederProjectState(
       serverNotificationsLogger: ServerNotificationsLogger,
       watch: Boolean = false,
       useLastGood: Boolean = false
-  ): (res: T, changed: Boolean) =
-    val (resAny, changed) = executeOne(moduleId, task.name, args, watch, serverNotificationsLogger, useLastGood)
-    (resAny.asInstanceOf[T], changed)
+  ): (res: T, changed: Boolean) = {
+    val span = OTEL.TRACER.spanBuilder(s"${moduleId}.${task.name}").startSpan()
+    try {
+      Using.resource(span.makeCurrent()) { scope =>
+        val (resAny, changed) = executeOne(moduleId, task.name, args, watch, serverNotificationsLogger, useLastGood)
+        val res = (resAny.asInstanceOf[T], changed)
+        res
+      }
+    } catch {
+      case e: Throwable =>
+        span.recordException(e)
+        span.setStatus(StatusCode.ERROR)
+        throw e
+    } finally span.end()
+  }
 
   def executeOne(
       moduleId: String,
