@@ -114,6 +114,37 @@ Currently working features:
 
 If you work on server code, after you build it you can run `./reset.sh` in examples/multi
 
+## OTEL tracing
+
+You can start [Jaeger](https://www.jaegertracing.io/) locally with docker:
+```shell
+docker run --rm --name jaeger \
+  -p 16686:16686 \
+  -p 4317:4317 \
+  -p 4318:4318 \
+  -p 5778:5778 \
+  -p 9411:9411 \
+  cr.jaegertracing.io/jaegertracing/jaeger:2.14.0
+```
+
+or Grafana LGTM:
+```shell
+git clone git@github.com:grafana/docker-otel-lgtm.git
+cd docker-otel-lgtm
+./run-lgtm.sh
+```
+
+then configure the deder server to use the OTEL java agent:
+```shell
+curl -L -o otel.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+
+# set the agent options in .deder/server.properties:
+JAVA_OPTS=-javaagent:../../otel.jar -Dotel.service.name=deder-server -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
+
+# see examples/multi/.deder/server.properties for an example
+```
+
+The deder server only depends on OTEL API, so if no agent is provided it will just run normally without tracing.
 
 ## Building locally
 
