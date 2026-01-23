@@ -13,6 +13,10 @@ import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.{*, given}
 import ba.sake.deder.*
 import ba.sake.deder.importing.Importer
+import io.opentelemetry.api.trace.StatusCode
+
+import java.util.UUID
+import scala.util.Using
 
 class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
@@ -65,16 +69,30 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
     // newline delimited JSON messages, only one for now..
-    var reader =
-      new BufferedReader(new InputStreamReader(Channels.newInputStream(clientChannel), StandardCharsets.UTF_8), 1)
-    var messageJson: String = reader.readLine()
+    val reader =
+      new BufferedReader(new InputStreamReader(Channels.newInputStream(clientChannel), StandardCharsets.UTF_8))
+    val messageJson: String = reader.readLine()
     val message =
       try messageJson.parseJson[CliClientMessage]
       catch {
         case e: TupsonException =>
           CliClientMessage.Help(Seq.empty)
       }
-    handleClientMessage(clientId, message, serverMessages)
+    val span = OTEL.TRACER
+      .spanBuilder(s"cli.${message.getClass.getSimpleName.toLowerCase}")
+      .setAttribute("clientId", clientId)
+      .setAttribute("request.id", UUID.randomUUID().toString)
+      .startSpan()
+    try {
+      Using.resource(span.makeCurrent()) { scope =>
+        handleClientMessage(clientId, message, serverMessages)
+      }
+    } catch {
+      case e: Throwable =>
+        span.recordException(e)
+        span.setStatus(StatusCode.ERROR)
+        throw e
+    } finally span.end()
   }
 
   private def handleClientMessage(

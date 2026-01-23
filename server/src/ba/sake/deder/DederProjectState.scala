@@ -171,7 +171,11 @@ class DederProjectState(
       watch: Boolean = false,
       useLastGood: Boolean = false
   ): (res: T, changed: Boolean) = {
-    val span = OTEL.TRACER.spanBuilder(s"${moduleId}.${task.name}").startSpan()
+    val span = OTEL.TRACER
+      .spanBuilder(s"${moduleId}.${task.name}")
+      .setAttribute("moduleId", moduleId)
+      .setAttribute("taskName", task.name)
+      .startSpan()
     try {
       Using.resource(span.makeCurrent()) { scope =>
         val (resAny, changed) = executeOne(moduleId, task.name, args, watch, serverNotificationsLogger, useLastGood)

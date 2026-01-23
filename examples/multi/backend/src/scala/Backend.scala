@@ -5,5 +5,5 @@ object Backend {
 
   def main(args: Array[String]): Unit = {
     println(s"Hello ! ${value}")
-  }
+
 }
