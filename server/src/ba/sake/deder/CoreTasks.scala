@@ -499,7 +499,7 @@ class CoreTasks() extends StrictLogging {
   val mainClassesTask = TaskBuilder
     .make[Seq[String]](
       name = "mainClasses",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(compileTask)
     .dependsOn(classesDirTask)
@@ -510,7 +510,7 @@ class CoreTasks() extends StrictLogging {
 
   val mainClassTask = ConfigValueTask[Option[String]](
     name = "mainClass",
-    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
     execute = { ctx =>
       ctx.module match {
         case m: JavaModule => Option(m.mainClass)
@@ -522,7 +522,7 @@ class CoreTasks() extends StrictLogging {
   val finalMainClassTask = TaskBuilder
     .make[Option[String]](
       name = "finalMainClass",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(mainClassTask)
     .dependsOn(mainClassesTask)

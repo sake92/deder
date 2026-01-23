@@ -494,24 +494,21 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
-      params.getTargets.asScala.flatMap { targetId =>
+      params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
-        // metals sometimes requires it even for test modules.. sigh
-        Option.when(isAppModule(module)) {
-          val items =
-            try {
-              executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask).map { mainClass =>
-                // TODO arguments + JVM opts
-                ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
-              }
-            } catch {
-              case e: TaskEvaluationException =>
-                // module failed to compile for example
-                List.empty
-            }
-          ScalaMainClassesItem(targetId, items.asJava)
-        }
+        val items =
+          try {
+            executeTask(serverNotificationsLogger, moduleId, coreTasks.finalMainClassTask).map { mainClass =>
+              // TODO arguments + JVM opts
+              ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
+            }.toList
+          } catch {
+            case e: TaskEvaluationException =>
+              // module failed to compile for example
+              List.empty
+          }
+        ScalaMainClassesItem(targetId, items.asJava)
       }
     }
     val result = ScalaMainClassesResult(items.asJava)
@@ -639,37 +636,36 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       val items = withLastGoodState { projectStateData =>
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         val serverNotificationsLogger = makeServerNotificationsLogger()
-        params.getTargets.asScala.flatMap { targetId =>
+        params.getTargets.asScala.map { targetId =>
           val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
-          // metals sometimes requires it even for test modules.. sigh
-          Option.when(isAppModule(module)) {
-            val mainClasses =
-              try executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)
-              catch case e: TaskEvaluationException => Seq.empty
-            val classpath =
-              try
-                executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
-                  .map(_.toNIO.toUri.toString)
-                  .toList
-              catch case e: TaskEvaluationException => List.empty
-            val jvmOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)
-            val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
-            val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
-            val item = JvmEnvironmentItem(
-              targetId,
-              classpath.asJava,
-              jvmOptions.asJava,
-              workingDirectory,
-              environmentVariables.asJava
-            )
-            val mainClassItems = mainClasses.map { mainClass =>
-              val args = List.empty[String] // TODO
-              JvmMainClass(mainClass, args.asJava)
-            }
-            item.setMainClasses(mainClassItems.asJava)
-            item
+          
+          val mainClasses =
+            try executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)
+            catch case e: TaskEvaluationException => Seq.empty
+          val classpath =
+            try
+              executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
+                .map(_.toNIO.toUri.toString)
+                .toList
+            catch case e: TaskEvaluationException => List.empty
+          val jvmOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)
+          val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
+          val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
+          val item = JvmEnvironmentItem(
+            targetId,
+            classpath.asJava,
+            jvmOptions.asJava,
+            workingDirectory,
+            environmentVariables.asJava
+          )
+          val mainClassItems = mainClasses.map { mainClass =>
+            val args = List.empty[String] // TODO
+            JvmMainClass(mainClass, args.asJava)
           }
+          item.setMainClasses(mainClassItems.asJava)
+          item
+
         }
       }
       val result = JvmRunEnvironmentResult(items.asJava)
@@ -734,20 +730,23 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           moduleId = Some(moduleId),
           isCompileTask = true
         )
-        val isRunnable = isAppModule(resolveModule(moduleId).get)
-        if !isRunnable then throw DederException(s"Module ${moduleId} does not have a main class to run")
-        val args = Option(params.getArguments).map(_.asScala.toSeq).getOrElse(Seq.empty)
-        val runCmd =
-          try executeTask(serverNotificationsLogger, moduleId, coreTasks.runTask, args = args)
-          catch case e: TaskEvaluationException => Seq.empty
-        if runCmd.isEmpty then {
-          logger.error(s"Failed to run module ${moduleId} via BSP")
-          RunResult(StatusCode.ERROR)
-        } else {
-          val wd = Option(params.getWorkingDirectory).map(os.Path(_)).getOrElse(os.pwd)
-          val runRes = os.proc(runCmd).call(cwd = wd, stdin = os.Pipe, stdout = os.Pipe, stderr = os.Pipe)
-          val status = if runRes.exitCode == 0 then StatusCode.OK else StatusCode.ERROR
-          RunResult(status)
+        executeTask(serverNotificationsLogger, moduleId, coreTasks.finalMainClassTask) match {
+          case Some(mainClass) =>
+            val args = Option(params.getArguments).map(_.asScala.toSeq).getOrElse(Seq.empty)
+            val runCmd =
+              try executeTask(serverNotificationsLogger, moduleId, coreTasks.runTask, args = args)
+              catch case e: TaskEvaluationException => Seq.empty
+            if runCmd.isEmpty then {
+              logger.error(s"Failed to run module ${moduleId} via BSP")
+              RunResult(StatusCode.ERROR)
+            } else {
+              val wd = Option(params.getWorkingDirectory).map(os.Path(_)).getOrElse(os.pwd)
+              val runRes = os.proc(runCmd).call(cwd = wd, stdin = os.Pipe, stdout = os.Pipe, stderr = os.Pipe)
+              val status = if runRes.exitCode == 0 then StatusCode.OK else StatusCode.ERROR
+              RunResult(status)
+            }
+          case None => 
+            throw DederException(s"Module ${moduleId} does not have a main class to run")
         }
       }
       result.setOriginId(params.getOriginId)
@@ -822,10 +821,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     testModuleTypes.contains(module.`type`)
 
   private def isAppModule(module: DederModule): Boolean =
-    module match {
-      case m: DederProject.JavaModule => m.mainClass != null
-      case _                          => false
-    }
+    !isTestModule(module)
 
   private def buildTarget(module: DederModule, projectStateData: DederProjectStateData): BuildTarget = {
     val id = buildTargetId(module)
