@@ -537,7 +537,7 @@ class CoreTasks() extends StrictLogging {
   val runTask = TaskBuilder
     .make[Seq[String]](
       name = "run",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(runClasspathTask)
     .dependsOn(finalMainClassTask)
@@ -615,7 +615,7 @@ class CoreTasks() extends StrictLogging {
   val jarTask = TaskBuilder
     .make[os.Path](
       name = "jar",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(compileTask)
     .dependsOn(finalMainClassTask)
@@ -639,7 +639,7 @@ class CoreTasks() extends StrictLogging {
   val allJarsTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "allJars",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
       transitive = true
     )
     .dependsOn(jarTask)
@@ -651,7 +651,7 @@ class CoreTasks() extends StrictLogging {
   val assemblyTask = TaskBuilder
     .make[os.Path](
       name = "assembly",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(scalaVersionTask)
     .dependsOn(finalMainClassTask)

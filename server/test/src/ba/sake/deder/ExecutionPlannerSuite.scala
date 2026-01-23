@@ -23,7 +23,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
     val uberTestModule = modules.find(_.id == "uber-test").get.asInstanceOf[ScalaTestModule]
     locally {
       val stages = executionPlanner.getExecStages(commonModule.id, "compileClasspath")
-      val stageTaskIds = stages.map(stage => stage.map(_.id).toSet).toSeq
+      val stageTaskIds = stages.map(stage => stage.map(_.id).toSet)
       assertEquals(
         stageTaskIds,
         Seq(
@@ -31,12 +31,13 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           Set("common.allClassesDirs", "common.dependencies"),
           Set("common.allDependencies"),
           Set("common.compileClasspath")
-        )
+        ),
+        "common compileClasspath stages mismatch"
       )
     }
     locally {
       val stages = executionPlanner.getExecStages(commonModule.id, "compile")
-      val stageTaskIds = stages.map(stage => stage.map(_.id).toSet).toSeq
+      val stageTaskIds = stages.map(stage => stage.map(_.id).toSet)
       assertEquals(
         stageTaskIds,
         Seq(
@@ -49,10 +50,10 @@ class ExecutionPlannerSuite extends munit.FunSuite {
             "common.javaSemanticdbVersion",
             "common.javacAnnotationProcessorDeps",
             "common.javacOptions",
-            "common.scalaSemanticdbVersion",
             "common.scalaVersion",
             "common.scalacOptions",
             "common.scalacPluginDeps",
+            "common.semanticdb",
             "common.semanticdbEnabled",
             "common.sources"
           ),
@@ -60,12 +61,13 @@ class ExecutionPlannerSuite extends munit.FunSuite {
             "common.allClassesDirs",
             "common.dependencies",
             "common.javacAnnotationProcessors",
-            "common.scalacPlugins"
+            "common.scalaSemanticdbVersion"
           ),
-          Set("common.allDependencies"),
+          Set("common.allDependencies", "common.scalacPlugins"),
           Set("common.compileClasspath"),
           Set("common.compile")
-        )
+        ),
+        "common compile stages mismatch"
       )
     }
   }
@@ -116,7 +118,6 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "common.javaSemanticdbVersion",
           "common.scalacOptions",
           "common.scalacPluginDeps",
-          "common.scalaSemanticdbVersion",
           "common.scalaVersion",
           "common.semanticdbEnabled",
           "backend.deps",
@@ -127,7 +128,6 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "backend.javaSemanticdbVersion",
           "backend.scalacOptions",
           "backend.scalacPluginDeps",
-          "backend.scalaSemanticdbVersion",
           "backend.scalaVersion",
           "backend.semanticdbEnabled",
           "frontend.deps",
@@ -138,7 +138,6 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "frontend.javaSemanticdbVersion",
           "frontend.scalacOptions",
           "frontend.scalacPluginDeps",
-          "frontend.scalaSemanticdbVersion",
           "frontend.scalaVersion",
           "frontend.semanticdbEnabled",
           "uber.deps",
@@ -149,7 +148,6 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "uber.javaSemanticdbVersion",
           "uber.scalacOptions",
           "uber.scalacPluginDeps",
-          "uber.scalaSemanticdbVersion",
           "uber.scalaVersion",
           "uber.semanticdbEnabled"
         )
