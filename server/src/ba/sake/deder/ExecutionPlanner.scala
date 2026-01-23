@@ -8,17 +8,20 @@ class ExecutionPlanner(
     tasksPerModule: Map[String, Seq[TaskInstance]]
 ) {
 
-  // build independent exec stages (~toposort)
   def getExecStages(moduleId: String, taskName: String): Seq[Seq[TaskInstance]] = {
-    val taskToExecute = tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName).getOrElse {
-      throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
-    }
+    getExecStages(Seq(moduleId), taskName)
+  }
 
-    val execSubgraph = getExecSubgraph(moduleId, taskName)
+  // build independent exec stages (~toposort)
+  // assumes tasks exist on given modules
+  def getExecStages(moduleIds: Seq[String], taskName: String): Seq[Seq[TaskInstance]] = {
 
-    def findStartTaskInstances(task: TaskInstance): Seq[TaskInstance] = {
-      val depEdges = execSubgraph.outgoingEdgesOf(task).asScala.toSeq
-      if depEdges.isEmpty then Seq(task)
+
+    val execSubgraph = getExecSubgraph(moduleIds, taskName)
+
+    def findStartTaskInstances(taskInstance: TaskInstance): Seq[TaskInstance] = {
+      val depEdges = execSubgraph.outgoingEdgesOf(taskInstance).asScala.toSeq
+      if depEdges.isEmpty then Seq(taskInstance)
       else
         depEdges.flatMap { depEdge =>
           val d = execSubgraph.getEdgeTarget(depEdge)
@@ -28,7 +31,12 @@ class ExecutionPlanner(
 
     // Kahn's algorithm variant
     // start from leaves and go backwards
-    var currentTaskInstances = findStartTaskInstances(taskToExecute).distinct.sortBy(_.id)
+    val taskInstancesToExecute = moduleIds.map { moduleId =>
+      getTaskInstance(moduleId, taskName)
+    }
+    var currentTaskInstances = taskInstancesToExecute.flatMap { tiToExecute =>
+      findStartTaskInstances(tiToExecute)
+    }.distinct.sortBy(_.id)
     var visitedTaskIds = currentTaskInstances.map(_.id).toSet
     var stages = Seq(currentTaskInstances)
 
@@ -55,31 +63,34 @@ class ExecutionPlanner(
       currentTaskInstances = nextTaskInstances
     }
 
-    stages.toSeq
+    stages
   }
 
   // plan execution
-  def getExecSubgraph(moduleId: String, taskName: String): AsSubgraph[TaskInstance, DefaultEdge] = {
-    val execTasksSet = Set.newBuilder[TaskInstance]
+  def getExecSubgraph(moduleId: String, taskName: String): AsSubgraph[TaskInstance, DefaultEdge] =
+    getExecSubgraph(Seq(moduleId), taskName)
 
+  def getExecSubgraph(moduleIds: Seq[String], taskName: String): AsSubgraph[TaskInstance, DefaultEdge] = {
+    // collect every task to execute
+    val execTasksSet = Set.newBuilder[TaskInstance]
     def go(moduleId: String, taskName: String): Unit = {
-      val taskToExecute = tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName).getOrElse {
-        throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
-      }
-      val deps = tasksGraph.outgoingEdgesOf(taskToExecute).asScala.toSeq
+      val taskInstanceToExecute = getTaskInstance(moduleId, taskName)
+      val deps = tasksGraph.outgoingEdgesOf(taskInstanceToExecute).asScala.toSeq
       deps.foreach { depEdge =>
         val d = tasksGraph.getEdgeTarget(depEdge)
         go(d.moduleId, d.task.name)
       }
-      execTasksSet.addOne(taskToExecute)
+      execTasksSet.addOne(taskInstanceToExecute)
     }
-
-    go(moduleId, taskName)
+    moduleIds.foreach { moduleId =>
+      go(moduleId, taskName)
+    }
     val subgraph = new AsSubgraph(tasksGraph, execTasksSet.result().asJava)
     GraphUtils.checkNoCycles(subgraph, _.id)
     subgraph
   }
 
+  /* WATCH MODE UTILS */
   // used for watch mode - find which source files affect the given task
   def getAffectingSourceFileTasks(moduleId: String, taskName: String): Set[TaskInstance] =
     getRootDepTasks(moduleId, taskName).filter(_.task match {
@@ -98,9 +109,7 @@ class ExecutionPlanner(
   private def getRootDepTasks(moduleId: String, taskName: String): Set[TaskInstance] = {
     val affectingTasks = Set.newBuilder[TaskInstance]
     def go(moduleId: String, taskName: String): Unit = {
-      val taskInstance = tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName).getOrElse {
-        throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
-      }
+      val taskInstance = getTaskInstance(moduleId, taskName)
       val deps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
       deps.foreach { depEdge =>
         val d = tasksGraph.getEdgeTarget(depEdge)
@@ -117,8 +126,9 @@ class ExecutionPlanner(
     affectingTasks.result()
   }
 
+  /* UTILS */
   def getTaskInstanceOpt(moduleId: String, taskName: String): Option[TaskInstance] =
-    tasksPerModule.get(moduleId).flatMap(_.find(_.task.name == taskName))
+    tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName)
   
   def getTaskInstance(moduleId: String, taskName: String): TaskInstance =
     getTaskInstanceOpt(moduleId, taskName).getOrElse {

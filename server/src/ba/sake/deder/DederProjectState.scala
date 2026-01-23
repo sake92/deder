@@ -1,23 +1,16 @@
 package ba.sake.deder
 
 import java.util.concurrent.ExecutorService
-import java.util.concurrent.atomic.AtomicReference
 import java.time.{Duration, Instant}
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
 import scala.util.control.NonFatal
-import scala.compiletime.uninitialized
-import scala.jdk.CollectionConverters.*
+import scala.util.Using
 import org.typelevel.jawn.ast.JValue
 import com.typesafe.scalalogging.StrictLogging
+import io.opentelemetry.api.trace.StatusCode
 import ba.sake.tupson.toJson
 import ba.sake.deder.config.{ConfigParser, DederProject}
-import ba.sake.deder.deps.Dependency
-import ba.sake.deder.deps.DependencyResolver
-import ba.sake.deder.zinc.ZincCompiler
-import io.opentelemetry.api.trace.StatusCode
-
-import scala.util.Using
 
 class DederProjectState(
     tasksRegistry: TasksRegistry,
@@ -87,7 +80,6 @@ class DederProjectState(
       case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
       case Right(s)  => s
 
-    // TODO deduplicate unnecessary work!? figure out if parent transitively runs dependent module task
     val allModuleIds = state.tasksResolver.allModules.map(_.id)
     val selectedModuleIds =
       if moduleSelectors.isEmpty then allModuleIds else WildcardUtils.getMatches(allModuleIds, moduleSelectors)
@@ -98,8 +90,6 @@ class DederProjectState(
       )
       serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
     } else {
-
-      var jsonValues = Map.empty[String, JValue]
       var success = true
       val relevantModuleAndTasks = selectedModuleIds.flatMap { moduleId =>
         state.executionPlanner.getTaskInstanceOpt(moduleId, taskName).map { taskInstance =>
@@ -119,23 +109,29 @@ class DederProjectState(
           )
         )
       }
-      relevantModuleAndTasks.foreach { case (moduleId, taskInstance) =>
-        val (taskRes, _) = executeTask(
-          moduleId,
-          taskInstance.task,
-          args,
-          serverNotificationsLogger,
-          watch = startWatch,
-          useLastGood = useLastGood
-        )
-        if json then
-          val jsonRes = taskInstance.task.rw.write(taskRes)
-          jsonValues = jsonValues.updated(moduleId, jsonRes)
-        if startWatch then {
-          val affectingSourceFileTasks =
-            state.executionPlanner.getAffectingSourceFileTasks(moduleId, taskName)
-          val affectingConfigValueTasks =
-            state.executionPlanner.getAffectingConfigValueTasks(moduleId, taskName)
+      val relevantModuleIds = relevantModuleAndTasks.map(_._1)
+      val results = executeTasks(
+        relevantModuleIds,
+        taskName,
+        args,
+        watch = startWatch,
+        serverNotificationsLogger,
+        useLastGood = useLastGood
+      )
+      if json then {
+        val jsonValues = results.map { res =>
+          val moduleId = res.taskInstance.moduleId
+          val taskInstance = res.taskInstance
+          val taskRes = res.res
+          val jsonRes = taskInstance.task.rw.write(taskRes.asInstanceOf[taskInstance.task.Res])
+          (moduleId, jsonRes)
+        }.toMap
+        serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
+      }
+      if startWatch then {
+        relevantModuleAndTasks.foreach { case (moduleId, taskInstance) =>
+          val affectingSourceFileTasks = state.executionPlanner.getAffectingSourceFileTasks(moduleId, taskName)
+          val affectingConfigValueTasks = state.executionPlanner.getAffectingConfigValueTasks(moduleId, taskName)
           watchedTasks = watchedTasks.appended(
             WatchedTaskData(
               clientId,
@@ -153,7 +149,6 @@ class DederProjectState(
           )
         }
       }
-      if json then serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
       if exitOnEnd then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = success))
     }
 
@@ -178,9 +173,8 @@ class DederProjectState(
       .startSpan()
     try {
       Using.resource(span.makeCurrent()) { scope =>
-        val (resAny, changed) = executeOne(moduleId, task.name, args, watch, serverNotificationsLogger, useLastGood)
-        val res = (resAny.asInstanceOf[T], changed)
-        res
+        val res = executeTasks(Seq(moduleId), task.name, args, watch, serverNotificationsLogger, useLastGood).head
+        (res.res.asInstanceOf[T], res.changed)
       }
     } catch {
       case e: Throwable =>
@@ -190,14 +184,15 @@ class DederProjectState(
     } finally span.end()
   }
 
-  def executeOne(
-      moduleId: String,
+  // execute a single task on many modules
+  def executeTasks(
+      moduleIds: Seq[String], // nonempty please :')
       taskName: String,
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean = false
-  ): (res: Any, changed: Boolean) =
+  ): Seq[TaskExecResult] =
     try {
       lastRequestStartedAt.set(Instant.now())
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
@@ -206,8 +201,7 @@ class DederProjectState(
         case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
         case Right(s)  => s
 
-      val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(moduleId, taskName)
-      val tasksExecStages = state.executionPlanner.getExecStages(moduleId, taskName)
+      val tasksExecStages = state.executionPlanner.getExecStages(moduleIds, taskName)
       val tasksExecutor =
         TasksExecutor(
           state.projectConfig,
@@ -221,7 +215,7 @@ class DederProjectState(
         taskInstance.lock.lock()
       }
       try {
-        tasksExecutor.execute(tasksExecStages, args, watch, serverNotificationsLogger)
+        tasksExecutor.execute(tasksExecStages, taskName, args, watch, serverNotificationsLogger)
       } finally {
         allTaskInstances.reverse.foreach { taskInstance =>
           taskInstance.lock.unlock()
@@ -230,7 +224,7 @@ class DederProjectState(
     } catch {
       case NonFatal(e) =>
         // send notification about failure to client
-        serverNotificationsLogger.add(ServerNotification.logError(e.getMessage, Some(moduleId)))
+        serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         throw TaskEvaluationException(s"Error during execution of task '${taskName}': ${e.getMessage}", e)
     }
@@ -299,8 +293,8 @@ class DederProjectState(
         }
       }
       if affected then {
-        executeOne(
-          watchedTask.taskInstance.moduleId,
+        executeTasks(
+          Seq(watchedTask.taskInstance.moduleId),
           watchedTask.taskInstance.task.name,
           watchedTask.args,
           true, // tell client we are in watch mode

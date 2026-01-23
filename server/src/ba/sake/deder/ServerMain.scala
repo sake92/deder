@@ -45,7 +45,7 @@ object ServerMain extends StrictLogging {
 
     val logLevel = props.getProperty("logLevel", "INFO").toUpperCase
     val maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "600").toInt
-    val workerThreads = props.getProperty("workerThreads", "10").toInt
+    val workerThreads = props.getProperty("workerThreads", "16").toInt
     val bspEnabled = props.getProperty("bspEnabled", "true").toBoolean
 
     val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger]

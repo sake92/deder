@@ -172,23 +172,21 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
                 if cliOptions.json.value then {
-                  val modules = state.tasksResolver.allModules
-                  serverMessages.put(CliServerMessage.Output(modules.map(_.id).toJson))
-                  serverMessages.put(CliServerMessage.Exit(0))
+                  val allModules = state.tasksResolver.allModules.sortBy(_.id)
+                  serverMessages.put(CliServerMessage.Output(allModules.map(_.id).toJson))
                 } else if cliOptions.dot.value then {
                   val dot =
                     GraphUtils.generateDOT(state.tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id))
                   serverMessages.put(CliServerMessage.Output(dot))
-                  serverMessages.put(CliServerMessage.Exit(0))
+
                 } else if cliOptions.ascii.value then {
                   val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.modulesGraph, v => v.id)
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
-                  serverMessages.put(CliServerMessage.Exit(0))
                 } else {
-                  val modules = state.tasksResolver.allModules
-                  serverMessages.put(CliServerMessage.Output(modules.map(_.id).mkString("\n")))
-                  serverMessages.put(CliServerMessage.Exit(0))
+                  val allModules = state.tasksResolver.allModules.sortBy(_.id)
+                  serverMessages.put(CliServerMessage.Output(allModules.map(_.id).mkString("\n")))
                 }
+                serverMessages.put(CliServerMessage.Exit(0))
             }
         }
       case m: CliClientMessage.Tasks =>
@@ -218,14 +216,14 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
                   serverMessages.put(CliServerMessage.Exit(0))
                 } else {
-                  // TODO sort somehow
                   val modules = cliOptions.module match {
                     case Some(moduleId) =>
                       state.tasksResolver.allModules.filter(_.id == moduleId)
                     case None =>
                       state.tasksResolver.allModules
                   }
-                  val modulesWithTasks = modules.map { module =>
+                  val sortedModules = modules.sortBy(_.id)
+                  val modulesWithTasks = sortedModules.map { module =>
                     val moduleTaskNames =
                       state.tasksResolver.taskInstancesPerModule(module.id).map(t => s"  ${t.task.name}")
                     s"${module.id}:\n${moduleTaskNames.mkString("\n")}"
@@ -248,29 +246,29 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
-                val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(cliOptions.module, cliOptions.task)
+                val selectedModuleIds = if cliOptions.modules.isEmpty then
+                  state.tasksResolver.allModules.map(_.id)
+                else cliOptions.modules
+                val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(selectedModuleIds, cliOptions.task)
                 if cliOptions.json.value then {
-                  val tasksExecStages = state.executionPlanner.getExecStages(cliOptions.module, cliOptions.task)
+                  val tasksExecStages = state.executionPlanner.getExecStages(selectedModuleIds, cliOptions.task)
                   serverMessages.put(CliServerMessage.Output(tasksExecStages.map(_.map(_.id)).toJson))
-                  serverMessages.put(CliServerMessage.Exit(0))
                 } else if cliOptions.dot.value then {
                   val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
                   serverMessages.put(CliServerMessage.Output(dot))
-                  serverMessages.put(CliServerMessage.Exit(0))
                 } else if cliOptions.ascii.value then {
                   val asciiGraph = GraphUtils.generateAscii(tasksExecSubgraph, v => v.id)
                   serverMessages.put(CliServerMessage.Output(asciiGraph))
-                  serverMessages.put(CliServerMessage.Exit(0))
                 } else {
-                  val tasksExecStages = state.executionPlanner.getExecStages(cliOptions.module, cliOptions.task)
+                  val tasksExecStages = state.executionPlanner.getExecStages(selectedModuleIds, cliOptions.task)
                   val stagesStr = tasksExecStages.zipWithIndex
                     .map { case (stage, idx) =>
                       s"Stage #${idx}:\n" + stage.map(ti => s"  ${ti.id}").mkString("\n")
                     }
                     .mkString("\n")
                   serverMessages.put(CliServerMessage.Output(stagesStr))
-                  serverMessages.put(CliServerMessage.Exit(0))
                 }
+                serverMessages.put(CliServerMessage.Exit(0))
             }
         }
       case m: CliClientMessage.Exec =>

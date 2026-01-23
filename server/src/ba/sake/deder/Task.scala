@@ -82,6 +82,7 @@ case class TaskExecContext[T, Deps <: Tuple](
 
 // TODO ensure a task is "singleton", i.e. you can only "run" ONE MODULE!
 sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] =:= true) {
+  type Res = T
   def name: String
   def description: String
   def supportedModuleTypes: Set[ModuleType]

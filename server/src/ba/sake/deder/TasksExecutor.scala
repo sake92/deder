@@ -1,18 +1,14 @@
 package ba.sake.deder
 
-import java.util
-import java.util.Collections
-import java.util.concurrent.{Callable, CopyOnWriteArrayList, ExecutorService}
-import scala.util.control.NonFatal
+import java.util.concurrent.{Callable, ExecutorService}
 import scala.jdk.CollectionConverters.*
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.util.control.NonFatal
+import scala.util.Using
 import org.jgrapht.graph.{DefaultEdge, SimpleDirectedGraph}
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import io.opentelemetry.api.trace.StatusCode
-
-import scala.util.Using
 
 class TasksExecutor(
     projectConfig: DederProject,
@@ -23,12 +19,13 @@ class TasksExecutor(
 
   def execute(
       stages: Seq[Seq[TaskInstance]],
+      taskName: String,
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger
-  ): (res: Any, changed: Boolean) = {
+  ): Seq[TaskExecResult] = {
     var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
-    var finalTaskResult: (res: Any, changed: Boolean) = (null, false)
+    var finalTaskResults = Seq.newBuilder[TaskExecResult]
     for (taskInstances, stageIndex) <- stages.zipWithIndex do {
       val stageSpan = OTEL.TRACER.spanBuilder(s"Stage $stageIndex").startSpan()
       try {
@@ -56,7 +53,9 @@ class TasksExecutor(
                       watch,
                       serverNotificationsLogger
                     )
-                  finalTaskResult = (taskRes.value, changed) // in last stage, last task's result will be returned
+                  // collect final task results
+                  if taskInstance.task.name == taskName then
+                    finalTaskResults = finalTaskResults.addOne(TaskExecResult(taskInstance, taskRes.value, changed))
                   taskInstance.id -> taskRes
                 }
               } catch {
@@ -86,7 +85,7 @@ class TasksExecutor(
           throw e
       } finally stageSpan.end()
     }
-    finalTaskResult
+    finalTaskResults.result()
   }
 
   private def getTransitiveResults(
@@ -120,3 +119,9 @@ class TasksExecutor(
     transitiveResults.map(_.sortBy(_._1).map(_._2))
   }
 }
+
+case class TaskExecResult(
+    taskInstance: TaskInstance,
+    res: Any,
+    changed: Boolean
+)

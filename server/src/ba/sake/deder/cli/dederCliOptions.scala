@@ -41,8 +41,8 @@ case class DederCliTasksOptions(
 
 @main("plan command", "Plan for task execution in a module")
 case class DederCliPlanOptions(
-    @arg(doc = "Module ID to plan", short = 'm')
-    module: String, // Seq[String] unsupported, would be weird/hard
+    @arg(doc = "Module IDs to plan", short = 'm')
+    modules: Seq[String], // cant have a default... :/
     @arg(doc = "The task to plan", short = 't')
     task: String,
     @arg(doc = "Output result as JSON")
@@ -64,7 +64,7 @@ case class DederCliExecOptions(
     @arg(doc = "The task to execute", short = 't')
     task: String = "compile",
     @arg(doc = "Module IDs to execute", short = 'm')
-    modules: Seq[String], // cant have a default.. :/
+    modules: Seq[String], // cant have a default... :/
     @arg(doc = "Log level", short = 'l')
     logLevel: LogLevel = LogLevel.INFO,
     @arg(doc = "Output result as JSON")
