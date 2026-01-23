@@ -82,19 +82,20 @@ class IntegrationSuite extends munit.FunSuite {
              |  common.javaVersion
              |  common.javacAnnotationProcessorDeps
              |  common.javacOptions
-             |  common.scalaSemanticdbVersion
              |  common.scalaVersion
              |  common.scalacOptions
              |  common.scalacPluginDeps
+             |  common.semanticdb
              |  common.semanticdbEnabled
              |  common.sources
              |Stage #1:
              |  common.allClassesDirs
              |  common.dependencies
              |  common.javacAnnotationProcessors
-             |  common.scalacPlugins
+             |  common.scalaSemanticdbVersion
              |Stage #2:
              |  common.allDependencies
+             |  common.scalacPlugins
              |Stage #3:
              |  common.compileClasspath
              |Stage #4:
@@ -111,20 +112,20 @@ class IntegrationSuite extends munit.FunSuite {
         // default command is compile
         // and the logs go to stderr!
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
-        assert(dederOutput.contains("Executing compile on modules: backend, common, frontend, uber, uber-test"))
+        assert(dederOutput.contains("Executing 'compile' task on modules: backend, common, frontend, uber, uber-test"))
         val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
         assertEquals(compilingCount, 5)
       }
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
-        assert(dederOutput.contains("Executing compile on modules: backend, common, frontend, uber, uber-test"))
+        assert(dederOutput.contains("Executing 'compile' task on modules: backend, common, frontend, uber, uber-test"))
         val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
         assertEquals(compilingCount, 0) // all compiled already
       }
       locally {
         os.write.append(projectPath / "common/src/Common.scala", "\n// some change to trigger recompilation\n")
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
-        assert(dederOutput.contains("Executing compile on modules: backend, common, frontend, uber, uber-test"))
+        assert(dederOutput.contains("Executing 'compile' task on modules: backend, common, frontend, uber, uber-test"))
         val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
         assertEquals(compilingCount, 1)
       }

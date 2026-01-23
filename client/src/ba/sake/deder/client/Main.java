@@ -135,15 +135,19 @@ public class Main {
 		var serverLogFile = Path.of(".deder/logs/server.log");
 		Files.writeString(serverLogFile, "=".repeat(50) + System.lineSeparator(), StandardCharsets.UTF_8,
 				StandardOpenOption.APPEND, StandardOpenOption.CREATE);
-		var propFileName = Paths.get(".deder/server.properties");
 		var javaOpts = serverProps.getProperty("JAVA_OPTS", "");
 		var processArgs = new ArrayList<String>();
 		// detach server process so it keeps running after client exits
-		if (System.getProperty("os.name").toLowerCase().contains("win")) {
+		var osname = System.getProperty("os.name").toLowerCase();
+		if (osname.contains("win")) {
 			processArgs.add("cmd");
 			processArgs.add("/c");
 			processArgs.add("start");
 			processArgs.add("/B");
+		} else if (osname.contains("mac")) {
+			processArgs.add("screen");
+			processArgs.add("-dmS");
+			processArgs.add("deder-server");
 		} else {
 			processArgs.add("setsid");
 		}

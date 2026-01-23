@@ -28,7 +28,7 @@ class ConcurrencySuite extends munit.FunSuite {
       val clientExecutorService = java.util.concurrent.Executors.newFixedThreadPool(32)
       val clientFutures = (1 to clientsCount).map { _ =>
         clientExecutorService.submit(() => {
-          state.executeOne("common", "task1", Seq.empty, false, serverNotificationsLogger, false)
+          state.executeTasks(Seq("common"), "task1", Seq.empty, false, serverNotificationsLogger)
         })
       }
       clientFutures.foreach(_.get()) // wait for all clients to finish
@@ -72,7 +72,7 @@ class ConcurrencySuite extends munit.FunSuite {
         clientExecutorService.submit(() => {
           // half of the clients always call "task2", the other half random tasks
           val taskName = if i % 2 == 0 then "task2" else taskNames(Random.nextInt(taskNames.length))
-          state.executeOne("common", taskName, Seq.empty, false, serverNotificationsLogger, false)
+          state.executeTasks(Seq("common"), taskName, Seq.empty, false, serverNotificationsLogger)
         })
       }
       clientFutures.foreach(_.get()) // wait for all clients to finish
