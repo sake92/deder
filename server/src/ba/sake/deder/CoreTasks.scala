@@ -425,10 +425,10 @@ class CoreTasks() extends StrictLogging {
           if scalaVersion.startsWith("3.") then
             Seq(
               "-Xsemanticdb",
-              s"-sourceroot",
+              "-sourceroot",
               DederGlobals.projectRootDir.toString,
-              "-semanticdb-target:",
-              semanticdbDir.toString
+              "-semanticdb-target",
+              semanticdbDir.toString,
             )
           else
             Seq(

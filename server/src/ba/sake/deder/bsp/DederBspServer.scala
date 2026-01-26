@@ -459,7 +459,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val classesDir =
             executeTask(serverNotificationsLogger, moduleId, coreTasks.classesDirTask).toNIO.toUri.toString
           val semanticdbDir =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask).toNIO.toUri.toString
+            executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask)
           val javacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.javacOptionsTask)
           val javacAnnotationProcessors =
             try executeTask(serverNotificationsLogger, moduleId, coreTasks.javacAnnotationProcessorsTask)
@@ -563,7 +563,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val scalaVersion = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalaVersionTask)
           val scalacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacOptionsTask)
           val semanticdbDir =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask).toNIO.toUri.toString
+            executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask)
           val scalacPlugins =
             try executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacPluginsTask)
             catch case e: TaskEvaluationException => Seq.empty
@@ -572,9 +572,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++
                 Seq(
                   "-Xsemanticdb",
-                  s"-sourceroot",
-                  s"${DederGlobals.projectRootDir}",
-                  "-semanticdb-target:",
+                  "-sourceroot",
+                  DederGlobals.projectRootDir.toString,
+                  "-semanticdb-target",
                   semanticdbDir.toString
                 )
             else
@@ -639,7 +639,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         params.getTargets.asScala.map { targetId =>
           val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
-          
           val mainClasses =
             try executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)
             catch case e: TaskEvaluationException => Seq.empty
