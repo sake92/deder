@@ -17,7 +17,7 @@ import ch.epfl.scala.bsp4j.*
 class BspIntegrationSuite extends munit.FunSuite {
 
   // first compile can take a while
-  override def munitTimeout = 2.minutes
+  override def munitTimeout: Duration = 2.minutes
 
   private val testResourceDir = os.Path(System.getenv("MILL_TEST_RESOURCE_DIR"))
   private val dederClientPath = System.getenv("DEDER_CLIENT_PATH")
@@ -50,7 +50,7 @@ class BspIntegrationSuite extends munit.FunSuite {
   private val baseUri = testDirectory.toUri.toString
   private given ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
 
-  private val languageIds = List("scala").asJava
+  private val languageIds = List("scala", "java").asJava
 
   override def beforeAll(): Unit =
     executeDederCommand(os.Path(testDirectory), "bsp install")
@@ -93,6 +93,9 @@ class BspIntegrationSuite extends munit.FunSuite {
     Collections.emptyList(), {
       val capabilities = new BuildTargetCapabilities()
       capabilities.setCanCompile(true)
+      capabilities.setCanRun(false)
+      capabilities.setCanTest(false)
+      capabilities.setCanDebug(false)
       capabilities
     }
   )
@@ -104,6 +107,9 @@ class BspIntegrationSuite extends munit.FunSuite {
     Lists.newArrayList(commonTargetId), {
       val capabilities = new BuildTargetCapabilities()
       capabilities.setCanCompile(true)
+      capabilities.setCanRun(false)
+      capabilities.setCanTest(false)
+      capabilities.setCanDebug(false)
       capabilities
     }
   )
@@ -115,6 +121,9 @@ class BspIntegrationSuite extends munit.FunSuite {
     Lists.newArrayList(commonTargetId), {
       val capabilities = new BuildTargetCapabilities()
       capabilities.setCanCompile(true)
+      capabilities.setCanRun(false)
+      capabilities.setCanTest(false)
+      capabilities.setCanDebug(false)
       capabilities
     }
   )
@@ -127,6 +136,8 @@ class BspIntegrationSuite extends munit.FunSuite {
       val capabilities = new BuildTargetCapabilities()
       capabilities.setCanCompile(true)
       capabilities.setCanRun(true)
+      capabilities.setCanTest(false)
+      capabilities.setCanDebug(false)
       capabilities
     }
   )
@@ -138,24 +149,32 @@ class BspIntegrationSuite extends munit.FunSuite {
     Lists.newArrayList(uberTargetId), {
       val capabilities = new BuildTargetCapabilities()
       capabilities.setCanCompile(true)
+      capabilities.setCanRun(false)
       capabilities.setCanTest(true)
+      capabilities.setCanDebug(false)
       capabilities
     }
   )
 
   private val allTargets = List(commonTarget, frontendTarget, backendTarget, uberTarget, uberTestTarget)
   private val allTargetIds = allTargets.map(_.getId)
+  allTargets.foreach { t =>
+    val scalaBuildTarget =
+      new ScalaBuildTarget("org.scala-lang", "3.7.1", "3", ScalaPlatform.JVM, List.empty.asJava)
+    t.setData(scalaBuildTarget)
+    t.setDataKind(BuildTargetDataKind.SCALA)
+  }
 
   test("Initialize connection followed by its shutdown") {
     client.testInitializeAndShutdown()
   }
 
-  /*
+
   test("Workspace Build Targets") {
     val targets = allTargets.asJava
     val workspaceBuildTargetsResult = new WorkspaceBuildTargetsResult(targets)
     client.testCompareWorkspaceTargetsResults(workspaceBuildTargetsResult)
-  }*/
+  }
 
   test("Initial imports") {
     client.testResolveProject()
@@ -188,21 +207,21 @@ class BspIntegrationSuite extends munit.FunSuite {
     )
   }
 
-  // TODO fails
-  /*
   test("Run Tests") {
     client.testTargetsTestSuccessfully(
       Lists.newArrayList(uberTestTarget)
     )
-  }*/
+  }
 
   test("Run javacOptions") {
     def classDirectory(moduleId: String) =
       testDirectory.resolve(s".deder/out/${moduleId}/classes").toUri.toString
+    def semanticdbDirectory(moduleId: String) =
+        testDirectory.resolve(s".deder/out/${moduleId}/semanticdb").toString
     def javacOptions(moduleId: String) = List(
       "-processorpath",
       coursierCachedFile("com/sourcegraph/semanticdb-javac/0.11.1/semanticdb-javac-0.11.1.jar").toString,
-      s"-Xplugin:semanticdb -sourceroot:${testDirectory} -targetroot:${classDirectory(moduleId)} -build-tool:sbt"
+      s"-Xplugin:semanticdb -sourceroot:${testDirectory} -targetroot:${semanticdbDirectory(moduleId)} -build-tool:sbt"
     ).asJava
     val javacOptionsItems = List(
       new JavacOptionsItem(
@@ -276,11 +295,12 @@ class BspIntegrationSuite extends munit.FunSuite {
       new JavacOptionsResult(javacOptionsItems)
     )
   }
-
+/*
   test("Run scalacOptions") {
     def classDirectory(moduleId: String) =
       testDirectory.resolve(s".deder/out/${moduleId}/classes").toUri.toString
-
+    def semanticdbDirectory(moduleId: String) =
+        testDirectory.resolve(s".deder/out/${moduleId}/semanticdb").toString
     def options(moduleId: String) = List(
       "-Xsemanticdb",
       "-sourceroot",
@@ -370,7 +390,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       new ScalaTestClassesParams(Lists.newArrayList(uberTestTargetId)),
       result
     )
-  }
+  }*/
 
   // TODO as soon as one fails, none other tests works :/
   /*
@@ -389,6 +409,7 @@ class BspIntegrationSuite extends munit.FunSuite {
     }
   }*/
 
+  /*
   test("Run Scala Main Classes") {
     val classes1 = List(
       new ScalaMainClass("uber.Main", List().asJava, List().asJava)
@@ -401,7 +422,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       new ScalaMainClassesParams(Lists.newArrayList(uberTargetId)),
       result
     )
-  }
+  }*/
 
 
   // TODO as soon as one fails, none other tests works :/

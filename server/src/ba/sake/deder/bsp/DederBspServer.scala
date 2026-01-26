@@ -475,9 +475,10 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
                 .map(_.toNIO.toUri.toString)
                 .toList
-            catch case e: TaskEvaluationException => List.empty
+            catch case e: TaskEvaluationException => Seq.empty
+          logger.info(s"compileClasspath for ${moduleId} : ${compileClasspath}")
           val javacOptionsItem =
-            JavacOptionsItem(targetId, finalJavacOptions.asJava, compileClasspath.asJava, classesDir)
+            new JavacOptionsItem(targetId, finalJavacOptions.asJava, compileClasspath.asJava, classesDir)
           List(javacOptionsItem)
         }
       }
@@ -744,7 +745,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               val status = if runRes.exitCode == 0 then StatusCode.OK else StatusCode.ERROR
               RunResult(status)
             }
-          case None => 
+          case None =>
             throw DederException(s"Module ${moduleId} does not have a main class to run")
         }
       }
@@ -819,17 +820,19 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     val testModuleTypes = Set(ModuleType.SCALA_TEST)
     testModuleTypes.contains(module.`type`)
 
-  private def isAppModule(module: DederModule): Boolean =
-    !isTestModule(module)
-
   private def buildTarget(module: DederModule, projectStateData: DederProjectStateData): BuildTarget = {
     val id = buildTargetId(module)
     val isTestModule0 = isTestModule(module)
-    val isAppModule0 = isAppModule(module)
+    val coreTasks = projectStateData.tasksRegistry.coreTasks
+    val serverNotificationsLogger = makeServerNotificationsLogger(
+      moduleId = Some(module.id),
+      isCompileTask = true
+    )
+    val isAppModule = executeTask(serverNotificationsLogger, module.id, coreTasks.finalMainClassTask).isDefined
     val tags = List(
+      List(BuildTargetTag.APPLICATION).filter(_ => isAppModule),
       List(BuildTargetTag.TEST).filter(_ => isTestModule0),
-      List(BuildTargetTag.APPLICATION).filter(_ => isAppModule0),
-      List(BuildTargetTag.LIBRARY).filter(_ => !isTestModule0 && !isAppModule0)
+      List(BuildTargetTag.LIBRARY).filter(_ => !isTestModule0 && !isAppModule)
     ).flatten
     val languageIds = module.`type` match {
       case ModuleType.SCALA | ModuleType.SCALA_TEST => List("scala", "java")
@@ -838,7 +841,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     val dependencies = module.moduleDeps.asScala.map(buildTargetId)
     val capabilities = new BuildTargetCapabilities()
     capabilities.setCanCompile(true)
-    capabilities.setCanRun(isAppModule0)
+    capabilities.setCanRun(isAppModule)
     capabilities.setCanTest(isTestModule0)
     capabilities.setCanDebug(false) // Metals does it for us https://github.com/scalameta/metals/issues/5928
     val buildTarget = new BuildTarget(id, tags.asJava, languageIds.asJava, dependencies.asJava, capabilities)
@@ -849,9 +852,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val binaryVersion = ScalaParameters(m.scalaVersion).scalaBinaryVersion
         val scalaBuildTarget =
           new ScalaBuildTarget("org.scala-lang", m.scalaVersion, binaryVersion, ScalaPlatform.JVM, List.empty.asJava)
-        val jvmBuildTarget = new JvmBuildTarget()
-        jvmBuildTarget.setJavaHome(m.javaHome)
-        jvmBuildTarget.setJavaVersion(m.javaVersion)
+        // val jvmBuildTarget = new JvmBuildTarget()
+        // jvmBuildTarget.setJavaHome(m.javaHome)
+        // jvmBuildTarget.setJavaVersion(m.javaVersion)
         // scalaBuildTarget.setJvmBuildTarget(jvmBuildTarget)
         buildTarget.setData(scalaBuildTarget)
         buildTarget.setDataKind(BuildTargetDataKind.SCALA)

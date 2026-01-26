@@ -191,7 +191,7 @@ class DederProjectState(
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
-      useLastGood: Boolean = false
+      useLastGood: Boolean
   ): Seq[TaskExecResult] =
     try {
       lastRequestStartedAt.set(Instant.now())

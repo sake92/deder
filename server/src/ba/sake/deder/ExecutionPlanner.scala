@@ -15,8 +15,7 @@ class ExecutionPlanner(
   // build independent exec stages (~toposort)
   // assumes tasks exist on given modules
   def getExecStages(moduleIds: Seq[String], taskName: String): Seq[Seq[TaskInstance]] = {
-
-
+    
     val execSubgraph = getExecSubgraph(moduleIds, taskName)
 
     def findStartTaskInstances(taskInstance: TaskInstance): Seq[TaskInstance] = {
