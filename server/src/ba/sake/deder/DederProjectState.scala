@@ -215,7 +215,7 @@ class DederProjectState(
         taskInstance.lock.lock()
       }
       try {
-        tasksExecutor.execute(tasksExecStages, taskName, args, watch, serverNotificationsLogger)
+        tasksExecutor.execute(tasksExecStages,moduleIds, taskName, args, watch, serverNotificationsLogger)
       } finally {
         allTaskInstances.reverse.foreach { taskInstance =>
           taskInstance.lock.unlock()

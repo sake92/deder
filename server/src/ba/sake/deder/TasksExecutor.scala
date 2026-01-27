@@ -19,6 +19,7 @@ class TasksExecutor(
 
   def execute(
       stages: Seq[Seq[TaskInstance]],
+      moduleIds: Seq[String],
       taskName: String,
       args: Seq[String],
       watch: Boolean,
@@ -54,7 +55,7 @@ class TasksExecutor(
                       serverNotificationsLogger
                     )
                   // collect final task results
-                  if taskInstance.task.name == taskName then
+                  if taskInstance.task.name == taskName && moduleIds.contains(taskInstance.moduleId) then
                     finalTaskResults = finalTaskResults.addOne(TaskExecResult(taskInstance, taskRes.value, changed))
                   taskInstance.id -> taskRes
                 }

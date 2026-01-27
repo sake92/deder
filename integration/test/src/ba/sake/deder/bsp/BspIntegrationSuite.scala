@@ -9,7 +9,8 @@ import java.util.concurrent.Executors
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.util.Properties
+import scala.jdk.DurationConverters.*
+import scala.util.*
 import com.google.common.collect.Lists
 import ch.epfl.scala.bsp.testkit.client.TestClient
 import ch.epfl.scala.bsp4j.*
@@ -32,7 +33,7 @@ class BspIntegrationSuite extends munit.FunSuite {
   )
   os.write.over(
     os.Path(testDirectory) / ".deder/server.properties",
-    s"localPath=$dederServerPath\nlogLevel=DEBUG\n",
+    s"localPath=$dederServerPath\n", // logLevel=DEBUG\n
     createFolders = true
   )
 
@@ -55,8 +56,10 @@ class BspIntegrationSuite extends munit.FunSuite {
   override def beforeAll(): Unit =
     executeDederCommand(os.Path(testDirectory), "bsp install")
 
-  override def afterAll(): Unit =
+  override def afterAll(): Unit = {
+    Thread.sleep(1000)
     executeDederCommand(os.Path(testDirectory), "shutdown")
+  }
 
   private val client = TestClient(
     () => {
@@ -67,7 +70,8 @@ class BspIntegrationSuite extends munit.FunSuite {
       val in: java.io.InputStream = bspServerProcess.stdout
       (out, in, () => bspServerProcess.destroy(shutdownGracePeriod = 0))
     },
-    initializeBuildParams
+    initializeBuildParams,
+    //10.seconds.toJava
   )
 
   private def executeDederCommand(projectPath: os.Path, command: String): os.CommandResult = {
@@ -169,7 +173,6 @@ class BspIntegrationSuite extends munit.FunSuite {
     client.testInitializeAndShutdown()
   }
 
-
   test("Workspace Build Targets") {
     val targets = allTargets.asJava
     val workspaceBuildTargetsResult = new WorkspaceBuildTargetsResult(targets)
@@ -217,7 +220,7 @@ class BspIntegrationSuite extends munit.FunSuite {
     def classDirectory(moduleId: String) =
       testDirectory.resolve(s".deder/out/${moduleId}/classes").toUri.toString
     def semanticdbDirectory(moduleId: String) =
-        testDirectory.resolve(s".deder/out/${moduleId}/semanticdb").toString
+      testDirectory.resolve(s".deder/out/${moduleId}/semanticdb").toString
     def javacOptions(moduleId: String) = List(
       "-processorpath",
       coursierCachedFile("com/sourcegraph/semanticdb-javac/0.11.1/semanticdb-javac-0.11.1.jar").toString,
@@ -295,22 +298,24 @@ class BspIntegrationSuite extends munit.FunSuite {
       new JavacOptionsResult(javacOptionsItems)
     )
   }
-/*
+
   test("Run scalacOptions") {
     def classDirectory(moduleId: String) =
       testDirectory.resolve(s".deder/out/${moduleId}/classes").toUri.toString
     def semanticdbDirectory(moduleId: String) =
-        testDirectory.resolve(s".deder/out/${moduleId}/semanticdb").toString
-    def options(moduleId: String) = List(
+      testDirectory.resolve(s".deder/out/${moduleId}/semanticdb").toString
+    def scalacOptions(moduleId: String) = List(
       "-Xsemanticdb",
       "-sourceroot",
-      testDirectory.toString
+      testDirectory.toString,
+      "-semanticdb-target",
+      semanticdbDirectory(moduleId)
     ).asJava
 
     val scalacOptionsItems = List(
       new ScalacOptionsItem(
         commonTargetId,
-        options("common"),
+        scalacOptions("common"),
         List(
           classDirectory("common"),
           coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
@@ -320,7 +325,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       ),
       new ScalacOptionsItem(
         frontendTargetId,
-        options("frontend"),
+        scalacOptions("frontend"),
         List(
           classDirectory("frontend"),
           classDirectory("common"),
@@ -331,7 +336,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       ),
       new ScalacOptionsItem(
         backendTargetId,
-        options("backend"),
+        scalacOptions("backend"),
         List(
           classDirectory("backend"),
           classDirectory("common"),
@@ -342,7 +347,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       ),
       new ScalacOptionsItem(
         uberTargetId,
-        options("uber"),
+        scalacOptions("uber"),
         List(
           classDirectory("uber"),
           classDirectory("backend"),
@@ -355,7 +360,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       ),
       new ScalacOptionsItem(
         uberTestTargetId,
-        options("uber-test"),
+        scalacOptions("uber-test"),
         List(
           classDirectory("uber-test"),
           classDirectory("uber"),
@@ -380,36 +385,6 @@ class BspIntegrationSuite extends munit.FunSuite {
     )
   }
 
-  test("Run Scala Test Classes") {
-    val classes1 = List("uber.MyTest").asJava
-    val item1 = new ScalaTestClassesItem(uberTestTargetId, classes1)
-    item1.setFramework("munit")
-    val testClassesItems = List(item1).asJava
-    val result = new ScalaTestClassesResult(testClassesItems)
-    client.testScalaTestClasses(
-      new ScalaTestClassesParams(Lists.newArrayList(uberTestTargetId)),
-      result
-    )
-  }*/
-
-  // TODO as soon as one fails, none other tests works :/
-  /*
-  test("Scala Test Classes with less items should fail") {
-    val classes1 = List("uber.MyTest").asJava
-    val testClassesItems = List(new ScalaTestClassesItem(uberTestTargetId, classes1)).asJava
-    val result = new ScalaTestClassesResult(testClassesItems)
-    Try(
-      client.testScalaTestClasses(
-        new ScalaTestClassesParams(Collections.emptyList()),
-        result
-      )
-    ) match {
-      case Failure(_) => assert(true)
-      case Success(_) => fail("Test Classes should expect all item classes to be defined!")
-    }
-  }*/
-
-  /*
   test("Run Scala Main Classes") {
     val classes1 = List(
       new ScalaMainClass("uber.Main", List().asJava, List().asJava)
@@ -422,11 +397,9 @@ class BspIntegrationSuite extends munit.FunSuite {
       new ScalaMainClassesParams(Lists.newArrayList(uberTargetId)),
       result
     )
-  }*/
+  }
 
-
-  // TODO as soon as one fails, none other tests works :/
-  /*test("Scala Main Classes with less items should fail") {
+  test("Scala Main Classes with less items should fail") {
     val classes1 = List(
       new ScalaMainClass("uber.Main", List().asJava, List().asJava)
     ).asJava
@@ -443,27 +416,36 @@ class BspIntegrationSuite extends munit.FunSuite {
       case Failure(_) => assert(true)
       case Success(_) => fail("Test Classes should expect all item classes to be defined!")
     }
-  }*/
-
-  /*
-
-  private def environmentItem(testing: Boolean) = {
-    val classpath = List("scala-library.jar").asJava
-    val jvmOptions = List("-Xms256m").asJava
-    val environmentVariables = Map("A" -> "a", "TESTING" -> testing.toString).asJava
-    val workdir = "/tmp"
-    val item1 = new JvmEnvironmentItem(
-      targetId1,
-      classpath,
-      jvmOptions,
-      workdir,
-      environmentVariables
-    )
-    val mainClass = new JvmMainClass("MainClass.java", List.empty[String].asJava)
-    item1.setMainClasses(List(mainClass).asJava)
-    List(item1).asJava
   }
 
+  test("Run Scala Test Classes") {
+    val classes1 = List("uber.MyTest").asJava
+    val item1 = new ScalaTestClassesItem(uberTestTargetId, classes1)
+    item1.setFramework("munit")
+    val testClassesItems = List(item1).asJava
+    val result = new ScalaTestClassesResult(testClassesItems)
+    client.testScalaTestClasses(
+      new ScalaTestClassesParams(Lists.newArrayList(uberTestTargetId)),
+      result
+    )
+  }
+
+  test("Scala Test Classes with less items should fail") {
+    val classes1 = List("uber.MyTest").asJava
+    val testClassesItems = List(new ScalaTestClassesItem(uberTestTargetId, classes1)).asJava
+    val result = new ScalaTestClassesResult(testClassesItems)
+    Try(
+      client.testScalaTestClasses(
+        new ScalaTestClassesParams(Collections.emptyList()),
+        result
+      )
+    ) match {
+      case Failure(_) => assert(true)
+      case Success(_) => fail("Test Classes should expect all item classes to be defined!")
+    }
+  }
+
+  /*
   test("Jvm Run Environment") {
     client.testJvmRunEnvironment(
       new JvmRunEnvironmentParams(Collections.emptyList()),
@@ -477,5 +459,21 @@ class BspIntegrationSuite extends munit.FunSuite {
       new JvmTestEnvironmentResult(environmentItem(testing = true))
     )
   }
-   */
+
+  private def environmentItem(testing: Boolean) = {
+    val classpath = List("scala-library.jar").asJava
+    val jvmOptions = List("-Xms256m").asJava
+    val environmentVariables = Map("A" -> "a", "TESTING" -> testing.toString).asJava
+    val workdir = "/tmp"
+    val item1 = new JvmEnvironmentItem(
+      commonTargetId,
+      classpath,
+      jvmOptions,
+      workdir,
+      environmentVariables
+    )
+    val mainClass = new JvmMainClass("MainClass.java", List.empty[String].asJava)
+    item1.setMainClasses(List(mainClass).asJava)
+    List(item1).asJava
+  }*/
 }
