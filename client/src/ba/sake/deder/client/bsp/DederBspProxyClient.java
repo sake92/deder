@@ -60,7 +60,7 @@ public class DederBspProxyClient implements DederClient {
 	}
 
 	@Override
-	public void stop() throws Exception {
+	public void stop(boolean isCancel) throws Exception {
 		if (serverWriteThread == null || serverReadThread == null) {
 			return; // didn't connect at all
 		}

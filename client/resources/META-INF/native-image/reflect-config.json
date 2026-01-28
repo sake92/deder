@@ -48,6 +48,12 @@
     "allDeclaredConstructors": true
   },
   {
+    "name": "ba.sake.deder.client.cli.ClientMessage$Cancel",
+    "allDeclaredFields": true,
+    "allDeclaredMethods": true,
+    "allDeclaredConstructors": true
+  },
+  {
     "name": "ba.sake.deder.client.cli.ClientMessage$Clean",
     "allDeclaredFields": true,
     "allDeclaredMethods": true,

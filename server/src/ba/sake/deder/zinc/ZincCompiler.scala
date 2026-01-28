@@ -28,9 +28,7 @@ import xsbti.compile.{
 }
 import com.typesafe.scalalogging.StrictLogging
 import sbt.internal.inc.ScalaInstance
-import ba.sake.deder.ServerNotificationsLogger
-import ba.sake.deder.ServerNotification
-import ba.sake.deder.DederGlobals
+import ba.sake.deder.{DederGlobals, RequestContext, ServerNotification, ServerNotificationsLogger}
 
 object ZincCompiler {
   def apply(compilerBridgeJar: os.Path): ZincCompiler =
@@ -184,7 +182,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
         // TODO
         Optional.empty[CompileAnalysis]
 
-      override def definesClass(classpathEntry: xsbti.VirtualFile): DefinesClass = (className: String) => 
+      override def definesClass(classpathEntry: xsbti.VirtualFile): DefinesClass = (className: String) =>
         Locate.definesClass(classpathEntry).apply(className)
     }
 
@@ -197,7 +195,9 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
         notifications.add(
           ServerNotification.TaskProgress(moduleId, "compile", current.toLong, total.toLong)
         )
-        true
+        val currentRequestId = RequestContext.id.get()
+        if currentRequestId == null then true
+        else !DederGlobals.cancellationTokens.get(currentRequestId).get()
       }
     }
 

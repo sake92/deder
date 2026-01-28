@@ -12,6 +12,9 @@ import io.opentelemetry.api.trace.StatusCode
 import ba.sake.tupson.toJson
 import ba.sake.deder.config.{ConfigParser, DederProject}
 
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
+
 class DederProjectState(
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
@@ -67,6 +70,7 @@ class DederProjectState(
 
   def executeCLI(
       clientId: Int,
+      requestId: String,
       moduleSelectors: Seq[String],
       taskName: String,
       args: Seq[String],
@@ -111,6 +115,7 @@ class DederProjectState(
       }
       val relevantModuleIds = relevantModuleAndTasks.map(_._1)
       val results = executeTasks(
+        requestId,
         relevantModuleIds,
         taskName,
         args,
@@ -173,7 +178,9 @@ class DederProjectState(
       .startSpan()
     try {
       Using.resource(span.makeCurrent()) { scope =>
-        val res = executeTasks(Seq(moduleId), task.name, args, watch, serverNotificationsLogger, useLastGood).head
+        val requestId = UUID.randomUUID().toString
+        val res =
+          executeTasks(requestId, Seq(moduleId), task.name, args, watch, serverNotificationsLogger, useLastGood).head
         (res.res.asInstanceOf[T], res.changed)
       }
     } catch {
@@ -186,6 +193,7 @@ class DederProjectState(
 
   // execute a single task on many modules
   def executeTasks(
+      requestId: String,
       moduleIds: Seq[String], // nonempty please :')
       taskName: String,
       args: Seq[String],
@@ -210,16 +218,18 @@ class DederProjectState(
           tasksExecutorService
         )
       val allTaskInstances = tasksExecStages.flatten.sortBy(_.id) // essential!!
-      allTaskInstances.foreach { taskInstance =>
-        // TODO timed wait
-        taskInstance.lock.lock()
-      }
       try {
-        tasksExecutor.execute(tasksExecStages,moduleIds, taskName, args, watch, serverNotificationsLogger)
+        allTaskInstances.foreach { taskInstance =>
+          // TODO timed wait
+          taskInstance.lock.lock()
+        }
+        DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
+        tasksExecutor.execute(requestId, tasksExecStages, moduleIds, taskName, args, watch, serverNotificationsLogger)
       } finally {
         allTaskInstances.reverse.foreach { taskInstance =>
           taskInstance.lock.unlock()
         }
+        DederGlobals.cancellationTokens.remove(requestId)
       }
     } catch {
       case NonFatal(e) =>
@@ -228,6 +238,12 @@ class DederProjectState(
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         throw TaskEvaluationException(s"Error during execution of task '${taskName}': ${e.getMessage}", e)
     }
+
+  def cancelRequest(requestId: String): Unit = {
+    val token = DederGlobals.cancellationTokens.get(requestId)
+    logger.debug(s"Cancelling request ${requestId} with token ${token}")
+    if token != null then token.set(true)
+  }
 
   private def scheduleInactiveShutdownChecker(): Unit = {
     val executor = Executors.newSingleThreadScheduledExecutor()
@@ -293,7 +309,9 @@ class DederProjectState(
         }
       }
       if affected then {
+        val requestId = UUID.randomUUID().toString
         executeTasks(
+          requestId,
           Seq(watchedTask.taskInstance.moduleId),
           watchedTask.taskInstance.task.name,
           watchedTask.args,
@@ -337,8 +355,10 @@ class DederProjectState(
       }
       if affected then {
         logger.debug(s"Deps watched task ${watchedTask.taskInstance.id} have changed, re-executing...")
+        val requestId = UUID.randomUUID().toString
         executeCLI(
           watchedTask.clientId,
+          requestId,
           Seq(watchedTask.taskInstance.moduleId),
           watchedTask.taskInstance.task.name,
           watchedTask.args,

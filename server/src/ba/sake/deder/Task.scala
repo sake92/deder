@@ -259,7 +259,14 @@ class ConfigValueTask[T: JsonRW: Hashable](
     execute: TaskExecContext[T, EmptyTuple] => T,
     supportedModuleTypes: Set[ModuleType] = Set.empty,
     description: String = ""
-) extends CachedTask[T, EmptyTuple](name, execute, taskDeps = EmptyTuple, transitive = false, supportedModuleTypes, description) {
+) extends CachedTask[T, EmptyTuple](
+      name,
+      execute,
+      taskDeps = EmptyTuple,
+      transitive = false,
+      supportedModuleTypes,
+      description
+    ) {
   override def toString(): String = s"ConfigValueTask($name)"
 }
 

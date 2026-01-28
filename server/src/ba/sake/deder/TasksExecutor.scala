@@ -18,6 +18,7 @@ class TasksExecutor(
 ) extends StrictLogging {
 
   def execute(
+      requestId: String,
       stages: Seq[Seq[TaskInstance]],
       moduleIds: Seq[String],
       taskName: String,
@@ -42,6 +43,7 @@ class TasksExecutor(
 
             () =>
               val taskSpan = OTEL.TRACER.spanBuilder(taskInstance.id).startSpan()
+              RequestContext.id.set(requestId)
               try {
                 Using.resource(taskSpan.makeCurrent()) { scope =>
                   val (taskRes, changed) = taskInstance.task
@@ -65,7 +67,10 @@ class TasksExecutor(
                   taskSpan.recordException(e)
                   taskSpan.setStatus(StatusCode.ERROR)
                   throw e
-              } finally taskSpan.end()
+              } finally {
+                RequestContext.id.remove()
+                taskSpan.end()
+              }
           }
           val futures = taskExecutions.map(tasksExecutorService.submit)
           val results =

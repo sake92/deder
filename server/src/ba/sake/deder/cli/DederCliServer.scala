@@ -3,7 +3,7 @@ package ba.sake.deder.cli
 import java.io.*
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
-import java.nio.channels.{Channels, ServerSocketChannel, SocketChannel}
+import java.nio.channels.{AsynchronousCloseException, Channels, ServerSocketChannel, SocketChannel}
 import java.nio.file.{Files, Path, Paths}
 import java.nio.charset.StandardCharsets
 import java.nio.ByteBuffer
@@ -71,36 +71,50 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
     // newline delimited JSON messages, only one for now..
     val reader =
       new BufferedReader(new InputStreamReader(Channels.newInputStream(clientChannel), StandardCharsets.UTF_8))
-    val messageJson: String = reader.readLine()
-    val message =
-      try messageJson.parseJson[CliClientMessage]
-      catch {
-        case e: TupsonException =>
-          CliClientMessage.Help(Seq.empty)
-      }
-    val span = OTEL.TRACER
-      .spanBuilder(s"cli.${message.getClass.getSimpleName.toLowerCase}")
-      .setAttribute("clientId", clientId)
-      .setAttribute("request.id", UUID.randomUUID().toString)
-      .startSpan()
-    try {
-      Using.resource(span.makeCurrent()) { scope =>
-        handleClientMessage(clientId, message, serverMessages)
-      }
-    } catch {
-      case e: Throwable =>
-        span.recordException(e)
-        span.setStatus(StatusCode.ERROR)
-        throw e
-    } finally span.end()
+    var messageJson: String = null
+    while {
+      messageJson = reader.readLine()
+      messageJson != null
+    } do {
+      println(s"PARSING CLIENT MESSAGE: $messageJson")
+      val message =
+        try messageJson.parseJson[CliClientMessage]
+        catch {
+          case e: TupsonException =>
+            CliClientMessage.Help(Seq.empty)
+        }
+      val requestId = message.getRequestId
+      val span = OTEL.TRACER
+        .spanBuilder(s"cli.${message.getClass.getSimpleName.toLowerCase}")
+        .setAttribute("clientId", clientId)
+        .setAttribute("request.id", requestId)
+        .startSpan()
+      try {
+        Using.resource(span.makeCurrent()) { scope =>
+          val t1 = new Thread(() => {
+            handleClientMessage(clientId, requestId, message, serverMessages)
+          })
+          // run in another thread so we can cancel it if needed
+          t1.start()
+        }
+      } catch {
+        case e: IOException =>
+          // all good, client disconnected...
+        case e: Throwable =>
+          span.recordException(e)
+          span.setStatus(StatusCode.ERROR)
+          throw e
+      } finally span.end()
+    }
   }
 
   private def handleClientMessage(
       clientId: Int,
+        requestId: String,
       message: CliClientMessage,
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
-    // println(s"Handling client message: $message")
+    println(s"Handling client message: $message")
     message match {
       case m: CliClientMessage.Help =>
         val defaultHelpText =
@@ -246,9 +260,9 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
-                val selectedModuleIds = if cliOptions.modules.isEmpty then
-                  state.tasksResolver.allModules.map(_.id)
-                else cliOptions.modules
+                val selectedModuleIds =
+                  if cliOptions.modules.isEmpty then state.tasksResolver.allModules.map(_.id)
+                  else cliOptions.modules
                 val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(selectedModuleIds, cliOptions.task)
                 if cliOptions.json.value then {
                   val tasksExecStages = state.executionPlanner.getExecStages(selectedModuleIds, cliOptions.task)
@@ -287,6 +301,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
             projectState.executeCLI(
               clientId,
+              requestId,
               cliOptions.modules,
               cliOptions.task,
               args = cliOptions.args.value,
@@ -296,6 +311,9 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
               exitOnEnd = !cliOptions.watch.value
             )
         }
+      case m: CliClientMessage.Cancel =>
+        projectState.cancelRequest(m.requestId)
+        serverMessages.put(CliServerMessage.Exit(130))
       case m: CliClientMessage.Clean =>
         mainargs.Parser[DederCliCleanOptions].constructEither(m.args) match {
           case Left(error) =>
@@ -332,6 +350,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
       case _: CliClientMessage.Shutdown =>
         logger.info(s"Client $clientId requested server shutdown.")
         serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
+        serverMessages.put(CliServerMessage.Exit(0))
         Thread.sleep(100) // let the message be sent
         projectState.shutdown()
     }
@@ -359,55 +378,6 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
       projectState.removeWatchedTasks(clientId)
     }
 
-}
-
-enum CliClientMessage derives JsonRW {
-  case Help(args: Seq[String])
-  case Version()
-  case Modules(args: Seq[String])
-  case Tasks(args: Seq[String])
-  case Plan(args: Seq[String])
-  case Exec(args: Seq[String])
-  case Clean(args: Seq[String])
-  case Import(args: Seq[String])
-  case Shutdown()
-}
-
-enum CliServerMessage derives JsonRW {
-  case Output(text: String)
-  case Log(text: String, level: LogLevel)
-  case RunSubprocess(cmd: Seq[String], watch: Boolean)
-  case Exit(exitCode: Int)
-}
-
-object CliServerMessage {
-  def fromServerNotification(sn: ServerNotification): Option[CliServerMessage] = sn match {
-    case m: ServerNotification.Output =>
-      Some(CliServerMessage.Output(m.text))
-    case m: ServerNotification.Log =>
-      val level = m.level match {
-        case ServerNotification.LogLevel.ERROR   => LogLevel.ERROR
-        case ServerNotification.LogLevel.WARNING => LogLevel.WARNING
-        case ServerNotification.LogLevel.INFO    => LogLevel.INFO
-        case ServerNotification.LogLevel.DEBUG   => LogLevel.DEBUG
-        case ServerNotification.LogLevel.TRACE   => LogLevel.TRACE
-      }
-      Some(CliServerMessage.Log(s"[${m.level.toString.toLowerCase}] ${m.message}", level))
-    case tp: ServerNotification.TaskProgress =>
-      None
-    case cs: ServerNotification.CompileStarted =>
-      None
-    case cd: ServerNotification.CompileDiagnostic =>
-      None
-    case cs: ServerNotification.CompileFinished =>
-      None
-    case cf: ServerNotification.CompileFailed =>
-      None
-    case rs: ServerNotification.RunSubprocess =>
-      Some(CliServerMessage.RunSubprocess(rs.cmd, rs.watch))
-    case ServerNotification.RequestFinished(success) =>
-      Some(CliServerMessage.Exit(if success then 0 else 1))
-  }
 }
 
 enum LogLevel derives JsonRW:
