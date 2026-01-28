@@ -8,15 +8,14 @@ import java.net.http.*;
 import java.util.concurrent.TimeUnit;
 import java.util.Arrays;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.stream.Collectors;
 import java.util.Properties;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+
 import sun.misc.Signal;
-import sun.misc.SignalHandler;
 import ba.sake.deder.client.cli.DederCliClient;
 import ba.sake.deder.client.bsp.DederBspProxyClient;
 
@@ -35,20 +34,20 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
         var main = new Main();
+        main.start(args);
+    }
+
+    private void start(String[] args) throws Exception {
         Signal.handle(new Signal("INT"), signal -> {
             try {
-                if (main.client != null) {
-                    main.client.stop(true);
+                if (client != null) {
+                    client.stop(true);
                 }
             } catch (Exception e) {
                 log("Error occurred while stopping client: " + e.getMessage());
             }
             System.exit(130);
         });
-        main.start(args);
-    }
-
-    private void start(String[] args) throws Exception {
 
         var thisProcess = ProcessHandle.current();
 
@@ -75,7 +74,7 @@ public class Main {
             pp.info().commandLine().ifPresent(cmd -> log("Parent Command: " + cmd));
         }, () -> log("No parent process"));
 
-        client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(args, logFile);
+        client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(this::log, args);
         var startedConnectingAt = Instant.now();
         var maxConnectDurationSeconds = 10;
         try {
@@ -104,7 +103,7 @@ public class Main {
         }
     }
 
-    private static void startServer(boolean isBspClient) throws Exception {
+    private void startServer(boolean isBspClient) throws Exception {
         System.err.println("Deder server not running, starting it...");
         log("Deder server not running, starting it...");
         ensureJavaInstalled();
@@ -132,7 +131,7 @@ public class Main {
         log("Deder server started.");
     }
 
-    private static void ensureJavaInstalled() throws Exception {
+    private void ensureJavaInstalled() throws Exception {
         log("Checking if Java is installed...");
         var processBuilder = new ProcessBuilder("java", "-version");
         processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(logFile.toFile()));
@@ -148,7 +147,7 @@ public class Main {
         log("Java looks ok.");
     }
 
-    private static void startServerProcess(boolean isBspClient, Properties serverProps) throws Exception {
+    private void startServerProcess(boolean isBspClient, Properties serverProps) throws Exception {
         var cwd = Paths.get(".").toAbsolutePath();
         var serverLogFile = Path.of(".deder/logs/server.log");
         Files.writeString(serverLogFile, "=".repeat(50) + System.lineSeparator(), StandardCharsets.UTF_8,
@@ -194,7 +193,7 @@ public class Main {
         }
     }
 
-    private static void writeBspInstallScript(ProcessHandle processHandle) throws IOException {
+    private void writeBspInstallScript(ProcessHandle processHandle) throws IOException {
         System.err.println("Installing BSP config...");
         var commandLineArgs = new ArrayList<String>();
         commandLineArgs.add(processHandle.info().command().get());
@@ -219,7 +218,7 @@ public class Main {
         System.err.println("BSP config installed at " + bspConfigPath);
     }
 
-    private static void download(String fileUrl, Path destination) throws Exception {
+    private void download(String fileUrl, Path destination) throws Exception {
         System.err.println("Starting download:  " + fileUrl);
         var client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
                 .followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build();
@@ -233,7 +232,7 @@ public class Main {
         }
     }
 
-    private static void log(String message) {
+    private void log(String message) {
         try {
             var logMessage = "[" + LocalDateTime.now().truncatedTo(ChronoUnit.MILLIS) + "] " + message;
             Files.writeString(logFile, logMessage + System.lineSeparator(), StandardCharsets.UTF_8,
