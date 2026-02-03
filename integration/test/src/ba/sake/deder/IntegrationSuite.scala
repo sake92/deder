@@ -106,11 +106,22 @@ class IntegrationSuite extends munit.FunSuite {
     }
   }
 
+  // default command is compile
+  // and the logs go to stderr!
   test("deder should compile multimodule project") {
     withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
       locally {
-        // default command is compile
-        // and the logs go to stderr!
+        val dederOutputJson = executeDederCommand(projectPath, "exec -m uber -t compileClasspath --json").out.text()
+        val dederOutput = dederOutputJson.parseJson[Map[String, List[String]]]
+        val uberCompileClasspath = dederOutput("uber")
+        assert(uberCompileClasspath(0).endsWith("/.deder/out/uber/classes"))
+        assert(uberCompileClasspath(1).endsWith("/.deder/out/backend/classes"))
+        assert(uberCompileClasspath(2).endsWith("/.deder/out/frontend/classes"))
+        assert(uberCompileClasspath(3).endsWith("/.deder/out/common/classes"))
+        assert(uberCompileClasspath.exists(_.contains("scala3-library_3-3.7.1.jar")))
+        assert(uberCompileClasspath.exists(_.contains("scala-library-2.13.16.jar")))
+      }
+      locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
         assert(dederOutput.contains("Executing 'compile' task on modules: backend, common, frontend, uber, uber-test"))
         val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
@@ -163,6 +174,30 @@ class IntegrationSuite extends munit.FunSuite {
           duration < maxExpectedDurationMs,
           s"Expected concurrent execution to be under ${maxExpectedDurationMs}ms, but took $duration ms"
         )
+      }
+    }
+  }
+
+  test("deder should run tests in multimodule/uber-test") {
+    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+      locally {
+        val dederOutput = executeDederCommand(projectPath, "exec -m uber-test -t test").out.text()
+        println(s"Test output:\n$dederOutput")
+        //assert(resText.contains("Args = argA, argB, argC"))
+      }
+    }
+  }
+
+  test("deder should assembly multimodule/uber and run it") {
+    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+      locally {
+        executeDederCommand(projectPath, "exec -m uber -t assembly")
+        val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
+        val command = s"java -cp ${projectPath / ".deder/out/uber/assembly/out.jar"} uber.Main argA argB argC"
+        val cmd = shell ++ Seq(command)
+        val res = os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe)
+        val resText = res.out.text()
+        assert(resText.contains("Args = argA, argB, argC"))
       }
     }
   }
