@@ -345,7 +345,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val coreTasks = projectStateData.tasksRegistry.coreTasks
         val cleaned = params.getTargets.asScala.forall { targetId =>
           val moduleId = targetId.moduleId
-          DederCleaner.cleanModules(Seq(moduleId))
+          projectState.cleanModules(Seq(moduleId))
         }
         val result = CleanCacheResult(cleaned)
         logger.debug(s"buildTargetCleanCache for params ${params} return: ${result}")

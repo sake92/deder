@@ -245,6 +245,24 @@ class DederProjectState(
     if token != null then token.set(true)
   }
 
+  def cleanModules(moduleIds: Seq[String]): Boolean = {
+    current.orElse(lastGood) match {
+      case Left(err) =>
+        logger.error(s"Cannot clean modules, project state is not available: ${err}")
+        false
+      case Right(state) =>
+        val modulesTaskInstances = moduleIds.flatMap(
+          state.tasksResolver.taskInstancesPerModule.get
+        ).flatten
+        try {
+          modulesTaskInstances.foreach(_.lock.lock())
+          DederCleaner.cleanModules(moduleIds)
+        } finally {
+            modulesTaskInstances.reverse.foreach(_.lock.unlock())
+        }
+    }
+  }
+
   private def scheduleInactiveShutdownChecker(): Unit = {
     val executor = Executors.newSingleThreadScheduledExecutor()
     executor.scheduleAtFixedRate(
@@ -326,7 +344,7 @@ class DederProjectState(
     }
   }
 
-  def triggerConfigWatchedTasks(): Unit = {
+  private def triggerConfigWatchedTasks(): Unit = {
     watchedTasks.foreach { watchedTask =>
       logger.debug(
         s"Checking if watched task is affected: ${watchedTask.taskInstance} by ${watchedTask.affectingConfigValueTasks}"
@@ -354,7 +372,9 @@ class DederProjectState(
         changed
       }
       if affected then {
-        logger.debug(s"Deps watched task ${watchedTask.taskInstance.id} have changed, re-executing...")
+        logger.debug(
+          s"Config value dependencies of watched task ${watchedTask.taskInstance.id} have changed, re-executing..."
+        )
         val requestId = UUID.randomUUID().toString
         executeCLI(
           watchedTask.clientId,

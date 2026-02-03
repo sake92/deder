@@ -328,7 +328,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                 val moduleIds =
                   if cliOptions.modules.nonEmpty then cliOptions.modules
                   else state.tasksResolver.allModules.map(_.id)
-                DederCleaner.cleanModules(moduleIds)
+                projectState.cleanModules(moduleIds)
                 serverMessages.put(CliServerMessage.Exit(0))
             }
         }
