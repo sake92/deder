@@ -105,6 +105,7 @@ class DederProjectState(
         serverNotificationsLogger.add(
           ServerNotification.logError(s"No '${taskName}' tasks found for modules: ${selectedModuleIds.mkString(", ")}")
         )
+        serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
       } else {
         val plural = if relevantModuleAndTasks.size > 1 then "s" else ""
         serverNotificationsLogger.add(

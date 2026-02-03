@@ -97,3 +97,28 @@ case class DederCliImportOptions(
     @arg(doc = "Build tool to import from")
     from: ImportBuildTool
 )
+
+enum ShellType:
+  case bash, zsh, powershell
+
+given TokensReader.Simple[ShellType] with {
+  def shortName = "shellType"
+  def read(strs: Seq[String]) = {
+    val strValue = strs.head.toLowerCase
+    try Right(ShellType.valueOf(strValue))
+    catch {
+      case e: IllegalArgumentException =>
+        throw new IllegalArgumentException(
+          s"Shell type '${strValue}' not supported, must be one of: ${ShellType.values.mkString(", ")}",
+          e
+        )
+    }
+  }
+}
+
+@main("complete command", "Generate shell completion script")
+case class DederCliCompleteOptions(
+    @arg(doc = "Shell type (bash, zsh, or powershell)")
+    shell: ShellType
+)
+

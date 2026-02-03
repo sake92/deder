@@ -128,6 +128,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             |  exec [options]          Execute a task
             |  clean [options]         Clean modules
             |  import [options]        Import from other build tool
+            |  complete [options]      Generate shell completion script
             |  shutdown                Shutdown the server
             |
             |Use help -c <command> for more details about each command.
@@ -163,6 +164,10 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
               case "import" =>
                 serverMessages.put(
                   CliServerMessage.Output(mainargs.Parser[DederCliImportOptions].helpText())
+                )
+              case "complete" =>
+                serverMessages.put(
+                  CliServerMessage.Output(mainargs.Parser[DederCliCompleteOptions].helpText())
                 )
               case "shutdown" =>
                 serverMessages.put(CliServerMessage.Output("Shuts down the Deder server."))
@@ -346,6 +351,16 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             val success = importer.doImport(cliOptions.from)
             val exitCode = if success then 0 else 1
             serverMessages.put(CliServerMessage.Exit(exitCode))
+        }
+      case m: CliClientMessage.Complete =>
+        mainargs.Parser[DederCliCompleteOptions].constructEither(m.args) match {
+          case Left(error) =>
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          case Right(cliOptions) =>
+            // For now, just return empty string
+            serverMessages.put(CliServerMessage.Output("shelll completion not implemented yet"))
+            serverMessages.put(CliServerMessage.Exit(0))
         }
       case _: CliClientMessage.Shutdown =>
         logger.info(s"Client $clientId requested server shutdown.")

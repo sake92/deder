@@ -14,6 +14,7 @@ enum CliClientMessage derives JsonRW {
   case Cancel(requestId: String)
   case Clean(args: Seq[String])
   case Import(args: Seq[String])
+  case Complete(args: Seq[String])
   case Shutdown()
 
   def getRequestId: String = this match {

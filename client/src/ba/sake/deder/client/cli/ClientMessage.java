@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = ClientMessage.Cancel.class, name = "Cancel"),
         @JsonSubTypes.Type(value = ClientMessage.Clean.class, name = "Clean"),
         @JsonSubTypes.Type(value = ClientMessage.Import.class, name = "Import"),
+        @JsonSubTypes.Type(value = ClientMessage.Complete.class, name = "Complete"),
         @JsonSubTypes.Type(value = ClientMessage.Shutdown.class, name = "Shutdown")})
 public sealed interface ClientMessage {
 
@@ -41,6 +42,9 @@ public sealed interface ClientMessage {
     }
 
     record Import(String[] args) implements ClientMessage {
+    }
+
+    record Complete(String[] args) implements ClientMessage {
     }
 
     record Shutdown() implements ClientMessage {
