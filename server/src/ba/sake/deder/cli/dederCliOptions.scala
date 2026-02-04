@@ -116,9 +116,14 @@ given TokensReader.Simple[ShellType] with {
   }
 }
 
-@main("complete command", "Generate shell completion script")
+@main("complete command", "Generate shell completion script and provide completions")
 case class DederCliCompleteOptions(
-    @arg(doc = "Shell type (bash, zsh, or powershell)")
-    shell: ShellType
+    @arg(doc = "Shell type: bash, zsh, or powershell", short = 's')
+    shell: ShellType,
+    @arg(doc = "Current command line", short = 'c')
+    commandLine: Option[String],
+    @arg(doc = "Current cursor position", short = 'p')
+    cursorPos: Option[Int],
+    @arg(doc = "Outputs completion script to stdout", short = 'o')
+    output: Flag
 )
-

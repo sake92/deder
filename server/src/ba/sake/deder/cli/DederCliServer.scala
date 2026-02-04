@@ -99,7 +99,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         }
       } catch {
         case e: IOException =>
-          // all good, client disconnected...
+        // all good, client disconnected...
         case e: Throwable =>
           span.recordException(e)
           span.setStatus(StatusCode.ERROR)
@@ -110,7 +110,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
   private def handleClientMessage(
       clientId: Int,
-        requestId: String,
+      requestId: String,
       message: CliClientMessage,
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
@@ -358,8 +358,26 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
-            // For now, just return empty string
-            serverMessages.put(CliServerMessage.Output("shelll completion not implemented yet"))
+            val res = if cliOptions.output.value then {
+              // TODO other shells
+              """_deder_completion() {
+                |    local cur line point completions
+                |    cur="${COMP_WORDS[COMP_CWORD]}"
+                |    line="${COMP_LINE}"
+                |    point="${COMP_POINT}"
+                |    completions=$(deder complete -s bash -c "$line" -p "$point" 2>/dev/null)
+                |    COMPREPLY=( $(compgen -W "$completions" -- "$cur") )
+                |    # clean up if no matches were found to prevent default file completion
+                |    [[ -z "$COMPREPLY" ]] && COMPREPLY=()
+                |}
+                |
+                |complete -F _deder_completion deder
+                |""".stripMargin
+            } else {
+              val tabCompletions = projectState.getTabCompletions(cliOptions.commandLine.getOrElse(""), cliOptions.cursorPos.getOrElse(-1))
+              tabCompletions.mkString(" ")
+            }
+            serverMessages.put(CliServerMessage.Output(res))
             serverMessages.put(CliServerMessage.Exit(0))
         }
       case _: CliClientMessage.Shutdown =>

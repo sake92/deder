@@ -254,7 +254,7 @@ class DederProjectState(
       case Right(state) =>
         val modulesTaskInstances = moduleIds.flatMap(
           state.tasksResolver.taskInstancesPerModule.get
-        ).flatten
+        ).flatten.sortBy(_.id)
         try {
           modulesTaskInstances.foreach(_.lock.lock())
           DederCleaner.cleanModules(moduleIds)
@@ -400,6 +400,14 @@ class DederProjectState(
     logger.debug(s"Removing watched tasks for client ${clientId}")
     watchedTasks = watchedTasks.filterNot(_.clientId == clientId)
   }
+  
+  def getTabCompletions(commandLine: String, cursorPos: Int): Seq[String] = 
+    current.orElse(lastGood) match {
+      case Left(_) => Seq.empty
+      case Right(state) =>
+        val tabCompleter = TabCompleter(state.tasksResolver)
+        tabCompleter.complete(commandLine, cursorPos)
+    }
 
   def shutdown(): Unit = {
     shutdownStarted = true

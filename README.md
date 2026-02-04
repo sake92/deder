@@ -40,6 +40,9 @@ deder shutdown
 ################ import existing sbt project
 deder import --from sbt
 
+################ install shell completions
+deder complete -s bash -o > ~/.local/share/bash-completion/completions/deder
+# open another shell to test it
 
 ################ explore the build
 # list modules
