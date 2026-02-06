@@ -99,7 +99,7 @@ case class DederCliImportOptions(
 )
 
 enum ShellType:
-  case bash, zsh, powershell
+  case bash, zsh, fish, powershell
 
 given TokensReader.Simple[ShellType] with {
   def shortName = "shellType"

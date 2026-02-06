@@ -68,6 +68,57 @@ class TabCompleter(tasksResolver: TasksResolver) {
 
 object TabCompleter {
 
+  val bashScript: String =
+    """|_deder_completion() {
+       |    local cur line point completions
+       |    cur="${COMP_WORDS[COMP_CWORD]}"
+       |    line="${COMP_LINE}"
+       |    point="${COMP_POINT}"
+       |    completions=$(deder complete -s bash -c "$line" -p "$point" 2>/dev/null)
+       |    COMPREPLY=( $(compgen -W "$completions" -- "$cur") )
+       |    # clean up if no matches were found to prevent default file completion
+       |    [[ -z "$COMPREPLY" ]] && COMPREPLY=()
+       |}
+       |
+       |complete -F _deder_completion deder
+       |""".stripMargin
+
+  val zshScript: String =
+    """|#compdef deder
+       |
+       |_deder_completion() {
+       |    local line curcontext="$curcontext" state
+       |    local completions
+       |    completions=$(deder complete -s zsh -c "$words" -p "$CURSOR" 2>/dev/null)
+       |    compadd -a completions
+       |}
+       |
+       |_deder_completion "$@"
+       |""".stripMargin
+
+  val powershellScript: String =
+    """|Register-ArgumentCompleter -Native -CommandName deder -ScriptBlock {
+       |    param($wordToComplete, $commandAst, $cursorPosition)
+       |    $line = $commandAst.ToString()
+       |    $completions = deder complete -s powershell -c "$line" -p $cursorPosition 2>$null
+       |    if ($completions) {
+       |        $completions -split "`n" | ForEach-Object {
+       |            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+       |        }
+       |    }
+       |}
+       |""".stripMargin
+
+  val fishScript: String =
+    """|function __deder_complete
+       |    set -l cmdline (commandline)
+       |    set -l cursor (commandline -C)
+       |    deder complete -s fish -c "$cmdline" -p $cursor 2>/dev/null
+       |end
+       |
+       |complete -c deder -f -a "(__deder_complete)"
+       |""".stripMargin
+
   def shellSplit(commandLine: String, cursorPos: Int): (Seq[String], Int) = {
     val tokens = scala.collection.mutable.ListBuffer.empty[String]
     val current = new StringBuilder()

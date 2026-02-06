@@ -13,8 +13,6 @@
 - use sqlite for coordination
 
 ## CLI
-- cancel compile and other tasks..
-- autocomplete
 - --mermaid diagrams
     - modules as subgraphs https://mermaid.js.org/syntax/flowchart.html#subgraphs
 

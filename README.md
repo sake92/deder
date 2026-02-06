@@ -43,6 +43,7 @@ deder import --from sbt
 ################ install shell completions
 deder complete -s bash -o > ~/.local/share/bash-completion/completions/deder
 # open another shell to test it
+# also supports zsh, fish, powershell
 
 ################ explore the build
 # list modules

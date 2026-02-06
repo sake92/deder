@@ -359,20 +359,12 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
             val res = if cliOptions.output.value then {
-              // TODO other shells
-              """_deder_completion() {
-                |    local cur line point completions
-                |    cur="${COMP_WORDS[COMP_CWORD]}"
-                |    line="${COMP_LINE}"
-                |    point="${COMP_POINT}"
-                |    completions=$(deder complete -s bash -c "$line" -p "$point" 2>/dev/null)
-                |    COMPREPLY=( $(compgen -W "$completions" -- "$cur") )
-                |    # clean up if no matches were found to prevent default file completion
-                |    [[ -z "$COMPREPLY" ]] && COMPREPLY=()
-                |}
-                |
-                |complete -F _deder_completion deder
-                |""".stripMargin
+              cliOptions.shell match {
+                case ShellType.bash => TabCompleter.bashScript
+                case ShellType.zsh => TabCompleter.zshScript
+                case ShellType.fish => TabCompleter.fishScript
+                case ShellType.powershell => TabCompleter.powershellScript
+              }
             } else {
               val tabCompletions = projectState.getTabCompletions(cliOptions.commandLine.getOrElse(""), cliOptions.cursorPos.getOrElse(-1))
               tabCompletions.mkString(" ")
