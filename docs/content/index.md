@@ -1,22 +1,9 @@
 
 # Deder
 
-## Concepts
-- project is the root of your git repo
-- modules are "subprojects", like common/frontend/app..
-- modules have tasks defined for them
+- [Getting Started](./getting-started)
 
-See [examples/multi](https://github.com/sake92/deder/tree/main/examples/multi) for a working example project.
-
-## Installation
-
-1. download `deder-client.jar` from [early release](https://github.com/sake92/deder/releases/tag/early-access)
-1. rename it to just `deder` 
-1. do `chmod +x deder`
-1. put it in `PATH`
-
-
-## Example commands
+## At a glance
 
 ```shell
 ################ basic commands
@@ -29,6 +16,14 @@ deder version
 # shutdown server
 deder shutdown
 
+
+################ import existing sbt project
+deder import --from sbt
+
+################ install shell completions
+deder complete -s bash -o > ~/.local/share/bash-completion/completions/deder
+# open another shell to test it
+# also supports zsh, fish, powershell
 
 ################ explore the build
 # list modules
@@ -50,28 +45,40 @@ deder plan -m common -t compileClasspath
 # by default executes compile on all modules
 deder exec
 
-# execute compile explicitly, on all modules
+# execute "compile" task explicitly, on all modules
 deder exec -t compile
+# compile the "common" module
+deder exec -t compile -m common
+# compile modules that start with "uber"
+deder exec -t compile -m uber%
 
-# execute run explicitly, on uber module
+# run the "uber" module
 deder exec -t run -m uber
 
-# execute run in watch mode
+# execute "run" in watch mode
 deder exec -t run -m frontend --watch
 # even in multiple terminals at the same time!!!
 deder exec -t run -m backend --watch
 
-# execute test on uber-test module
-deder exec -t test -m uber-test
+# generate an "uber" jar, assembly of all deps and your code
+deder exec -t assembly -m uber
+java -jar .deder/out/uber/assembly/out.jar
 
+# execute all tests on all test modules
+deder exec -t test
+# execute tests on "uber-test" module
+deder exec -t test -m uber-test
+# execute a specific test suite
+deder exec -t test uber.MyTestSuite1
+# execute test suites that start with "uber"
+deder exec -t test uber.%
+# execute specific test called "test1" in suite uber.MyTestSuite1
+deder exec -t test uber.MyTestSuite1#test1
 
 ################ BSP
 # write BSP config file for current project
+# and then open it in VSCode or IntelliJ (open as a BSP project)
 deder bsp install
-
-# start a BSP client for current project
-deder bsp
-
 ```
 
 ## Dependencies

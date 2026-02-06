@@ -97,11 +97,8 @@ deder exec -t test uber.MyTestSuite1#test1
 
 ################ BSP
 # write BSP config file for current project
+# and then open it in VSCode or IntelliJ (open as a BSP project)
 deder bsp install
-
-# start a BSP client for current project
-deder bsp
-
 ```
 
 ## IDE setup
