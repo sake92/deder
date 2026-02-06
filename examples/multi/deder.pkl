@@ -34,9 +34,10 @@ local const uber = (baseModule) {
   mainClass = "uber.Main"
 }
 
-local const uberTest = (baseModule.toDynamic().toTyped(ScalaTestModule)) {
+local const uberTest = new ScalaTestModule {
   id = "uber-test"
   root = "uber/test"
+  scalaVersion = "3.7.4"
   moduleDeps { uber }
   deps {
     "org.scalameta::munit:1.2.1"

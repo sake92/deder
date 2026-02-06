@@ -33,6 +33,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
     serverChannel.bind(address)
 
     // TODO better try catch
+    // TODO extract writer/reader threads to own classes
     try {
       var clientId = 0
       while true do {
@@ -43,7 +44,12 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         logger.info(s"Client #$currentClientId connected")
         val serverMessages = new LinkedBlockingQueue[CliServerMessage]()
         val clientReadThread = new Thread(
-          () => clientRead(clientChannel, currentClientId, serverMessages),
+          () =>
+            try clientRead(clientChannel, currentClientId, serverMessages)
+            catch {
+              case _: AsynchronousCloseException =>
+              // all good, client disconnected
+            },
           s"ClientReadThread-$currentClientId"
         )
         val clientWriteThread = new Thread(
@@ -76,7 +82,6 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
       messageJson = reader.readLine()
       messageJson != null
     } do {
-      println(s"PARSING CLIENT MESSAGE: $messageJson")
       val message =
         try messageJson.parseJson[CliClientMessage]
         catch {
@@ -114,7 +119,6 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
       message: CliClientMessage,
       serverMessages: BlockingQueue[CliServerMessage]
   ): Unit = {
-    println(s"Handling client message: $message")
     message match {
       case m: CliClientMessage.Help =>
         val defaultHelpText =
@@ -360,13 +364,14 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
           case Right(cliOptions) =>
             val res = if cliOptions.output.value then {
               cliOptions.shell match {
-                case ShellType.bash => TabCompleter.bashScript
-                case ShellType.zsh => TabCompleter.zshScript
-                case ShellType.fish => TabCompleter.fishScript
+                case ShellType.bash       => TabCompleter.bashScript
+                case ShellType.zsh        => TabCompleter.zshScript
+                case ShellType.fish       => TabCompleter.fishScript
                 case ShellType.powershell => TabCompleter.powershellScript
               }
             } else {
-              val tabCompletions = projectState.getTabCompletions(cliOptions.commandLine.getOrElse(""), cliOptions.cursorPos.getOrElse(-1))
+              val tabCompletions =
+                projectState.getTabCompletions(cliOptions.commandLine.getOrElse(""), cliOptions.cursorPos.getOrElse(-1))
               tabCompletions.mkString(" ")
             }
             serverMessages.put(CliServerMessage.Output(res))
