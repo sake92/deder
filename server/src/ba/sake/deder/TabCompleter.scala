@@ -36,24 +36,17 @@ class TabCompleter(tasksResolver: TasksResolver) {
       case Seq("deder", rest*) =>
         rest match {
           case Seq("version", _*) => Seq.empty
-          case Seq("clean", _*) =>
-            if prevWord == "-m" || prevWord == "--module" then allModuleIds.filter(_.startsWith(currentWord))
-            else Seq.empty
+          case Seq("clean", _*)   => completeModule(prevWord, currentWord).getOrElse(Seq.empty)
           case Seq("modules", _*) => Seq.empty
-          case Seq("tasks", _*) =>
-            if prevWord == "-m" || prevWord == "--module" then allModuleIds.filter(_.startsWith(currentWord))
-            else Seq.empty
+          case Seq("tasks", _*)   => completeModule(prevWord, currentWord).getOrElse(Seq.empty)
           case Seq("plan", _*) =>
-            if prevWord == "-m" || prevWord == "--module" then allModuleIds.filter(_.startsWith(currentWord))
-            else if prevWord == "-t" || prevWord == "--task" then allTaskIds.filter(_.startsWith(currentWord))
-            else Seq.empty
+            completeModule(prevWord, currentWord)
+              .orElse(completeTask(prevWord, currentWord))
+              .getOrElse(Seq.empty)
           case Seq("exec", _*) =>
-            if prevWord == "-m" || prevWord == "--module" then allModuleIds.filter(_.startsWith(currentWord))
-            else if prevWord == "-t" || prevWord == "--task" then
-              {
-                allTaskIds
-              }.filter(_.startsWith(currentWord))
-            else Seq.empty
+            completeModule(prevWord, currentWord)
+              .orElse(completeTask(prevWord, currentWord))
+              .getOrElse(Seq.empty)
           case Seq("shutdown", _*) => Seq.empty
           case Seq("import", _*)   => Seq.empty
           case Seq("complete", _*) => Seq.empty
@@ -66,6 +59,11 @@ class TabCompleter(tasksResolver: TasksResolver) {
     res
   }
 
+  private def completeModule(prevWord: String, currentWord: String): Option[Seq[String]] =
+    Option.when(prevWord == "-m" || prevWord == "--module")(allModuleIds.filter(_.startsWith(currentWord)))
+
+  private def completeTask(prevWord: String, currentWord: String): Option[Seq[String]] =
+    Option.when(prevWord == "-t" || prevWord == "--task")(allTaskIds.filter(_.startsWith(currentWord)))
 }
 
 object TabCompleter {
