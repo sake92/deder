@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
   <meta name="description" content="">
-  <title> Untitled | My Site </title>
+  <title> Untitled | Deder Documentation </title>
   <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
@@ -26,7 +26,12 @@
       </form>
      </li>
     </ul>
-    <ul></ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
    </nav>
   </header>
   <main class="pico container">
@@ -38,6 +43,8 @@
        <ul>
         <li><a href="#deder">Deder</a>
          <ul>
+          <li><a href="#key-concepts">Key Concepts</a></li>
+          <li><a href="#site-map">Site Map</a></li>
           <li><a href="#at-a-glance">At a glance</a></li>
           <li><a href="#dependencies">Dependencies</a></li>
           <li><a href="#ide-setup">IDE setup</a></li>
@@ -52,8 +59,20 @@
     <div></div>
    </div>
    <h1 id="deder">Deder<a href="#deder" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Deder is a config-based, concurrent-first client-server build tool designed for JVM projects (Java and Scala).
+    <br>
+    It uses <a href="https://pkl-lang.org/">Pkl</a> for configuration, providing type safety, IDE support, and powerful abstraction capabilities.</p>
+   <h2 id="key-concepts">Key Concepts<a href="#key-concepts" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>A <strong>project</strong> is the root directory where your build configuration lives. (usually git repo root)</p>
+   <p><strong>Modules</strong> are subprojects within your project (like <code>common</code>, <code>frontend</code>, <code>backend</code>, etc.). They can depend on each other, forming a directed acyclic graph (DAG).</p>
+   <p><strong>Tasks</strong> are operations that can be performed on modules (like <code>compile</code>, <code>run</code>, <code>test</code>). Each module type has a predefined set of tasks available.</p>
+   <h2 id="site-map">Site Map<a href="#site-map" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <ul>
-    <li><a href="./getting-started">Getting Started</a></li>
+    <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a>
+     <ul>
+      <li><a href="https://sake92.github.io/deder/tutorials/installation">Installation</a></li>
+      <li><a href="https://sake92.github.io/deder/tutorials/quickstart">Quickstart</a></li>
+     </ul></li>
    </ul>
    <h2 id="at-a-glance">At a glance<a href="#at-a-glance" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <pre><code class="language-shell hljs" data-highlighted="yes"><span class="hljs-meta prompt_">#</span><span class="language-bash"><span class="hljs-comment">############### basic commands</span></span>
@@ -145,7 +164,18 @@ deder bsp install
    </ul>
    <h2 id="tips--tricks">Tips &amp; Tricks<a href="#tips--tricks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>deder plan -m common -t compileClasspath --dot | dot -Tsvg &gt; bla.svg</p>
+   <aside>
+    <nav>
+     <ul>
+      <li><a href="https://sake92.github.io/deder/tutorials/installation.html">Untitled</a></li>
+      <li><a href="https://sake92.github.io/deder/tutorials/quickstart.html">Untitled</a></li>
+     </ul>
+    </nav>
+    <div>
+     <a href="#" disabled role="button">Prev</a> <span role="button" class="outline" disabled>1</span> <a href="#" disabled role="button">Next</a>
+    </div>
+   </aside>
   </main>
-  <footer class="pico container">My Site</footer>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
  </body>
 </html>
