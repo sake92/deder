@@ -2,7 +2,7 @@ amends "../../config/DederProject.pkl"
 
 //amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
-local const baseModule = new ScalaModule {
+local const baseModule: ScalaModule = new {
   // scalaVersion = "2.12.21" // TODO fix scala 2.12 support
   // scalaVersion = "2.13.18"
   scalaVersion = "3.7.4"
@@ -34,10 +34,10 @@ local const uber = (baseModule) {
   mainClass = "uber.Main"
 }
 
-local const uberTest = new ScalaTestModule {
+local const uberTest: ScalaTestModule = new {
   id = "uber-test"
   root = "uber/test"
-  scalaVersion = "3.7.4"
+  scalaVersion = baseModule.scalaVersion
   moduleDeps { uber }
   deps {
     "org.scalameta::munit:1.2.1"

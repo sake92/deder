@@ -8,13 +8,18 @@
 
 ## Scala Native
 
+## Scalafmt
+- add as a subcommand, `deder format`
+
+## Scalafix
+- support out of the box?
 
 ## Tests
 
 - optionally run as separate JVM process(es), for isolation etc..
 - on first run just randomly distribute between workers, record stats per test/suite
 - on next run use stats to figure out how to exec more performantly
-- use sqlite for coordination
+- use H2 db for coordination
 
 ## CLI
 - --mermaid diagrams
