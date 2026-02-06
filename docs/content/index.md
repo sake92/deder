@@ -1,7 +1,23 @@
 
 # Deder
 
-- [Getting Started](./getting-started)
+Deder is a config-based, concurrent-first client-server build tool designed for JVM projects (Java and Scala).  
+It uses [Pkl](https://pkl-lang.org/) for configuration, providing type safety, IDE support, and powerful abstraction capabilities.
+
+## Key Concepts
+
+A **project** is the root directory where your build configuration lives. (usually git repo root)
+
+**Modules** are subprojects within your project (like `common`, `frontend`, `backend`, etc.).
+They can depend on each other, forming a directed acyclic graph (DAG).
+
+**Tasks** are operations that can be performed on modules (like `compile`, `run`, `test`).
+Each module type has a predefined set of tasks available.
+
+## Site Map
+- [Tutorials](/tutorials)
+    - [Installation](/tutorials/installation)
+    - [Quickstart](/tutorials/quickstart)
 
 ## At a glance
 

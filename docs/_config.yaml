@@ -1,0 +1,17 @@
+
+name: Deder Documentation
+description: Deder Build Tool Documentation
+
+categories:
+  tutorials:
+    label: Tutorials
+    description: Deder Tutorials
+  howtos:
+    label: How-Tos
+    description: Deder How-Tos
+  reference:
+    label: Reference
+    description: Deder Reference Documentation
+  philosophy:
+    label: Philosophy
+    description: Deder Philosophy
