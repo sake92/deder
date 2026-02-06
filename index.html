@@ -38,9 +38,7 @@
        <ul>
         <li><a href="#deder">Deder</a>
          <ul>
-          <li><a href="#concepts">Concepts</a></li>
-          <li><a href="#installation">Installation</a></li>
-          <li><a href="#example-commands">Example commands</a></li>
+          <li><a href="#at-a-glance">At a glance</a></li>
           <li><a href="#dependencies">Dependencies</a></li>
           <li><a href="#ide-setup">IDE setup</a></li>
           <li><a href="#tips--tricks">Tips &amp; Tricks</a></li>
@@ -54,22 +52,11 @@
     <div></div>
    </div>
    <h1 id="deder">Deder<a href="#deder" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <h2 id="concepts">Concepts<a href="#concepts" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <ul>
-    <li>project is the root of your git repo</li>
-    <li>modules are "subprojects", like common/frontend/app..</li>
-    <li>modules have tasks defined for them</li>
+    <li><a href="./getting-started">Getting Started</a></li>
    </ul>
-   <p>See <a href="https://github.com/sake92/deder/tree/main/examples/multi">examples/multi</a> for a working example project.</p>
-   <h2 id="installation">Installation<a href="#installation" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <ol>
-    <li>download <code>deder-client.jar</code> from <a href="https://github.com/sake92/deder/releases/tag/early-access">early release</a></li>
-    <li>rename it to just <code>deder</code></li>
-    <li>do <code>chmod +x deder</code></li>
-    <li>put it in <code>PATH</code></li>
-   </ol>
-   <h2 id="example-commands">Example commands<a href="#example-commands" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <pre>            <code class="language-shell hljs" data-highlighted="yes"><span class="hljs-meta prompt_">#</span><span class="language-bash"><span class="hljs-comment">############### basic commands</span></span>
+   <h2 id="at-a-glance">At a glance<a href="#at-a-glance" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <pre><code class="language-shell hljs" data-highlighted="yes"><span class="hljs-meta prompt_">#</span><span class="language-bash"><span class="hljs-comment">############### basic commands</span></span>
 <span class="hljs-meta prompt_"># </span><span class="language-bash">prints <span class="hljs-built_in">help</span></span>
 deder
 <span class="hljs-meta prompt_">
@@ -80,6 +67,14 @@ deder version
 deder shutdown
 <span class="hljs-meta prompt_">
 
+#</span><span class="language-bash"><span class="hljs-comment">############### import existing sbt project</span></span>
+deder import --from sbt
+<span class="hljs-meta prompt_">
+#</span><span class="language-bash"><span class="hljs-comment">############### install shell completions</span></span>
+deder complete -s bash -o &gt; ~/.local/share/bash-completion/completions/deder
+<span class="hljs-meta prompt_"># </span><span class="language-bash">open another shell to <span class="hljs-built_in">test</span> it</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">also supports zsh, fish, powershell</span>
+<span class="hljs-meta prompt_">
 #</span><span class="language-bash"><span class="hljs-comment">############### explore the build</span></span>
 <span class="hljs-meta prompt_"># </span><span class="language-bash">list modules</span>
 <span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --ascii, --dot</span>
@@ -100,30 +95,41 @@ deder plan -m common -t compileClasspath
 <span class="hljs-meta prompt_"># </span><span class="language-bash">by default executes compile on all modules</span>
 deder exec
 <span class="hljs-meta prompt_">
-# </span><span class="language-bash">execute compile explicitly, on all modules</span>
+# </span><span class="language-bash">execute <span class="hljs-string">"compile"</span> task explicitly, on all modules</span>
 deder exec -t compile
+<span class="hljs-meta prompt_"># </span><span class="language-bash">compile the <span class="hljs-string">"common"</span> module</span>
+deder exec -t compile -m common
+<span class="hljs-meta prompt_"># </span><span class="language-bash">compile modules that start with <span class="hljs-string">"uber"</span></span>
+deder exec -t compile -m uber%
 <span class="hljs-meta prompt_">
-# </span><span class="language-bash">execute run explicitly, on uber module</span>
+# </span><span class="language-bash">run the <span class="hljs-string">"uber"</span> module</span>
 deder exec -t run -m uber
 <span class="hljs-meta prompt_">
-# </span><span class="language-bash">execute run <span class="hljs-keyword">in</span> watch mode</span>
+# </span><span class="language-bash">execute <span class="hljs-string">"run"</span> <span class="hljs-keyword">in</span> watch mode</span>
 deder exec -t run -m frontend --watch
 <span class="hljs-meta prompt_"># </span><span class="language-bash">even <span class="hljs-keyword">in</span> multiple terminals at the same <span class="hljs-keyword">time</span>!!!</span>
 deder exec -t run -m backend --watch
 <span class="hljs-meta prompt_">
-# </span><span class="language-bash">execute <span class="hljs-built_in">test</span> on uber-test module</span>
-deder exec -t test -m uber-test
+# </span><span class="language-bash">generate an <span class="hljs-string">"uber"</span> jar, assembly of all deps and your code</span>
+deder exec -t assembly -m uber
+java -jar .deder/out/uber/assembly/out.jar
 <span class="hljs-meta prompt_">
-
+# </span><span class="language-bash">execute all tests on all <span class="hljs-built_in">test</span> modules</span>
+deder exec -t test
+<span class="hljs-meta prompt_"># </span><span class="language-bash">execute tests on <span class="hljs-string">"uber-test"</span> module</span>
+deder exec -t test -m uber-test
+<span class="hljs-meta prompt_"># </span><span class="language-bash">execute a specific <span class="hljs-built_in">test</span> suite</span>
+deder exec -t test uber.MyTestSuite1
+<span class="hljs-meta prompt_"># </span><span class="language-bash">execute <span class="hljs-built_in">test</span> suites that start with <span class="hljs-string">"uber"</span></span>
+deder exec -t test uber.%
+<span class="hljs-meta prompt_"># </span><span class="language-bash">execute specific <span class="hljs-built_in">test</span> called <span class="hljs-string">"test1"</span> <span class="hljs-keyword">in</span> suite uber.MyTestSuite1</span>
+deder exec -t test uber.MyTestSuite1#test1
+<span class="hljs-meta prompt_">
 #</span><span class="language-bash"><span class="hljs-comment">############### BSP</span></span>
 <span class="hljs-meta prompt_"># </span><span class="language-bash">write BSP config file <span class="hljs-keyword">for</span> current project</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">and <span class="hljs-keyword">then</span> open it <span class="hljs-keyword">in</span> VSCode or IntelliJ (open as a BSP project)</span>
 deder bsp install
-<span class="hljs-meta prompt_">
-# </span><span class="language-bash">start a BSP client <span class="hljs-keyword">for</span> current project</span>
-deder bsp
-
-</code>
-          </pre>
+</code></pre>
    <h2 id="dependencies">Dependencies<a href="#dependencies" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Dependencies are written using Coursier's Dependency syntax.
     <br>
