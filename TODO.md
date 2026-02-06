@@ -4,6 +4,10 @@
 
 ## Config
 
+## Scala.js
+
+## Scala Native
+
 
 ## Tests
 
@@ -28,10 +32,6 @@
 
 - publish
 
-## Tracing
-- otel
-- https://grafana.com/docs/opentelemetry/docker-lgtm/
-- jaeger
 
 ## Web server dashboard
 
@@ -50,7 +50,7 @@ Locally would be interesting to have a dashboard with nice overview:
 
 ## Plugins
 
-https://github.com/pf4j/pf4j ?
+https://github.com/pf4j/pf4j ? no, too complex
 
 - maybe just use a simple ServiceLoader with start() + configure(): Seq[Task[?]] + stop()
 - just give it CoreTasks so it can make deps

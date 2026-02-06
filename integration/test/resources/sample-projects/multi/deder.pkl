@@ -2,6 +2,9 @@ amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
 local const baseModule = new ScalaModule {
   scalaVersion = "3.7.1"
+  // we normally disable semanticdb in CI because it isnt needed
+  // but for integration tests we want to make sure it works, so we enable it
+  semanticdbEnabled = true
 }
 
 local const common = (baseModule) {
@@ -39,6 +42,7 @@ local const uberTest = new ScalaTestModule {
   deps {
     "org.scalameta::munit:1.2.1"
   }
+  semanticdbEnabled = true
 }
 
 modules {
