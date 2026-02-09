@@ -34,10 +34,9 @@ local const uber = (baseModule) {
   mainClass = "uber.Main"
 }
 
-local const uberTest: ScalaTestModule = new {
+local const uberTest: ScalaTestModule = (baseModule.asTest()) {
   id = "uber-test"
   root = "uber/test"
-  scalaVersion = baseModule.scalaVersion
   moduleDeps { uber }
   deps {
     "org.scalameta::munit:1.2.1"
