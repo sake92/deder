@@ -4,12 +4,9 @@ import java.io.File
 import java.net.URLClassLoader
 import java.nio.file.Path
 import java.util.Optional
-import java.util.function.Supplier
-import sbt.internal.inc.{FileAnalysisStore, MappedFileConverter, ZincUtil}
+import sbt.internal.inc.{MappedFileConverter, ZincUtil}
 import sbt.internal.inc.Locate
 import sbt.internal.inc.consistent.ConsistentFileAnalysisStore
-import sbt.internal.util.ManagedLogger
-import sbt.util.LoggerContext
 import xsbti.compile.analysis.ReadWriteMappers
 import xsbti.compile.{
   AnalysisContents,
@@ -28,7 +25,7 @@ import xsbti.compile.{
 }
 import com.typesafe.scalalogging.StrictLogging
 import sbt.internal.inc.ScalaInstance
-import ba.sake.deder.{DederGlobals, RequestContext, ServerNotification, ServerNotificationsLogger}
+import ba.sake.deder.{ClassLoaderUtils, DederGlobals, RequestContext, ServerNotification, ServerNotificationsLogger}
 
 object ZincCompiler {
   def apply(compilerBridgeJar: os.Path): ZincCompiler =
@@ -53,26 +50,54 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       moduleId: String,
       notifications: ServerNotificationsLogger
   ): Unit = {
-
     val scalaLibraryJars = compileClasspath.filter { p =>
       (p.last.startsWith("scala-library-") || p.last.startsWith("scala3-library_3")) && p.last.endsWith(".jar")
     }
 
-    // TODO try with resources classloader...
-    val parentClassloader = this.getClass.getClassLoader
-    val libraryClassloader = new URLClassLoader(
-      scalaLibraryJars.map(_.toNIO.toUri.toURL).toArray,
-      parentClassloader
-    )
-    val compilerClassloader = new URLClassLoader(
-      compilerJars.map(_.toNIO.toUri.toURL).toArray,
-      libraryClassloader
-    )
-    val allJarsClassloader = new URLClassLoader(
-      (compilerJars ++ scalaLibraryJars).map(_.toNIO.toUri.toURL).toArray,
-      parentClassloader
-    )
+    ClassLoaderUtils.withClassLoader(scalaLibraryJars) { libraryClassloader =>
+      ClassLoaderUtils.withClassLoader(compilerJars, libraryClassloader) { compilerClassloader =>
+        ClassLoaderUtils.withClassLoader(compilerJars ++ scalaLibraryJars) { allJarsClassloader =>
+          doCompile(
+            javaHome = javaHome,
+            scalaVersion = scalaVersion,
+            compilerJars = compilerJars,
+            scalaLibraryJars = scalaLibraryJars,
+            compileClasspath = compileClasspath,
+            libraryClassloader = libraryClassloader,
+            compilerClassloader = compilerClassloader,
+            allJarsClassloader = allJarsClassloader,
+            zincCacheFile = zincCacheFile,
+            sources = sources,
+            classesDir = classesDir,
+            scalacOptions = scalacOptions,
+            javacOptions = javacOptions,
+            zincLogger = zincLogger,
+            moduleId = moduleId,
+            notifications = notifications
+          )
+        }
+      }
+    }
+  }
 
+  private def doCompile(
+      javaHome: Option[Path],
+      scalaVersion: String,
+      compilerJars: Seq[os.Path], // compiler + reflect
+      scalaLibraryJars: Seq[os.Path],
+      compileClasspath: Seq[os.Path],
+      libraryClassloader: ClassLoader,
+      compilerClassloader: ClassLoader,
+      allJarsClassloader: ClassLoader,
+      zincCacheFile: os.Path,
+      sources: Seq[os.Path],
+      classesDir: os.Path,
+      scalacOptions: Seq[String],
+      javacOptions: Seq[String],
+      zincLogger: xsbti.Logger,
+      moduleId: String,
+      notifications: ServerNotificationsLogger
+  ): Unit = {
     val scalaInstance = new ScalaInstance(
       version = scalaVersion,
       loader = allJarsClassloader,
