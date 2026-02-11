@@ -23,7 +23,7 @@ abstract class DederModule {
   /// Module dependencies
   moduleDeps: Listing<DederModule>
 
-  fixed type: ModuleType
+  type: ModuleType
 
   hidden idValidation = (value: String) ->
     if (!value.matches(Regex("^[a-zA-Z0-9_-]+$")))
@@ -41,7 +41,7 @@ abstract class DederModule {
 typealias ModuleType = "java" | "scala" | "scala-test"
 
 open class JavaModule extends DederModule {
-  fixed type = "java"
+  type = "java"
   resources: Listing<String> = new Listing { "resources" }
   javaHome: String?
   jvmOptions: Listing<String> = new Listing {}
@@ -56,15 +56,18 @@ open class JavaModule extends DederModule {
 }
 
 open class ScalaModule extends JavaModule {
-  fixed type = "scala"
+  type = "scala"
   scalaVersion: String
   scalacOptions: Listing<String> = new Listing {}
   scalacPluginDeps: Listing<String> = new Listing {}
   scalaSemanticdbVersion: String?
+  function asTest(): ScalaTestModule = (this.toDynamic().toTyped(ScalaTestModule)) {
+    type = "scala-test"
+  }
 }
 
 class ScalaTestModule extends ScalaModule {
-  fixed type = "scala-test"
+  type = "scala-test"
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
