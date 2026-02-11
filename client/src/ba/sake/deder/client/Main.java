@@ -199,7 +199,7 @@ public class Main {
         commandLineArgs.add(processHandle.info().command().get());
         commandLineArgs.addAll(Arrays.asList(processHandle.info().arguments().get()));
         // this is called with "bsp install", need to remove "install"
-        commandLineArgs.remove(commandLineArgs.size() - 1);
+        commandLineArgs.removeLast();
         var commandLineArgsJson = commandLineArgs.stream().map(arg -> "\"" + arg + "\"")
                 .collect(Collectors.joining(", "));
         Files.createDirectories(Path.of(".bsp"));
@@ -220,15 +220,16 @@ public class Main {
 
     private void download(String fileUrl, Path destination) throws Exception {
         System.err.println("Starting download:  " + fileUrl);
-        var client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
-                .followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build();
-        var request = HttpRequest.newBuilder().uri(URI.create(fileUrl)).GET().build();
-        var response = client.send(request,
-                HttpResponse.BodyHandlers.ofFile(destination, StandardOpenOption.CREATE, StandardOpenOption.WRITE));
-        if (response.statusCode() == 200) {
-            System.err.println("File downloaded successfully to: " + response.body());
-        } else {
-            throw new RuntimeException("Failed to download '" + fileUrl + "'. Response: " + response);
+        try (var client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build()) {
+            var request = HttpRequest.newBuilder().uri(URI.create(fileUrl)).GET().build();
+            var response = client.send(request,
+                    HttpResponse.BodyHandlers.ofFile(destination, StandardOpenOption.CREATE, StandardOpenOption.WRITE));
+            if (response.statusCode() == 200) {
+                System.err.println("File downloaded successfully to: " + response.body());
+            } else {
+                throw new RuntimeException("Failed to download '" + fileUrl + "'. Response: " + response);
+            }
         }
     }
 

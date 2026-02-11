@@ -104,13 +104,13 @@ class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
 
   def handle(event: Event): Unit = {
     val status = event.status() match {
-      case Status.Success  => "✓"
-      case Status.Failure  => "✗"
-      case Status.Error    => "✗"
-      case Status.Skipped  => "○"
-      case Status.Ignored  => "○"
-      case Status.Canceled => "○"
-      case Status.Pending  => "○"
+      case Status.Success  => "PASS"
+      case Status.Failure  => "FAIL"
+      case Status.Error    => "FAIL"
+      case Status.Skipped  => "SKIP"
+      case Status.Ignored  => "SKIP"
+      case Status.Canceled => "SKIP"
+      case Status.Pending  => "SKIP"
     }
     val testName = event.selector() match {
       case s: TestSelector       => s.testName()
@@ -119,7 +119,7 @@ class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
       case _                     => event.fullyQualifiedName()
     }
     logger.test(s"$status $testName")
-    val eventThrowable = Option.when(event.throwable().isDefined())(event.throwable().get())
+    val eventThrowable = Option.when(event.throwable().isDefined)(event.throwable().get())
     eventThrowable.foreach { t =>
       logger.error(s"  ${t.getMessage}")
       if (logger.showStackTraces) {

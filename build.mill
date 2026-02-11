@@ -92,5 +92,6 @@ object `client-native` extends JavaModule, NativeImageModule, VersionModule {
   def mvnDeps = client.mvnDeps
   def jvmId = "graalvm-community:25.0.1"
   def jvmIndexVersion = "0.0.4-128-8f0ad3"
-  def nativeImageOptions = Seq("--no-fallback")
+  // https://github.com/oracle/graal/issues/3737
+  def nativeImageOptions = Seq("--no-fallback", "-H:+StaticExecutableWithDynamicLibC")
 }

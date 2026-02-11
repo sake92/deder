@@ -1,0 +1,35 @@
+amends "https://sake92.github.io/deder/config/DederProject.pkl"
+
+const local function testModule(name: String) = new ScalaTestModule {
+  id = name
+  root = name
+  scalaVersion = "3.7.1"
+}
+
+local const junit4 = (testModule("junit4")) {
+  deps {
+    "com.github.sbt:junit-interface:0.13.2"
+    "junit:junit:4.13"
+  }
+}
+
+local const junit5 = (testModule("junit5")) {
+  deps {
+    "com.github.sbt.junit:jupiter-interface:0.16.0"
+    "org.junit.jupiter:junit-jupiter-api:5.10.1"
+  }
+}
+
+local const munit = (testModule("munit")) {
+  deps {
+    "org.scalameta::munit:1.2.1"
+  }
+}
+
+//"org.scalatest" %% "scalatest" % "3.2.19"
+
+modules {
+  junit4
+  junit5
+  munit
+}

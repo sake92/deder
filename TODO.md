@@ -1,6 +1,7 @@
 
 
 - handle no deder.pkl present
+- close ClassLoaders properly
 
 ## Config
 

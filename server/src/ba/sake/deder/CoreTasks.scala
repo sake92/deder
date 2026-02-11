@@ -16,6 +16,8 @@ import ba.sake.deder.deps.given
 import ba.sake.deder.jar.{JarManifest, JarUtils}
 import ba.sake.deder.testing.*
 
+import scala.util.Using
+
 class CoreTasks() extends StrictLogging {
 
   private def makeZincCompiler(scalaVersion: String) = {
@@ -428,7 +430,7 @@ class CoreTasks() extends StrictLogging {
               "-sourceroot",
               DederGlobals.projectRootDir.toString,
               "-semanticdb-target",
-              semanticdbDir.toString,
+              semanticdbDir.toString
             )
           else
             Seq(
@@ -562,22 +564,23 @@ class CoreTasks() extends StrictLogging {
       name = "testClasses",
       supportedModuleTypes = Set(ModuleType.SCALA_TEST)
     )
-    .dependsOn(compileTask)
+    .dependsOn(classesDirTask)
     .dependsOn(runClasspathTask)
     .build { ctx =>
       val (classesDir, runClasspath) = ctx.depResults
-      val testClasspath = (Seq(classesDir.absPath) ++ runClasspath).reverse.distinct.reverse
-      val urls = testClasspath.map(_.toURI.toURL).toArray
-      val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
-      val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
-      val testDiscovery = DederTestDiscovery(
-        classLoader = classLoader,
-        testClassesDir = classesDir.absPath.toIO,
-        frameworkClassNames = frameworkClassNames,
-        logger = DederTestLogger(ctx.notifications, ctx.module.id)
-      )
-      testDiscovery.discover().map { case (framework, tests) =>
-        DiscoveredFrameworkTests(framework.name(), tests.map(_._1))
+      val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
+      ClassLoaderUtils.withClassLoader(runtimeClasspath) { classLoader =>
+        val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
+        val testDiscovery = DederTestDiscovery(
+          classLoader = classLoader,
+          testClassesDir = classesDir,
+          testClasspath = runtimeClasspath,
+          frameworkClassNames = frameworkClassNames,
+          logger = DederTestLogger(ctx.notifications, ctx.module.id)
+        )
+        testDiscovery.discover().map { case (framework, tests) =>
+          DiscoveredFrameworkTests(framework.name(), tests.map(_._1))
+        }
       }
     }
 
@@ -586,29 +589,27 @@ class CoreTasks() extends StrictLogging {
       name = "test",
       supportedModuleTypes = Set(ModuleType.SCALA_TEST)
     )
-    .dependsOn(compileTask)
+    .dependsOn(classesDirTask)
     .dependsOn(runClasspathTask)
     // cant reuse testClassesTask coz Framework is not Json-able...
     .build { ctx =>
       val (classesDir, runClasspath) = ctx.depResults
-      val testClasspath = (Seq(classesDir.absPath) ++ runClasspath).reverse.distinct.reverse
-      val urls = testClasspath.map(_.toURI.toURL).toArray
-      val classLoader = new URLClassLoader(urls, getClass.getClassLoader)
-      val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
-      val testDiscovery = DederTestDiscovery(
-        classLoader = classLoader,
-        testClassesDir = classesDir.absPath.toIO,
-        frameworkClassNames = frameworkClassNames,
-        logger = DederTestLogger(ctx.notifications, ctx.module.id)
-      )
-      val frameworkTests = testDiscovery.discover()
-      val testRunner = DederTestRunner(
-        tests = frameworkTests,
-        classLoader = classLoader,
-        logger = DederTestLogger(ctx.notifications, ctx.module.id)
-      )
-      val testOptions = DederTestOptions(ctx.args)
-      testRunner.run(testOptions)
+      val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
+      ClassLoaderUtils.withClassLoader(runtimeClasspath) { classLoader =>
+        val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
+        val logger = DederTestLogger(ctx.notifications, ctx.module.id)
+        val testDiscovery = DederTestDiscovery(
+          classLoader = classLoader,
+          testClassesDir = classesDir,
+          testClasspath = runtimeClasspath,
+          frameworkClassNames = frameworkClassNames,
+          logger = logger
+        )
+        val frameworkTests = testDiscovery.discover()
+        val testRunner = DederTestRunner(frameworkTests, classLoader, logger)
+        val testOptions = DederTestOptions(ctx.args)
+        testRunner.run(testOptions)
+      }
     }
 
   // TODO manifest config

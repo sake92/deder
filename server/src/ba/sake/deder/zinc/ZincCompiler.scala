@@ -58,6 +58,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       (p.last.startsWith("scala-library-") || p.last.startsWith("scala3-library_3")) && p.last.endsWith(".jar")
     }
 
+    // TODO try with resources classloader...
     val parentClassloader = this.getClass.getClassLoader
     val libraryClassloader = new URLClassLoader(
       scalaLibraryJars.map(_.toNIO.toUri.toURL).toArray,

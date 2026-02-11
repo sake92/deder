@@ -1,20 +1,29 @@
 package ba.sake.deder.testing
 
 import sbt.testing.{Task as SbtTestTask, *}
+
 import java.io.File
 import java.net.URLClassLoader
 import scala.collection.mutable
 import ba.sake.deder.*
 import ba.sake.tupson.JsonRW
 
+import java.lang.annotation.Annotation
+import java.lang.reflect.Modifier
+
 case class DiscoveredFrameworkTests(framework: String, testClasses: Seq[String]) derives JsonRW
 
+// TODO special-case for JUnit5, which has its own discovery mechanism
+// see https://github.com/sbt/sbt-jupiter-interface/blob/main/src/plugin/src/main/scala/com/github/sbt/junit/jupiter/sbt/JupiterPlugin.scala#L97-L118
 class DederTestDiscovery(
     classLoader: ClassLoader,
-    testClassesDir: File,
+    testClassesDir: os.Path,
+    testClasspath: Seq[os.Path],
     frameworkClassNames: Seq[String],
     logger: DederTestLogger
 ) {
+
+  private lazy val jupiterTestFingerprint = newJupiterTestFingerprint
 
   def discover(): Seq[(Framework, Seq[(String, Fingerprint)])] =
     discoverFrameworks().map { framework =>
@@ -46,23 +55,25 @@ class DederTestDiscovery(
   end discoverFrameworks
 
   private def discoverTests(framework: Framework): Seq[(String, Fingerprint)] = {
-    val fingerprints = framework.fingerprints()
-    val testClasses = findClassFiles()
-    testClasses.flatMap { className =>
-      fingerprints.collectFirst {
-        case fp if matchesFingerprint(className, fp, classLoader) =>
-          (className, fp)
+    if framework.name() == "Jupiter" then {
+      discoverJupiterTests.map(_ -> framework.fingerprints.head)
+    } else {
+      val fingerprints = framework.fingerprints()
+      val testClasses = findClassFiles()
+      testClasses.flatMap { className =>
+        fingerprints.collectFirst {
+          case fp if matchesFingerprint(className, fp, classLoader) =>
+            (className, fp)
+        }
       }
     }
   }
 
   private def findClassFiles(): Seq[String] = {
-    val osDir = os.Path(testClassesDir)
-    os.walk(osDir)
+    os.walk(testClassesDir)
       .filter(_.last.endsWith(".class"))
-      .map(_.subRelativeTo(osDir))
+      .map(_.subRelativeTo(testClassesDir))
       .map(_.segments.mkString(".").stripSuffix(".class"))
-      .toSeq
   }
 
   private def matchesFingerprint(
@@ -76,10 +87,13 @@ class DederTestDiscovery(
         case sub: SubclassFingerprint =>
           val superCls = classLoader.loadClass(sub.superclassName())
           superCls.isAssignableFrom(cls) && sub.isModule == isModule(cls)
-        case ann: AnnotatedFingerprint =>
-          val annCls = classLoader.loadClass(ann.annotationName())
-          cls.isAnnotationPresent(annCls.asInstanceOf[Class[java.lang.annotation.Annotation]]) &&
-          ann.isModule == isModule(cls)
+        case f: AnnotatedFingerprint =>
+          val annotationCls = classLoader.loadClass(f.annotationName()).asInstanceOf[Class[Annotation]]
+          f.isModule == isModule(cls) && (
+            cls.isAnnotationPresent(annotationCls) ||
+              cls.getDeclaredMethods.exists(_.isAnnotationPresent(annotationCls)) ||
+              cls.getMethods.exists(m => m.isAnnotationPresent(annotationCls) && Modifier.isPublic(m.getModifiers))
+          )
       }
     } catch {
       case e: Exception =>
@@ -90,5 +104,17 @@ class DederTestDiscovery(
 
   private def isModule(cls: Class[?]): Boolean = {
     cls.getName.endsWith("$")
+  }
+
+  private def discoverJupiterTests = {
+    DiscoverJunit5Tests.discover(classLoader, testClassesDir, testClasspath)
+  }
+
+  private def newJupiterTestFingerprint = {
+    classLoader
+      .loadClass("com.github.sbt.junit.jupiter.api.JupiterTestFingerprint")
+      .getDeclaredConstructor()
+      .newInstance()
+      .asInstanceOf[Fingerprint]
   }
 }
