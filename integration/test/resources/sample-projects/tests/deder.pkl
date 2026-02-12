@@ -26,6 +26,12 @@ local const scalatest = (testModule("scalatest")) {
   }
 }
 
+local const specs2 = (testModule("specs2")) {
+  deps {
+    "org.specs2::specs2-core:5.7.0"
+  }
+}
+
 local const munit = (testModule("munit")) {
   deps {
     "org.scalameta::munit:1.2.1"
@@ -55,6 +61,7 @@ modules {
   junit4
   junit5
   scalatest
+  specs2
   munit
   utest
   weaver

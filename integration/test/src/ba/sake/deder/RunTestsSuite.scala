@@ -34,6 +34,15 @@ class RunTestsSuite extends munit.FunSuite {
     }
   }
 
+  test("deder should run Specs2 tests") {
+    withTestProject(testResourceDir / "sample-projects/tests") { projectPath =>
+      val res = executeDederCommand(projectPath, "exec -m specs2 -t test")
+      val outText = res.err.text()
+      assert(outText.contains("Passed: 2"), s"Expected test output to contain 'Passed: 2', got: ${outText}")
+      assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
+    }
+  }
+
   test("deder should run Munit tests") {
     withTestProject(testResourceDir / "sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec -m munit -t test")
@@ -69,8 +78,6 @@ class RunTestsSuite extends munit.FunSuite {
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
   }
-
-
 
   private def withTestProject(testProjectPath: os.Path)(testCode: os.Path => Unit): Unit = {
     // mill test runs in sandbox folder, so it is safe to create temp folders here
