@@ -606,9 +606,11 @@ class CoreTasks() extends StrictLogging {
           logger = logger
         )
         val frameworkTests = testDiscovery.discover()
-        val testRunner = DederTestRunner(frameworkTests, classLoader, logger)
-        val testOptions = DederTestOptions(ctx.args)
-        testRunner.run(testOptions)
+        Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) { executorService =>
+          val testRunner = DederTestRunner(executorService, frameworkTests, classLoader, logger)
+          val testOptions = DederTestOptions(ctx.args)
+          testRunner.run(testOptions)
+        }
       }
     }
 

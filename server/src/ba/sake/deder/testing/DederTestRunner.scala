@@ -5,23 +5,24 @@ package ba.sake.deder.testing
 // TODO forked execution
 
 import java.time.Duration
-import scala.concurrent.duration.Duration as ScalaDuration
-import sbt.testing.{Task as SbtTestTask, *}
+import java.util.concurrent.ExecutorService
 import scala.collection.mutable
+import scala.util.control.NonFatal
+import sbt.testing.{Task as SbtTestTask, *}
 import ba.sake.deder.*
 import ba.sake.tupson.JsonRW
 
 class DederTestRunner(
+    executorService: ExecutorService,
     tests: Seq[(Framework, Seq[(String, Fingerprint)])],
     classLoader: ClassLoader,
     logger: DederTestLogger
 ) {
 
-  // TODO run in another thread, so we can run tests from multiple terminals/BSP
-  // TODO run suites in parallel
-  // TODO print failed tests at the end, with option to re-run just those
-  // TODO handle cancellation requests
+  // TODO run in another thread+outputdir, so we can run tests from multiple terminals/BSP
+  // TODO print how to re-run just those
   def run(options: DederTestOptions): DederTestResults = {
+    val startedAt = System.currentTimeMillis()
     val res = if (tests.isEmpty) {
       logger.warn("No tests found on the classpath.")
       DederTestResults.empty
@@ -56,9 +57,12 @@ class DederTestRunner(
       }
       DederTestResults.aggregate(allResults)
     }
-    val duration = Duration.ofMillis(res.duration)
+    val endedAt = System.currentTimeMillis()
+    val realDuration = Duration.ofMillis(endedAt - startedAt)
+    val testsDuration = Duration.ofMillis(res.duration)
     logger.info(
-      s"Test run complete. Passed: ${res.passed}, Failed: ${res.failed}, Errors: ${res.errors}, Skipped: ${res.skipped}; Duration: ${duration.toPrettyString}"
+      s"Test run complete. Passed: ${res.passed}, Failed: ${res.failed}, Errors: ${res.errors}, Skipped: ${res.skipped}; " +
+        s"Executed in ${realDuration.toPrettyString}; Tests aggregated duration: ${testsDuration.toPrettyString}"
     )
     res
   }
@@ -90,9 +94,10 @@ class DederTestRunner(
       runner.tasks(Array(taskDef))
     }
     val handler = DederTestEventHandler(logger)
-    val cancelled = executeTasks(tasks, handler)
-    if cancelled then {
-      logger.warn("Test run was cancelled.")
+    try executeTasks(tasks, handler)
+    catch {
+      case _: CancelledException =>
+        logger.warn("Test run was cancelled.")
     }
     val summary = runner.done()
     logger.info(summary)
@@ -102,24 +107,33 @@ class DederTestRunner(
     if (failedTests.nonEmpty) {
       logger.info("Failed tests:")
       failedTests.foreach { t =>
-        logger.info(s"  ${t.name} - ${t.throwable.map(_.getMessage).getOrElse("No error message").take(100)}")
+        val msg = t.throwable.flatMap(thr => Option(thr.getMessage)).getOrElse("No error message")
+        logger.info(s"  ${t.name} - ${msg.take(100)}")
       }
     }
     results
   }
 
-  private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Boolean =
-    tasks.exists { task =>
-      val currentRequestId = RequestContext.id.get()
-      val cancelled = currentRequestId != null && DederGlobals.cancellationTokens.get(currentRequestId).get()
-      if !cancelled then {
-        val nestedTasks = task.execute(handler, Array(logger))
-        if nestedTasks.nonEmpty then {
-          executeTasks(nestedTasks, handler)
+  private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Unit = {
+    val currentRequestId = RequestContext.id.get()
+    val futures = {
+      tasks.map { task =>
+        executorService.submit { () =>
+          val cancelled = currentRequestId != null && DederGlobals.cancellationTokens.get(currentRequestId).get()
+          if cancelled then throw CancelledException("Tests execution cancelled")
+          task.execute(handler, Array(logger))
         }
       }
-      cancelled
+      // val nestedTasks = ... TODO
     }
+    try futures.map(_.get())
+    catch {
+      case _: CancelledException =>
+        // if one task fails (maybe cancelled..), cancel all other pending tasks
+        logger.warn(s"Cancelling remaining tests...")
+        futures.foreach(_.cancel(true))
+    }
+  }
 }
 
 case class DederTestOptions(
@@ -140,9 +154,10 @@ class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
       case Status.Canceled => "SKIP"
       case Status.Pending  => "SKIP"
     }
+    val fqn = event.fullyQualifiedName()
     val testName = event.selector() match {
-      case s: TestSelector       => s.testName()
-      case s: NestedTestSelector => s.testName()
+      case s: TestSelector       => s"${fqn}#${s.testName()}"
+      case s: NestedTestSelector => s"${fqn}#${s.testName()}"
       case s: SuiteSelector      => event.fullyQualifiedName()
       case _                     => event.fullyQualifiedName()
     }
@@ -207,11 +222,9 @@ object DederTestResults {
 }
 
 extension (d: Duration) {
-  def toPrettyString: String = {
-    val prettyDuration = d.toString
+  def toPrettyString: String =
+    d.toString
       .substring(2)
-      .replaceAll("(\\d[HMS])(?!$)", "$1 ")
+      .replaceAll("(\\d[HMS])(?!$)", "$1")
       .toLowerCase()
-    prettyDuration
-  }
 }
