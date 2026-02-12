@@ -139,7 +139,7 @@ class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
       case _                     => event.fullyQualifiedName()
     }
     val duration = Duration.ofMillis(event.duration())
-    logger.test(s"$status $testName, took ${duration.toPrettyString}")
+    logger.test(s"$status $testName ; took ${duration.toPrettyString}")
     val eventThrowable = Option.when(event.throwable().isDefined)(event.throwable().get())
     eventThrowable.foreach { t =>
       logger.error(s"  ${t.getMessage}")
