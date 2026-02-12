@@ -4,9 +4,9 @@ package ba.sake.deder.testing
 
 // TODO forked execution
 
+import java.time.Duration
+import scala.concurrent.duration.Duration as ScalaDuration
 import sbt.testing.{Task as SbtTestTask, *}
-import java.io.File
-import java.net.URLClassLoader
 import scala.collection.mutable
 import ba.sake.deder.*
 import ba.sake.tupson.JsonRW
@@ -17,6 +17,9 @@ class DederTestRunner(
     logger: DederTestLogger
 ) {
 
+  // TODO run in another thread, so we can run tests from multiple terminals/BSP
+  // TODO print failed tests at the end, with option to re-run just those
+  // TODO handle cancellation requests
   def run(options: DederTestOptions): DederTestResults = {
     val res = if (tests.isEmpty) {
       logger.warn("No tests found on the classpath.")
@@ -52,8 +55,9 @@ class DederTestRunner(
       }
       DederTestResults.aggregate(allResults)
     }
+    val duration = Duration.ofMillis(res.duration)
     logger.info(
-      s"Test run complete. Passed: ${res.passed}, Failed: ${res.failed}, Errors: ${res.errors}, Skipped: ${res.skipped}; Duration: ${res.duration}ms"
+      s"Test run complete. Passed: ${res.passed}, Failed: ${res.failed}, Errors: ${res.errors}, Skipped: ${res.skipped}; Duration: ${duration.toPrettyString}"
     )
     res
   }
@@ -88,7 +92,16 @@ class DederTestRunner(
     executeTasks(tasks, handler)
     val summary = runner.done()
     logger.info(summary)
-    handler.results
+
+    val results = handler.results
+    val failedTests = results.filter(r => r.status == Status.Failure || r.status == Status.Error)
+    if (failedTests.nonEmpty) {
+      logger.info("Failed tests:")
+      failedTests.foreach { t =>
+        logger.info(s"  ${t.name} - ${t.throwable.map(_.getMessage).getOrElse("No error message").take(100)}")
+      }
+    }
+    results
   }
 
   private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Unit = {
@@ -109,6 +122,7 @@ class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
   private val _results = mutable.ArrayBuffer[DederTestResult]()
 
   def handle(event: Event): Unit = {
+    // TODO add some color
     val status = event.status() match {
       case Status.Success  => "PASS"
       case Status.Failure  => "FAIL"
@@ -124,7 +138,8 @@ class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
       case s: SuiteSelector      => event.fullyQualifiedName()
       case _                     => event.fullyQualifiedName()
     }
-    logger.test(s"$status $testName")
+    val duration = Duration.ofMillis(event.duration())
+    logger.test(s"$status $testName, took ${duration.toPrettyString}")
     val eventThrowable = Option.when(event.throwable().isDefined)(event.throwable().get())
     eventThrowable.foreach { t =>
       logger.error(s"  ${t.getMessage}")
@@ -152,6 +167,7 @@ case class DederTestResult(
     throwable: Option[Throwable]
 )
 
+// TODO also return DederPath of results folder
 case class DederTestResults(
     total: Int,
     passed: Int,
@@ -179,5 +195,15 @@ object DederTestResults {
       ),
       duration = results.map(_.duration).sum
     )
+  }
+}
+
+extension (d: Duration) {
+  def toPrettyString: String = {
+    val prettyDuration = d.toString
+      .substring(2)
+      .replaceAll("(\\d[HMS])(?!$)", "$1 ")
+      .toLowerCase()
+    prettyDuration
   }
 }

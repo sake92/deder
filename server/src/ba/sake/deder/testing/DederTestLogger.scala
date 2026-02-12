@@ -28,6 +28,6 @@ class DederTestLogger(
     serverNotificationsLogger.add(ServerNotification.logDebug(msg, Some(moduleId)))
 
   def trace(t: Throwable): Unit =
-    error(t.getStackTrace().mkString("\n"))
+    error(t.getStackTrace.mkString("\n"))
 }
 
