@@ -20,16 +20,43 @@ local const junit5 = (testModule("junit5")) {
   }
 }
 
+local const scalatest = (testModule("scalatest")) {
+  deps {
+    "org.scalatest::scalatest:3.2.19"
+  }
+}
+
 local const munit = (testModule("munit")) {
   deps {
     "org.scalameta::munit:1.2.1"
   }
 }
 
-//"org.scalatest" %% "scalatest" % "3.2.19"
+local const utest = (testModule("utest")) {
+  deps {
+    "com.lihaoyi::utest:0.10.0-RC1"
+  }
+}
+
+local const weaver = (testModule("weaver")) {
+  deps {
+    "org.typelevel::weaver-cats:0.11.3"
+  }
+}
+
+local const ztest = (testModule("ztest")) {
+  deps {
+    "dev.zio::zio-test:2.1.24"
+    "dev.zio::zio-test-sbt:2.1.24"
+  }
+}
 
 modules {
   junit4
   junit5
+  scalatest
   munit
+  utest
+  weaver
+  ztest
 }

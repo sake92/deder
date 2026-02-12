@@ -32,15 +32,19 @@ class DederTestRunner(
               ts.split("#") match {
                 case Array(classNameSelector, testSelector) =>
                   val matchedClassNames = WildcardUtils.getMatches(testClassNames, classNameSelector)
-                  matchedClassNames.flatMap { n =>
-                     testClasses.find(_._1 == n)
-                  }.map(tc => (tc._1, tc._2, new TestSelector(testSelector)))
-                  // TODO add TestWildcardSelector? hmm just a substring
+                  matchedClassNames
+                    .flatMap { n =>
+                      testClasses.find(_._1 == n)
+                    }
+                    .map(tc => (tc._1, tc._2, new TestSelector(testSelector)))
+                // TODO add TestWildcardSelector? hmm just a substring
                 case _ =>
                   val matchedClassNames = WildcardUtils.getMatches(testClassNames, ts)
-                  matchedClassNames.flatMap { n =>
-                    testClasses.find(_._1 == n)
-                  }.map(tc => (tc._1, tc._2, new SuiteSelector))
+                  matchedClassNames
+                    .flatMap { n =>
+                      testClasses.find(_._1 == n)
+                    }
+                    .map(tc => (tc._1, tc._2, new SuiteSelector))
               }
             }
           }
@@ -56,7 +60,7 @@ class DederTestRunner(
 
   private def runFramework(
       framework: Framework,
-      testClasses: Seq[(String, Fingerprint, Selector)],
+      testClasses: Seq[(String, Fingerprint, Selector)]
   ): Seq[DederTestResult] = {
     logger.info(s"Running tests with ${framework.name()}")
     if (testClasses.isEmpty) {
@@ -70,8 +74,10 @@ class DederTestRunner(
       classLoader
     )
     val tasks = testClasses.flatMap { case (className, fingerprint, selector) =>
+      // weaver is wonky, wants class name without $ suffix, even for objects..
+      val tweakedClassName = if framework.name().startsWith("weaver-") then className.stripSuffix("$") else className
       val taskDef = new TaskDef(
-        className,
+        tweakedClassName,
         fingerprint,
         false, // explicitly specified
         Array(selector)
