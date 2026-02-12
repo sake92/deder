@@ -162,9 +162,7 @@ public class Main {
             processArgs.add("start");
             processArgs.add("/B");
         } else if (osname.contains("mac")) {
-            processArgs.add("screen");
-            processArgs.add("-dmS");
-            processArgs.add("deder-server");
+            processArgs.add("nohup");
         } else {
             processArgs.add("setsid");
         }

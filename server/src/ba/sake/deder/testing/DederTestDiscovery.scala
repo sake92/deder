@@ -1,20 +1,14 @@
 package ba.sake.deder.testing
 
-import sbt.testing.{Task as SbtTestTask, *}
-
-import java.io.File
-import java.net.URLClassLoader
-import scala.collection.mutable
+import java.lang.annotation.Annotation
+import java.lang.reflect.Modifier
+import sbt.testing.*
 import ba.sake.deder.*
 import ba.sake.tupson.JsonRW
 
-import java.lang.annotation.Annotation
-import java.lang.reflect.Modifier
 
 case class DiscoveredFrameworkTests(framework: String, testClasses: Seq[String]) derives JsonRW
 
-// TODO special-case for JUnit5, which has its own discovery mechanism
-// see https://github.com/sbt/sbt-jupiter-interface/blob/main/src/plugin/src/main/scala/com/github/sbt/junit/jupiter/sbt/JupiterPlugin.scala#L97-L118
 class DederTestDiscovery(
     classLoader: ClassLoader,
     testClassesDir: os.Path,
@@ -22,8 +16,6 @@ class DederTestDiscovery(
     frameworkClassNames: Seq[String],
     logger: DederTestLogger
 ) {
-
-  private lazy val jupiterTestFingerprint = newJupiterTestFingerprint
 
   def discover(): Seq[(Framework, Seq[(String, Fingerprint)])] =
     discoverFrameworks().map { framework =>
@@ -108,13 +100,5 @@ class DederTestDiscovery(
 
   private def discoverJupiterTests = {
     DiscoverJunit5Tests.discover(classLoader, testClassesDir, testClasspath)
-  }
-
-  private def newJupiterTestFingerprint = {
-    classLoader
-      .loadClass("com.github.sbt.junit.jupiter.api.JupiterTestFingerprint")
-      .getDeclaredConstructor()
-      .newInstance()
-      .asInstanceOf[Fingerprint]
   }
 }

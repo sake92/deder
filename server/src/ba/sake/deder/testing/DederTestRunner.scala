@@ -89,7 +89,10 @@ class DederTestRunner(
       runner.tasks(Array(taskDef))
     }
     val handler = DederTestEventHandler(logger)
-    executeTasks(tasks, handler)
+    val cancelled = executeTasks(tasks, handler)
+    if cancelled then {
+      logger.warn("Test run was cancelled.")
+    }
     val summary = runner.done()
     logger.info(summary)
 
@@ -104,14 +107,18 @@ class DederTestRunner(
     results
   }
 
-  private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Unit = {
-    tasks.foreach { task =>
-      val nestedTasks = task.execute(handler, Array(logger))
-      if (nestedTasks.nonEmpty) {
-        executeTasks(nestedTasks, handler)
+  private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Boolean =
+    tasks.exists { task =>
+      val currentRequestId = RequestContext.id.get()
+      val cancelled = currentRequestId != null && DederGlobals.cancellationTokens.get(currentRequestId).get()
+      if !cancelled then {
+        val nestedTasks = task.execute(handler, Array(logger))
+        if nestedTasks.nonEmpty then {
+          executeTasks(nestedTasks, handler)
+        }
       }
+      cancelled
     }
-  }
 }
 
 case class DederTestOptions(
