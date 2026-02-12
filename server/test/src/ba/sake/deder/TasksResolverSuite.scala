@@ -100,10 +100,7 @@ class TasksResolverSuite extends munit.FunSuite {
       val uberTestModuleTasks = taskInstancesPerModule(uberTestModule.id)
       assertEquals(
         uberTestModuleTasks.map(_.task.name).toSet,
-        baseTasks ++ Set(
-          "testClasses",
-          "test"
-        ),
+        baseTasks ++ Set("testClasses", "test"),
         "uber-test module tasks mismatch"
       )
     }
@@ -137,7 +134,7 @@ class TasksResolverSuite extends munit.FunSuite {
           transitiveScalaModuleTaskEdges("uber-test", "uber")
       locally {
         val diff = expectedEdges.diff(taskInstanceEdgeIdsGraph)
-        assert(diff.isEmpty, diff.toString)
+        assert(diff.isEmpty, s"Task instance graph edges mismatch. Missing edges: ${diff.take(10)}${if diff.size > 10 then "..." else ""}")
         // assertEquals(taskInstanceEdgeIdsGraph, expectedEdges)
       }
     }
@@ -156,9 +153,9 @@ class TasksResolverSuite extends munit.FunSuite {
 
   private def scalaTestModuleTaskEdges(moduleId: String): Set[(String, String)] =
     scalaModuleTaskEdges(moduleId) ++ Set(
-      (s"${moduleId}.testClasses", s"${moduleId}.compile"),
+      (s"${moduleId}.testClasses", s"${moduleId}.classes"),
       (s"${moduleId}.testClasses", s"${moduleId}.runClasspath"),
-      (s"${moduleId}.test", s"${moduleId}.compile"),
+      (s"${moduleId}.test", s"${moduleId}.classes"),
       (s"${moduleId}.test", s"${moduleId}.runClasspath")
     )
 

@@ -165,7 +165,7 @@ class CoreTasks() extends StrictLogging {
       (deps ++ ctx.transitiveResults.flatten.flatten).distinct
     }
 
-  val classesDirTask = TaskBuilder
+  val classesTask = TaskBuilder
     .make[os.Path](
       name = "classes",
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
@@ -186,7 +186,7 @@ class CoreTasks() extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
       transitive = true
     )
-    .dependsOn(classesDirTask)
+    .dependsOn(classesTask)
     .build { ctx =>
       Seq(ctx.depResults._1) ++ ctx.transitiveResults.flatten.flatten
     }
@@ -349,7 +349,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(scalacOptionsTask)
     .dependsOn(scalaVersionTask)
     .dependsOn(compileClasspathTask)
-    .dependsOn(classesDirTask)
+    .dependsOn(classesTask)
     .dependsOn(semanticdbDirTask)
     .dependsOn(scalacPluginsTask)
     .dependsOn(javacAnnotationProcessorsTask)
@@ -504,7 +504,7 @@ class CoreTasks() extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(compileTask)
-    .dependsOn(classesDirTask)
+    .dependsOn(classesTask)
     .build { ctx =>
       val (_, classesDir) = ctx.depResults
       MainClassesDiscovery.discover(Seq(classesDir))
@@ -564,7 +564,7 @@ class CoreTasks() extends StrictLogging {
       name = "testClasses",
       supportedModuleTypes = Set(ModuleType.SCALA_TEST)
     )
-    .dependsOn(classesDirTask)
+    .dependsOn(classesTask)
     .dependsOn(runClasspathTask)
     .build { ctx =>
       val (classesDir, runClasspath) = ctx.depResults
@@ -589,7 +589,7 @@ class CoreTasks() extends StrictLogging {
       name = "test",
       supportedModuleTypes = Set(ModuleType.SCALA_TEST)
     )
-    .dependsOn(classesDirTask)
+    .dependsOn(classesTask)
     .dependsOn(runClasspathTask)
     // cant reuse testClassesTask coz Framework is not Json-able...
     .build { ctx =>
@@ -709,7 +709,7 @@ class CoreTasks() extends StrictLogging {
     depsTask,
     dependenciesTask,
     allDependenciesTask,
-    classesDirTask,
+    classesTask,
     semanticdbDirTask,
     allClassesDirsTask,
     compileClasspathTask,

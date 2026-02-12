@@ -18,6 +18,7 @@ class DederTestRunner(
 ) {
 
   // TODO run in another thread, so we can run tests from multiple terminals/BSP
+  // TODO run suites in parallel
   // TODO print failed tests at the end, with option to re-run just those
   // TODO handle cancellation requests
   def run(options: DederTestOptions): DederTestResults = {

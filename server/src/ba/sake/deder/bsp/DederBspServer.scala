@@ -457,7 +457,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         params.getTargets.asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
           val classesDir =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.classesDirTask).toNIO.toUri.toString
+            executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).toNIO.toUri.toString
           val semanticdbDir =
             executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask)
           val javacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.javacOptionsTask)
@@ -593,7 +593,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
                 .toList
             catch case e: TaskEvaluationException => List.empty
           val classesDir =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.classesDirTask).toNIO.toUri.toString
+            executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).toNIO.toUri.toString
           val scalacOptionsItem =
             ScalacOptionsItem(targetId, finalScalacOptions.asJava, compileClasspath.asJava, classesDir)
           List(scalacOptionsItem)
