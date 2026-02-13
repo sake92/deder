@@ -236,7 +236,7 @@ class DederProjectState(
       case NonFatal(e) =>
         // send notification about failure to client
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
-        serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
+        if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         throw TaskEvaluationException(s"Error during execution of task '${taskName}': ${e.getMessage}", e)
     }
 
@@ -252,14 +252,17 @@ class DederProjectState(
         logger.error(s"Cannot clean modules, project state is not available: ${err}")
         false
       case Right(state) =>
-        val modulesTaskInstances = moduleIds.flatMap(
-          state.tasksResolver.taskInstancesPerModule.get
-        ).flatten.sortBy(_.id)
+        val modulesTaskInstances = moduleIds
+          .flatMap(
+            state.tasksResolver.taskInstancesPerModule.get
+          )
+          .flatten
+          .sortBy(_.id)
         try {
           modulesTaskInstances.foreach(_.lock.lock())
           DederCleaner.cleanModules(moduleIds)
         } finally {
-            modulesTaskInstances.reverse.foreach(_.lock.unlock())
+          modulesTaskInstances.reverse.foreach(_.lock.unlock())
         }
     }
   }
@@ -400,8 +403,8 @@ class DederProjectState(
     logger.debug(s"Removing watched tasks for client ${clientId}")
     watchedTasks = watchedTasks.filterNot(_.clientId == clientId)
   }
-  
-  def getTabCompletions(commandLine: String, cursorPos: Int): Seq[String] = 
+
+  def getTabCompletions(commandLine: String, cursorPos: Int): Seq[String] =
     current.orElse(lastGood) match {
       case Left(_) => Seq.empty
       case Right(state) =>
