@@ -8,6 +8,8 @@ class TasksRegistry(val coreTasks: CoreTasks) {
 
   def resolve(moduleType: ModuleType): Seq[Task[?, ?]] =
     allTasks.filter { t =>
+      // if empty -> supports all types...
+      t.supportedModuleTypes.isEmpty ||
       t.supportedModuleTypes.contains(moduleType)
     }
 

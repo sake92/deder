@@ -38,7 +38,7 @@ abstract class DederModule {
       true
 }
 
-typealias ModuleType = "java" | "scala" | "scala-test"
+typealias ModuleType = "java" | "scala" | "scala-test" | "scala-js"
 
 open class JavaModule extends DederModule {
   type = "java"
@@ -78,4 +78,13 @@ class ScalaTestModule extends ScalaModule {
     "zio.test.sbt.ZTestFramework"
     "weaver.framework.CatsEffect"
   }
+}
+
+open class ScalaJsModule extends ScalaModule {
+  type = "scala-js"
+  scalaVersion: String
+  scalaJSVersion: String
+  scalacOptions: Listing<String> = new Listing {}
+  scalacPluginDeps: Listing<String> = new Listing {}
+  scalaSemanticdbVersion: String?
 }
