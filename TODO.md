@@ -2,6 +2,10 @@
 
 - handle no deder.pkl present
 
+# CI
+- build GraalVM client executables
+- release brew/apt..
+
 ## Config
 
 ## Scala.js
@@ -12,7 +16,7 @@
 - add as a subcommand, `deder format`
 
 ## Scalafix
-- support out of the box?
+- support out of the box? `deder fix`
 
 ## Tests
 

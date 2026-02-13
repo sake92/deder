@@ -1,15 +1,13 @@
 package ba.sake.deder
 
 import java.io.File
-import java.net.URLClassLoader
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import dependency.parser.DependencyParser
 import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.JsonRW
-import ba.sake.deder.zinc.{DederZincLogger, ZincCompiler}
-import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, ScalaModule, ScalaTestModule}
+import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompiler}
+import ba.sake.deder.config.DederProject.{JavaModule, ModuleType, ScalaModule, ScalaTestModule}
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
@@ -370,6 +368,8 @@ class CoreTasks() extends StrictLogging {
         javacAnnotationProcessors,
         semanticdbEnabled
       ) = ctx.depResults
+
+      JdkUtils.checkCompat(JdkUtils.getVersion(scala.util.Properties.javaSpecVersion), scalaVersion)
 
       val sourceFiles = sourceDirs
         .map(_.absPath)

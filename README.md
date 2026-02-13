@@ -166,7 +166,7 @@ cp out/client-native/nativeImage.dest/native-executable /usr/local/bin/deder
 # then you can run commands:
 cd examples/multi
 # start from clean state, copy the server JAR etc
-./reset 
+./reset
 ```
 
 
