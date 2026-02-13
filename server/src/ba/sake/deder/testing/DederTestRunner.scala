@@ -145,13 +145,13 @@ class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
 
   def handle(event: Event): Unit = {
     val status = event.status() match {
-      case Status.Success  => fansi.Color.Green("PASS")
-      case Status.Failure  => fansi.Color.Red("FAIL")
-      case Status.Error    => fansi.Color.Red("FAIL")
-      case Status.Skipped  => fansi.Color.LightYellow("SKIP")
-      case Status.Ignored  => fansi.Color.LightYellow("SKIP")
-      case Status.Canceled => fansi.Color.LightYellow("SKIP")
-      case Status.Pending  => fansi.Color.LightYellow("SKIP")
+      case Status.Success  => fansi.Color.Green("PASS ✅")
+      case Status.Failure  => fansi.Color.Red("FAIL \uD83D\uDD34")
+      case Status.Error    => fansi.Color.Red("FAIL \uD83D\uDD34")
+      case Status.Skipped  => fansi.Color.LightYellow("SKIP 🚫")
+      case Status.Ignored  => fansi.Color.LightYellow("SKIP 🚫")
+      case Status.Canceled => fansi.Color.LightYellow("SKIP 🚫")
+      case Status.Pending  => fansi.Color.LightYellow("SKIP 🚫")
     }
     val fqn = event.fullyQualifiedName()
     val testName = event.selector() match {
