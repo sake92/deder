@@ -62,7 +62,7 @@ class DederTestRunner(
     val testsDuration = Duration.ofMillis(res.duration)
     logger.info(
       s"Test run complete. Passed: ${res.passed}, Failed: ${res.failed}, Errors: ${res.errors}, Skipped: ${res.skipped}; " +
-        s"Executed in ${realDuration.toPrettyString}; Tests aggregated duration: ${testsDuration.toPrettyString}"
+        s"Executed in ${realDuration.toPrettyString}, Aggregated duration: ${testsDuration.toPrettyString}"
     )
     res
   }
@@ -144,15 +144,14 @@ class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
   private val _results = mutable.ArrayBuffer[DederTestResult]()
 
   def handle(event: Event): Unit = {
-    // TODO add some color
     val status = event.status() match {
-      case Status.Success  => "PASS"
-      case Status.Failure  => "FAIL"
-      case Status.Error    => "FAIL"
-      case Status.Skipped  => "SKIP"
-      case Status.Ignored  => "SKIP"
-      case Status.Canceled => "SKIP"
-      case Status.Pending  => "SKIP"
+      case Status.Success  => fansi.Color.Green("PASS")
+      case Status.Failure  => fansi.Color.Red("FAIL")
+      case Status.Error    => fansi.Color.Red("FAIL")
+      case Status.Skipped  => fansi.Color.LightYellow("SKIP")
+      case Status.Ignored  => fansi.Color.LightYellow("SKIP")
+      case Status.Canceled => fansi.Color.LightYellow("SKIP")
+      case Status.Pending  => fansi.Color.LightYellow("SKIP")
     }
     val fqn = event.fullyQualifiedName()
     val testName = event.selector() match {
