@@ -93,7 +93,7 @@ class DederProjectState(
       case Left(recommendedModuleIds) =>
         val msg =
           if recommendedModuleIds.isEmpty then s"No modules found for selectors: ${moduleSelectors.mkString(", ")}"
-          else s"No modules found, maybe you meant: ${recommendedModuleIds.mkString(", ")} ?"
+          else s"No modules found, did you mean: ${recommendedModuleIds.mkString(", ")} ?"
         serverNotificationsLogger.add(ServerNotification.logError(msg))
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
       case Right(moduleIds) =>
@@ -101,7 +101,7 @@ class DederProjectState(
           case Left(recommendations) =>
             val msg =
               if recommendations.isEmpty then s"No '${taskName}' tasks found"
-              else s"No '${taskName}' tasks found, maybe you meant: ${recommendations.mkString(", ")} ?"
+              else s"No '${taskName}' tasks found, did you mean: ${recommendations.mkString(", ")} ?"
             serverNotificationsLogger.add(ServerNotification.logError(msg))
             serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
             Seq.empty
@@ -115,6 +115,9 @@ class DederProjectState(
             values
         }
         val relevantModuleIds = relevantModuleAndTasks.map(_._1)
+        val isTaskSingleton = relevantModuleAndTasks.exists(_._2.task.singleton)
+        if isTaskSingleton && relevantModuleIds.length > 1 then
+          throw RuntimeException(s"Task '${taskName}' is singleton, cannot execute it on multiple modules at once")
         val results = executeTasks(
           requestId,
           relevantModuleIds,

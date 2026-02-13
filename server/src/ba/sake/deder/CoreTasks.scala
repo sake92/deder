@@ -539,6 +539,7 @@ class CoreTasks() extends StrictLogging {
   val runTask = TaskBuilder
     .make[Seq[String]](
       name = "run",
+      singleton = true,
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(runClasspathTask)
@@ -606,10 +607,11 @@ class CoreTasks() extends StrictLogging {
           logger = logger
         )
         val frameworkTests = testDiscovery.discover()
-        Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) { executorService =>
-          val testRunner = DederTestRunner(executorService, frameworkTests, classLoader, logger)
-          val testOptions = DederTestOptions(ctx.args)
-          testRunner.run(testOptions)
+        Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
+          executorService =>
+            val testRunner = DederTestRunner(executorService, frameworkTests, classLoader, logger)
+            val testOptions = DederTestOptions(ctx.args)
+            testRunner.run(testOptions)
         }
       }
     }

@@ -31,7 +31,6 @@ case class ProjectExport(
     scmInfo: Option[ScmInfoExport]
 ) derives JsonRW
 
-// TODO structured crossVersion?
 case class DependencyExport(
     organization: String, // groupId
     name: String, // artifactName

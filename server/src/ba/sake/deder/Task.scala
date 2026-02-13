@@ -15,13 +15,14 @@ case class TaskBuilder[T: JsonRW, Deps <: Tuple] private (
     taskDeps: Deps,
     // if it triggers upstream modules task with same name
     transitive: Boolean,
+    singleton: Boolean,
     supportedModuleTypes: Set[ModuleType]
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: Task[T2, ?]): TaskBuilder[T, Deps :* Task[T2, ?]] =
-    TaskBuilder(name, taskDeps :* t, transitive, supportedModuleTypes)
+    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
-    TaskImpl(name, execute, taskDeps, transitive, supportedModuleTypes)
+    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes)
 }
 
 object TaskBuilder {
@@ -29,8 +30,9 @@ object TaskBuilder {
       name: String,
       // if it triggers upstream modules task with same name
       transitive: Boolean = false,
+      singleton: Boolean = false,
       supportedModuleTypes: Set[ModuleType] = Set.empty
-  ): TaskBuilder[T, EmptyTuple] = TaskBuilder(name, EmptyTuple, transitive, supportedModuleTypes)
+  ): TaskBuilder[T, EmptyTuple] = TaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes)
 }
 
 case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
@@ -38,13 +40,14 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     taskDeps: Deps,
     // if it triggers upstream modules task with same name
     transitive: Boolean,
+    singleton: Boolean,
     supportedModuleTypes: Set[ModuleType]
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: Task[T2, ?]): CachedTaskBuilder[T, Deps :* Task[T2, ?]] =
-    CachedTaskBuilder(name, taskDeps :* t, transitive, supportedModuleTypes)
+    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
-    CachedTask(name, execute, taskDeps, transitive, supportedModuleTypes)
+    CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes)
 }
 
 object CachedTaskBuilder {
@@ -52,8 +55,9 @@ object CachedTaskBuilder {
       name: String,
       // if it triggers upstream modules task with same name
       transitive: Boolean = false,
+      singleton: Boolean = false,
       supportedModuleTypes: Set[ModuleType] = Set.empty
-  ): CachedTaskBuilder[T, EmptyTuple] = CachedTaskBuilder(name, EmptyTuple, transitive, supportedModuleTypes)
+  ): CachedTaskBuilder[T, EmptyTuple] = CachedTaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes)
 }
 
 // this is to make sure that Deps are Task-s and not arbitrary types
@@ -80,13 +84,13 @@ case class TaskExecContext[T, Deps <: Tuple](
     out: os.Path
 )(using ev: TaskDeps[Deps] =:= true)
 
-// TODO ensure a task is "singleton", i.e. you can only "run" ONE MODULE!
 sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] =:= true) {
   type Res = T
   def name: String
   def description: String
   def supportedModuleTypes: Set[ModuleType]
   def transitive: Boolean
+  def singleton: Boolean // e.g. you can only "run" ONE MODULE!
   def taskDeps: Deps
   def execute: TaskExecContext[T, Deps] => T
   private[deder] def executeUnsafe(
@@ -107,6 +111,7 @@ class TaskImpl[T: JsonRW, Deps <: Tuple](
     // if it triggers upstream modules task with same name
     // the only way to reference a task across modules
     val transitive: Boolean = false,
+    val singleton: Boolean = false,
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
     val description: String = ""
 )(using ev: TaskDeps[Deps] =:= true)
@@ -155,6 +160,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     // if it triggers upstream modules task with same name
     // the only way to reference a task across modules
     val transitive: Boolean = false,
+    val singleton: Boolean = false,
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
     val description: String = ""
 )(using ev: TaskDeps[Deps] =:= true)
@@ -232,6 +238,7 @@ class SourceFileTask(
       execute,
       taskDeps = EmptyTuple,
       transitive = false,
+      singleton = false,
       supportedModuleTypes,
       description
     ) {
@@ -248,6 +255,7 @@ class SourceFilesTask(
       execute,
       taskDeps = EmptyTuple,
       transitive = false,
+      singleton = false,
       supportedModuleTypes,
       description
     ) {
@@ -264,6 +272,7 @@ class ConfigValueTask[T: JsonRW: Hashable](
       execute,
       taskDeps = EmptyTuple,
       transitive = false,
+      singleton = false,
       supportedModuleTypes,
       description
     ) {
