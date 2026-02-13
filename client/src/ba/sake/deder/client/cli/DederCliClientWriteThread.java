@@ -38,7 +38,9 @@ public class DederCliClientWriteThread extends Thread {
         } catch (ClosedByInterruptException e) {
             // when cancelled with Ctrl+C
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            // ignore broken pipe, usually some race condition..
+            if (!e.getMessage().contains("Broken pipe"))
+                throw new UncheckedIOException(e);
         }
     }
 

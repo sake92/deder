@@ -15,7 +15,7 @@ class ExecutionPlanner(
   // build independent exec stages (~toposort)
   // assumes tasks exist on given modules
   def getExecStages(moduleIds: Seq[String], taskName: String): Seq[Seq[TaskInstance]] = {
-    
+
     val execSubgraph = getExecSubgraph(moduleIds, taskName)
 
     def findStartTaskInstances(taskInstance: TaskInstance): Seq[TaskInstance] = {
@@ -33,9 +33,12 @@ class ExecutionPlanner(
     val taskInstancesToExecute = moduleIds.map { moduleId =>
       getTaskInstance(moduleId, taskName)
     }
-    var currentTaskInstances = taskInstancesToExecute.flatMap { tiToExecute =>
-      findStartTaskInstances(tiToExecute)
-    }.distinct.sortBy(_.id)
+    var currentTaskInstances = taskInstancesToExecute
+      .flatMap { tiToExecute =>
+        findStartTaskInstances(tiToExecute)
+      }
+      .distinct
+      .sortBy(_.id)
     var visitedTaskIds = currentTaskInstances.map(_.id).toSet
     var stages = Seq(currentTaskInstances)
 
@@ -126,12 +129,23 @@ class ExecutionPlanner(
   }
 
   /* UTILS */
+  // returns Either[did_you_mean, Seq(module1->task1, module2->task2)]
+  def getTaskInstances(moduleIds: Seq[String], taskName: String): Either[Seq[String], Seq[(String, TaskInstance)]] = {
+    val res = moduleIds.flatMap(mId => getTaskInstanceOpt(mId, taskName).map(tId => (mId, tId)))
+    if res.isEmpty then
+      Left {
+        val allTaskNames = moduleIds.flatMap(tasksPerModule.apply).map(_.task.name).distinct
+        StringUtils.recommend(taskName, allTaskNames)
+      }
+    else Right(res)
+  }
+
   def getTaskInstanceOpt(moduleId: String, taskName: String): Option[TaskInstance] =
     tasksPerModule.getOrElse(moduleId, Seq.empty).find(_.task.name == taskName)
-  
+
   def getTaskInstance(moduleId: String, taskName: String): TaskInstance =
     getTaskInstanceOpt(moduleId, taskName).getOrElse {
       throw TaskNotFoundException(s"Task not found ${moduleId}.${taskName}")
     }
-  
+
 }
