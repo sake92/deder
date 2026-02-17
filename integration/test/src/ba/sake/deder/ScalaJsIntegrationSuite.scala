@@ -22,8 +22,11 @@ class ScalaJsIntegrationSuite extends munit.FunSuite {
         val dederOutput = dederOutputJson.parseJson[Map[String, List[String]]]
         val frontendCompileClasspath = dederOutput("frontend")
         assert(frontendCompileClasspath(0).endsWith("/.deder/out/frontend/classes"))
-        assert(frontendCompileClasspath.exists(_.contains("scala3-library_3-3.7.1.jar")))
-        assert(frontendCompileClasspath.exists(_.contains("scala-library-2.13.16.jar")))
+        assert(frontendCompileClasspath.exists(_.contains("scala3-library_sjs1_3-3.7.1.jar")))
+        assert(frontendCompileClasspath.exists(_.contains("scalajs-library_2.13-1.20.2.jar")))
+        assert(frontendCompileClasspath.exists(_.contains("scala-library-2.13.17.jar")))
+        assert(frontendCompileClasspath.exists(_.contains("scalajs-javalib-1.20.2.jar")))
+        assert(frontendCompileClasspath.exists(_.contains("scalajs-scalalib_2.13")))
       }
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
