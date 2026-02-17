@@ -87,10 +87,13 @@ object TabCompleter {
     """|#compdef deder
        |
        |_deder_completion() {
-       |    local line curcontext="$curcontext" state
-       |    local completions
-       |    completions=$(deder complete -s zsh -c "$words" -p "$CURSOR" 2>/dev/null)
-       |    compadd -a completions
+       |    local -a completions
+       |    local raw_output
+       |    raw_output=$(/Users/sakibh/programs/bin/deder complete -s zsh -c "${(j: :)words}" -p "$CURSOR" 2>/dev/null)
+       |    completions=(${(s: :)raw_output})
+       |    if (( ${#completions} > 0 )); then
+       |        compadd -a completions
+       |    fi
        |}
        |
        |_deder_completion "$@"
