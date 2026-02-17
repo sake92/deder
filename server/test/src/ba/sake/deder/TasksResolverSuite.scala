@@ -165,7 +165,6 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.dependencies", s"${moduleId}.scalaVersion"),
       (s"${moduleId}.allDependencies", s"${moduleId}.dependencies"),
       (s"${moduleId}.allClassesDirs", s"${moduleId}.classes"),
-      (s"${moduleId}.compileClasspath", s"${moduleId}.scalacOptions"),
       (s"${moduleId}.compileClasspath", s"${moduleId}.scalaVersion"),
       (s"${moduleId}.compileClasspath", s"${moduleId}.allDependencies"),
       (s"${moduleId}.compileClasspath", s"${moduleId}.allClassesDirs"),

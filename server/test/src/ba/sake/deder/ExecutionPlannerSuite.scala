@@ -27,7 +27,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
       assertEquals(
         stageTaskIds,
         Seq(
-          Set("common.classes", "common.deps", "common.scalaVersion", "common.scalacOptions"),
+          Set("common.classes", "common.deps", "common.scalaVersion"),
           Set("common.allClassesDirs", "common.dependencies"),
           Set("common.allDependencies"),
           Set("common.compileClasspath")
