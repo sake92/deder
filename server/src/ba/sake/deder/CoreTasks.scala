@@ -12,6 +12,7 @@ import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.jar.{JarManifest, JarUtils}
+import ba.sake.deder.scalajs.ScalaJsLinker
 import ba.sake.deder.testing.*
 
 import scala.util.Using
@@ -182,24 +183,36 @@ class CoreTasks() extends StrictLogging {
       name = "compileClasspath",
       transitive = true
     )
-    .dependsOn(scalacOptionsTask)
     .dependsOn(scalaVersionTask)
     .dependsOn(allDependenciesTask)
     .dependsOn(allClassesDirsTask)
     .build { ctx =>
       // we feed even this module's classes dir because of javac annotation processing,
       // it can generate java sources.. and then scala sources can depend on them
-      val (scalacOptions, scalaVersion, dependencies, allClassesDirs) = ctx.depResults
-      val scalaLibDep =
-        if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
-        else s"org.scala-lang:scala-library:${scalaVersion}"
-      val scalaJsLibDep = ctx.module match {
-        case m: ScalaJsModule => Seq(s"org.scala-js::scalajs-library:${m.scalaJSVersion}")
-        case _                => Seq.empty
-      }
-      val libDeps = Seq(Dependency.make(scalaLibDep, scalaVersion)) ++ scalaJsLibDep.map(Dependency.make(_, "2.13"))
+      val (scalaVersion, dependencies, allClassesDirs) = ctx.depResults
+      val scalaLibDeps =
+        if scalaVersion.startsWith("3.") then
+          ctx.module match {
+            case m: ScalaJsModule =>
+              Seq(
+                Dependency.make(s"org.scala-lang::scala3-library::${scalaVersion}", scalaVersion, Some("sjs1")),
+                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJSVersion}", "2.13")
+              )
+            case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang::scala3-library:${scalaVersion}", scalaVersion))
+            case _              => Seq.empty
+          }
+        else
+          ctx.module match {
+            case m: ScalaJsModule =>
+              Seq(
+                Dependency.make(s"org.scala-lang::scala-library::${scalaVersion}", scalaVersion, Some("sjs1")),
+                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJSVersion}", "2.13")
+              )
+            case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang::scala-library:${scalaVersion}", scalaVersion))
+            case _              => Seq.empty
+          }
       val depsJars = DependencyResolver
-        .fetchFiles(libDeps ++ dependencies, Some(ctx.notifications))
+        .fetchFiles(scalaLibDeps ++ dependencies, Some(ctx.notifications))
       // val additionalCompileClasspath = ctx.transitiveResults.flatten.flatten ++ depsJars
       (allClassesDirs ++ depsJars).reverse.distinct.reverse
     }
@@ -375,14 +388,31 @@ class CoreTasks() extends StrictLogging {
 
       // TODO scalajs compiler on scala2
       val compilerDeps =
-        if scalaVersion.startsWith("3.") then Seq(s"org.scala-lang::scala3-compiler:${scalaVersion}")
+        if scalaVersion.startsWith("3.") then
+          ctx.module match {
+            case m: ScalaJsModule =>
+              Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion, Some("sjs1")))
+            case m: ScalaModule =>
+              Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion))
+            case _ => Seq.empty
+          }
         else
-          Seq(
-            s"org.scala-lang:scala-compiler:${scalaVersion}",
-            s"org.scala-lang:scala-reflect:${scalaVersion}"
-          )
+          ctx.module match {
+            case m: ScalaJsModule =>
+              Seq(
+                Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
+                Dependency.make(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion),
+                Dependency.make(s"org.scala-js:scalajs-compiler:${scalaVersion}", scalaVersion)
+              )
+            case m: ScalaModule =>
+              Seq(
+                Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
+                Dependency.make(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion)
+              )
+            case _ => Seq.empty
+          }
       val compilerJars = DependencyResolver.fetchFiles(
-        compilerDeps.map(d => Dependency.make(d, scalaVersion))
+        compilerDeps // .map(d => Dependency.make(d, scalaVersion))
       )
 
       val zincCacheFile = ctx.out / "inc_compile.zip"
@@ -676,6 +706,28 @@ class CoreTasks() extends StrictLogging {
       resultJarPath
     }
 
+  val fastLinkJsTask = TaskBuilder
+    .make[String](
+      name = "fastLinkJs",
+      supportedModuleTypes = Set(ModuleType.SCALA_JS)
+    )
+    .dependsOn(compileClasspathTask)
+    .dependsOn(finalMainClassTask)
+    .build { ctx =>
+      val (compileClasspath, mainClass) = ctx.depResults
+      val irContainers = compileClasspath
+      os.makeDir.all(ctx.out)
+      import scala.concurrent.ExecutionContext.Implicits.global
+      val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
+      linker.link(
+        irContainers = irContainers,
+        outputDir = ctx.out,
+        mainClass = mainClass
+      )
+      // TODO thread pool..
+      ""
+    }
+
   // order matters for dependency resolution!!
   val all: Seq[Task[?, ?]] = Seq(
     sourcesTask,
@@ -711,7 +763,8 @@ class CoreTasks() extends StrictLogging {
     testTask,
     jarTask,
     allJarsTask,
-    assemblyTask
+    assemblyTask,
+    fastLinkJsTask
   )
 
   private val allNames = all.map(_.name)

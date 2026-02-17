@@ -51,7 +51,8 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       notifications: ServerNotificationsLogger
   ): Unit = {
     val scalaLibraryJars = compileClasspath.filter { p =>
-      (p.last.startsWith("scala-library-") || p.last.startsWith("scala3-library_3")) && p.last.endsWith(".jar")
+      (p.last.startsWith("scala-library") || p.last.startsWith("scala3-library_3") ||
+        p.last.startsWith("scalajs-library")) && p.last.endsWith(".jar")
     }
 
     ClassLoaderUtils.withClassLoader(scalaLibraryJars) { libraryClassloader =>
