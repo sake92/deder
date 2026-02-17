@@ -42,8 +42,9 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
       }
 
     val report = Await.result(res, Duration.Inf)
+    val publicModulePaths = report.publicModules.map(_.jsFileName).map(outputDir / _)
     notifications.add(
-      ServerNotification.logInfo("Linking succeeded: " + report.publicModules.map(_.jsFileName).mkString(", "))
+      ServerNotification.logInfo("Linking succeeded: " + publicModulePaths.mkString(", "))
     )
   }
 }

@@ -566,6 +566,7 @@ class CoreTasks() extends StrictLogging {
           val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp.mkString(File.pathSeparator), mc) ++ ctx.args
           logger.debug(s"Client should run command: ${cmd}")
           ctx.notifications.add(ServerNotification.RunSubprocess(cmd, ctx.watch))
+          // TODO run ScalaJS with node
           cmd
         case None =>
           // TODO ability to set one..
