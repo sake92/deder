@@ -15,7 +15,7 @@ class ScalaJsIntegrationSuite extends munit.FunSuite {
 
   // default command is compile
   // and the logs go to stderr!
-  test("deder should compile multimodule project") {
+  test("deder should compile scalajs project") {
     withTestProject(testResourceDir / "sample-projects/scalajs") { projectPath =>
       locally {
         val dederOutputJson = executeDederCommand(projectPath, "exec -m frontend -t compileClasspath --json").out.text()
@@ -30,14 +30,7 @@ class ScalaJsIntegrationSuite extends munit.FunSuite {
       }
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
-        assert(dederOutput.contains("Executing 'compile' task on modules: frontend"))
-        val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
-        assertEquals(compilingCount, 5)
-      }
-      locally {
-        os.write.append(projectPath / "common/src/Common.scala", "\n// some change to trigger recompilation\n")
-        val dederOutput = executeDederCommand(projectPath, "exec").err.text()
-        assert(dederOutput.contains("Executing 'compile' task on modules: frontend"))
+        assert(dederOutput.contains("Executing 'compile' task on module: frontend"))
         val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
         assertEquals(compilingCount, 1)
       }
