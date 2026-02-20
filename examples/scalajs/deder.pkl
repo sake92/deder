@@ -7,6 +7,9 @@ local const frontend: ScalaJsModule = new {
   scalaVersion = "3.7.1"
   scalaJSVersion = "1.20.2"
   moduleKind = "es-module"
+  deps {
+    "org.scala-js::scalajs-dom::2.2.0"
+  }
 }
 
 // TODO use swebserver that watches SPA index.html...

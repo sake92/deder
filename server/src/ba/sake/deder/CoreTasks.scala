@@ -141,7 +141,11 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val (deps, scalaVersion) = ctx.depResults
-      deps.map(depDecl => Dependency.make(depDecl, scalaVersion))
+      val platformSuffix =ctx.module match {
+        case m: ScalaJsModule => Some("sjs1")
+        case _ => None
+      }
+      deps.map(depDecl => Dependency.make(depDecl, scalaVersion, platformSuffix))
     }
 
   val allDependenciesTask = TaskBuilder
