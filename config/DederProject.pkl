@@ -85,22 +85,35 @@ open class ScalaJsModule extends ScalaModule {
   scalaJSVersion: String(!isEmpty)
 }
 
-
 /* CROSS MODULE */
 class CrossModules {
   jvm: ScalaModule
+  jvm_test: ScalaTestModule
   js: ScalaJsModule
-  all: Listing<DederModule> = new {
-    jvm
-    js
-  }
+  all: Listing<DederModule> = new { jvm; jvm_test; js }
 }
 
-const function crossJsModules(_root: String, _scalaVersion: String, _scalaJSVersion: String): CrossModules = new {
+// helper function to create cross JS modules
+// https://pkl-lang.org/blog/class-as-a-function.html
+class CrossJsModules {
+  _root: String
+  _scalaVersion: String
+  _scalaJSVersion: String
+  fixed get: CrossModules = crossJsModules(_root, _scalaVersion, _scalaJSVersion)
+}
+
+const function crossJsModules(
+  _root: String,
+  _scalaVersion: String,
+  _scalaJSVersion: String,
+): CrossModules = new {
   jvm = new {
     id = "\(_root)-jvm-\(_scalaVersion)"
     root = _root
     scalaVersion = _scalaVersion
+  }
+  jvm_test = (jvm.asTest()) {
+    id = "\(_root)-jvm-test-\(_scalaVersion)"
   }
   js = new {
     id = "\(_root)-js-\(_scalaVersion)"
