@@ -729,7 +729,8 @@ class CoreTasks() extends StrictLogging {
       linker.link(
         irContainers = irContainers,
         outputDir = ctx.out,
-        mainClass = mainClass
+        mainClass = mainClass,
+        jsModuleKind = ctx.module.asInstanceOf[ScalaJsModule].moduleKind
       )
       // TODO thread pool..
       ""

@@ -1,5 +1,7 @@
 package ba.sake.deder.scalajs
 
+import ba.sake.deder.config.DederProject.ScalaJsModuleKind
+
 import scala.concurrent.{Await, ExecutionContext, Future}
 import org.scalajs.linker.*
 import org.scalajs.linker.interface.*
@@ -13,10 +15,14 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
       irContainers: Seq[os.Path], // classesDir + all JARs in compileClasspath
       outputDir: os.Path,
       mainClass: Option[String],
-      moduleKind: ModuleKind = ModuleKind.NoModule
+      jsModuleKind: ScalaJsModuleKind
   ): Unit = {
     notifications.add(ServerNotification.logDebug("Linking: " + irContainers))
-
+    val moduleKind = jsModuleKind match {
+      case ScalaJsModuleKind.NO_MODULE       => ModuleKind.NoModule
+      case ScalaJsModuleKind.ES_MODULE       => ModuleKind.ESModule
+      case ScalaJsModuleKind.COMMONJS_MODULE => ModuleKind.CommonJSModule
+    }
     val linkerConfig = StandardConfig()
       .withModuleKind(moduleKind)
       .withClosureCompiler(false)

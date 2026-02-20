@@ -6,8 +6,23 @@ local const frontend: ScalaJsModule = new {
   id = "frontend"
   scalaVersion = "3.7.1"
   scalaJSVersion = "1.20.2"
+  moduleKind = "es-module"
+}
+
+// TODO use swebserver that watches SPA index.html...
+local const backend: ScalaModule = new {
+  id = "backend"
+  scalaVersion = "3.7.1"
+  deps {
+    "ba.sake::sharaf-undertow:0.16.0"
+    "org.jboss.xnio:xnio-nio:3.8.16.Final"
+  }
+  scalacOptions {
+    "-Yretain-trees"
+  }
 }
 
 modules {
   frontend
+  backend
 }

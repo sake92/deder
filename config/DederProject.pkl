@@ -80,10 +80,17 @@ class ScalaTestModule extends ScalaModule {
   }
 }
 
+// TODO creates a main module with test module..
+//function scalaModule
+
+typealias ScalaJsModuleKind =  "no-module" | "es-module" | "commonjs-module"
+
 open class ScalaJsModule extends ScalaModule {
   type = "scala-js"
   scalaJSVersion: String(!isEmpty)
+  moduleKind: ScalaJsModuleKind = "no-module"
 }
+
 
 /* CROSS MODULE */
 class CrossModules {

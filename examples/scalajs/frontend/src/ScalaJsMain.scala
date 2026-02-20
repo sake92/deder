@@ -1,4 +1,4 @@
 
 @main def helloScalaJs: Unit = {
-  println("Hello, Scala.js!")
+  println("Hello, Scala.js! fdsfsdfs")
 }
