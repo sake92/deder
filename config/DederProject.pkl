@@ -26,8 +26,8 @@ abstract class DederModule {
   type: ModuleType
 
   hidden idValidation = (value: String) ->
-    if (!value.matches(Regex("^[a-zA-Z0-9_-]+$")))
-      throw("Id must be alphanumeric and can contain '_' and '-'.")
+    if (!value.matches(Regex("^[.a-zA-Z0-9_-]+$")))
+      throw("Id must be alphanumeric and can contain '_' and '-' but got: " + value)
     else
       true
 
@@ -57,7 +57,7 @@ open class JavaModule extends DederModule {
 
 open class ScalaModule extends JavaModule {
   type = "scala"
-  scalaVersion: String
+  scalaVersion: String(!isEmpty)
   scalacOptions: Listing<String> = new Listing {}
   scalacPluginDeps: Listing<String> = new Listing {}
   scalaSemanticdbVersion: String?
@@ -82,9 +82,30 @@ class ScalaTestModule extends ScalaModule {
 
 open class ScalaJsModule extends ScalaModule {
   type = "scala-js"
-  scalaVersion: String
-  scalaJSVersion: String
-  scalacOptions: Listing<String> = new Listing {}
-  scalacPluginDeps: Listing<String> = new Listing {}
-  scalaSemanticdbVersion: String?
+  scalaJSVersion: String(!isEmpty)
+}
+
+
+/* CROSS MODULE */
+class CrossModules {
+  jvm: ScalaModule
+  js: ScalaJsModule
+  all: Listing<DederModule> = new {
+    jvm
+    js
+  }
+}
+
+const function crossJsModules(_root: String, _scalaVersion: String, _scalaJSVersion: String): CrossModules = new {
+  jvm = new {
+    id = "\(_root)-jvm-\(_scalaVersion)"
+    root = _root
+    scalaVersion = _scalaVersion
+  }
+  js = new {
+    id = "\(_root)-js-\(_scalaVersion)"
+    root = _root
+    scalaVersion = _scalaVersion
+    scalaJSVersion = _scalaJSVersion
+  }
 }

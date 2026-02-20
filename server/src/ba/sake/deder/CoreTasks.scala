@@ -205,10 +205,10 @@ class CoreTasks() extends StrictLogging {
           ctx.module match {
             case m: ScalaJsModule =>
               Seq(
-                Dependency.make(s"org.scala-lang::scala-library::${scalaVersion}", scalaVersion, Some("sjs1")),
+                Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion, Some("sjs1")),
                 Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJSVersion}", "2.13")
               )
-            case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang::scala-library:${scalaVersion}", scalaVersion))
+            case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion))
             case _              => Seq.empty
           }
       val depsJars = DependencyResolver
@@ -322,7 +322,14 @@ class CoreTasks() extends StrictLogging {
       val semanticDbDeps =
         if scalaVersion.startsWith("3.") then Seq.empty
         else Option.when(semanticdbEnabled)(s"org.scalameta:::semanticdb-scalac:${scalaSemanticdbVersion}").toSeq
-      val allDeps = scalacPluginDeps ++ semanticDbDeps
+      val scalaJsDeps =
+        if scalaVersion.startsWith("3.") then Seq.empty
+        else
+          ctx.module match {
+            case m: ScalaJsModule => Seq(s"org.scala-js:::scalajs-compiler:${m.scalaJSVersion}")
+            case _                => Seq.empty
+          }
+      val allDeps = scalacPluginDeps ++ semanticDbDeps ++ scalaJsDeps
       val pluginJars = DependencyResolver.fetchFiles(
         allDeps.map(d => Dependency.make(d, scalaVersion)),
         Some(ctx.notifications)
@@ -401,8 +408,7 @@ class CoreTasks() extends StrictLogging {
             case m: ScalaJsModule =>
               Seq(
                 Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
-                Dependency.make(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion),
-                Dependency.make(s"org.scala-js:scalajs-compiler:${scalaVersion}", scalaVersion)
+                Dependency.make(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion)
               )
             case m: ScalaModule =>
               Seq(
@@ -454,7 +460,7 @@ class CoreTasks() extends StrictLogging {
             )
         else Seq.empty
       val platformSpecificScalacOptions = ctx.module match {
-        case module: ScalaJsModule => Seq("-scalajs")
+        case module: ScalaJsModule => if scalaVersion.startsWith("3.") then Seq("-scalajs") else Seq.empty
         case _                     => Seq.empty
       }
       val finalScalacOptions =
