@@ -12,7 +12,6 @@ local const frontend: ScalaJsModule = new {
   }
 }
 
-// TODO use swebserver that watches SPA index.html...
 local const backend: ScalaModule = new {
   id = "backend"
   scalaVersion = "3.7.1"
