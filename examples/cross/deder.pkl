@@ -4,7 +4,17 @@ local const scalaVersions = List("2.13.18", "3.7.4")
 local const scalaJsVersion = "1.20.2"
 
 local const commonModules =
-  scalaVersions.map((sv) -> crossJsModules("common", sv, scalaJsVersion).all).toList().flatten()
+  scalaVersions
+    .map((sv) ->
+      new CrossJsModules {
+        _root = "common"
+        _scalaVersion = sv
+        _scalaJSVersion = scalaJsVersion
+      }
+        .get
+        .all
+    )
+    .flatten()
 
 modules {
   ...commonModules
