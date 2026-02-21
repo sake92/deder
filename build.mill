@@ -42,7 +42,8 @@ object server extends ScalaModule, VersionModule {
     mvn"ch.qos.logback:logback-classic:1.5.23",
     mvn"com.eed3si9n.jarjarabrams::jarjar-abrams-core:1.16.0",
     mvn"com.lihaoyi::fansi:0.5.1",
-    mvn"org.scala-js::scalajs-linker:1.20.2".withDottyCompat(scalaVersion())
+    mvn"org.scala-js::scalajs-linker:1.20.2".withDottyCompat(scalaVersion()),
+    mvn"org.scala-native::tools:0.5.10"
   )
   def moduleDeps = Seq(config)
 
