@@ -7,19 +7,13 @@ import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompiler}
-import ba.sake.deder.config.DederProject.{
-  JavaModule,
-  ModuleType,
-  ScalaJsModule,
-  ScalaModule,
-  ScalaNativeModule,
-  ScalaTestModule
-}
+import ba.sake.deder.config.DederProject.{JavaModule, ModuleType, ScalaJsModule, ScalaModule, ScalaNativeModule, ScalaTestModule}
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.jar.{JarManifest, JarUtils}
 import ba.sake.deder.scalajs.ScalaJsLinker
+import ba.sake.deder.scalanative.ScalaNativeLinker
 import ba.sake.deder.testing.*
 import dependency.ScalaVersion
 
@@ -828,6 +822,30 @@ class CoreTasks() extends StrictLogging {
       ""
     }
 
+  val nativeLinkTask = TaskBuilder
+    .make[String](
+      name = "nativeLink",
+      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE)
+    )
+    .dependsOn(compileClasspathTask)
+    .dependsOn(finalMainClassTask)
+    .build { ctx =>
+      val (compileClasspath, mainClass) = ctx.depResults
+      val nirPaths = compileClasspath
+      os.makeDir.all(ctx.out)
+      import scala.concurrent.ExecutionContext.Implicits.global
+      val linker = new ScalaNativeLinker(ctx.notifications, ctx.module.id)
+      linker.link(
+        nirPaths = nirPaths,
+        outputDir = ctx.out,
+        mainClass = mainClass,
+        nativeLibs = Seq.empty
+      )
+      // TODO thread pool..
+      ""
+    }
+
+
   // order matters for dependency resolution!!
   val all: Seq[Task[?, ?]] = Seq(
     sourcesTask,
@@ -864,7 +882,8 @@ class CoreTasks() extends StrictLogging {
     jarTask,
     allJarsTask,
     assemblyTask,
-    fastLinkJsTask
+    fastLinkJsTask,
+    nativeLinkTask
   )
 
   private val allNames = all.map(_.name)
