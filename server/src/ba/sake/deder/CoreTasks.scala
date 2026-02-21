@@ -7,13 +7,21 @@ import com.github.blemale.scaffeine.{Cache, Scaffeine}
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompiler}
-import ba.sake.deder.config.DederProject.{JavaModule, ModuleType, ScalaJsModule, ScalaModule, ScalaTestModule}
+import ba.sake.deder.config.DederProject.{
+  JavaModule,
+  ModuleType,
+  ScalaJsModule,
+  ScalaModule,
+  ScalaNativeModule,
+  ScalaTestModule
+}
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.jar.{JarManifest, JarUtils}
 import ba.sake.deder.scalajs.ScalaJsLinker
 import ba.sake.deder.testing.*
+import dependency.ScalaVersion
 
 import scala.util.Using
 
@@ -102,7 +110,6 @@ class CoreTasks() extends StrictLogging {
 
   val scalacOptionsTask = ConfigValueTask[Seq[String]](
     name = "scalacOptions",
-    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.SCALA_JS),
     execute = { ctx =>
       ctx.module match {
         case m: ScalaModule => m.scalacOptions.asScala.toSeq
@@ -113,7 +120,6 @@ class CoreTasks() extends StrictLogging {
 
   val scalaVersionTask = ConfigValueTask[String](
     name = "scalaVersion",
-    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.SCALA_JS),
     execute = { ctx =>
       ctx.module match {
         case m: ScalaModule => m.scalaVersion
@@ -141,9 +147,10 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val (deps, scalaVersion) = ctx.depResults
-      val platformSuffix =ctx.module match {
-        case m: ScalaJsModule => Some("sjs1")
-        case _ => None
+      val platformSuffix = ctx.module match {
+        case m: ScalaJsModule     => ScalaVersion.jsBinary(m.scalaJSVersion).map("sjs" + _)
+        case m: ScalaNativeModule => ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+        case _                    => None
       }
       deps.map(depDecl => Dependency.make(depDecl, scalaVersion, platformSuffix))
     }
@@ -199,8 +206,46 @@ class CoreTasks() extends StrictLogging {
           ctx.module match {
             case m: ScalaJsModule =>
               Seq(
-                Dependency.make(s"org.scala-lang::scala3-library::${scalaVersion}", scalaVersion, Some("sjs1")),
+                Dependency.make(
+                  s"org.scala-lang::scala3-library::${scalaVersion}",
+                  scalaVersion,
+                  ScalaVersion.jsBinary(m.scalaJSVersion).map("sjs" + _)
+                ),
                 Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJSVersion}", "2.13")
+              )
+            case m: ScalaNativeModule =>
+              val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
+              Seq(
+                Dependency.make(
+                  s"org.scala-native::scala3lib::${scalaSpecificVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::javalib::${m.scalaNativeVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::nativelib::${m.scalaNativeVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::auxlib::${m.scalaNativeVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::clib::${m.scalaNativeVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::posixlib::${m.scalaNativeVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                )
               )
             case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang::scala3-library:${scalaVersion}", scalaVersion))
             case _              => Seq.empty
@@ -209,8 +254,46 @@ class CoreTasks() extends StrictLogging {
           ctx.module match {
             case m: ScalaJsModule =>
               Seq(
-                Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion, Some("sjs1")),
+                Dependency.make(
+                  s"org.scala-lang:scala-library:${scalaVersion}",
+                  scalaVersion,
+                  ScalaVersion.jsBinary(m.scalaJSVersion).map("sjs" + _)
+                ),
                 Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJSVersion}", "2.13")
+              )
+            case m: ScalaNativeModule =>
+              val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
+              Seq(
+                Dependency.make(
+                  s"org.scala-native::scalalib::${scalaSpecificVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::javalib::${m.scalaNativeVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::nativelib::${m.scalaNativeVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::auxlib::${m.scalaNativeVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::clib::${m.scalaNativeVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::posixlib::${m.scalaNativeVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                )
               )
             case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion))
             case _              => Seq.empty
@@ -303,7 +386,6 @@ class CoreTasks() extends StrictLogging {
 
   val scalacPluginDepsTask = ConfigValueTask[Seq[String]](
     name = "scalacPluginDeps",
-    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.SCALA_JS),
     execute = { ctx =>
       ctx.module match {
         case m: ScalaModule => m.scalacPluginDeps.asScala.toSeq
@@ -314,8 +396,7 @@ class CoreTasks() extends StrictLogging {
 
   val scalacPluginsTask = TaskBuilder
     .make[Seq[os.Path]](
-      name = "scalacPlugins",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST, ModuleType.SCALA_JS)
+      name = "scalacPlugins"
     )
     .dependsOn(scalaVersionTask)
     .dependsOn(semanticdbEnabledTask)
@@ -327,11 +408,16 @@ class CoreTasks() extends StrictLogging {
         if scalaVersion.startsWith("3.") then Seq.empty
         else Option.when(semanticdbEnabled)(s"org.scalameta:::semanticdb-scalac:${scalaSemanticdbVersion}").toSeq
       val scalaJsDeps =
-        if scalaVersion.startsWith("3.") then Seq.empty
+        if scalaVersion.startsWith("3.") then
+          ctx.module match {
+            case m: ScalaNativeModule => Seq(s"org.scala-native:::nscplugin:${m.scalaNativeVersion}")
+            case _                    => Seq.empty
+          }
         else
           ctx.module match {
-            case m: ScalaJsModule => Seq(s"org.scala-js:::scalajs-compiler:${m.scalaJSVersion}")
-            case _                => Seq.empty
+            case m: ScalaJsModule     => Seq(s"org.scala-js:::scalajs-compiler:${m.scalaJSVersion}")
+            case m: ScalaNativeModule => Seq(s"org.scala-native:::nscplugin:${m.scalaNativeVersion}")
+            case _                    => Seq.empty
           }
       val allDeps = scalacPluginDeps ++ semanticDbDeps ++ scalaJsDeps
       val pluginJars = DependencyResolver.fetchFiles(
@@ -402,7 +488,13 @@ class CoreTasks() extends StrictLogging {
         if scalaVersion.startsWith("3.") then
           ctx.module match {
             case m: ScalaJsModule =>
-              Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion, Some("sjs1")))
+              Seq(
+                Dependency.make(
+                  s"org.scala-lang::scala3-compiler:${scalaVersion}",
+                  scalaVersion,
+                  ScalaVersion.jsBinary(m.scalaJSVersion).map("sjs" + _)
+                )
+              )
             case m: ScalaModule =>
               Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion))
             case _ => Seq.empty
@@ -642,10 +734,7 @@ class CoreTasks() extends StrictLogging {
 
   // TODO manifest config
   val jarTask = TaskBuilder
-    .make[os.Path](
-      name = "jar",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
-    )
+    .make[os.Path](name = "jar")
     .dependsOn(compileTask)
     .dependsOn(finalMainClassTask)
     .build { ctx =>
@@ -668,7 +757,6 @@ class CoreTasks() extends StrictLogging {
   val allJarsTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "allJars",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST),
       transitive = true
     )
     .dependsOn(jarTask)

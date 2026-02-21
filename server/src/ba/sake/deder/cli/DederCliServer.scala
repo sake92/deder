@@ -189,7 +189,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
-            projectState.lastGood match {
+            projectState.current match {
               case Left(error) =>
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
@@ -201,7 +201,6 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                   val dot =
                     GraphUtils.generateDOT(state.tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id))
                   serverMessages.put(CliServerMessage.Output(dot))
-
                 } else if cliOptions.ascii.value then {
                   val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.modulesGraph, v => v.id)
                   serverMessages.put(CliServerMessage.Output(asciiGraph))

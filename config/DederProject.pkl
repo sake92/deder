@@ -38,7 +38,7 @@ abstract class DederModule {
       true
 }
 
-typealias ModuleType = "java" | "scala" | "scala-test" | "scala-js"
+typealias ModuleType = "java" | "scala" | "scala-test" | "scala-js" | "scala-native"
 
 open class JavaModule extends DederModule {
   type = "java"
@@ -89,6 +89,11 @@ open class ScalaJsModule extends ScalaModule {
   type = "scala-js"
   scalaJSVersion: String(!isEmpty)
   moduleKind: ScalaJsModuleKind = "no-module"
+}
+
+open class ScalaNativeModule extends ScalaModule {
+  type = "scala-native"
+  scalaNativeVersion: String(!isEmpty)
 }
 
 
