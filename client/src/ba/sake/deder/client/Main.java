@@ -44,7 +44,11 @@ public class Main {
                     client.stop(true);
                 }
             } catch (Exception e) {
-                log("Error occurred while stopping client: " + e.getMessage());
+                try {
+                    log("Error occurred while stopping client: " + e.getMessage());
+                } catch (Exception ex) {
+                    // ignore, let the process exit
+                }
             }
             System.exit(130);
         });

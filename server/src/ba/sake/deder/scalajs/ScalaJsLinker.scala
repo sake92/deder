@@ -25,6 +25,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
     }
     val linkerConfig = StandardConfig()
       .withModuleKind(moduleKind)
+      //.withRelativizeSourceMapBase(Some(outputDir.toURI))
       .withClosureCompiler(false)
     // TODO true for production/minified builds
     // TODO optimized build, incremental...
