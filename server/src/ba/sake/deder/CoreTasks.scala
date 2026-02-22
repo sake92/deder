@@ -210,8 +210,7 @@ class CoreTasks() extends StrictLogging {
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
               Seq(
-
-               // Dependency.make(s"org.scala-lang:scala3-library:${scalaVersion}", scalaVersion),
+                Dependency.make(s"org.scala-lang::scala3-library:${scalaVersion}", scalaVersion),
                 Dependency.make(
                   s"org.scala-native::scala3lib::${scalaSpecificVersion}",
                   scalaVersion,
@@ -265,7 +264,7 @@ class CoreTasks() extends StrictLogging {
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
               Seq(
-              //  Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion),
+                Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion),
                 Dependency.make(
                   s"org.scala-native::scalalib::${scalaSpecificVersion}",
                   scalaVersion,
@@ -831,7 +830,6 @@ class CoreTasks() extends StrictLogging {
       name = "nativeLink",
       supportedModuleTypes = Set(ModuleType.SCALA_NATIVE)
     )
-    // TODO runtimeClasspath?
     .dependsOn(compileClasspathTask)
     .dependsOn(finalMainClassTask)
     .build { ctx =>
