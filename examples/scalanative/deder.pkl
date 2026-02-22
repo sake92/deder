@@ -5,7 +5,7 @@ amends "../../config/DederProject.pkl"
 
 local const cli: ScalaNativeModule = new {
   id = "cli"
-  scalaVersion = "3.7.1"
+  scalaVersion = "3.7.4"
   scalaNativeVersion = "0.5.10"
 }
 

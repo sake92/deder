@@ -210,8 +210,15 @@ class CoreTasks() extends StrictLogging {
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
               Seq(
+
+               // Dependency.make(s"org.scala-lang:scala3-library:${scalaVersion}", scalaVersion),
                 Dependency.make(
                   s"org.scala-native::scala3lib::${scalaSpecificVersion}",
+                  scalaVersion,
+                  ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-native::scalalib::${scalaSpecificVersion}",
                   scalaVersion,
                   ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
                 ),
@@ -258,6 +265,7 @@ class CoreTasks() extends StrictLogging {
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
               Seq(
+              //  Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion),
                 Dependency.make(
                   s"org.scala-native::scalalib::${scalaSpecificVersion}",
                   scalaVersion,
@@ -415,7 +423,7 @@ class CoreTasks() extends StrictLogging {
           }
       val allDeps = scalacPluginDeps ++ semanticDbDeps ++ scalaJsDeps
       val pluginJars = DependencyResolver.fetchFiles(
-        allDeps.map(d => Dependency.make(d, scalaVersion)),
+        allDeps.map(d => Dependency.make(d, scalaVersion)),//.exclude(dependency.Module("*", "*"))),
         Some(ctx.notifications)
       )
       pluginJars
@@ -495,11 +503,6 @@ class CoreTasks() extends StrictLogging {
           }
         else
           ctx.module match {
-            case m: ScalaJsModule =>
-              Seq(
-                Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
-                Dependency.make(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion)
-              )
             case m: ScalaModule =>
               Seq(
                 Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
@@ -804,6 +807,7 @@ class CoreTasks() extends StrictLogging {
       name = "fastLinkJs",
       supportedModuleTypes = Set(ModuleType.SCALA_JS)
     )
+    // TODO runtimeClasspath?
     .dependsOn(compileClasspathTask)
     .dependsOn(finalMainClassTask)
     .build { ctx =>
@@ -827,6 +831,7 @@ class CoreTasks() extends StrictLogging {
       name = "nativeLink",
       supportedModuleTypes = Set(ModuleType.SCALA_NATIVE)
     )
+    // TODO runtimeClasspath?
     .dependsOn(compileClasspathTask)
     .dependsOn(finalMainClassTask)
     .build { ctx =>

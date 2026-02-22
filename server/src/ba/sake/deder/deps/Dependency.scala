@@ -1,10 +1,9 @@
 package ba.sake.deder.deps
 
 import dependency.parser.DependencyParser
-import dependency.Dependency as CoursierDependency
-import dependency.ScalaParameters
-import dependency.AnyDependency
+import dependency.{AnyDependency, CovariantSet, ScalaParameters, Dependency as CoursierDependency}
 import ba.sake.tupson.JsonRW
+import dependency.Module
 import org.typelevel.jawn.ast.JValue
 import org.typelevel.jawn.ast.JNull
 
@@ -14,6 +13,8 @@ case class Dependency(
 ) {
   def applied: CoursierDependency =
     coursierDep.applyParams(scalaParameters)
+  def exclude(modules: Module*): Dependency =
+    copy(coursierDep = coursierDep.copy(exclude = CovariantSet.from(modules)))
 }
 
 object Dependency {

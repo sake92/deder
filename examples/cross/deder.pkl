@@ -2,14 +2,16 @@ amends "../../config/DederProject.pkl"
 
 local const scalaVersions = List("2.13.18", "3.7.4")
 local const scalaJsVersion = "1.20.2"
+local const scalaNativeVersion = "0.5.10"
 
-local const commonModules =
+local const commonModules: List<ScalaModule> =
   scalaVersions
     .map((sv) ->
-      new CrossJsModules {
+      new CreateCrossModules {
         _root = "common"
         _scalaVersion = sv
         _scalaJSVersion = scalaJsVersion
+        _scalaNativeVersion = scalaNativeVersion
       }
         .get
         .all

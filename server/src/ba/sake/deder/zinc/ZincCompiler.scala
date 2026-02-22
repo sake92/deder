@@ -50,32 +50,72 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       moduleId: String,
       notifications: ServerNotificationsLogger
   ): Unit = {
+    val scalaLibraryPrefixes = Seq(
+      "scala-library",
+      "scala3-library",
+      "scalajs-library",
+      "scala3lib",
+      "scalalib",
+      "javalib",
+      "nativelib",
+      "auxlib",
+      "clib",
+      "posixlib"
+    )
     val scalaLibraryJars = compileClasspath.filter { p =>
-      (p.last.startsWith("scala-library") || p.last.startsWith("scala3-library_3") ||
-        p.last.startsWith("scalajs-library")) && p.last.endsWith(".jar")
+      scalaLibraryPrefixes.exists(p.last.startsWith) &&
+      p.last.endsWith(".jar")
     }
 
-    ClassLoaderUtils.withClassLoader(scalaLibraryJars) { libraryClassloader =>
-      ClassLoaderUtils.withClassLoader(compilerJars, libraryClassloader) { compilerClassloader =>
-        ClassLoaderUtils.withClassLoader(compilerJars ++ scalaLibraryJars) { allJarsClassloader =>
-          doCompile(
-            javaHome = javaHome,
-            scalaVersion = scalaVersion,
-            compilerJars = compilerJars,
-            scalaLibraryJars = scalaLibraryJars,
-            compileClasspath = compileClasspath,
-            libraryClassloader = libraryClassloader,
-            compilerClassloader = compilerClassloader,
-            allJarsClassloader = allJarsClassloader,
-            zincCacheFile = zincCacheFile,
-            sources = sources,
-            classesDir = classesDir,
-            scalacOptions = scalacOptions,
-            javacOptions = javacOptions,
-            zincLogger = zincLogger,
-            moduleId = moduleId,
-            notifications = notifications
-          )
+    // Bridge classloader: delegates xsbti.* to app classloader,
+    // everything else to platform classloader (effectively hidden)
+    val appClassLoader = getClass.getClassLoader
+    val bridgeClassLoader = new ClassLoader(ClassLoader.getPlatformClassLoader) {
+      override def loadClass(name: String, resolve: Boolean): Class[?] = {
+        if (name.startsWith("xsbti.") || name.startsWith("sbt.internal.inc.")) {
+          val c = appClassLoader.loadClass(name)
+          if (resolve) resolveClass(c)
+          c
+        } else {
+          super.loadClass(name, resolve)
+        }
+      }
+
+      override def getResource(name: String): java.net.URL = {
+        if (name.startsWith("xsbti/") || name.startsWith("sbt/internal/inc/")) {
+          appClassLoader.getResource(name)
+        } else {
+          super.getResource(name)
+        }
+      }
+    }
+
+    val allJars = compilerJars ++ compileClasspath
+    ClassLoaderUtils.withClassLoader(allJars, parent = bridgeClassLoader) { zincClassloader =>
+      ClassLoaderUtils.withClassLoader(scalaLibraryJars, parent = zincClassloader) { libraryClassloader =>
+        ClassLoaderUtils.withClassLoader(compilerJars, parent =libraryClassloader) {
+          compilerClassloader =>
+            ClassLoaderUtils.withClassLoader(compilerJars ++ scalaLibraryJars, parent = zincClassloader) {
+              allJarsClassloader =>
+                doCompile(
+                  javaHome = javaHome,
+                  scalaVersion = scalaVersion,
+                  compilerJars = compilerJars,
+                  scalaLibraryJars = scalaLibraryJars,
+                  compileClasspath = compileClasspath,
+                  libraryClassloader = libraryClassloader,
+                  compilerClassloader = compilerClassloader,
+                  allJarsClassloader = allJarsClassloader,
+                  zincCacheFile = zincCacheFile,
+                  sources = sources,
+                  classesDir = classesDir,
+                  scalacOptions = scalacOptions,
+                  javacOptions = javacOptions,
+                  zincLogger = zincLogger,
+                  moduleId = moduleId,
+                  notifications = notifications
+                )
+            }
         }
       }
     }
