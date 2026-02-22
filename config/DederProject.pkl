@@ -64,6 +64,12 @@ open class ScalaModule extends JavaModule {
   function asTest(): ScalaTestModule = (this.toDynamic().toTyped(ScalaTestModule)) {
     type = "scala-test"
   }
+  function asJs(): ScalaJsModule = (this.toDynamic().toTyped(ScalaJsModule)) {
+    type = "scala-js"
+  }
+  function asNative(): ScalaNativeModule = (this.toDynamic().toTyped(ScalaNativeModule)) {
+    type = "scala-native"
+  }
 }
 
 class ScalaTestModule extends ScalaModule {
@@ -83,7 +89,7 @@ class ScalaTestModule extends ScalaModule {
 // TODO creates a main module with test module..
 //function scalaModule
 
-typealias ScalaJsModuleKind =  "no-module" | "es-module" | "commonjs-module"
+typealias ScalaJsModuleKind = "no-module" | "es-module" | "commonjs-module"
 
 open class ScalaJsModule extends ScalaModule {
   type = "scala-js"
@@ -95,7 +101,6 @@ open class ScalaNativeModule extends ScalaModule {
   type = "scala-native"
   scalaNativeVersion: String(!isEmpty)
 }
-
 
 /* CROSS MODULE */
 class CrossModules {
@@ -109,37 +114,65 @@ class CrossModules {
 // helper function to create cross JS modules
 // https://pkl-lang.org/blog/class-as-a-function.html
 class CreateCrossModules {
+  _template: ScalaModule
+  _testTemplate: ScalaTestModule = _template.asTest()
+  _jsTemplate: ScalaJsModule = _template.asJs()
+  _nativeTemplate: ScalaNativeModule = _template.asNative()
   _root: String
-  _scalaVersion: String
   _scalaJSVersion: String
   _scalaNativeVersion: String
-  fixed get: CrossModules = crossModules(_root, _scalaVersion, _scalaJSVersion, _scalaNativeVersion)
+  fixed get: CrossModules =
+    crossModules(
+      _template,
+      _testTemplate,
+      _jsTemplate,
+      _nativeTemplate,
+      _root,
+      _scalaJSVersion,
+      _scalaNativeVersion,
+    )
 }
 
 const function crossModules(
+  _template: ScalaModule,
+  _testTemplate: ScalaTestModule,
+  _jsTemplate: ScalaJsModule,
+  _nativeTemplate: ScalaNativeModule,
   _root: String,
-  _scalaVersion: String,
   _scalaJSVersion: String,
   _scalaNativeVersion: String,
 ): CrossModules = new {
-  jvm = new {
-    id = "\(_root)-jvm-\(_scalaVersion)"
+  jvm = (_template) {
+    id = "\(_root)-jvm-\(_template.scalaVersion)"
     root = _root
-    scalaVersion = _scalaVersion
+    sources {
+      "src-jvm"
+    }
   }
-  jvm_test = (jvm.asTest()) {
-    id = "\(_root)-jvm-test-\(_scalaVersion)"
+  jvm_test = (_testTemplate) {
+    id = "\(_root)-jvm-test-\(_template.scalaVersion)"
+    root = "\(_root)/test"
+    sources {
+      "src-jvm"
+    }
+    moduleDeps {
+      jvm
+    }
   }
-  js = new {
-    id = "\(_root)-js-\(_scalaVersion)"
+  js = (_jsTemplate) {
+    id = "\(_root)-js-\(_template.scalaVersion)"
     root = _root
-    scalaVersion = _scalaVersion
     scalaJSVersion = _scalaJSVersion
+    sources {
+      "src-js"
+    }
   }
-  native = new {
-    id = "\(_root)-native-\(_scalaVersion)"
+  native = (_nativeTemplate) {
+    id = "\(_root)-native-\(_template.scalaVersion)"
     root = _root
-    scalaVersion = _scalaVersion
     scalaNativeVersion = _scalaNativeVersion
+    sources {
+      "src-native"
+    }
   }
 }

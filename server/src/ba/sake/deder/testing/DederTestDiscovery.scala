@@ -62,10 +62,12 @@ class DederTestDiscovery(
   }
 
   private def findClassFiles(): Seq[String] = {
+    if os.exists(testClassesDir) then
     os.walk(testClassesDir)
       .filter(_.last.endsWith(".class"))
       .map(_.subRelativeTo(testClassesDir))
       .map(_.segments.mkString(".").stripSuffix(".class"))
+    else Seq.empty
   }
 
   private def matchesFingerprint(
@@ -75,6 +77,9 @@ class DederTestDiscovery(
   ): Boolean = {
     try {
       val cls = classLoader.loadClass(className)
+      if (cls.isInterface || Modifier.isAbstract(cls.getModifiers)) {
+        return false
+      }
       fingerprint match {
         case sub: SubclassFingerprint =>
           val superCls = classLoader.loadClass(sub.superclassName())
