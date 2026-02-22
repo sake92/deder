@@ -102,22 +102,25 @@ class CrossModules {
   jvm: ScalaModule
   jvm_test: ScalaTestModule
   js: ScalaJsModule
-  all: Listing<DederModule> = new { jvm; jvm_test; js }
+  native: ScalaNativeModule
+  all: Listing<DederModule> = new { jvm; jvm_test; js; native }
 }
 
 // helper function to create cross JS modules
 // https://pkl-lang.org/blog/class-as-a-function.html
-class CrossJsModules {
+class CreateCrossModules {
   _root: String
   _scalaVersion: String
   _scalaJSVersion: String
-  fixed get: CrossModules = crossJsModules(_root, _scalaVersion, _scalaJSVersion)
+  _scalaNativeVersion: String
+  fixed get: CrossModules = crossModules(_root, _scalaVersion, _scalaJSVersion, _scalaNativeVersion)
 }
 
-const function crossJsModules(
+const function crossModules(
   _root: String,
   _scalaVersion: String,
   _scalaJSVersion: String,
+  _scalaNativeVersion: String,
 ): CrossModules = new {
   jvm = new {
     id = "\(_root)-jvm-\(_scalaVersion)"
@@ -132,5 +135,11 @@ const function crossJsModules(
     root = _root
     scalaVersion = _scalaVersion
     scalaJSVersion = _scalaJSVersion
+  }
+  native = new {
+    id = "\(_root)-native-\(_scalaVersion)"
+    root = _root
+    scalaVersion = _scalaVersion
+    scalaNativeVersion = _scalaNativeVersion
   }
 }
