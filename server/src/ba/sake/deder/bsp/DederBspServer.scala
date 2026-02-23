@@ -835,7 +835,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       List(BuildTargetTag.LIBRARY).filter(_ => !isTestModule0 && !isAppModule)
     ).flatten
     val languageIds = module.`type` match {
-      case ModuleType.SCALA | ModuleType.SCALA_TEST | ModuleType.SCALA_JS => List("scala", "java")
+      case ModuleType.SCALA | ModuleType.SCALA_TEST | ModuleType.SCALA_JS | ModuleType.SCALA_NATIVE => List("scala", "java")
       case ModuleType.JAVA                                                => List("java")
     }
     val dependencies = module.moduleDeps.asScala.map(buildTargetId)

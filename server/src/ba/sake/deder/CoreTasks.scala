@@ -127,7 +127,7 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (deps, scalaVersion) = ctx.depResults
       val platformSuffix = ctx.module match {
-        case m: ScalaJsModule     => ScalaVersion.jsBinary(m.scalaJSVersion).map("sjs" + _)
+        case m: ScalaJsModule     => ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
         case m: ScalaNativeModule => ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
         case _                    => None
       }
@@ -165,7 +165,7 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(classesTask)
     .build { ctx =>
-      Seq(ctx.depResults._1) ++ ctx.transitiveResults.flatten.flatten
+      Seq(ctx.depResults._1) ++ ctx.transitiveResults.flatten.flatten.distinct
     }
 
   val compileClasspathTask = TaskBuilder
@@ -188,9 +188,9 @@ class CoreTasks() extends StrictLogging {
                 Dependency.make(
                   s"org.scala-lang::scala3-library::${scalaVersion}",
                   scalaVersion,
-                  ScalaVersion.jsBinary(m.scalaJSVersion).map("sjs" + _)
+                  ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
                 ),
-                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJSVersion}", "2.13")
+                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJsVersion}", "2.13")
               )
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
@@ -242,9 +242,9 @@ class CoreTasks() extends StrictLogging {
                 Dependency.make(
                   s"org.scala-lang:scala-library:${scalaVersion}",
                   scalaVersion,
-                  ScalaVersion.jsBinary(m.scalaJSVersion).map("sjs" + _)
+                  ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
                 ),
-                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJSVersion}", "2.13")
+                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJsVersion}", "2.13")
               )
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
@@ -286,7 +286,6 @@ class CoreTasks() extends StrictLogging {
           }
       val depsJars = DependencyResolver
         .fetchFiles(scalaLibDeps ++ dependencies, Some(ctx.notifications))
-      // val additionalCompileClasspath = ctx.transitiveResults.flatten.flatten ++ depsJars
       (allClassesDirs ++ depsJars).reverse.distinct.reverse
     }
 
@@ -401,7 +400,7 @@ class CoreTasks() extends StrictLogging {
           }
         else
           ctx.module match {
-            case m: ScalaJsModule     => Seq(s"org.scala-js:::scalajs-compiler:${m.scalaJSVersion}")
+            case m: ScalaJsModule     => Seq(s"org.scala-js:::scalajs-compiler:${m.scalaJsVersion}")
             case m: ScalaNativeModule => Seq(s"org.scala-native:::nscplugin:${m.scalaNativeVersion}")
             case _                    => Seq.empty
           }
@@ -413,6 +412,7 @@ class CoreTasks() extends StrictLogging {
       pluginJars
     }
 
+  // returns classes dir
   val compileTask = TaskBuilder
     .make[DederPath](
       name = "compile",
@@ -478,7 +478,7 @@ class CoreTasks() extends StrictLogging {
                 Dependency.make(
                   s"org.scala-lang::scala3-compiler:${scalaVersion}",
                   scalaVersion,
-                  ScalaVersion.jsBinary(m.scalaJSVersion).map("sjs" + _)
+                  ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
                 )
               )
             case m: ScalaModule =>
@@ -494,9 +494,7 @@ class CoreTasks() extends StrictLogging {
               )
             case _ => Seq.empty
           }
-      val compilerJars = DependencyResolver.fetchFiles(
-        compilerDeps // .map(d => Dependency.make(d, scalaVersion))
-      )
+      val compilerJars = DependencyResolver.fetchFiles(compilerDeps)
 
       val zincCacheFile = ctx.out / "inc_compile.zip"
       val zincLogger = new DederZincLogger(ctx.notifications, ctx.module.id)
@@ -578,26 +576,13 @@ class CoreTasks() extends StrictLogging {
       name = "runClasspath",
       transitive = true
     )
-    .dependsOn(scalaVersionTask)
-    .dependsOn(allDependenciesTask)
     .dependsOn(compileTask)
+    .dependsOn(compileClasspathTask)
     .dependsOn(resourcesTask)
     .build { ctx =>
-      val (scalaVersion, dependencies, classesDir, resourceDirs) = ctx.depResults
-      val mandatoryDeps = ctx.module match {
-        case _: ScalaModule =>
-          val scalaLibDep =
-            if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
-            else s"org.scala-lang:scala-library:${scalaVersion}"
-          Seq(Dependency.make(scalaLibDep, scalaVersion))
-        case _ => Seq.empty
-      }
-      val depsJars = DependencyResolver.fetchFiles(mandatoryDeps ++ dependencies, Some(ctx.notifications))
-
-      // classdirs that are last in each module are pushed last in final classpath
-      val classesDirsAbs = Seq(classesDir).map(_.absPath)
+      val (_, compileClasspath, resourceDirs) = ctx.depResults
       val resources = resourceDirs.map(_.absPath)
-      (classesDirsAbs ++ resources ++ ctx.transitiveResults.flatten.flatten ++ depsJars).reverse.distinct.reverse
+      compileClasspath ++ resources
     }
 
   val mainClassesTask = TaskBuilder
@@ -793,12 +778,11 @@ class CoreTasks() extends StrictLogging {
       name = "fastLinkJs",
       supportedModuleTypes = Set(ModuleType.SCALA_JS)
     )
-    // TODO runtimeClasspath?
-    .dependsOn(compileClasspathTask)
+    .dependsOn(runClasspathTask)
     .dependsOn(finalMainClassTask)
     .build { ctx =>
-      val (compileClasspath, mainClass) = ctx.depResults
-      val irContainers = compileClasspath
+      val (classpath, mainClass) = ctx.depResults
+      val irContainers = classpath
       os.makeDir.all(ctx.out)
       import scala.concurrent.ExecutionContext.Implicits.global
       val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
@@ -817,11 +801,11 @@ class CoreTasks() extends StrictLogging {
       name = "nativeLink",
       supportedModuleTypes = Set(ModuleType.SCALA_NATIVE)
     )
-    .dependsOn(compileClasspathTask)
+    .dependsOn(runClasspathTask)
     .dependsOn(finalMainClassTask)
     .build { ctx =>
-      val (compileClasspath, mainClass) = ctx.depResults
-      val nirPaths = compileClasspath
+      val (classpath, mainClass) = ctx.depResults
+      val nirPaths = classpath
       os.makeDir.all(ctx.out)
       import scala.concurrent.ExecutionContext.Implicits.global
       val linker = new ScalaNativeLinker(ctx.notifications, ctx.module.id)
