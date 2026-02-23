@@ -155,10 +155,10 @@ class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
     }
     val fqn = event.fullyQualifiedName()
     val testName = event.selector() match {
-      case s: TestSelector       => s"${fqn}#${s.testName()}"
-      case s: NestedTestSelector => s"${fqn}#${s.testName()}"
-      case s: SuiteSelector      => event.fullyQualifiedName()
-      case _                     => event.fullyQualifiedName()
+      case s: TestSelector       => if s.testName().contains("#") then s.testName() else s"${fqn}#${s.testName()}"
+      case s: NestedTestSelector => if s.testName().contains("#") then s.testName() else s"${fqn}#${s.testName()}"
+      case s: SuiteSelector      => fqn
+      case _                     => fqn
     }
     val duration = Duration.ofMillis(event.duration())
     logger.test(s"$status $testName ; took ${duration.toPrettyString}")
