@@ -1,13 +1,19 @@
 package ba.sake.deder
 
 import java.io.File
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import com.github.blemale.scaffeine.{Cache, Scaffeine}
+import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.JsonRW
-import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompiler}
-import ba.sake.deder.config.DederProject.{JavaModule, ModuleType, ScalaJsModule, ScalaModule, ScalaNativeModule, ScalaTestModule}
+import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompilersCache}
+import ba.sake.deder.config.DederProject.{
+  JavaModule,
+  ModuleType,
+  ScalaJsModule,
+  ScalaModule,
+  ScalaNativeModule,
+  ScalaTestModule
+}
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
@@ -17,28 +23,7 @@ import ba.sake.deder.scalanative.ScalaNativeLinker
 import ba.sake.deder.testing.*
 import dependency.ScalaVersion
 
-import scala.util.Using
-
 class CoreTasks() extends StrictLogging {
-
-  private def makeZincCompiler(scalaVersion: String) = {
-    val dep =
-      if scalaVersion.startsWith("3.") then s"org.scala-lang:scala3-sbt-bridge:${scalaVersion}"
-      else "org.scala-sbt::compiler-bridge:1.11.0"
-    val compilerBridgeJar = DependencyResolver.fetchFile(
-      Dependency.make(dep, scalaVersion)
-    )
-    ZincCompiler(compilerBridgeJar)
-  }
-
-  private val zincCache: Cache[String, ZincCompiler] =
-    Scaffeine()
-      .expireAfterAccess(5.minute)
-      .maximumSize(10)
-      .build()
-
-  private def getZincCompiler(scalaVersion: String): ZincCompiler =
-    zincCache.get(scalaVersion, _ => makeZincCompiler(scalaVersion))
 
   /** source folders */
   val sourcesTask = SourceFilesTask(
@@ -422,7 +407,7 @@ class CoreTasks() extends StrictLogging {
           }
       val allDeps = scalacPluginDeps ++ semanticDbDeps ++ scalaJsDeps
       val pluginJars = DependencyResolver.fetchFiles(
-        allDeps.map(d => Dependency.make(d, scalaVersion)),//.exclude(dependency.Module("*", "*"))),
+        allDeps.map(d => Dependency.make(d, scalaVersion)), // .exclude(dependency.Module("*", "*"))),
         Some(ctx.notifications)
       )
       pluginJars
@@ -559,20 +544,22 @@ class CoreTasks() extends StrictLogging {
         scalacOptions ++ scalacPlugins
           .map(p => s"-Xplugin:${p.toString}") ++ platformSpecificScalacOptions ++ semanticDbScalacOpts
 
-      getZincCompiler(scalaVersion).compile(
-        javaHome = javaHome.map(_.toNIO),
-        scalaVersion = scalaVersion,
-        compilerJars = compilerJars,
-        compileClasspath = compileClasspath,
-        zincCacheFile = zincCacheFile,
-        sources = sourceFiles,
-        classesDir = classesDir,
-        scalacOptions = finalScalacOptions,
-        javacOptions = finalJavacOptions,
-        zincLogger = zincLogger,
-        moduleId = ctx.module.id,
-        notifications = ctx.notifications
-      )
+      ZincCompilersCache
+        .get(scalaVersion)
+        .compile(
+          javaHome = javaHome.map(_.toNIO),
+          scalaVersion = scalaVersion,
+          compilerJars = compilerJars,
+          compileClasspath = compileClasspath,
+          zincCacheFile = zincCacheFile,
+          sources = sourceFiles,
+          classesDir = classesDir,
+          scalacOptions = finalScalacOptions,
+          javacOptions = finalJavacOptions,
+          zincLogger = zincLogger,
+          moduleId = ctx.module.id,
+          notifications = ctx.notifications
+        )
       DederPath(classesDir)
     }
 
@@ -847,7 +834,6 @@ class CoreTasks() extends StrictLogging {
       // TODO thread pool..
       ""
     }
-
 
   // order matters for dependency resolution!!
   val all: Seq[Task[?, ?]] = Seq(
