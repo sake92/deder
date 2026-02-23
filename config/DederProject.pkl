@@ -86,9 +86,6 @@ class ScalaTestModule extends ScalaModule {
   }
 }
 
-// TODO creates a main module with test module..
-//function scalaModule
-
 typealias ScalaJsModuleKind = "no-module" | "es-module" | "commonjs-module"
 
 open class ScalaJsModule extends ScalaModule {
@@ -102,7 +99,39 @@ open class ScalaNativeModule extends ScalaModule {
   scalaNativeVersion: String(!isEmpty)
 }
 
-/* CROSS MODULE */
+// helpers
+// https://pkl-lang.org/blog/class-as-a-function.html
+
+class ScalaModules {
+  main: ScalaModule
+  test: ScalaTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateScalaModules {
+  _root: String
+  _template: ScalaModule
+  _testTemplate: ScalaTestModule = _template.asTest()
+  fixed get: ScalaModules = scalaModules(_template, _testTemplate, _root)
+}
+
+const function scalaModules(
+  _template: ScalaModule,
+  _testTemplate: ScalaTestModule,
+  _root: String,
+): ScalaModules = new {
+  main = (_template) {
+    id = _root
+    root = _root
+  }
+  test = (_testTemplate) {
+    id = "\(_root)-test"
+    root = "\(_root)/test"
+    moduleDeps {
+      main
+    }
+  }
+}
+
 class CrossModules {
   jvm: ScalaModule
   jvm_test: ScalaTestModule
@@ -111,25 +140,19 @@ class CrossModules {
   all: Listing<DederModule> = new { jvm; jvm_test; js; native }
 }
 
-// helper function to create cross JS modules
-// https://pkl-lang.org/blog/class-as-a-function.html
 class CreateCrossModules {
   _template: ScalaModule
   _testTemplate: ScalaTestModule = _template.asTest()
   _jsTemplate: ScalaJsModule = _template.asJs()
   _nativeTemplate: ScalaNativeModule = _template.asNative()
   _root: String
-  _scalaJSVersion: String
-  _scalaNativeVersion: String
   fixed get: CrossModules =
     crossModules(
       _template,
       _testTemplate,
       _jsTemplate,
       _nativeTemplate,
-      _root,
-      _scalaJSVersion,
-      _scalaNativeVersion,
+      _root
     )
 }
 
@@ -139,8 +162,6 @@ const function crossModules(
   _jsTemplate: ScalaJsModule,
   _nativeTemplate: ScalaNativeModule,
   _root: String,
-  _scalaJSVersion: String,
-  _scalaNativeVersion: String,
 ): CrossModules = new {
   jvm = (_template) {
     id = "\(_root)-jvm-\(_template.scalaVersion)"
@@ -162,7 +183,6 @@ const function crossModules(
   js = (_jsTemplate) {
     id = "\(_root)-js-\(_template.scalaVersion)"
     root = _root
-    scalaJSVersion = _scalaJSVersion
     sources {
       "src-js"
     }
@@ -170,7 +190,6 @@ const function crossModules(
   native = (_nativeTemplate) {
     id = "\(_root)-native-\(_template.scalaVersion)"
     root = _root
-    scalaNativeVersion = _scalaNativeVersion
     sources {
       "src-native"
     }
