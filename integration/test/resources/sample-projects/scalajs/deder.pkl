@@ -3,7 +3,7 @@ amends "https://sake92.github.io/deder/config/DederProject.pkl"
 local const frontend = new ScalaJsModule {
   id = "frontend"
   scalaVersion = "3.7.1"
-  scalaJSVersion = "1.20.2"
+  scalaJsVersion = "1.20.2"
 }
 
 modules {
