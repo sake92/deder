@@ -7,15 +7,7 @@ pagination:
 
 # {{ page.title }}
 
-{%
 
-set tutorials = [
-{ label: "Installation", url: "/tutorials/installation.html" },
-{ label: "Quickstart", url: "/tutorials/quickstart.html" }
-]
-
-%}
-
-{% for tut in tutorials %}- [{{ tut.label }}]({{ tut.url}})
+{% for tut in site.data.project.tutorials %}- [{{ tut.label }}]({{ tut.url}})
 {% endfor %}
 

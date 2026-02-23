@@ -1,0 +1,13 @@
+tutorials:
+  - label: "Installation"
+    url: "/tutorials/installation.html"
+  - label: "Quickstart"
+    url: "/tutorials/quickstart.html"
+  - label: "Scala.js"
+    url: "/tutorials/scalajs.html"
+  - label: "Scala Native"
+    url: "/tutorials/scalanative.html"
+  - label: "Cross Project"
+    url: "/tutorials/cross-project.html"
+
+

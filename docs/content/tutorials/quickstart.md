@@ -1,23 +1,32 @@
+---
+title: Quickstart Guide
+description: Deder Quickstart Guide
+---
 
 # Quickstart Guide
 
-## Create a Configuration File
+## Create a Build File
 
 Create a `deder.pkl` file in your project root:
 
 ```pkl
 amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
-local const myModule = new ScalaModule {
-  id = "my-module"
-  scalaVersion = "3.7.4"
-  deps {
-    "com.lihaoyi::pprint:0.9.5"
+local const myModules = new CreateScalaModules {
+  _root = "my-module"
+  _template = new {
+    scalaVersion = "3.7.4"
+    mainClass = "mymodule.Main"
   }
-}
+  _testTemplate = (_template.asTest()) {
+    deps {
+      "org.scalameta::munit:1.2.1"
+    }
+  }
+}.get
 
 modules {
-  myModule
+  ...myModules
 }
 ```
 
@@ -44,7 +53,7 @@ deder tasks
 deder plan -m my-module -t compile
 ```
 
-## Run Some More Tasks
+## Run More Tasks
 
 ```bash
 # Run the main class of my-module

@@ -1,3 +1,9 @@
+---
+title: Deder Docs
+description: Deder Build Tool Docs
+pagination:
+  enabled: false
+---
 
 # Deder
 
@@ -16,8 +22,9 @@ Each module type has a predefined set of tasks available.
 
 ## Site Map
 - [Tutorials](/tutorials)
-    - [Installation](/tutorials/installation)
-    - [Quickstart](/tutorials/quickstart)
+  {% for tut in site.data.project.tutorials %}- [{{ tut.label }}]({{ tut.url}})
+  {% endfor %}
+
 
 ## At a glance
 
