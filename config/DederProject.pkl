@@ -90,7 +90,7 @@ typealias ScalaJsModuleKind = "no-module" | "es-module" | "commonjs-module"
 
 open class ScalaJsModule extends ScalaModule {
   type = "scala-js"
-  scalaJSVersion: String(!isEmpty)
+  scalaJsVersion: String(!isEmpty)
   moduleKind: ScalaJsModuleKind = "no-module"
 }
 
