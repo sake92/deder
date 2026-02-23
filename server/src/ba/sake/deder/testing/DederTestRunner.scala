@@ -93,7 +93,7 @@ class DederTestRunner(
       )
       runner.tasks(Array(taskDef))
     }
-    val handler = DederTestEventHandler(logger)
+    val handler = DederTestEventHandler(logger, framework.name())
     try executeTasks(tasks, handler)
     catch {
       case _: CancelledException =>
@@ -140,7 +140,7 @@ case class DederTestOptions(
     testSelectors: Seq[String]
 )
 
-class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
+class DederTestEventHandler(logger: DederTestLogger, frameworkName: String) extends EventHandler {
   private val _results = mutable.ArrayBuffer[DederTestResult]()
 
   def handle(event: Event): Unit = {
@@ -155,8 +155,8 @@ class DederTestEventHandler(logger: DederTestLogger) extends EventHandler {
     }
     val fqn = event.fullyQualifiedName()
     val testName = event.selector() match {
-      case s: TestSelector       => if s.testName().contains("#") then s.testName() else s"${fqn}#${s.testName()}"
-      case s: NestedTestSelector => if s.testName().contains("#") then s.testName() else s"${fqn}#${s.testName()}"
+      case s: TestSelector       => if frameworkName == "Jupiter" then s"${fqn}#${s.testName()}" else s.testName()
+      case s: NestedTestSelector => if frameworkName == "Jupiter" then s"${fqn}#${s.testName()}" else s.testName()
       case s: SuiteSelector      => fqn
       case _                     => fqn
     }
