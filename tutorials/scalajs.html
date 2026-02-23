@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="Deder Tutorials">
-  <title> Tutorials | Deder Documentation </title>
+  <meta name="description" content="Deder Scala.js Tutorial">
+  <title> Scala.js Tutorial | Deder Documentation </title>
   <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
@@ -41,7 +41,7 @@
       <summary>Table of Contents</summary>
       <div>
        <ul>
-        <li><a href="#tutorials">Tutorials</a></li>
+        <li><a href="#scalajs-tutorial">Scala.js Tutorial</a></li>
        </ul>
       </div>
      </details>
@@ -50,14 +50,31 @@
     <div></div>
     <div></div>
    </div>
-   <h1 id="tutorials">Tutorials<a href="#tutorials" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <ul>
-    <li><a href="https://sake92.github.io/deder/tutorials/installation.html">Installation</a></li>
-    <li><a href="https://sake92.github.io/deder/tutorials/quickstart.html">Quickstart</a></li>
-    <li><a href="https://sake92.github.io/deder/tutorials/scalajs.html">Scala.js</a></li>
-    <li><a href="https://sake92.github.io/deder/tutorials/scalanative.html">Scala Native</a></li>
-    <li><a href="https://sake92.github.io/deder/tutorials/cross-project.html">Cross Project</a></li>
-   </ul>
+   <h1 id="scalajs-tutorial">Scala.js Tutorial<a href="#scalajs-tutorial" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Create a <code>deder.pkl</code> file in your project root:</p>
+   <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/DederProject.pkl"
+
+local const frontend: ScalaJsModule = new {
+  id = "frontend"
+  scalaVersion = "3.7.1"
+  scalaJsVersion = "1.20.2"
+  moduleKind = "es-module"
+  deps {
+    "org.scala-js::scalajs-dom::2.2.0"
+  }
+}
+
+modules {
+  frontend
+}
+</code></pre>
+   <p>Run in watch mode:</p>
+   <pre><code class="language-bash hljs" data-highlighted="yes">deder <span class="hljs-built_in">exec</span> -m frontend -t fastLinkJs -w
+</code></pre>
+   <p>The output will be in <code>.deder/out/frontend/fastLinkJs/main.js</code>.
+    <br>
+    You can include this in an HTML page to run your Scala.js code in the browser.</p>
+   <p>For a more elaborate example, you can check out the <a href="https://github.com/sake92/deder/tree/main/examples/scalajs">Example with Vite + Sharaf backend</a></p>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
  </body>

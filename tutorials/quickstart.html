@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="">
-  <title> Untitled | Deder Documentation </title>
+  <meta name="description" content="Deder Quickstart Guide">
+  <title> Quickstart Guide | Deder Documentation </title>
   <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
@@ -43,10 +43,10 @@
        <ul>
         <li><a href="#quickstart-guide">Quickstart Guide</a>
          <ul>
-          <li><a href="#create-a-configuration-file">Create a Configuration File</a></li>
+          <li><a href="#create-a-build-file">Create a Build File</a></li>
           <li><a href="#run-your-first-task">Run Your First Task</a></li>
           <li><a href="#explore-your-build">Explore Your Build</a></li>
-          <li><a href="#run-some-more-tasks">Run Some More Tasks</a></li>
+          <li><a href="#run-more-tasks">Run More Tasks</a></li>
          </ul></li>
        </ul>
       </div>
@@ -57,20 +57,25 @@
     <div></div>
    </div>
    <h1 id="quickstart-guide">Quickstart Guide<a href="#quickstart-guide" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <h2 id="create-a-configuration-file">Create a Configuration File<a href="#create-a-configuration-file" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <h2 id="create-a-build-file">Create a Build File<a href="#create-a-build-file" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Create a <code>deder.pkl</code> file in your project root:</p>
    <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
-local const myModule = new ScalaModule {
-  id = "my-module"
-  scalaVersion = "3.7.4"
-  deps {
-    "com.lihaoyi::pprint:0.9.5"
+local const myModules = new CreateScalaModules {
+  _root = "my-module"
+  _template = new {
+    scalaVersion = "3.7.4"
+    mainClass = "mymodule.Main"
   }
-}
+  _testTemplate = (_template.asTest()) {
+    deps {
+      "org.scalameta::munit:1.2.1"
+    }
+  }
+}.get
 
 modules {
-  myModule
+  ...myModules
 }
 </code></pre>
    <h2 id="run-your-first-task">Run Your First Task<a href="#run-your-first-task" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
@@ -90,7 +95,7 @@ deder tasks
 <span class="hljs-comment"># See the execution plan for a specific task</span>
 deder plan -m my-module -t compile
 </code></pre>
-   <h2 id="run-some-more-tasks">Run Some More Tasks<a href="#run-some-more-tasks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <h2 id="run-more-tasks">Run More Tasks<a href="#run-more-tasks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <pre><code class="language-bash hljs" data-highlighted="yes"><span class="hljs-comment"># Run the main class of my-module</span>
 deder <span class="hljs-built_in">exec</span> -t run -m my-module
 

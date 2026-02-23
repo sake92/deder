@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Deder Cross Project Tutorial">
+  <title> Cross Project Tutorial | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#cross-project-tutorial">Cross Project Tutorial</a></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="cross-project-tutorial">Cross Project Tutorial<a href="#cross-project-tutorial" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Sometimes you want to create multiple modules based on:</p>
+   <ul>
+    <li>platforms (e.g., JVM, JS, Native)</li>
+    <li>scala versions (e.g., 2.13, 3.0)</li>
+    <li>or both</li>
+   </ul>
+   <p>Since Deder builds are "just config", you can easily create multiple modules.
+    <br>
+    Create a <code>deder.pkl</code> file in your project root:</p>
+   <pre><code class="language-ts hljs language-typescript" data-highlighted="yes">amends <span class="hljs-string">"https://sake92.github.io/deder/config/DederProject.pkl"</span>
+
+local <span class="hljs-keyword">const</span> scalaVersions = <span class="hljs-title class_">List</span>(<span class="hljs-string">"2.13.18"</span>, <span class="hljs-string">"3.7.4"</span>)
+
+local <span class="hljs-keyword">const</span> <span class="hljs-attr">commonModules</span>: <span class="hljs-title class_">List</span>&lt;<span class="hljs-title class_">ScalaModule</span>&gt; =
+  scalaVersions
+    .<span class="hljs-title function_">map</span>((sv) -&gt;
+        <span class="hljs-keyword">new</span> <span class="hljs-title class_">CreateCrossModules</span> {
+          _root = <span class="hljs-string">"common"</span>
+          _template = <span class="hljs-keyword">new</span> {
+            scalaVersion = sv
+          }
+          _jsTemplate = (_template.<span class="hljs-title function_">asJs</span>()) {
+            scalaJsVersion = <span class="hljs-string">"1.20.2"</span>
+          }
+          _nativeTemplate = (_template.<span class="hljs-title function_">asNative</span>()) {
+            scalaNativeVersion = <span class="hljs-string">"0.5.10"</span>
+          }
+        }
+      .<span class="hljs-property">get</span>
+      .<span class="hljs-property">all</span>
+    )
+    .<span class="hljs-title function_">flatten</span>()
+
+modules {
+  ...commonModules
+}
+</code></pre>
+   <p>This might seem a bit verbose, but it is very flexible.
+    <br>
+    The <code>CreateCrossModules</code> helper creates 3 modules for each scala version: one for JVM, one for JS, and one for Native.
+    <br>
+    Then the <code>scalaVersions</code> list specifies which scala versions you want to support. We loop through the <code>scalaVersions</code> list and create modules for each version, and then flatten the result to get a single list of modules.</p>
+   <p>Finally, we add all the created modules to the <code>modules</code> section:</p>
+   <pre><code class="language-pkl">modules {
+  ...commonModules
+}
+</code></pre>
+   <p>List all modules:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes"><span class="hljs-meta prompt_">$ </span><span class="language-bash">deder modules</span>
+common-js-2.13.18
+common-js-3.7.4
+common-jvm-2.13.18
+common-jvm-3.7.4
+common-jvm-test-2.13.18
+common-jvm-test-3.7.4
+common-native-2.13.18
+common-native-3.7.4
+</code></pre>
+   <hr>
+   <p>You can even filter the <code>commonModules</code> list, if you want to remove some modules.
+    <br>
+    For example, if Scala Native is not ready for Scala 3.7.4, you can filter it out like this:</p>
+   <pre><code class="language-pkl">modules {
+  ...commonModules.filter((m) -&gt; !m.id.endsWith("-native-3.7.4"))
+}
+</code></pre>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>
