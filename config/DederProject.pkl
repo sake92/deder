@@ -40,6 +40,12 @@ abstract class DederModule {
 
 typealias ModuleType = "java" | "scala" | "scala-test" | "scala-js" | "scala-native"
 
+class PomSettings {
+  groupId: String(!isEmpty)
+  artifactId: String(!isEmpty)
+  version: String(!isEmpty)
+}
+
 open class JavaModule extends DederModule {
   type = "java"
   resources: Listing<String> = new Listing { "resources" }
@@ -53,6 +59,7 @@ open class JavaModule extends DederModule {
   semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default
   javaSemanticdbVersion: String = "0.11.1"
   // TODO manifest entries
+  pomSettings: PomSettings?
 }
 
 open class ScalaModule extends JavaModule {
@@ -152,7 +159,7 @@ class CreateCrossModules {
       _testTemplate,
       _jsTemplate,
       _nativeTemplate,
-      _root
+      _root,
     )
 }
 

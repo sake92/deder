@@ -166,7 +166,9 @@ deder bsp install
     <li>run main scala classes (Java doesnt.. #todo-fixme )</li>
    </ul>
    <h2 id="tips--tricks">Tips &amp; Tricks<a href="#tips--tricks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <p>deder plan -m common -t compileClasspath --dot | dot -Tsvg &gt; bla.svg</p>
+   <p>Generate an SVG of the dependency graph for a specific task:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder plan -m common -t compileClasspath --dot | dot -Tsvg &gt; bla.svg
+</code></pre>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
  </body>
