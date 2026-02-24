@@ -2,6 +2,10 @@ package ba.sake.deder
 
 import java.nio.ByteBuffer
 
+extension [T](value: T)(using hashable: Hashable[T]) {
+  def hashStr: String = hashable.hashStr(value)
+}
+
 trait Hashable[T] {
   def hashStr(value: T): String
 }

@@ -18,7 +18,7 @@ import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.jar.{JarManifest, JarUtils}
-import ba.sake.deder.publish.{Hasher, PgpSigner, PomGenerator}
+import ba.sake.deder.publish.{Hasher, PgpSigner, PomGenerator, PomSettings, Publisher}
 import ba.sake.deder.scalajs.ScalaJsLinker
 import ba.sake.deder.scalanative.ScalaNativeLinker
 import ba.sake.deder.testing.*
@@ -820,35 +820,91 @@ class CoreTasks() extends StrictLogging {
       ""
     }
 
+  val pomSettingsTask = ConfigValueTask[Option[PomSettings]](
+    name = "pomSettings",
+    execute = { ctx =>
+      ctx.module match {
+        case m: JavaModule =>
+          Option(m.pomSettings).map(p =>
+            PomSettings(
+              groupId = p.groupId,
+              artifactId = p.artifactId,
+              version = p.version
+            )
+          )
+        case _ => None
+      }
+    }
+  )
+
+  case class PublishArtifactsRes(
+      pom: PomSettings,
+      outDir: os.Path
+  ) derives JsonRW
+
   val publishArtifactsTask = TaskBuilder
-    .make[os.Path](
+    .make[PublishArtifactsRes](
       name = "publishArtifacts"
     )
+    .dependsOn(pomSettingsTask)
     .dependsOn(jarTask)
     .build { ctx =>
-      val jar = ctx.depResults._1
-      // TODO sources jar, javadoc jar..
-      os.makeDir.all(ctx.out)
-      val mainJarPath = ctx.out / s"${ctx.module.id}.jar"
-      os.copy.over(jar, mainJarPath)
-      val pomXmlContent = PomGenerator.generate("ba.sake", ctx.module.id, "0.1.0-SNAPSHOT", Seq.empty)
-      val pomXmlPath = ctx.out / s"${ctx.module.id}.pom"
-      os.write.over(pomXmlPath, pomXmlContent)
-      // TODO optional ?
-      // sign files
-      val pgpPassphrase = sys.env
-        .getOrElse("DEDER_PGP_PASSPHRASE", throw DederException("DEDER_PGP_PASSPHRASE env var not set"))
-        .toCharArray
-      val pgpSecret = sys.env.getOrElse("DEDER_PGP_SECRET", throw DederException("DEDER_PGP_SECRET env var not set"))
-      val artifacts = List(mainJarPath, pomXmlPath)
-      artifacts.foreach(f => PgpSigner.signFile(f, pgpSecret, pgpPassphrase))
-      // generate hashes
-      artifacts.foreach { f =>
-        val checksum = f / os.up / s"${f.last}.asc"
-        Hasher.generateChecksums(f)
-        Hasher.generateChecksums(checksum)
+      val (pomSettings, jar) = ctx.depResults
+      pomSettings match {
+        case Some(pom) =>
+          val artifactBaseName = s"${pom.artifactId}-${pom.version}"
+          // TODO sources jar, javadoc jar.. deps
+          os.makeDir.all(ctx.out)
+          val mainJarPath = ctx.out / s"${artifactBaseName}.jar"
+          os.copy.over(jar, mainJarPath)
+          val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, Seq.empty)
+          val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
+          os.write.over(pomXmlPath, pomXmlContent)
+          PublishArtifactsRes(pom, ctx.out)
+        case None => throw new RuntimeException("pomSettings are not defined")
       }
+    }
 
+  val publishLocalTask = TaskBuilder
+    .make[os.Path](
+      name = "publishLocal"
+    )
+    .dependsOn(publishArtifactsTask)
+    .build { ctx =>
+      val publishArtifactsRes = ctx.depResults._1
+      val pom = publishArtifactsRes.pom
+      val artifacts = os.list(publishArtifactsRes.outDir)
+      // generate hashes
+      val allFiles = artifacts.flatMap { f =>
+        Seq(f) ++ Hasher.generateChecksums(f)
+      }
+      // publish to local m2
+      Publisher.publishLocalM2(pom.groupId, pom.artifactId, pom.version, allFiles)
+      ctx.out
+    }
+
+  val publishTask = TaskBuilder
+    .make[os.Path](
+      name = "publish"
+    )
+    .dependsOn(publishArtifactsTask)
+    .build { ctx =>
+      val publishArtifactsRes = ctx.depResults._1
+      val pom = publishArtifactsRes.pom
+      val artifacts = os.list(publishArtifactsRes.outDir)
+      // sign files
+      val pgpPassphrase =
+        sys.env.getOrElse("DEDER_PGP_PASSPHRASE", throw RuntimeException("DEDER_PGP_PASSPHRASE env var not set"))
+      val pgpSecret = sys.env.getOrElse("DEDER_PGP_SECRET", throw RuntimeException("DEDER_PGP_SECRET env var not set"))
+      artifacts.foreach(f => PgpSigner.signFile(f, pgpSecret, pgpPassphrase.toCharArray))
+      // generate hashes
+      val allFiles = artifacts.flatMap { f =>
+        Seq(f) ++
+          Hasher.generateChecksums(f) ++
+          Hasher.generateChecksums(f / os.up / s"${f.last}.asc")
+      }
+      // TODO publish for realsies
+      Publisher.publishLocalM2(pom.groupId, pom.artifactId, pom.version, allFiles)
       ctx.out
     }
 
@@ -890,7 +946,10 @@ class CoreTasks() extends StrictLogging {
     assemblyTask,
     fastLinkJsTask,
     nativeLinkTask,
-    publishArtifactsTask
+    pomSettingsTask,
+    publishArtifactsTask,
+    publishLocalTask,
+    publishTask
   )
 
   private val allNames = all.map(_.name)

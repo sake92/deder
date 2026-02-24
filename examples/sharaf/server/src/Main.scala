@@ -12,7 +12,4 @@ import ba.sake.sharaf.undertow.UndertowSharafServer
   UndertowSharafServer("localhost", 8181, routes).start()
 
   println(s"Server started at http://localhost:8181")
-  
-
-
 }

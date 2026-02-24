@@ -9,6 +9,11 @@ local const server = new ScalaModule {
   deps {
     "ba.sake::sharaf-undertow:0.13.0"
   }
+  pomSettings {
+    groupId = "ba.sake"
+    artifactId = "server"
+    version = "0.1.0-SNAPSHOT"
+  }
 }
 
 modules {

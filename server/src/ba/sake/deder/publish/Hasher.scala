@@ -6,16 +6,18 @@ import java.nio.file.{Files, Paths}
 
 object Hasher {
 
-  def generateChecksums(file: os.Path): Unit = {
+  def generateChecksums(file: os.Path): Seq[os.Path] =
     // maven usually wants both MD5 and SHA-1
-    writeChecksum(file, "SHA-1", ".sha1")
-    writeChecksum(file, "MD5", ".md5")
-  }
+    Seq(
+      writeChecksum(file, "SHA-1", ".sha1"),
+      writeChecksum(file, "MD5", ".md5")
+    )
 
-  private def writeChecksum(target: os.Path, algorithm: String, extension: String): Unit = {
+  private def writeChecksum(target: os.Path, algorithm: String, extension: String): os.Path = {
     val hash = calculateHash(target, algorithm)
     val checksumFile = target / os.up / s"${target.last}${extension}"
     os.write.over(checksumFile, hash.getBytes("UTF-8"))
+    checksumFile
   }
 
   private def calculateHash(file: os.Path, algorithm: String): String = {
