@@ -125,9 +125,10 @@ Currently working features:
 
 ## Tips & Tricks
 
+Generate an SVG of the dependency graph for a specific task:
+```shell
 deder plan -m common -t compileClasspath --dot | dot -Tsvg > bla.svg
-
-
+```
 
 
 
