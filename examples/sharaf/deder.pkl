@@ -12,7 +12,7 @@ local const server = new ScalaModule {
   pomSettings {
     groupId = "ba.sake"
     artifactId = "server"
-    version = "0.1.0-SNAPSHOT"
+    version = "0.1.3-SNAPSHOT"
   }
 }
 

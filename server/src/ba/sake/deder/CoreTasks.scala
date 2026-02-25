@@ -854,6 +854,7 @@ class CoreTasks() extends StrictLogging {
         case Some(pom) =>
           val artifactBaseName = s"${pom.artifactId}-${pom.version}"
           // TODO sources jar, javadoc jar.. deps
+          os.remove.all(ctx.out)
           os.makeDir.all(ctx.out)
           val mainJarPath = ctx.out / s"${artifactBaseName}.jar"
           os.copy.over(jar, mainJarPath)
@@ -880,6 +881,7 @@ class CoreTasks() extends StrictLogging {
       }
       // publish to local m2
       Publisher.publishLocalM2(pom.groupId, pom.artifactId, pom.version, allFiles)
+      ctx.notifications.add(ServerNotification.logInfo(s"Published to local m2 repository: ${pom.groupId}:${pom.artifactId}:${pom.version}"))
       ctx.out
     }
 
