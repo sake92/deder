@@ -59,6 +59,7 @@ open class JavaModule extends DederModule {
   semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default
   javaSemanticdbVersion: String = "0.11.1"
   // TODO manifest entries
+  publish: Boolean = true
   pomSettings: PomSettings?
 }
 
@@ -70,6 +71,7 @@ open class ScalaModule extends JavaModule {
   scalaSemanticdbVersion: String?
   function asTest(): ScalaTestModule = (this.toDynamic().toTyped(ScalaTestModule)) {
     type = "scala-test"
+    publish = false
   }
   function asJs(): ScalaJsModule = (this.toDynamic().toTyped(ScalaJsModule)) {
     type = "scala-js"

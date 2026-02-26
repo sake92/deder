@@ -824,14 +824,24 @@ class CoreTasks() extends StrictLogging {
     name = "pomSettings",
     execute = { ctx =>
       ctx.module match {
-        case m: JavaModule =>
-          Option(m.pomSettings).map(p =>
+        case jm: JavaModule =>
+          Option(jm.pomSettings).map { pom =>
+            val finalArtifactId = jm match {
+              case m: ScalaJsModule =>
+                s"${pom.artifactId}_sjs${ScalaVersion.jsBinary(m.scalaJsVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
+              case m: ScalaNativeModule =>
+                s"${pom.artifactId}_native${ScalaVersion.nativeBinary(m.scalaNativeVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
+              case m: ScalaModule =>
+                s"${pom.artifactId}_${ScalaVersion.binary(m.scalaVersion)}"
+              case m: JavaModule =>
+                pom.artifactId
+            }
             PomSettings(
-              groupId = p.groupId,
-              artifactId = p.artifactId,
-              version = p.version
+              groupId = pom.groupId,
+              artifactId = finalArtifactId,
+              version = pom.version
             )
-          )
+          }
         case _ => None
       }
     }
@@ -846,10 +856,12 @@ class CoreTasks() extends StrictLogging {
     .make[PublishArtifactsRes](
       name = "publishArtifacts"
     )
+    .dependsOn(scalaVersionTask)
     .dependsOn(pomSettingsTask)
+    .dependsOn(dependenciesTask)
     .dependsOn(jarTask)
     .build { ctx =>
-      val (pomSettings, jar) = ctx.depResults
+      val (scalaVersion, pomSettings, dependencies, jar) = ctx.depResults
       pomSettings match {
         case Some(pom) =>
           val artifactBaseName = s"${pom.artifactId}-${pom.version}"
@@ -858,7 +870,7 @@ class CoreTasks() extends StrictLogging {
           os.makeDir.all(ctx.out)
           val mainJarPath = ctx.out / s"${artifactBaseName}.jar"
           os.copy.over(jar, mainJarPath)
-          val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, Seq.empty)
+          val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, dependencies)
           val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
           os.write.over(pomXmlPath, pomXmlContent)
           PublishArtifactsRes(pom, ctx.out)
@@ -879,9 +891,20 @@ class CoreTasks() extends StrictLogging {
       val allFiles = artifacts.flatMap { f =>
         Seq(f) ++ Hasher.generateChecksums(f)
       }
-      // publish to local m2
-      Publisher.publishLocalM2(pom.groupId, pom.artifactId, pom.version, allFiles)
-      ctx.notifications.add(ServerNotification.logInfo(s"Published to local m2 repository: ${pom.groupId}:${pom.artifactId}:${pom.version}"))
+      ctx.module match {
+        case javaModule: JavaModule =>
+          if javaModule.publish then {
+            // publish to local m2
+            Publisher.publishLocalM2(pom.groupId, pom.artifactId, pom.version, allFiles)
+            ctx.notifications.add(
+              ServerNotification
+                .logInfo(s"Published to local m2 repository: ${pom.groupId}:${pom.artifactId}:${pom.version}")
+            )
+          } else {
+            ctx.notifications.add(ServerNotification.logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled"))
+          }
+        case _ =>
+      }
       ctx.out
     }
 

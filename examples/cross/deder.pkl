@@ -9,6 +9,14 @@ local const commonModules: List<ScalaModule> =
         _root = "common"
         _template = new {
           scalaVersion = sv
+          pomSettings {
+            groupId = "ba.sake"
+            artifactId = "deder-cross-common"
+            version = "0.1.4-SNAPSHOT"
+          }
+          deps {
+            "com.softwaremill.sttp.client3::core::3.11.0"
+          }
         }
         _jsTemplate = (_template.asJs()) {
           scalaJsVersion = "1.20.2"
