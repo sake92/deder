@@ -820,32 +820,48 @@ class CoreTasks() extends StrictLogging {
       ""
     }
 
-  val pomSettingsTask = ConfigValueTask[Option[PomSettings]](
+  val pomSettingsTask = ConfigValueTask[PomSettings](
     name = "pomSettings",
     execute = { ctx =>
       ctx.module match {
         case jm: JavaModule =>
-          Option(jm.pomSettings).map { pom =>
-            val finalArtifactId = jm match {
-              case m: ScalaJsModule =>
-                s"${pom.artifactId}_sjs${ScalaVersion.jsBinary(m.scalaJsVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
-              case m: ScalaNativeModule =>
-                s"${pom.artifactId}_native${ScalaVersion.nativeBinary(m.scalaNativeVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
-              case m: ScalaModule =>
-                s"${pom.artifactId}_${ScalaVersion.binary(m.scalaVersion)}"
-              case m: JavaModule =>
-                pom.artifactId
-            }
-            PomSettings(
-              groupId = pom.groupId,
-              artifactId = finalArtifactId,
-              version = pom.version
-            )
+          val pom = jm.pomSettings
+          if pom == null then throw RuntimeException("POM settings are not set")
+          val finalArtifactId = jm match {
+            case m: ScalaJsModule =>
+              s"${pom.artifactId}_sjs${ScalaVersion.jsBinary(m.scalaJsVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
+            case m: ScalaNativeModule =>
+              s"${pom.artifactId}_native${ScalaVersion.nativeBinary(m.scalaNativeVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
+            case m: ScalaModule =>
+              s"${pom.artifactId}_${ScalaVersion.binary(m.scalaVersion)}"
+            case m: JavaModule =>
+              pom.artifactId
           }
-        case _ => None
+          PomSettings(
+            groupId = pom.groupId,
+            artifactId = finalArtifactId,
+            version = pom.version
+          )
+
+        case other => throw RuntimeException(s"POM settings cannot be applied to $other")
       }
     }
   )
+
+  val sourcesJarTask = TaskBuilder
+    .make[os.Path](name = "sourcesJar")
+    .dependsOn(pomSettingsTask)
+    .dependsOn(sourcesTask)
+    .build { ctx =>
+      val (pomSettings, sources) = ctx.depResults
+      os.makeDir.all(ctx.out)
+      val resultJarPath = ctx.out / s"${pomSettings.artifactId}-sources.jar"
+      val sourcePaths = sources.flatMap { sourceDir =>
+        os.list(sourceDir.absPath)
+      }
+      os.zip(resultJarPath, sourcePaths)
+      resultJarPath
+    }
 
   case class PublishArtifactsRes(
       pom: PomSettings,
@@ -861,25 +877,21 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(dependenciesTask)
     .dependsOn(jarTask)
     .build { ctx =>
-      val (scalaVersion, pomSettings, dependencies, jar) = ctx.depResults
-      pomSettings match {
-        case Some(pom) =>
-          val artifactBaseName = s"${pom.artifactId}-${pom.version}"
-          // TODO sources jar, javadoc jar.. deps
-          os.remove.all(ctx.out)
-          os.makeDir.all(ctx.out)
-          val mainJarPath = ctx.out / s"${artifactBaseName}.jar"
-          os.copy.over(jar, mainJarPath)
-          // TODO handle moduleDeps for pom generation
-          val pomSettings = ctx.module match {
-            case jm: JavaModule => jm.pomSettings
-          }
-          val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, dependencies, pomSettings)
-          val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
-          os.write.over(pomXmlPath, pomXmlContent)
-          PublishArtifactsRes(pom, ctx.out)
-        case None => throw new RuntimeException("pomSettings are not defined")
+      val (scalaVersion, pom, dependencies, jar) = ctx.depResults
+      val artifactBaseName = s"${pom.artifactId}-${pom.version}"
+      // TODO sources jar, javadoc jar.. deps
+      os.remove.all(ctx.out)
+      os.makeDir.all(ctx.out)
+      val mainJarPath = ctx.out / s"${artifactBaseName}.jar"
+      os.copy.over(jar, mainJarPath)
+      // TODO handle moduleDeps for pom generation
+      val pomSettings = ctx.module match {
+        case jm: JavaModule => jm.pomSettings
       }
+      val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, dependencies, pomSettings)
+      val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
+      os.write.over(pomXmlPath, pomXmlContent)
+      PublishArtifactsRes(pom, ctx.out)
     }
 
   val publishLocalTask = TaskBuilder
@@ -905,7 +917,9 @@ class CoreTasks() extends StrictLogging {
                 .logInfo(s"Published to local m2 repository: ${pom.groupId}:${pom.artifactId}:${pom.version}")
             )
           } else {
-            ctx.notifications.add(ServerNotification.logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled"))
+            ctx.notifications.add(
+              ServerNotification.logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled")
+            )
           }
         case _ =>
       }
@@ -976,6 +990,7 @@ class CoreTasks() extends StrictLogging {
     fastLinkJsTask,
     nativeLinkTask,
     pomSettingsTask,
+    sourcesJarTask,
     publishArtifactsTask,
     publishLocalTask,
     publishTask
