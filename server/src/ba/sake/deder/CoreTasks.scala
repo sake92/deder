@@ -870,7 +870,11 @@ class CoreTasks() extends StrictLogging {
           os.makeDir.all(ctx.out)
           val mainJarPath = ctx.out / s"${artifactBaseName}.jar"
           os.copy.over(jar, mainJarPath)
-          val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, dependencies)
+          // TODO handle moduleDeps for pom generation
+          val pomSettings = ctx.module match {
+            case jm: JavaModule => jm.pomSettings
+          }
+          val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, dependencies, pomSettings)
           val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
           os.write.over(pomXmlPath, pomXmlContent)
           PublishArtifactsRes(pom, ctx.out)

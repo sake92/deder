@@ -40,10 +40,30 @@ abstract class DederModule {
 
 typealias ModuleType = "java" | "scala" | "scala-test" | "scala-js" | "scala-native"
 
+class PomLicense {
+  name: String(!isEmpty)
+  url: String(!isEmpty)
+}
+class PomDeveloper {
+  id: String(!isEmpty)
+  name: String(!isEmpty)
+  email: String(!isEmpty)
+}
+class PomScm {
+  url: String?
+  connection: String?
+  developerConnection: String?
+  tag: String?
+}
 class PomSettings {
   groupId: String(!isEmpty)
   artifactId: String(!isEmpty)
   version: String(!isEmpty)
+  description: String?
+  url: String?
+  licenses: Listing<PomLicense> = new Listing {}
+  developers: Listing<PomDeveloper> = new Listing {}
+  scm: PomScm?
 }
 
 open class JavaModule extends DederModule {
@@ -53,7 +73,7 @@ open class JavaModule extends DederModule {
   jvmOptions: Listing<String> = new Listing {}
   javaVersion: String?
   javacOptions: Listing<String> = new Listing {}
-  mainClass: String? = null
+  mainClass: String?
   deps: Listing<String> = new Listing {}
   javacAnnotationProcessorDeps: Listing<String> = new Listing {}
   semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default

@@ -10,9 +10,27 @@ local const server = new ScalaModule {
     "ba.sake::sharaf-undertow:0.13.0"
   }
   pomSettings {
-    groupId = "ba.sake"
-    artifactId = "server"
-    version = "0.1.4-SNAPSHOT"
+    groupId = "com.example"
+    artifactId = "server-example"
+    version = "0.0.1-SNAPSHOT"
+    description = "Example Deder publish project"
+    url = "https://github.com/myuser/server-example"
+    licenses {
+      new PomLicense {
+        name = "MIT License"
+        url = "https://opensource.org/license/mit/"
+      }
+    }
+    developers {
+      new PomDeveloper {
+        id = "myuser"
+        name = "My User"
+        email = "myuser@example.com"
+      }
+    }
+    scm {
+      url = "git@github.com:myuser/server-example.git"
+    }
   }
 }
 
