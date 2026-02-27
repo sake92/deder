@@ -856,10 +856,75 @@ class CoreTasks() extends StrictLogging {
       val (pomSettings, sources) = ctx.depResults
       os.makeDir.all(ctx.out)
       val resultJarPath = ctx.out / s"${pomSettings.artifactId}-sources.jar"
-      val sourcePaths = sources.flatMap { sourceDir =>
-        os.list(sourceDir.absPath)
+      os.remove(resultJarPath)
+      os.zip(resultJarPath, sources.map(_.absPath))
+      resultJarPath
+    }
+
+  val javadocJarTask = TaskBuilder
+    .make[os.Path](name = "javadocJar")
+    .dependsOn(scalaVersionTask)
+    .dependsOn(pomSettingsTask)
+    .dependsOn(sourcesTask)
+    .dependsOn(compileClasspathTask)
+    .dependsOn(compileTask)
+    .dependsOn(classesTask)
+    .build { ctx =>
+      val (scalaVersion, pomSettings, sources, compileClasspath, _, classesDir) = ctx.depResults
+      os.remove.all(ctx.out)
+      os.makeDir.all(ctx.out)
+      val generatedDir = ctx.out / "generated"
+      os.makeDir.all(generatedDir)
+
+      // TODO java, scala2
+      // scala2 wants sources, scala3 tasty files..
+      val sourceFiles = sources
+        .map(_.absPath)
+        .flatMap { sourceDir =>
+          if os.exists(sourceDir) then
+            os.walk(
+              sourceDir,
+              skip = p => {
+                if os.isDir(p) then false
+                else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
+                else true
+              }
+            )
+          else Seq.empty
+        }
+        .filter(os.isFile)
+      val tastyFiles =
+        if os.exists(classesDir) then
+          os.walk(
+            classesDir,
+            skip = p => {
+              if os.isDir(p) then false
+              else if os.isFile(p) then !(p.ext == "tasty")
+              else true
+            }
+          )
+        else Seq.empty
+
+      val deps = Seq(Dependency.make(s"org.scala-lang::scaladoc:${scalaVersion}", scalaVersion))
+      val depsJars = DependencyResolver.fetchFiles(deps, Some(ctx.notifications))
+      ClassLoaderUtils.withClassLoader(depsJars, parent = null) { classLoader =>
+        val scaladocClass = classLoader.loadClass("dotty.tools.scaladoc.Main")
+        val scaladocMethod = scaladocClass.getMethod("run", classOf[Array[String]])
+        val args = Array[String](
+          "-d",
+          generatedDir.toString,
+          "-classpath",
+          compileClasspath.mkString(File.pathSeparator),
+          "--"
+        ) ++ tastyFiles.filter(os.isFile(_)).map(_.toString)
+        val scaladocObj = scaladocClass.getConstructor().newInstance()
+        scaladocMethod.invoke(scaladocObj, args)
       }
-      os.zip(resultJarPath, sourcePaths)
+
+      // ne zippuje dobro.. raspakuje foldere a ne bi trebo..
+      val resultJarPath = ctx.out / s"${pomSettings.artifactId}-javadoc.jar"
+      os.remove(resultJarPath)
+      os.zip(resultJarPath, Seq(generatedDir))
       resultJarPath
     }
 
@@ -991,6 +1056,7 @@ class CoreTasks() extends StrictLogging {
     nativeLinkTask,
     pomSettingsTask,
     sourcesJarTask,
+    javadocJarTask,
     publishArtifactsTask,
     publishLocalTask,
     publishTask
