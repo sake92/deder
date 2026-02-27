@@ -3,22 +3,23 @@ amends "../../config/DederProject.pkl"
 
 //amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
-local const server = new ScalaModule {
+local const mylibrary = new ScalaModule {
   scalaVersion = "3.7.1"
-  id = "server"
+  id = "mylibrary"
   deps {
     "ba.sake::sharaf-undertow:0.13.0"
   }
   pomSettings {
     groupId = "com.example"
-    artifactId = "server-example"
+    artifactId = "deder-example-library"
     version = "0.0.1-SNAPSHOT"
-    description = "Example Deder publish project"
-    url = "https://github.com/myuser/server-example"
+    name = "Deder Publish Example"
+    description = "Deder example library"
+    url = "https://github.com/myuser/deder-example-library"
     licenses {
       new PomLicense {
         name = "MIT License"
-        url = "https://opensource.org/license/mit/"
+        url = "http://www.opensource.org/licenses/mit-license.php"
       }
     }
     developers {
@@ -29,11 +30,11 @@ local const server = new ScalaModule {
       }
     }
     scm {
-      url = "git@github.com:myuser/server-example.git"
+      url = "git@github.com:myuser/deder-example-library.git"
     }
   }
 }
 
 modules {
-  server
+  mylibrary
 }

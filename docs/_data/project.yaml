@@ -9,5 +9,7 @@ tutorials:
     url: "/tutorials/scalanative.html"
   - label: "Cross Project"
     url: "/tutorials/cross-project.html"
+  - label: "Publishing"
+    url: "/tutorials/publishing.html"
 
 
