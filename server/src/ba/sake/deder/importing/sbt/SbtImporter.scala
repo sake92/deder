@@ -134,6 +134,8 @@ class SbtImporter(
           List.empty.asJava, // javacAnnotationProcessorDeps
           true, // semanticdbEnabled
           "0.11.1", // javaSemanticdbVersion
+          false, // publish
+          null, // pomSettings
           sbtProjectExport.scalaVersion,
           sbtProjectExport.scalacOptions.asJava,
           List.empty.asJava, // scalacPluginDeps
@@ -157,6 +159,8 @@ class SbtImporter(
           List.empty.asJava, // javacAnnotationProcessorDeps
           true, // semanticdbEnabled
           "0.11.1", // javaSemanticdbVersion
+          false, // publish
+          null, // pomSettings
           sbtProjectExport.scalaVersion,
           sbtProjectExport.scalacOptions.asJava,
           List.empty.asJava, // scalacPluginDeps

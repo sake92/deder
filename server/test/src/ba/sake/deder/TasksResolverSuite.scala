@@ -88,7 +88,13 @@ class TasksResolverSuite extends munit.FunSuite {
       "jar",
       "allJars",
       "assembly",
-      "run"
+      "run",
+      "sourcesJar",
+      "javadocJar",
+      "pomSettings",
+      "publishArtifacts",
+      "publishLocal",
+      "publish"
     )
     val taskInstancesPerModule = tasksResolver.taskInstancesPerModule
     locally {
@@ -134,7 +140,10 @@ class TasksResolverSuite extends munit.FunSuite {
           transitiveScalaModuleTaskEdges("uber-test", "uber")
       locally {
         val diff = expectedEdges.diff(taskInstanceEdgeIdsGraph)
-        assert(diff.isEmpty, s"Task instance graph edges mismatch. Missing edges: ${diff.take(10)}${if diff.size > 10 then "..." else ""}")
+        assert(
+          diff.isEmpty,
+          s"Task instance graph edges mismatch. Missing edges: ${diff.take(10)}${if diff.size > 10 then "..." else ""}"
+        )
         // assertEquals(taskInstanceEdgeIdsGraph, expectedEdges)
       }
     }
