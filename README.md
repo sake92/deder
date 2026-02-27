@@ -7,6 +7,16 @@ See [dev docs](docs/dev/README.md) for more technical details
 
 ☢️ EXPERIMENTAL! ☢️
 
+## Current status and features
+- CLI client with shell completions
+- BSP client with support for VSCode and IntelliJ
+- exploring the build with listing modules, tasks, and execution plans (visualized as ASCII or DOT graphs)
+- packaging module as JAR, uber JAR, Scala.js bundle, Scala Native executable
+- executing tests
+- watch mode with concurrent execution in multiple terminals
+- import from sbt (experimental, feedback needed)
+- OTEL tracing support
+- some features only work for scala3, help welcome! :)
 
 ## Concepts
 - project is the root of your git repo
