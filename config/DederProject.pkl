@@ -59,6 +59,7 @@ class PomSettings {
   groupId: String(!isEmpty)
   artifactId: String(!isEmpty)
   version: String(!isEmpty)
+  name: String(!isEmpty)
   description: String?
   url: String?
   licenses: Listing<PomLicense> = new Listing {}

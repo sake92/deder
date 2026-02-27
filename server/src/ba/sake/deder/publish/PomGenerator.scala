@@ -18,6 +18,7 @@ object PomGenerator {
   ): String = {
     val model = new Model()
     model.setModelVersion("4.0.0")
+    model.setName(pomSettings.name)
     model.setGroupId(groupId)
     model.setArtifactId(artifactId)
     model.setVersion(version)

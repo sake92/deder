@@ -941,14 +941,16 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(pomSettingsTask)
     .dependsOn(dependenciesTask)
     .dependsOn(jarTask)
+    .dependsOn(sourcesJarTask)
+    .dependsOn(javadocJarTask)
     .build { ctx =>
-      val (scalaVersion, pom, dependencies, jar) = ctx.depResults
+      val (scalaVersion, pom, dependencies, jar, sourcesJar, javadocJar) = ctx.depResults
       val artifactBaseName = s"${pom.artifactId}-${pom.version}"
-      // TODO sources jar, javadoc jar.. deps
       os.remove.all(ctx.out)
       os.makeDir.all(ctx.out)
-      val mainJarPath = ctx.out / s"${artifactBaseName}.jar"
-      os.copy.over(jar, mainJarPath)
+      os.copy.over(jar, ctx.out / s"${artifactBaseName}.jar")
+      os.copy.over(sourcesJar, ctx.out / s"${artifactBaseName}-sources.jar")
+      os.copy.over(javadocJar, ctx.out / s"${artifactBaseName}-javadoc.jar")
       // TODO handle moduleDeps for pom generation
       val pomSettings = ctx.module match {
         case jm: JavaModule => jm.pomSettings
@@ -975,12 +977,8 @@ class CoreTasks() extends StrictLogging {
       ctx.module match {
         case javaModule: JavaModule =>
           if javaModule.publish then {
-            // publish to local m2
-            Publisher.publishLocalM2(pom.groupId, pom.artifactId, pom.version, allFiles)
-            ctx.notifications.add(
-              ServerNotification
-                .logInfo(s"Published to local m2 repository: ${pom.groupId}:${pom.artifactId}:${pom.version}")
-            )
+            val publisher = Publisher(ctx.notifications)
+            publisher.publishLocalM2(pom, allFiles)
           } else {
             ctx.notifications.add(
               ServerNotification.logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled")
@@ -1007,12 +1005,26 @@ class CoreTasks() extends StrictLogging {
       artifacts.foreach(f => PgpSigner.signFile(f, pgpSecret, pgpPassphrase.toCharArray))
       // generate hashes
       val allFiles = artifacts.flatMap { f =>
-        Seq(f) ++
+        val checksumFile = f / os.up / s"${f.last}.asc"
+        Seq(f, checksumFile) ++
           Hasher.generateChecksums(f) ++
-          Hasher.generateChecksums(f / os.up / s"${f.last}.asc")
+          Hasher.generateChecksums(checksumFile)
       }
-      // TODO publish for realsies
-      Publisher.publishLocalM2(pom.groupId, pom.artifactId, pom.version, allFiles)
+      val username =
+        sys.env.getOrElse("DEDER_SONATYPE_USERNAME", throw RuntimeException("DEDER_SONATYPE_USERNAME env var not set"))
+      val password =
+        sys.env.getOrElse("DEDER_SONATYPE_PASSWORD", throw RuntimeException("DEDER_SONATYPE_PASSWORD env var not set"))
+      os.remove.all(ctx.out)
+      val filesDir =
+        ctx.out / "final" / os.SubPath(s"${pom.groupId.replace('.', '/')}/${pom.artifactId}/${pom.version}")
+      os.makeDir.all(filesDir)
+      allFiles.foreach(f => os.copy(f, filesDir / f.last))
+      val filesZip = ctx.out / s"${pom.artifactId}_bundle.zip"
+      os.zip(filesZip, Seq(ctx.out / "final"))
+      val publisher = Publisher(ctx.notifications)
+      if pom.version.endsWith("-SNAPSHOT") then
+        publisher.publishSonatypeSnapshot(username, password, pom, allFiles)
+      else publisher.publishSonatypeCentral(username, password, pom, filesZip)
       ctx.out
     }
 

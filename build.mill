@@ -47,7 +47,8 @@ object server extends ScalaModule, VersionModule {
     mvn"org.apache.maven:maven-model:3.9.12",
     mvn"org.bouncycastle:bcpg-jdk18on:1.78",
     // https://github.com/bcgit/bc-java/issues/1629#issuecomment-2238898856
-    mvn"org.bouncycastle:bcpkix-jdk18on:1.78"
+    mvn"org.bouncycastle:bcpkix-jdk18on:1.78",
+    mvn"com.github.mizosoft.methanol:methanol:1.9.0"
   )
   def moduleDeps = Seq(config)
 
