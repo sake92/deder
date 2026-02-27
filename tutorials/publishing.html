@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Deder Publishing Tutorial">
+  <title> Publishing Tutorial | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#publishing-tutorial">Publishing Tutorial</a>
+         <ul>
+          <li><a href="#publish-to-local-maven-repository">Publish to Local Maven Repository</a></li>
+          <li><a href="#publish-to-sonatype-maven-central">Publish to Sonatype Maven Central</a></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="publishing-tutorial">Publishing Tutorial<a href="#publishing-tutorial" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Make a minimal <code>deder.pkl</code> file in your project root:</p>
+   <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/DederProject.pkl"
+
+local const mylibrary = new ScalaModule {
+  scalaVersion = "3.7.1"
+  id = "mylibrary"
+  deps {
+    "ba.sake::sharaf-undertow:0.13.0"
+  }
+  pomSettings {
+    groupId = "com.example"
+    artifactId = "deder-example-library"
+    version = "0.0.1-SNAPSHOT"
+    name = "Deder Publish Example"
+    description = "Deder example library"
+    url = "https://github.com/myuser/deder-example-library"
+    licenses {
+      new PomLicense {
+        name = "MIT License"
+        url = "http://www.opensource.org/licenses/mit-license.php"
+      }
+    }
+    developers {
+      new PomDeveloper {
+        id = "myuser"
+        name = "My User"
+        email = "myuser@example.com"
+      }
+    }
+    scm {
+      url = "git@github.com:myuser/deder-example-library.git"
+    }
+  }
+}
+
+modules {
+  mylibrary
+}
+</code></pre>
+   <p>All this information is necessary for publishing to Maven repositories.
+    <br>
+    See the official <a href="https://central.sonatype.org/publish/requirements/#required-pom-metadata/">Sonatype Central Repository documentation</a> for more details.</p>
+   <h2 id="publish-to-local-maven-repository">Publish to Local Maven Repository<a href="#publish-to-local-maven-repository" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>To publish to your local <code>.m2</code> repository, run the following command:</p>
+   <pre><code class="language-bash hljs" data-highlighted="yes">deder <span class="hljs-built_in">exec</span> -t publishLocal
+</code></pre>
+   <blockquote>
+    <p>For <code>publishLocal</code> purposes, only <code>groupId</code>, <code>artifactId</code>, <code>version</code>, <code>name</code> are needed.</p>
+   </blockquote>
+   <p>After running this command, you can find the published artifact in your local <code>.m2</code> repository, located at <code>~/.m2/repository/com/example/deder-example-library_3/0.0.1-SNAPSHOT/</code>.
+    <br>
+    Then you can use it in other projects by adding the dependency:</p>
+   <pre><code class="language-scala hljs" data-highlighted="yes"><span class="hljs-comment">// deder</span>
+<span class="hljs-string">"com.example::deder-example-library:0.0.1-SNAPSHOT"</span>
+<span class="hljs-comment">// sbt</span>
+libraryDependencies += <span class="hljs-string">"com.example"</span> %% <span class="hljs-string">"deder-example-library"</span> % <span class="hljs-string">"0.0.1-SNAPSHOT"</span>
+<span class="hljs-comment">// mill</span>
+<span class="hljs-string">mvn"com.example::deder-example-library:0.0.1-SNAPSHOT"</span>
+</code></pre>
+   <h2 id="publish-to-sonatype-maven-central">Publish to Sonatype Maven Central<a href="#publish-to-sonatype-maven-central" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>To publish to Sonatype Maven Central, you need to set the following environment variables:</p>
+   <pre><code class="language-bash hljs" data-highlighted="yes"><span class="hljs-built_in">export</span> DEDER_PGP_PASSPHRASE=<span class="hljs-string">"..."</span>
+<span class="hljs-built_in">export</span> DEDER_PGP_SECRET=<span class="hljs-string">"..."</span>
+<span class="hljs-built_in">export</span> DEDER_SONATYPE_PASSWORD=<span class="hljs-string">"..."</span>
+<span class="hljs-built_in">export</span> DEDER_SONATYPE_USERNAME=<span class="hljs-string">"..."</span>
+</code></pre>
+   <p>If this is your first time publishing to Sonatype, you need to create an account and set up your PGP keys.
+    <br>
+    You can follow the <a href="https://github.com/sbt/sbt-ci-release?tab=readme-ov-file#sonatype/">sbt-ci-release documentation</a> for detailed instructions on how to do it.</p>
+   <p>Then you can run the following command to publish your library:</p>
+   <pre><code class="language-bash hljs" data-highlighted="yes">deder <span class="hljs-built_in">exec</span> -t publish
+</code></pre>
+   <p>For a full example, you can check out the <a href="https://github.com/sake92/deder/tree/main/examples/publish">publish example</a>.</p>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>
