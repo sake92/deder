@@ -39,6 +39,34 @@ jobs:
           VERSION=$(./mill show server.version | tr -d '"')
           echo "VERSION=$(echo $VERSION)" >> $GITHUB_OUTPUT
 
+  build-cli-native-image:
+    needs: [ precheck ]
+    if: endsWith(${{ needs.precheck.outputs.VERSION }}, '-SNAPSHOT')
+    strategy:
+      matrix:
+        os:
+          - gh-name: ubuntu-22.04
+            name: linux-x86_64
+            ext: ""
+          - gh-name: macos-15
+            name: macos-aarch64
+            ext: ""
+          - gh-name: windows-2025
+            name: windows-x86_64
+            ext: ".exe"
+    runs-on: ${{ matrix.os.gh-name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build CLI native image
+        run: |
+          ./mill -i client-native.nativeImage
+          cp out/client-native/nativeImage.dest/native-executable${{ matrix.os.ext }} deder-${{ matrix.os.name }}${{ matrix.os.ext }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deder-cli-${{ matrix.os.name }}
+          path: deder${{ matrix.os.name }}${{ matrix.os.ext }}
+
   release:
     needs: [ precheck ]
     if: endsWith(${{ needs.precheck.outputs.VERSION }}, '-SNAPSHOT')
@@ -53,13 +81,14 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
-      - name: Build
+      - name: Build JARs
         run: |
           ./scripts/gen-config-bindings.sh
           ./mill server.assembly
           cp out/server/assembly.dest/out.jar deder-server.jar
           ./mill client.assembly
           cp out/client/assembly.dest/out.jar deder-client.jar
+
       - name: Release
         uses: jreleaser/release-action@v2
         with:

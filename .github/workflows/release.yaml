@@ -48,7 +48,7 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
-      - name: Build
+      - name: Build JARs
         run: |
           ./scripts/gen-config-bindings.sh
           ./mill server.assembly
@@ -70,27 +70,3 @@ jobs:
           path: |
             out/jreleaser/trace.log
             out/jreleaser/output.properties
-
-
-# TODO make it work
-#  build-cli-native-image:
-#    strategy:
-#      matrix:
-#        os:
-#          - name: ubuntu-latest
-#            ext: ""
-#          - name: windows-latest
-#            ext: ".exe"
-#          # TODO macos-latest, windows-latest
-#    runs-on: ${{ matrix.os }}
-#    steps:
-#      - uses: actions/checkout@v4
-#      - name: Build CLI native image
-#        run: |
-#          ./mill -i cli.nativeImage
-#          cp out/cli/nativeImage.dest/native-executable${{ matrix.os.ext }} deder
-#      - name: Upload artifact
-#        uses: actions/upload-artifact@v4
-#        with:
-#          name: deder-cli-${{ matrix.os.name }}
-#          path: deder${{ matrix.os.ext }}
