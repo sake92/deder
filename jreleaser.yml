@@ -33,18 +33,20 @@ distributions:
     type: SINGLE_JAR
     artifacts:
       - path: deder-client.jar
-#  deder-client-native:
-#    type: FLAT_BINARY
-#    artifacts:
-#      - path: deder-client-linux-amd64
-#        platform: linux-x86_64
+  deder-client-native:
+    type: FLAT_BINARY
+    artifacts:
+      - path: deder-client-linux-amd64
+        platform: linux-x86_64
+      - path: deder-client-macos-aarch64
+        platform: osx-aarch_64
 
-#packagers:
-#  brew:
-#    active: ALWAYS
-#    # same formula for both macOS and Linux
-#    multiPlatform: true
-#    repository:
-#      owner: sake92
-#      name: homebrew-tap
-#      token: {{ env.JRELEASER_HOMEBREW_GITHUB_TOKEN }}
+packagers:
+  brew:
+    active: ALWAYS
+    # same formula for both macOS and Linux
+    multiPlatform: true
+    repository:
+      owner: sake92
+      name: homebrew-tap
+      token: {{ env.JRELEASER_HOMEBREW_GITHUB_TOKEN }}
