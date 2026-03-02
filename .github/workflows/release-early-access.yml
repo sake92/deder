@@ -60,6 +60,7 @@ jobs:
       - name: Build CLI native image
         run: |
           ./mill -i client-native.nativeImage
+          ls out/client-native/nativeImage.dest/
           cp out/client-native/nativeImage.dest/native-executable${{ matrix.os.ext }} deder-${{ matrix.os.name }}${{ matrix.os.ext }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
