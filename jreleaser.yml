@@ -33,11 +33,18 @@ distributions:
     type: SINGLE_JAR
     artifacts:
       - path: deder-client.jar
+#  deder-client-native:
+#    type: FLAT_BINARY
+#    artifacts:
+#      - path: deder-client-linux-amd64
+#        platform: linux-x86_64
 
-  # TODO graalvm native images + brew etc
-  #deder-client-native:
-  #  type: FLAT_BINARY
-  #  artifacts:
-  #    - path: deder-client-linux-amd64
-  #      extraProperties:
-  #          universal: true
+#packagers:
+#  brew:
+#    active: ALWAYS
+#    # same formula for both macOS and Linux
+#    multiPlatform: true
+#    repository:
+#      owner: sake92
+#      name: homebrew-tap
+#      token: {{ env.JRELEASER_HOMEBREW_GITHUB_TOKEN }}
