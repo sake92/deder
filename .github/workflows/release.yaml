@@ -34,6 +34,32 @@ jobs:
           git commit -a --allow-empty -m "Releasing version $VERSION"
           git push origin main
 
+  build-jars:
+    needs: [ precheck ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRO }}
+      - name: Build JARs
+        run: |
+          ./scripts/gen-config-bindings.sh
+          ./mill server.assembly
+          cp out/server/assembly.dest/out.jar deder-server.jar
+          ./mill client.assembly
+          cp out/client/assembly.dest/out.jar deder-client.jar
+      - name: Upload JARs
+        uses: actions/upload-artifact@v4
+        with:
+          name: deder-jars
+          path: |
+            deder-server.jar
+            deder-client.jar
+
   build-client-native-image:
     needs: [ precheck ]
     strategy:
@@ -68,7 +94,7 @@ jobs:
           path: deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
 
   release:
-    needs: [ precheck, build-client-native-image ]
+    needs: [ precheck, build-jars, build-client-native-image ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -81,13 +107,6 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
-      - name: Build JARs
-        run: |
-          ./scripts/gen-config-bindings.sh
-          ./mill server.assembly
-          cp out/server/assembly.dest/out.jar deder-server.jar
-          ./mill client.assembly
-          cp out/client/assembly.dest/out.jar deder-client.jar
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
