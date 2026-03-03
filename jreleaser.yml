@@ -49,4 +49,3 @@ packagers:
     repository:
       owner: sake92
       name: homebrew-tap
-      token: {{ env.JRELEASER_HOMEBREW_GITHUB_TOKEN }}
