@@ -29,10 +29,14 @@ distributions:
     type: SINGLE_JAR
     artifacts:
       - path: deder-server.jar
+    brew:
+      active: NEVER
   deder-client-jar:
     type: SINGLE_JAR
     artifacts:
       - path: deder-client.jar
+    brew:
+      active: NEVER
   deder-client-native:
     type: FLAT_BINARY
     artifacts:
@@ -40,6 +44,8 @@ distributions:
         platform: linux-x86_64
       - path: deder-client-macos-aarch64
         platform: osx-aarch_64
+    brew:
+      formulaName: deder
 
 packagers:
   brew:
