@@ -40,9 +40,9 @@ distributions:
   deder-client-native:
     type: FLAT_BINARY
     artifacts:
-      - path: deder-client-linux-amd64
+      - path: deder-client-linux-x86_64
         platform: linux-x86_64
-      - path: deder-client-macos-aarch64
+      - path: deder-client-osx-aarch_64
         platform: osx-aarch_64
     brew:
       formulaName: deder

@@ -46,13 +46,13 @@ jobs:
       matrix:
         os:
           - gh-name: ubuntu-22.04
-            name: linux-amd64
+            name: linux-x86_64
             ext: ""
           - gh-name: macos-15
-            name: macos-aarch64
+            name: osx-aarch_64
             ext: ""
          # - gh-name: windows-2025
-         #   name: windows-amd64
+         #   name: windows-x86_64
          #   ext: ".exe"
     runs-on: ${{ matrix.os.gh-name }}
     steps:

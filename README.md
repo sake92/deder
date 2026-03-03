@@ -27,7 +27,15 @@ See [examples/multi](examples/multi/) for a working example project.
 
 ## Installation
 
-1. download `deder-client.jar` from [early release](https://github.com/sake92/deder/releases/tag/early-access)
+### Homebrew (macOS and Linux)
+
+```shell
+brew install sake92/tap/deder
+```
+
+### Manual installation
+
+1. download `deder-client.jar` (or a native version) from [early release](https://github.com/sake92/deder/releases/tag/early-access)
 1. rename it to just `deder` 
 1. do `chmod +x deder`
 1. put it in `PATH`
