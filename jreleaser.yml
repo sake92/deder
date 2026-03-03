@@ -39,6 +39,8 @@ distributions:
       active: NEVER
   deder-client-native:
     type: FLAT_BINARY
+    executable:
+      name: deder
     artifacts:
       - path: deder-client-linux-x86_64
         platform: linux-x86_64
