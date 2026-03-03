@@ -57,16 +57,21 @@ jobs:
     runs-on: ${{ matrix.os.gh-name }}
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Java # for mill itself
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRO }}
       - name: Build Client native image
         run: |
           ./mill -i client-native.nativeImage
           ls out/client-native/nativeImage.dest/
-          cp out/client-native/nativeImage.dest/native-executable${{ matrix.os.ext }} deder-${{ matrix.os.name }}${{ matrix.os.ext }}
+          cp out/client-native/nativeImage.dest/native-executable${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: deder-client-${{ matrix.os.name }}
-          path: deder-${{ matrix.os.name }}${{ matrix.os.ext }}
+          path: deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
 
   release:
     needs: [ precheck, build-client-native-image ]
