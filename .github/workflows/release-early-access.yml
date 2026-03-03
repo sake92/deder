@@ -69,7 +69,7 @@ jobs:
           path: deder-${{ matrix.os.name }}${{ matrix.os.ext }}
 
   release:
-    needs: [ build-cli-native-image ]
+    needs: [ precheck, build-cli-native-image ]
     if: ${{ endsWith(needs.precheck.outputs.VERSION, '-SNAPSHOT') }}
     runs-on: ubuntu-latest
     steps:
