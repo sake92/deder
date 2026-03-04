@@ -37,7 +37,7 @@ class ScalaJsIntegrationSuite extends munit.FunSuite {
     }
   }
 
-  test("deder should link scalajs") {
+  test("deder should fastLinkJs scalajs project") {
     withTestProject(testResourceDir / "sample-projects/scalajs") { projectPath =>
       locally {
         executeDederCommand(projectPath, "exec -m frontend -t fastLinkJs")

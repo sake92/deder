@@ -191,7 +191,7 @@ class CoreTasks() extends StrictLogging {
                   scalaVersion,
                   ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
                 ),
-                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJsVersion}", "2.13")
+                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJsVersion}", if m.scalaVersion.startsWith("3.") then "2.13" else m.scalaVersion)
               )
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
@@ -245,7 +245,7 @@ class CoreTasks() extends StrictLogging {
                   scalaVersion,
                   ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
                 ),
-                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJsVersion}", "2.13")
+                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJsVersion}", if m.scalaVersion.startsWith("3.") then "2.13" else m.scalaVersion)
               )
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"

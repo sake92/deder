@@ -1,6 +1,6 @@
 amends "../../config/DederProject.pkl"
 
-local const scalaVersions = List("2.13.18", "3.7.4")
+local const scalaVersions = List("2.12.21", "2.13.18", "3.7.4")
 
 local const commonModules: List<ScalaModule> =
   scalaVersions
