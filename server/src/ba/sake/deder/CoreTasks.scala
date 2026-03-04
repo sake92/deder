@@ -166,7 +166,7 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(classesTask)
     .build { ctx =>
-      Seq(ctx.depResults._1) ++ ctx.transitiveResults.flatten.flatten.distinct
+      Seq(ctx.depResults._1) ++ ctx.transitiveResults.flatten.flatten.reverse.distinct.reverse
     }
 
   val compileClasspathTask = TaskBuilder

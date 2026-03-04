@@ -18,7 +18,7 @@ import ch.epfl.scala.bsp4j.*
 class BspIntegrationSuite extends munit.FunSuite {
 
   // first compile can take a while
-  override def munitTimeout: Duration = 2.minutes
+  override def munitTimeout: Duration = 3.minutes
 
   private val testResourceDir = os.Path(System.getenv("MILL_TEST_RESOURCE_DIR"))
   private val dederClientPath = System.getenv("DEDER_CLIENT_PATH")

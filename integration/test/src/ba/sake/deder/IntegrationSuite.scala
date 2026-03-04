@@ -181,7 +181,7 @@ class IntegrationSuite extends munit.FunSuite {
   test("deder should run tests in multimodule/uber-test") {
     withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
       locally {
-        val dederOutput = executeDederCommand(projectPath, "exec -m uber-test -t test").out.text()
+        val dederOutput = executeDederCommand(projectPath, "exec -m uber-test -t test").err.text()
         println(s"Test output:\n$dederOutput")
         //assert(resText.contains("Args = argA, argB, argC"))
       }
