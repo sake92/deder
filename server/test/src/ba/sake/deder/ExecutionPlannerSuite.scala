@@ -9,7 +9,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
   test("ExecutionPlanner builds correct execution plan") {
     val projectPath = os.resource / "sample-projects/multi"
     val projectConfigStr = os.read(projectPath / "deder.pkl")
-    val configParser = ConfigParser()
+    val configParser = ConfigParser(writeJson = false)
     val parsedConfig = configParser.parse(projectConfigStr)
     val projectConfig = parsedConfig.toOption.get
     val tasksRegistry = TasksRegistry(CoreTasks())
@@ -28,7 +28,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
         stageTaskIds,
         Seq(
           Set("common.classes", "common.deps", "common.scalaVersion"),
-          Set("common.allClassesDirs", "common.dependencies"),
+          Set("common.allClassesDirs", "common.dependencies", "common.mandatoryDependencies"),
           Set("common.allDependencies"),
           Set("common.compileClasspath")
         ),
@@ -59,6 +59,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           ),
           Set(
             "common.allClassesDirs",
+            "common.mandatoryDependencies",
             "common.dependencies",
             "common.javacAnnotationProcessors",
             "common.scalaSemanticdbVersion"
@@ -75,7 +76,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
   test("ExecutionPlanner returns correct tasks for getAffectingSourceFileTasks") {
     val projectPath = os.resource / "sample-projects/multi"
     val projectConfigStr = os.read(projectPath / "deder.pkl")
-    val configParser = ConfigParser()
+    val configParser = ConfigParser(writeJson = false)
     val parsedConfig = configParser.parse(projectConfigStr)
     val projectConfig = parsedConfig.toOption.get
     val tasksRegistry = TasksRegistry(CoreTasks())
@@ -96,7 +97,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
   test("ExecutionPlanner returns correct tasks for getAffectingConfigValueTasks") {
     val projectPath = os.resource / "sample-projects/multi"
     val projectConfigStr = os.read(projectPath / "deder.pkl")
-    val configParser = ConfigParser()
+    val configParser = ConfigParser(writeJson = false)
     val parsedConfig = configParser.parse(projectConfigStr)
     val projectConfig = parsedConfig.toOption.get
     val tasksRegistry = TasksRegistry(CoreTasks())

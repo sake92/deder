@@ -148,41 +148,13 @@ class CoreTasks() extends StrictLogging {
       (deps ++ ctx.transitiveResults.flatten.flatten).distinct
     }
 
-  val classesTask = TaskBuilder
-    .make[os.Path](
-      name = "classes"
-    )
-    .build { ctx => ctx.out }
-
-  val semanticdbDirTask = TaskBuilder
-    .make[os.Path](
-      name = "semanticdb"
-    )
-    .build { ctx => ctx.out }
-
-  // this is localRunClasspath in mill ??
-  val allClassesDirsTask = TaskBuilder
-    .make[Seq[os.Path]](
-      name = "allClassesDirs",
-      transitive = true
-    )
-    .dependsOn(classesTask)
-    .build { ctx =>
-      Seq(ctx.depResults._1) ++ ctx.transitiveResults.flatten.flatten.reverse.distinct.reverse
-    }
-
-  val compileClasspathTask = TaskBuilder
-    .make[Seq[os.Path]](
-      name = "compileClasspath",
-      transitive = true
+  val mandatoryDependenciesTask = TaskBuilder
+    .make[Seq[deps.Dependency]](
+      name = "mandatoryDependencies"
     )
     .dependsOn(scalaVersionTask)
-    .dependsOn(allDependenciesTask)
-    .dependsOn(allClassesDirsTask)
     .build { ctx =>
-      // we feed even this module's classes dir because of javac annotation processing,
-      // it can generate java sources.. and then scala sources can depend on them
-      val (scalaVersion, dependencies, allClassesDirs) = ctx.depResults
+      val scalaVersion = ctx.depResults._1
       val scalaLibDeps =
         if scalaVersion.startsWith("3.") then
           ctx.module match {
@@ -239,7 +211,7 @@ class CoreTasks() extends StrictLogging {
                 )
               )
             case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang::scala3-library:${scalaVersion}", scalaVersion))
-            case _              => Seq.empty
+            case _ => Seq.empty
           }
         else
           ctx.module match {
@@ -291,10 +263,49 @@ class CoreTasks() extends StrictLogging {
                 )
               )
             case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion))
-            case _              => Seq.empty
+            case _ => Seq.empty
           }
+      scalaLibDeps
+    }
+
+  val classesTask = TaskBuilder
+    .make[os.Path](
+      name = "classes"
+    )
+    .build { ctx => ctx.out }
+
+  val semanticdbDirTask = TaskBuilder
+    .make[os.Path](
+      name = "semanticdb"
+    )
+    .build { ctx => ctx.out }
+
+  // this is localRunClasspath in mill ??
+  val allClassesDirsTask = TaskBuilder
+    .make[Seq[os.Path]](
+      name = "allClassesDirs",
+      transitive = true
+    )
+    .dependsOn(classesTask)
+    .build { ctx =>
+      Seq(ctx.depResults._1) ++ ctx.transitiveResults.flatten.flatten.reverse.distinct.reverse
+    }
+
+  val compileClasspathTask = TaskBuilder
+    .make[Seq[os.Path]](
+      name = "compileClasspath",
+      transitive = true
+    )
+    .dependsOn(scalaVersionTask)
+    .dependsOn(mandatoryDependenciesTask)
+    .dependsOn(allDependenciesTask)
+    .dependsOn(allClassesDirsTask)
+    .build { ctx =>
+      // we feed even this module's classes dir because of javac annotation processing,
+      // it can generate java sources.. and then scala sources can depend on them
+      val (scalaVersion,mandatoryDependencies,  dependencies, allClassesDirs) = ctx.depResults
       val depsJars = DependencyResolver
-        .fetchFiles(scalaLibDeps ++ dependencies, Some(ctx.notifications))
+        .fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
       (allClassesDirs ++ depsJars).reverse.distinct.reverse
     }
 
@@ -996,12 +1007,13 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(scalaVersionTask)
     .dependsOn(pomSettingsTask)
+    .dependsOn(mandatoryDependenciesTask)
     .dependsOn(dependenciesTask)
     .dependsOn(jarTask)
     .dependsOn(sourcesJarTask)
     .dependsOn(javadocJarTask)
     .build { ctx =>
-      val (scalaVersion, pomOpt, dependencies, jar, sourcesJarOpt, javadocJarOpt) = ctx.depResults
+      val (scalaVersion, pomOpt, mandatoryDependencies, dependencies, jar, sourcesJarOpt, javadocJarOpt) = ctx.depResults
       pomOpt.zip(sourcesJarOpt).zip(javadocJarOpt).map { case ((pom, sourcesJar), javadocJar) =>
         val artifactBaseName = s"${pom.artifactId}-${pom.version}"
         os.remove.all(ctx.out)
@@ -1013,7 +1025,8 @@ class CoreTasks() extends StrictLogging {
         val pomSettings = ctx.module match {
           case jm: JavaModule => jm.pomSettings
         }
-        val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, dependencies, pomSettings)
+        val allDependencies = mandatoryDependencies ++ dependencies
+        val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, allDependencies, pomSettings)
         val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
         os.write.over(pomXmlPath, pomXmlContent)
         PublishArtifactsRes(pom, ctx.out)
@@ -1115,6 +1128,7 @@ class CoreTasks() extends StrictLogging {
     javacAnnotationProcessorsTask,
     scalacPluginsTask,
     depsTask,
+    mandatoryDependenciesTask,
     dependenciesTask,
     allDependenciesTask,
     classesTask,

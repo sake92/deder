@@ -9,7 +9,7 @@ class TasksResolverSuite extends munit.FunSuite {
   test("TasksResolver builds correct modules and tasks graph") {
     val projectPath = os.resource / "sample-projects/multi"
     val projectConfigStr = os.read(projectPath / "deder.pkl")
-    val configParser = ConfigParser()
+    val configParser = ConfigParser(writeJson = false)
     val parsedConfig = configParser.parse(projectConfigStr)
     assert(parsedConfig.isRight, parsedConfig.left.get)
     val projectConfig = parsedConfig.toOption.get
@@ -77,6 +77,7 @@ class TasksResolverSuite extends munit.FunSuite {
       "deps",
       "dependencies",
       "allDependencies",
+      "mandatoryDependencies",
       "classes",
       "allClassesDirs",
       "compileClasspath",
@@ -175,11 +176,13 @@ class TasksResolverSuite extends munit.FunSuite {
 
   private def baseScalaModuleTaskEdges(moduleId: String): Set[(String, String)] =
     Set(
+      (s"${moduleId}.mandatoryDependencies", s"${moduleId}.scalaVersion"),
       (s"${moduleId}.dependencies", s"${moduleId}.deps"),
       (s"${moduleId}.dependencies", s"${moduleId}.scalaVersion"),
       (s"${moduleId}.allDependencies", s"${moduleId}.dependencies"),
       (s"${moduleId}.allClassesDirs", s"${moduleId}.classes"),
       (s"${moduleId}.compileClasspath", s"${moduleId}.scalaVersion"),
+      (s"${moduleId}.compileClasspath", s"${moduleId}.mandatoryDependencies"),
       (s"${moduleId}.compileClasspath", s"${moduleId}.allDependencies"),
       (s"${moduleId}.compileClasspath", s"${moduleId}.allClassesDirs"),
       (s"${moduleId}.javacAnnotationProcessors", s"${moduleId}.scalaVersion"),

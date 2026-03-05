@@ -7,7 +7,7 @@ import org.pkl.config.java.ConfigEvaluator
 import org.pkl.core.{EvaluatorBuilder, ModuleSource, OutputFormat, PklException}
 import ba.sake.deder.config.DederProject
 
-class ConfigParser() {
+class ConfigParser(writeJson: Boolean) {
 
   def parse(str: String): Either[String, DederProject] =
     parse(ModuleSource.text(str))
@@ -22,14 +22,16 @@ class ConfigParser() {
     val moduleIds = dederProject.modules.asScala.map(_.id)
     val diff = moduleIds.diff(moduleIds.distinct)
     if diff.nonEmpty then Left(s"Duplicate module ids found: ${diff.distinct.mkString(", ")}")
-    else Right {
-      val evaluator = EvaluatorBuilder.preconfigured.setOutputFormat(OutputFormat.JSON).build
-      try {
-        val text = evaluator.evaluateOutputText(moduleSource)
-        os.write.over(DederGlobals.projectRootDir / ".deder/out/project.json", text) // useful for debugging
-      } finally if (evaluator != null) evaluator.close()
-      dederProject
-    }
+    else
+      Right {
+        val evaluator = EvaluatorBuilder.preconfigured.setOutputFormat(OutputFormat.JSON).build
+        if writeJson then
+          try {
+            val text = evaluator.evaluateOutputText(moduleSource)
+            os.write.over(DederGlobals.projectRootDir / ".deder/out/project.json", text) // useful for debugging
+          } finally if (evaluator != null) evaluator.close()
+        dederProject
+      }
   } catch {
     case pklException: PklException =>
       Left(s"Failed to parse config file: ${pklException.getMessage}")

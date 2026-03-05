@@ -26,7 +26,7 @@ class DederProjectState(
 
   @volatile private var shutdownStarted = false
 
-  private val configParser = ConfigParser()
+  private val configParser = ConfigParser(writeJson = true)
   private val configFile = DederGlobals.projectRootDir / "deder.pkl"
 
   // TODO atomicref?
