@@ -1,9 +1,11 @@
 package ba.sake.deder
 
+import ba.sake.tupson.*
+
 import scala.concurrent.duration.*
 import scala.util.Properties
 
-class CrossIntegrationSuite extends munit.FunSuite {
+class ScalaNativeIntegrationSuite extends munit.FunSuite {
 
   // first compile can take a while
   override def munitTimeout = 1.minute
@@ -14,20 +16,25 @@ class CrossIntegrationSuite extends munit.FunSuite {
 
   // default command is compile
   // and the logs go to stderr!
-  test("deder should compile cross project") {
-    withTestProject(testResourceDir / "sample-projects/cross") { projectPath =>
+  test("deder should compile scalanative cli project") {
+    withTestProject(testResourceDir / "sample-projects/scalanative") { projectPath =>
       locally {
-        val dederCompileRes = executeDederCommand(projectPath, "exec")
-        assert(dederCompileRes.exitCode == 0, s"Deder compile failed with error: ${dederCompileRes.err.text()}")
-        val dederCompileResOutput = dederCompileRes.err.text()
-        val expectedModules = Seq(
-          "common-js-2.12.21", "common-js-2.13.18", "common-js-3.7.4",
-          "common-jvm-2.12.21", "common-jvm-2.13.18", "common-jvm-3.7.4", "common-jvm-test-2.12.21",
-          "common-jvm-test-2.13.18", "common-jvm-test-3.7.4", "common-native-2.12.21", "common-native-2.13.18", "common-native-3.7.4"
-        )
-        expectedModules.foreach { moduleId =>
-          assert(dederCompileResOutput.contains(moduleId), s"Expected module '$moduleId' was not compiled")
-        }
+        val dederOutput = executeDederCommand(projectPath, "exec").err.text()
+        assert(dederOutput.contains("Executing 'compile' task on module: cli"))
+        val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
+        assertEquals(compilingCount, 1)
+      }
+    }
+  }
+
+  test("deder should nativeLink cli project") {
+    withTestProject(testResourceDir / "sample-projects/scalanative") { projectPath =>
+      locally {
+        executeDederCommand(projectPath, "exec -m cli -t nativeLink")
+        val command = s"./.deder/out/cli/nativeLink/cli"
+        val res = os.proc(command).call(cwd = projectPath, stderr = os.Pipe)
+        val resText = res.out.text()
+        assert(resText.contains("Hello from Scala Native!"))
       }
     }
   }
