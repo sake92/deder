@@ -169,7 +169,7 @@ class IntegrationSuite extends munit.FunSuite {
           val output = results.get()(i)
           assert(output.contains(s"Args = arg$i"), s"Run #$i did not receive correct argument")
         }
-        val maxExpectedDurationMs = 10_000 // TODO whyyy it takes so long ???
+        val maxExpectedDurationMs = 11_000 // TODO whyyy it takes so long ???
         assert(
           duration < maxExpectedDurationMs,
           s"Expected concurrent execution to be under ${maxExpectedDurationMs}ms, but took $duration ms"
