@@ -489,7 +489,7 @@ class CoreTasks() extends StrictLogging {
       // annotation processors need generated sources dir to exist
       os.makeDir.all(generatedSourcesDir)
 
-      // TODO scalajs compiler on scala2
+      // TODO scalajs compiler on scala2?
       val compilerDeps =
         if scalaVersion.startsWith("3.") then
           ctx.module match {
@@ -796,20 +796,12 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(scalaVersionTask)
     .dependsOn(finalMainClassTask)
+    .dependsOn(mandatoryDependenciesTask)
     .dependsOn(allDependenciesTask)
     .dependsOn(allJarsTask)
     .build { ctx =>
-      val (scalaVersion, mainClass, dependencies, allModulesJars) = ctx.depResults
-      // TODO mandatoryDeps task..
-      val mandatoryDeps = ctx.module match {
-        case _: ScalaModule =>
-          val scalaLibDep =
-            if scalaVersion.startsWith("3.") then s"org.scala-lang::scala3-library:${scalaVersion}"
-            else s"org.scala-lang:scala-library:${scalaVersion}"
-          Seq(Dependency.make(scalaLibDep, scalaVersion))
-        case _ => Seq.empty
-      }
-      val depsJars = DependencyResolver.fetchFiles(mandatoryDeps ++ dependencies, Some(ctx.notifications))
+      val (scalaVersion, mainClass, mandatoryDependencies, dependencies, allModulesJars) = ctx.depResults
+      val depsJars = DependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
       val tmpDir = ctx.out / "jars"
       os.makeDir.all(tmpDir)
       allModulesJars.zipWithIndex.foreach { case (jar, index) =>
