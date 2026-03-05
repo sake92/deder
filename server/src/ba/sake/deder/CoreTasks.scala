@@ -1,5 +1,7 @@
 package ba.sake.deder
 
+import ba.sake.deder.config.DederProject
+
 import java.io.File
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
@@ -191,7 +193,10 @@ class CoreTasks() extends StrictLogging {
                   scalaVersion,
                   ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
                 ),
-                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJsVersion}", if m.scalaVersion.startsWith("3.") then "2.13" else m.scalaVersion)
+                Dependency.make(
+                  s"org.scala-js::scalajs-library:${m.scalaJsVersion}",
+                  if m.scalaVersion.startsWith("3.") then "2.13" else m.scalaVersion
+                )
               )
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
@@ -245,7 +250,10 @@ class CoreTasks() extends StrictLogging {
                   scalaVersion,
                   ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
                 ),
-                Dependency.make(s"org.scala-js::scalajs-library:${m.scalaJsVersion}", if m.scalaVersion.startsWith("3.") then "2.13" else m.scalaVersion)
+                Dependency.make(
+                  s"org.scala-js::scalajs-library:${m.scalaJsVersion}",
+                  if m.scalaVersion.startsWith("3.") then "2.13" else m.scalaVersion
+                )
               )
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
@@ -820,49 +828,59 @@ class CoreTasks() extends StrictLogging {
       ""
     }
 
-  val pomSettingsTask = ConfigValueTask[PomSettings](
+  val pomSettingsTask = ConfigValueTask[Option[PomSettings]](
     name = "pomSettings",
     execute = { ctx =>
       ctx.module match {
         case jm: JavaModule =>
           val pom = jm.pomSettings
-          if pom == null then throw RuntimeException("POM settings are not set")
-          val finalArtifactId = jm match {
-            case m: ScalaJsModule =>
-              s"${pom.artifactId}_sjs${ScalaVersion.jsBinary(m.scalaJsVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
-            case m: ScalaNativeModule =>
-              s"${pom.artifactId}_native${ScalaVersion.nativeBinary(m.scalaNativeVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
-            case m: ScalaModule =>
-              s"${pom.artifactId}_${ScalaVersion.binary(m.scalaVersion)}"
-            case m: JavaModule =>
-              pom.artifactId
+          if jm.publish then {
+            if pom == null then throw RuntimeException(s"POM settings are not set for ${jm.id}")
+            val finalArtifactId = jm match {
+              case m: ScalaJsModule =>
+                s"${pom.artifactId}_sjs${ScalaVersion.jsBinary(m.scalaJsVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
+              case m: ScalaNativeModule =>
+                s"${pom.artifactId}_native${ScalaVersion.nativeBinary(m.scalaNativeVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
+              case m: ScalaModule =>
+                s"${pom.artifactId}_${ScalaVersion.binary(m.scalaVersion)}"
+              case _ =>
+                pom.artifactId
+            }
+            Some(
+              PomSettings(
+                groupId = pom.groupId,
+                artifactId = finalArtifactId,
+                version = pom.version
+              )
+            )
+          } else {
+            ctx.notifications.add(
+              ServerNotification.logInfo(s"Skipping POM generation for module ${jm.id} because publish is set to false")
+            )
+            None
           }
-          PomSettings(
-            groupId = pom.groupId,
-            artifactId = finalArtifactId,
-            version = pom.version
-          )
-
         case other => throw RuntimeException(s"POM settings cannot be applied to $other")
       }
     }
   )
 
   val sourcesJarTask = TaskBuilder
-    .make[os.Path](name = "sourcesJar")
+    .make[Option[os.Path]](name = "sourcesJar")
     .dependsOn(pomSettingsTask)
     .dependsOn(sourcesTask)
     .build { ctx =>
-      val (pomSettings, sources) = ctx.depResults
-      os.makeDir.all(ctx.out)
-      val resultJarPath = ctx.out / s"${pomSettings.artifactId}-sources.jar"
-      os.remove(resultJarPath)
-      os.zip(resultJarPath, sources.map(_.absPath))
-      resultJarPath
+      val (pomSettingsOpt, sources) = ctx.depResults
+      pomSettingsOpt.map { pomSettings =>
+        os.makeDir.all(ctx.out)
+        val resultJarPath = ctx.out / s"${pomSettings.artifactId}-sources.jar"
+        os.remove(resultJarPath)
+        os.zip(resultJarPath, sources.map(_.absPath).filter(os.exists(_)))
+        resultJarPath
+      }
     }
 
   val javadocJarTask = TaskBuilder
-    .make[os.Path](name = "javadocJar")
+    .make[Option[os.Path]](name = "javadocJar")
     .dependsOn(scalaVersionTask)
     .dependsOn(pomSettingsTask)
     .dependsOn(sourcesTask)
@@ -870,62 +888,63 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(compileTask)
     .dependsOn(classesTask)
     .build { ctx =>
-      val (scalaVersion, pomSettings, sources, compileClasspath, _, classesDir) = ctx.depResults
-      os.remove.all(ctx.out)
-      os.makeDir.all(ctx.out)
-      val generatedDir = ctx.out / "generated"
-      os.makeDir.all(generatedDir)
+      val (scalaVersion, pomSettingsOpt, sources, compileClasspath, _, classesDir) = ctx.depResults
+      pomSettingsOpt.map { pomSettings =>
+        os.remove.all(ctx.out)
+        os.makeDir.all(ctx.out)
+        val generatedDir = ctx.out / "generated"
+        os.makeDir.all(generatedDir)
 
-      // TODO java, scala2
-      // scala2 wants sources, scala3 tasty files..
-      val sourceFiles = sources
-        .map(_.absPath)
-        .flatMap { sourceDir =>
-          if os.exists(sourceDir) then
+        // TODO java, scala2
+        // scala2 wants sources, scala3 tasty files..
+        val sourceFiles = sources
+          .map(_.absPath)
+          .flatMap { sourceDir =>
+            if os.exists(sourceDir) then
+              os.walk(
+                sourceDir,
+                skip = p => {
+                  if os.isDir(p) then false
+                  else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
+                  else true
+                }
+              )
+            else Seq.empty
+          }
+          .filter(os.isFile)
+        val tastyFiles =
+          if os.exists(classesDir) then
             os.walk(
-              sourceDir,
+              classesDir,
               skip = p => {
                 if os.isDir(p) then false
-                else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
+                else if os.isFile(p) then !(p.ext == "tasty")
                 else true
               }
             )
           else Seq.empty
+
+        val deps = Seq(Dependency.make(s"org.scala-lang::scaladoc:${scalaVersion}", scalaVersion))
+        val depsJars = DependencyResolver.fetchFiles(deps, Some(ctx.notifications))
+        ClassLoaderUtils.withClassLoader(depsJars, parent = null) { classLoader =>
+          val scaladocClass = classLoader.loadClass("dotty.tools.scaladoc.Main")
+          val scaladocMethod = scaladocClass.getMethod("run", classOf[Array[String]])
+          val args = Array[String](
+            "-d",
+            generatedDir.toString,
+            "-classpath",
+            compileClasspath.mkString(File.pathSeparator),
+            "--"
+          ) ++ tastyFiles.filter(os.isFile(_)).map(_.toString)
+          val scaladocObj = scaladocClass.getConstructor().newInstance()
+          scaladocMethod.invoke(scaladocObj, args)
         }
-        .filter(os.isFile)
-      val tastyFiles =
-        if os.exists(classesDir) then
-          os.walk(
-            classesDir,
-            skip = p => {
-              if os.isDir(p) then false
-              else if os.isFile(p) then !(p.ext == "tasty")
-              else true
-            }
-          )
-        else Seq.empty
 
-      val deps = Seq(Dependency.make(s"org.scala-lang::scaladoc:${scalaVersion}", scalaVersion))
-      val depsJars = DependencyResolver.fetchFiles(deps, Some(ctx.notifications))
-      ClassLoaderUtils.withClassLoader(depsJars, parent = null) { classLoader =>
-        val scaladocClass = classLoader.loadClass("dotty.tools.scaladoc.Main")
-        val scaladocMethod = scaladocClass.getMethod("run", classOf[Array[String]])
-        val args = Array[String](
-          "-d",
-          generatedDir.toString,
-          "-classpath",
-          compileClasspath.mkString(File.pathSeparator),
-          "--"
-        ) ++ tastyFiles.filter(os.isFile(_)).map(_.toString)
-        val scaladocObj = scaladocClass.getConstructor().newInstance()
-        scaladocMethod.invoke(scaladocObj, args)
+        val resultJarPath = ctx.out / s"${pomSettings.artifactId}-javadoc.jar"
+        os.remove(resultJarPath)
+        os.zip(resultJarPath, Seq(generatedDir))
+        resultJarPath
       }
-
-      // ne zippuje dobro.. raspakuje foldere a ne bi trebo..
-      val resultJarPath = ctx.out / s"${pomSettings.artifactId}-javadoc.jar"
-      os.remove(resultJarPath)
-      os.zip(resultJarPath, Seq(generatedDir))
-      resultJarPath
     }
 
   case class PublishArtifactsRes(
@@ -934,7 +953,7 @@ class CoreTasks() extends StrictLogging {
   ) derives JsonRW
 
   val publishArtifactsTask = TaskBuilder
-    .make[PublishArtifactsRes](
+    .make[Option[PublishArtifactsRes]](
       name = "publishArtifacts"
     )
     .dependsOn(scalaVersionTask)
@@ -944,88 +963,100 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(sourcesJarTask)
     .dependsOn(javadocJarTask)
     .build { ctx =>
-      val (scalaVersion, pom, dependencies, jar, sourcesJar, javadocJar) = ctx.depResults
-      val artifactBaseName = s"${pom.artifactId}-${pom.version}"
-      os.remove.all(ctx.out)
-      os.makeDir.all(ctx.out)
-      os.copy.over(jar, ctx.out / s"${artifactBaseName}.jar")
-      os.copy.over(sourcesJar, ctx.out / s"${artifactBaseName}-sources.jar")
-      os.copy.over(javadocJar, ctx.out / s"${artifactBaseName}-javadoc.jar")
-      // TODO handle moduleDeps for pom generation
-      val pomSettings = ctx.module match {
-        case jm: JavaModule => jm.pomSettings
+      val (scalaVersion, pomOpt, dependencies, jar, sourcesJarOpt, javadocJarOpt) = ctx.depResults
+      pomOpt.zip(sourcesJarOpt).zip(javadocJarOpt).map { case ((pom, sourcesJar), javadocJar) =>
+        val artifactBaseName = s"${pom.artifactId}-${pom.version}"
+        os.remove.all(ctx.out)
+        os.makeDir.all(ctx.out)
+        os.copy.over(jar, ctx.out / s"${artifactBaseName}.jar")
+        os.copy.over(sourcesJar, ctx.out / s"${artifactBaseName}-sources.jar")
+        os.copy.over(javadocJar, ctx.out / s"${artifactBaseName}-javadoc.jar")
+        // TODO handle moduleDeps for pom generation
+        val pomSettings = ctx.module match {
+          case jm: JavaModule => jm.pomSettings
+        }
+        val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, dependencies, pomSettings)
+        val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
+        os.write.over(pomXmlPath, pomXmlContent)
+        PublishArtifactsRes(pom, ctx.out)
       }
-      val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, dependencies, pomSettings)
-      val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
-      os.write.over(pomXmlPath, pomXmlContent)
-      PublishArtifactsRes(pom, ctx.out)
     }
 
   val publishLocalTask = TaskBuilder
-    .make[os.Path](
+    .make[Option[os.Path]](
       name = "publishLocal"
     )
     .dependsOn(publishArtifactsTask)
     .build { ctx =>
-      val publishArtifactsRes = ctx.depResults._1
-      val pom = publishArtifactsRes.pom
-      val artifacts = os.list(publishArtifactsRes.outDir)
-      // generate hashes
-      val allFiles = artifacts.flatMap { f =>
-        Seq(f) ++ Hasher.generateChecksums(f)
+      val publishArtifactsResOpt = ctx.depResults._1
+      publishArtifactsResOpt.map { publishArtifactsRes =>
+        val pom = publishArtifactsRes.pom
+        val artifacts = os.list(publishArtifactsRes.outDir)
+        // generate hashes
+        val allFiles = artifacts.flatMap { f =>
+          Seq(f) ++ Hasher.generateChecksums(f)
+        }
+        ctx.module match {
+          case javaModule: JavaModule =>
+            if javaModule.publish then {
+              val publisher = Publisher(ctx.notifications)
+              publisher.publishLocalM2(pom, allFiles)
+            } else {
+              ctx.notifications.add(
+                ServerNotification.logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled")
+              )
+            }
+          case _ =>
+        }
+        ctx.out
       }
-      ctx.module match {
-        case javaModule: JavaModule =>
-          if javaModule.publish then {
-            val publisher = Publisher(ctx.notifications)
-            publisher.publishLocalM2(pom, allFiles)
-          } else {
-            ctx.notifications.add(
-              ServerNotification.logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled")
-            )
-          }
-        case _ =>
-      }
-      ctx.out
     }
 
   val publishTask = TaskBuilder
-    .make[os.Path](
+    .make[String](
       name = "publish"
     )
     .dependsOn(publishArtifactsTask)
     .build { ctx =>
-      val publishArtifactsRes = ctx.depResults._1
-      val pom = publishArtifactsRes.pom
-      val artifacts = os.list(publishArtifactsRes.outDir)
-      // sign files
-      val pgpPassphrase =
-        sys.env.getOrElse("DEDER_PGP_PASSPHRASE", throw RuntimeException("DEDER_PGP_PASSPHRASE env var not set"))
-      val pgpSecret = sys.env.getOrElse("DEDER_PGP_SECRET", throw RuntimeException("DEDER_PGP_SECRET env var not set"))
-      artifacts.foreach(f => PgpSigner.signFile(f, pgpSecret, pgpPassphrase.toCharArray))
-      // generate hashes
-      val allFiles = artifacts.flatMap { f =>
-        val checksumFile = f / os.up / s"${f.last}.asc"
-        Seq(f, checksumFile) ++
-          Hasher.generateChecksums(f) ++
-          Hasher.generateChecksums(checksumFile)
+      val publishArtifactsResOpt = ctx.depResults._1
+      publishArtifactsResOpt.map { publishArtifactsRes =>
+        val pom = publishArtifactsRes.pom
+        val artifacts = os.list(publishArtifactsRes.outDir)
+        // sign files
+        val pgpPassphrase =
+          sys.env.getOrElse("DEDER_PGP_PASSPHRASE", throw RuntimeException("DEDER_PGP_PASSPHRASE env var not set"))
+        val pgpSecret =
+          sys.env.getOrElse("DEDER_PGP_SECRET", throw RuntimeException("DEDER_PGP_SECRET env var not set"))
+        artifacts.foreach(f => PgpSigner.signFile(f, pgpSecret, pgpPassphrase.toCharArray))
+        // generate hashes
+        val allFiles = artifacts.flatMap { f =>
+          val checksumFile = f / os.up / s"${f.last}.asc"
+          Seq(f, checksumFile) ++
+            Hasher.generateChecksums(f) ++
+            Hasher.generateChecksums(checksumFile)
+        }
+        val username =
+          sys.env.getOrElse(
+            "DEDER_SONATYPE_USERNAME",
+            throw RuntimeException("DEDER_SONATYPE_USERNAME env var not set")
+          )
+        val password =
+          sys.env.getOrElse(
+            "DEDER_SONATYPE_PASSWORD",
+            throw RuntimeException("DEDER_SONATYPE_PASSWORD env var not set")
+          )
+        os.remove.all(ctx.out)
+        val filesDir =
+          ctx.out / "final" / os.SubPath(s"${pom.groupId.replace('.', '/')}/${pom.artifactId}/${pom.version}")
+        os.makeDir.all(filesDir)
+        allFiles.foreach(f => os.copy(f, filesDir / f.last))
+        val filesZip = ctx.out / s"${pom.artifactId}_bundle.zip"
+        os.zip(filesZip, Seq(ctx.out / "final"))
+        val publisher = Publisher(ctx.notifications)
+        if pom.version.endsWith("-SNAPSHOT") then publisher.publishSonatypeSnapshot(username, password, pom, allFiles)
+        else publisher.publishSonatypeCentral(username, password, pom, filesZip)
       }
-      val username =
-        sys.env.getOrElse("DEDER_SONATYPE_USERNAME", throw RuntimeException("DEDER_SONATYPE_USERNAME env var not set"))
-      val password =
-        sys.env.getOrElse("DEDER_SONATYPE_PASSWORD", throw RuntimeException("DEDER_SONATYPE_PASSWORD env var not set"))
-      os.remove.all(ctx.out)
-      val filesDir =
-        ctx.out / "final" / os.SubPath(s"${pom.groupId.replace('.', '/')}/${pom.artifactId}/${pom.version}")
-      os.makeDir.all(filesDir)
-      allFiles.foreach(f => os.copy(f, filesDir / f.last))
-      val filesZip = ctx.out / s"${pom.artifactId}_bundle.zip"
-      os.zip(filesZip, Seq(ctx.out / "final"))
-      val publisher = Publisher(ctx.notifications)
-      if pom.version.endsWith("-SNAPSHOT") then
-        publisher.publishSonatypeSnapshot(username, password, pom, allFiles)
-      else publisher.publishSonatypeCentral(username, password, pom, filesZip)
-      ctx.out
+      ""
     }
 
   // order matters for dependency resolution!!

@@ -125,10 +125,12 @@ public class Main {
             // handy for development, use local server build
             Files.copy(Path.of(serverLocalPath), serverJarPath, StandardCopyOption.REPLACE_EXISTING);
         } else {
-            // TODO figure out server.jar current running version and avoid re-downloading
-            // if same version
-            download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
-                    serverJarPath);
+            // if (Files.exists(serverJarPath)) { // TODO figure out server.jar if == set version and avoid re-download..
+            // for now we just skip it, user can delete server.jar to force re-download
+            if (!Files.exists(serverJarPath)) {
+                download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
+                        serverJarPath);
+            }
         }
         startServerProcess(isBspClient, props);
         System.err.println("Deder server started.");
@@ -221,7 +223,7 @@ public class Main {
     }
 
     private void download(String fileUrl, Path destination) throws Exception {
-        System.err.println("Starting download:  " + fileUrl);
+        System.err.println("Downloading server from " + fileUrl);
         try (var client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
                 .followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build()) {
             var request = HttpRequest.newBuilder().uri(URI.create(fileUrl)).GET().build();

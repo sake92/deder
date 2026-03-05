@@ -3,8 +3,7 @@
 - handle no deder.pkl present
 
 # CI
-- build GraalVM client executables
-- release brew/apt..
+- windows..
 
 ## Config
 
@@ -39,7 +38,7 @@
 
 ## Packaging, publishing
 
-- publish
+- publish for github packages etc
 
 
 ## Web server dashboard

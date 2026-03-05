@@ -209,14 +209,20 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     }
 
     if os.exists(metadataFile) then {
-      val cachedTaskResult = os.read(metadataFile).parseJson[TaskResult[T]]
-      val hasDeps = allDepResults.nonEmpty
-      val newRes = if hasDeps && inputsHash == cachedTaskResult.inputsHash then
-        serverNotificationsLogger.add(ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id)))
-        cachedTaskResult
-      else computeTaskResult()
-      val changed = newRes.outputHash != cachedTaskResult.outputHash
-      (newRes, changed)
+      try {
+        val cachedTaskResult = os.read(metadataFile).parseJson[TaskResult[T]]
+        val hasDeps = allDepResults.nonEmpty
+        val newRes = if hasDeps && inputsHash == cachedTaskResult.inputsHash then
+          serverNotificationsLogger.add(ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id)))
+          cachedTaskResult
+        else computeTaskResult()
+        val changed = newRes.outputHash != cachedTaskResult.outputHash
+        (newRes, changed)
+      } catch {
+        case _: TupsonException =>
+          // if metadata file is corrupted, just recompute
+          (computeTaskResult(), true)
+      }
     } else {
       (computeTaskResult(), true)
     }
