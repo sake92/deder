@@ -635,21 +635,57 @@ class CoreTasks() extends StrictLogging {
       singleton = true
     )
     .dependsOn(runClasspathTask)
+    .dependsOn(mainClassesTask)
     .dependsOn(finalMainClassTask)
     .dependsOn(jvmOptionsTask)
     .build { ctx =>
-      val (runClasspath, mainClass, jvmOptions) = ctx.depResults
-      mainClass match {
+      val (runClasspath, discoveredMainClasses, finalMainClass, jvmOptions) = ctx.depResults
+      finalMainClass match {
         case Some(mc) =>
           val cp = runClasspath.map(_.toString)
           val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp.mkString(File.pathSeparator), mc) ++ ctx.args
           logger.debug(s"Client should run command: ${cmd}")
           ctx.notifications.add(ServerNotification.RunSubprocess(cmd, ctx.watch))
-          // TODO run ScalaJS with node
           cmd
         case None =>
-          // TODO ability to set one..
-          throw new Exception(s"No main class specified for module: ${ctx.module.id}")
+          if discoveredMainClasses.length > 1 then
+            throw new Exception(
+              s"Multiple main classes discovered for module '${ctx.module.id}': ${discoveredMainClasses.mkString(", ")}. " +
+                "Please specify which one to run in deder.pkl or use runMain task with main class argument."
+            )
+          else throw new Exception(s"No main class specified for module: ${ctx.module.id}")
+      }
+    }
+
+  val runMainTask = TaskBuilder
+    .make[Seq[String]](
+      name = "runMain",
+      singleton = true
+    )
+    .dependsOn(runClasspathTask)
+    .dependsOn(mainClassesTask)
+    .dependsOn(jvmOptionsTask)
+    .build { ctx =>
+      val (runClasspath, discoveredMainClasses, jvmOptions) = ctx.depResults
+      val selectedMainClass = ctx.args.headOption.getOrElse(
+        throw RuntimeException(
+          "No main class specified to run. Please provide the main class as an argument. " +
+            s"Possible candidates: ${discoveredMainClasses.mkString(", ")}"
+        )
+      )
+      val finalMainClass = discoveredMainClasses.find(_ == selectedMainClass)
+      finalMainClass match {
+        case Some(mc) =>
+          val cp = runClasspath.map(_.toString)
+          val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp.mkString(File.pathSeparator), mc) ++ ctx.args.tail
+          logger.debug(s"Client should run command: ${cmd}")
+          ctx.notifications.add(ServerNotification.RunSubprocess(cmd, ctx.watch))
+          cmd
+        case None =>
+          throw new RuntimeException(
+            s"Class '${selectedMainClass}' with main method not found for module '${ctx.module.id}'. " +
+              s"Possible candidates: ${discoveredMainClasses.mkString(", ")}"
+          )
       }
     }
 
@@ -855,7 +891,9 @@ class CoreTasks() extends StrictLogging {
             )
           } else {
             ctx.notifications.add(
-              ServerNotification.logInfo(s"Skipping POM generation for module ${jm.id} because publish is set to false")
+              ServerNotification.logDebug(
+                s"Skipping POM generation for module ${jm.id} because publish is set to false"
+              )
             )
             None
           }
@@ -1090,6 +1128,7 @@ class CoreTasks() extends StrictLogging {
     mainClassesTask,
     finalMainClassTask,
     runTask,
+    runMainTask,
     testClassesTask,
     testTask,
     jarTask,

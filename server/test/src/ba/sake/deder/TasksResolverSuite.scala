@@ -89,6 +89,7 @@ class TasksResolverSuite extends munit.FunSuite {
       "allJars",
       "assembly",
       "run",
+      "runMain",
       "sourcesJar",
       "javadocJar",
       "pomSettings",
@@ -157,7 +158,11 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.finalMainClass", s"${moduleId}.mainClass"),
       (s"${moduleId}.run", s"${moduleId}.jvmOptions"),
       (s"${moduleId}.run", s"${moduleId}.runClasspath"),
-      (s"${moduleId}.run", s"${moduleId}.finalMainClass")
+      (s"${moduleId}.run", s"${moduleId}.mainClasses"),
+      (s"${moduleId}.run", s"${moduleId}.finalMainClass"),
+      (s"${moduleId}.runMain", s"${moduleId}.jvmOptions"),
+      (s"${moduleId}.runMain", s"${moduleId}.runClasspath"),
+      (s"${moduleId}.runMain", s"${moduleId}.mainClasses")
     )
 
   private def scalaTestModuleTaskEdges(moduleId: String): Set[(String, String)] =
