@@ -977,6 +977,8 @@ class CoreTasks() extends StrictLogging {
             )
           else Seq.empty
 
+        if tastyFiles.isEmpty then throw RuntimeException(s"No .tasty files found in ${classesDir} for generating scaladoc")
+
         val deps = Seq(Dependency.make(s"org.scala-lang::scaladoc:${scalaVersion}", scalaVersion))
         val depsJars = DependencyResolver.fetchFiles(deps, Some(ctx.notifications))
         ClassLoaderUtils.withClassLoader(depsJars, parent = null) { classLoader =>

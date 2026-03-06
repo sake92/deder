@@ -1,0 +1,49 @@
+amends "https://sake92.github.io/deder/config/DederProject.pkl"
+
+local const mylibrary = new ScalaModule {
+  scalaVersion = "3.7.1"
+  id = "mylibrary"
+  deps {
+    "com.lihaoyi::os-lib:0.11.6"
+  }
+  pomSettings = makePomSettings("mylibrary")
+}
+
+local const myapp = new ScalaModule {
+  scalaVersion = "3.7.1"
+  id = "myapp"
+  moduleDeps {
+    mylibrary
+  }
+  pomSettings = makePomSettings("myapp")
+}
+
+modules {
+  mylibrary
+  myapp
+}
+
+local const function makePomSettings(_artifactId: String): PomSettings = new {
+  groupId = "com.example"
+  artifactId = _artifactId
+  version = "0.0.1-SNAPSHOT"
+  name = "Deder Example"
+  description = "Deder example"
+  url = "https://github.com/myuser/deder-example"
+  licenses {
+    new PomLicense {
+      name = "MIT License"
+      url = "http://www.opensource.org/licenses/mit-license.php"
+    }
+  }
+  developers {
+    new PomDeveloper {
+      id = "myuser"
+      name = "My User"
+      email = "myuser@example.com"
+    }
+  }
+  scm {
+    url = "git@github.com:myuser/deder-example.git"
+  }
+}
