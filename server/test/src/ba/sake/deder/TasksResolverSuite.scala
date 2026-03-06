@@ -94,6 +94,7 @@ class TasksResolverSuite extends munit.FunSuite {
       "sourcesJar",
       "javadocJar",
       "pomSettings",
+      "moduleDepsPomSettings",
       "publishArtifacts",
       "publishLocal",
       "publish"

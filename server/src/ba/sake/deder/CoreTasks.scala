@@ -913,6 +913,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(pomSettingsTask)
     .build { ctx =>
       val pom: Option[PomSettings] = ctx.depResults._1
+      // just the first level, direct module dependencies
       pom.toSeq ++ ctx.transitiveResults.headOption.getOrElse(Seq.empty).flatten
     }
 
@@ -1026,7 +1027,6 @@ class CoreTasks() extends StrictLogging {
         os.copy.over(jar, ctx.out / s"${artifactBaseName}.jar")
         os.copy.over(sourcesJar, ctx.out / s"${artifactBaseName}-sources.jar")
         os.copy.over(javadocJar, ctx.out / s"${artifactBaseName}-javadoc.jar")
-        // TODO handle moduleDeps for pom generation
         val pomSettings = ctx.module match {
           case jm: JavaModule => jm.pomSettings
         }

@@ -33,7 +33,6 @@ local const uber = (baseModule) {
   mainClass = "uber.Main"
 }
 
-// TODO how to DRY this ?
 local const uberTest = new ScalaTestModule {
   id = "uber-test"
   root = "uber/test"
