@@ -211,7 +211,7 @@ class CoreTasks() extends StrictLogging {
                 )
               )
             case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang::scala3-library:${scalaVersion}", scalaVersion))
-            case _ => Seq.empty
+            case _              => Seq.empty
           }
         else
           ctx.module match {
@@ -263,7 +263,7 @@ class CoreTasks() extends StrictLogging {
                 )
               )
             case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion))
-            case _ => Seq.empty
+            case _              => Seq.empty
           }
       scalaLibDeps
     }
@@ -303,7 +303,7 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       // we feed even this module's classes dir because of javac annotation processing,
       // it can generate java sources.. and then scala sources can depend on them
-      val (scalaVersion,mandatoryDependencies,  dependencies, allClassesDirs) = ctx.depResults
+      val (scalaVersion, mandatoryDependencies, dependencies, allClassesDirs) = ctx.depResults
       val depsJars = DependencyResolver
         .fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
       (allClassesDirs ++ depsJars).reverse.distinct.reverse
@@ -905,6 +905,17 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
+  val moduleDepsPomSettingsTask =   TaskBuilder
+    .make[Seq[PomSettings]](
+      name = "moduleDepsPomSettings",
+      transitive = true
+    )
+    .dependsOn(pomSettingsTask)
+    .build { ctx =>
+      val pom: Option[PomSettings] = ctx.depResults._1
+      pom.toSeq ++ ctx.transitiveResults.headOption.getOrElse(Seq.empty).flatten
+    }
+
   val sourcesJarTask = TaskBuilder
     .make[Option[os.Path]](name = "sourcesJar")
     .dependsOn(pomSettingsTask)
@@ -999,13 +1010,15 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(scalaVersionTask)
     .dependsOn(pomSettingsTask)
+    .dependsOn(moduleDepsPomSettingsTask)
     .dependsOn(mandatoryDependenciesTask)
     .dependsOn(dependenciesTask)
     .dependsOn(jarTask)
     .dependsOn(sourcesJarTask)
     .dependsOn(javadocJarTask)
     .build { ctx =>
-      val (scalaVersion, pomOpt, mandatoryDependencies, dependencies, jar, sourcesJarOpt, javadocJarOpt) = ctx.depResults
+      val (scalaVersion, pomOpt, moduleDepsPomSettings, mandatoryDependencies, dependencies, jar, sourcesJarOpt, javadocJarOpt) =
+        ctx.depResults
       pomOpt.zip(sourcesJarOpt).zip(javadocJarOpt).map { case ((pom, sourcesJar), javadocJar) =>
         val artifactBaseName = s"${pom.artifactId}-${pom.version}"
         os.remove.all(ctx.out)
@@ -1018,7 +1031,8 @@ class CoreTasks() extends StrictLogging {
           case jm: JavaModule => jm.pomSettings
         }
         val allDependencies = mandatoryDependencies ++ dependencies
-        val pomXmlContent = PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, allDependencies, pomSettings)
+        val pomXmlContent =
+          PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, allDependencies, pomSettings, moduleDepsPomSettings.tail)
         val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
         os.write.over(pomXmlPath, pomXmlContent)
         PublishArtifactsRes(pom, ctx.out)
@@ -1143,6 +1157,7 @@ class CoreTasks() extends StrictLogging {
     fastLinkJsTask,
     nativeLinkTask,
     pomSettingsTask,
+    moduleDepsPomSettingsTask,
     sourcesJarTask,
     javadocJarTask,
     publishArtifactsTask,

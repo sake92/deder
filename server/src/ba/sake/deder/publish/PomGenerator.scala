@@ -14,7 +14,8 @@ object PomGenerator {
       artifactId: String,
       version: String,
       dependencies: Seq[Dependency],
-      pomSettings: PklPomSettings
+      pomSettings: PklPomSettings,
+      moduleDepsPomSettings: Seq[PomSettings]
   ): String = {
     val model = new Model()
     model.setModelVersion("4.0.0")
@@ -44,18 +45,26 @@ object PomGenerator {
       scm.setDeveloperConnection(pomSettings.scm.developerConnection)
       model.setScm(scm)
     }
-    if (dependencies.nonEmpty) {
-      val mavenDependencies = dependencies.map { dep =>
-        val coursierDep = dep.applied
-        val d = new org.apache.maven.model.Dependency()
-        d.setGroupId(coursierDep.module.organization)
-        d.setArtifactId(coursierDep.module.name)
-        d.setVersion(coursierDep.version)
-        d.setScope(coursierDep.userParamsMap.getOrElse("scope", Seq.empty).headOption.flatten.getOrElse("compile"))
-        d
-      }
-      model.setDependencies(mavenDependencies.asJava)
+
+    val mavenDependencies = new java.util.ArrayList[org.apache.maven.model.Dependency]()
+    dependencies.foreach { dep =>
+      val coursierDep = dep.applied
+      val d = new org.apache.maven.model.Dependency()
+      d.setGroupId(coursierDep.module.organization)
+      d.setArtifactId(coursierDep.module.name)
+      d.setVersion(coursierDep.version)
+      d.setScope(coursierDep.userParamsMap.getOrElse("scope", Seq.empty).headOption.flatten.getOrElse("compile"))
+      mavenDependencies.add(d)
     }
+    moduleDepsPomSettings.foreach { moduleDep =>
+      val d = new org.apache.maven.model.Dependency()
+      d.setGroupId(moduleDep.groupId)
+      d.setArtifactId(moduleDep.artifactId)
+      d.setVersion(moduleDep.version)
+      d.setScope("compile")
+      mavenDependencies.add(d)
+    }
+    model.setDependencies(mavenDependencies)
 
     val writer = new MavenXpp3Writer()
     val stringWriter = new StringWriter()
