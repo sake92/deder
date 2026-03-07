@@ -15,6 +15,8 @@ tutorials:
 references:
   - label: "Architecture"
     url: "/reference/architecture.html"
+  - label: "Files layout"
+    url: "/reference/files-layout.html"
 
 philosophies:
   - label: "Design Philosophy"
