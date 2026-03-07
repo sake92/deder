@@ -1,4 +1,4 @@
-# deder
+# Deder
 
 
 Config based, concurrent-first, client-server JVM build tool.
@@ -122,7 +122,7 @@ deder bsp install
 ## IDE setup
 
 Run `deder bsp install` and just open with VSCode or IntelliJ (open as a BSP project).
-The `reset.sh` script does this for you..
+The `reset.sh` script does this for you in examples...
 
 Currently working features:
 - import of project
@@ -133,58 +133,9 @@ Currently working features:
 
 If you work on server code, after you build it you can run `./reset.sh` in examples/multi
 
-## OTEL tracing
 
-You can start [Jaeger](https://www.jaegertracing.io/) locally with docker:
-```shell
-docker run --rm --name jaeger \
-  -p 16686:16686 \
-  -p 4317:4317 \
-  -p 4318:4318 \
-  -p 5778:5778 \
-  -p 9411:9411 \
-  cr.jaegertracing.io/jaegertracing/jaeger:2.14.0
-```
 
-or Grafana LGTM:
-```shell
-git clone git@github.com:grafana/docker-otel-lgtm.git
-cd docker-otel-lgtm
-./run-lgtm.sh
-```
+## Contributing
 
-then configure the deder server to use the OTEL java agent:
-```shell
-curl -L -o otel.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
-
-# set the agent options in .deder/server.properties:
-JAVA_OPTS=-javaagent:../../otel.jar -Dotel.service.name=deder-server -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
-
-# see examples/multi/.deder/server.properties for an example
-```
-
-The deder server only depends on OTEL API, so if no agent is provided it will just run normally without tracing.
-
-## Building locally
-
-Build the server and client:
-```shell
-./scripts/gen-config-bindings.sh
-./mill server.assembly
-
-# client executable JAR
-./mill client.assembly
-# or as native client
-./mill client-native.nativeImage
-
-# AND PUT CLIENT IN PATH !!! for example:
-cp out/client/assembly.dest/out.jar /usr/local/bin/deder
-cp out/client-native/nativeImage.dest/native-executable /usr/local/bin/deder
-
-# then you can run commands:
-cd examples/multi
-# start from clean state, copy the server JAR etc
-./reset
-```
-
+See [dev docs](docs/dev/README.md) for how to build Deder locally, run integration tests, setup tracing etc.
 
