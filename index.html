@@ -59,13 +59,15 @@
     <div></div>
    </div>
    <h1 id="deder">Deder<a href="#deder" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <p>Deder is a config-based, concurrent-first client-server build tool designed for JVM projects (Java and Scala).
+   <p>Deder is a config-based, concurrent-first, client-server build tool for JVM projects (Java and Scala).
     <br>
     It uses <a href="https://pkl-lang.org/">Pkl</a> for configuration, providing type safety, IDE support, and powerful abstraction capabilities.</p>
    <h2 id="key-concepts">Key Concepts<a href="#key-concepts" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <p>A <strong>project</strong> is the root directory where your build configuration lives. (usually git repo root)</p>
+   <p><strong>Project</strong> is the root directory where your build configuration lives (usually the git repo root).</p>
    <p><strong>Modules</strong> are subprojects within your project (like <code>common</code>, <code>frontend</code>, <code>backend</code>, etc.). They can depend on each other, forming a directed acyclic graph (DAG).</p>
-   <p><strong>Tasks</strong> are operations that can be performed on modules (like <code>compile</code>, <code>run</code>, <code>test</code>). Each module type has a predefined set of tasks available.</p>
+   <p><strong>Tasks</strong> are operations that can be performed on modules (like <code>compile</code>, <code>run</code>, <code>test</code>). Each module type has a predefined set of tasks available.
+    <br>
+    They also form a directed acyclic graph (DAG).</p>
    <h2 id="site-map">Site Map<a href="#site-map" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <ul>
     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a>
@@ -156,15 +158,18 @@ deder bsp install
    <h2 id="dependencies">Dependencies<a href="#dependencies" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Dependencies are written using Coursier's Dependency syntax.
     <br>
-    See <a href="https://github.com/coursier/dependency">https://github.com/coursier/dependency</a> for more details</p>
+    See <a href="https://github.com/coursier/dependency">https://github.com/coursier/dependency</a> for more details.</p>
    <h2 id="ide-setup">IDE setup<a href="#ide-setup" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <p>Run <code>deder bsp install</code> and just open with VSCode or IntelliJ (open as a BSP project). The <code>reset.sh</code> script does this for you..</p>
+   <p>Run <code>deder bsp install</code> and then open with VSCode or IntelliJ (open as a BSP project).
+    <br>
+    The <code>reset.sh</code> script in each of example folder does this for you.</p>
    <p>Currently working features:</p>
    <ul>
     <li>import of project</li>
     <li>navigation</li>
     <li>compilation and diagnostics</li>
     <li>run main scala classes (Java doesnt.. #todo-fixme )</li>
+    <li>run tests</li>
    </ul>
    <h2 id="tips--tricks">Tips &amp; Tricks<a href="#tips--tricks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Generate an SVG of the dependency graph for a specific task:</p>

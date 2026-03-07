@@ -78,6 +78,15 @@ modules {
   ...myModules
 }
 </code></pre>
+   <p>This assumes you have a project folder structure like this:</p>
+   <pre><code class="language- hljs language-stylus" data-highlighted="yes">deder<span class="hljs-selector-class">.pkl</span>
+my-module/
+    <span class="hljs-attribute">src</span>/
+        Main<span class="hljs-selector-class">.scala</span>
+    test/
+        <span class="hljs-attribute">src</span>/
+            MainTest<span class="hljs-selector-class">.scala</span>
+</code></pre>
    <h2 id="run-your-first-task">Run Your First Task<a href="#run-your-first-task" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <pre><code class="language-bash hljs" data-highlighted="yes"><span class="hljs-comment"># Compile all modules</span>
 deder <span class="hljs-built_in">exec</span> -t compile
@@ -99,7 +108,7 @@ deder plan -m my-module -t compile
    <pre><code class="language-bash hljs" data-highlighted="yes"><span class="hljs-comment"># Run the main class of my-module</span>
 deder <span class="hljs-built_in">exec</span> -t run -m my-module
 
-<span class="hljs-comment"># Watch mode - recompile on changes</span>
+<span class="hljs-comment"># Watch mode - recompile automatically when source files change</span>
 deder <span class="hljs-built_in">exec</span> -t compile -m my-module --watch
 
 <span class="hljs-comment"># Run tests</span>

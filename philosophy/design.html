@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Deder Design | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#deder-design">Deder Design</a>
+         <ul>
+          <li><a href="#file-watching">File watching</a></li>
+          <li><a href="#modules-graph">Modules graph</a></li>
+          <li><a href="#tasks-graph">Tasks graph</a></li>
+          <li><a href="#plan-graph-and-execution-stages">Plan graph and execution stages</a></li>
+          <li><a href="#plan-execution">Plan execution</a></li>
+          <li><a href="#concurrent-execution-and-locking">Concurrent execution and locking</a></li>
+          <li><a href="#caching--minimality">Caching / minimality</a></li>
+          <li><a href="#bsp">BSP</a></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="deder-design">Deder Design<a href="#deder-design" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <h2 id="file-watching">File watching<a href="#file-watching" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Deder instantiates a file watcher in the project root.</p>
+   <p>If <code>deder.pkl</code> changes, the config is reloaded automatically, no need to do anything.</p>
+   <p>If any source files change, the affected watched tasks are re-executed.
+    <br>
+    E.g. if you do <code>deder -t compile --watch</code>, then the <code>compile</code> task is re-executed whenever source files change.</p>
+   <h2 id="modules-graph">Modules graph<a href="#modules-graph" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>A graph of modules is formed from the config. E.g <code>A</code> depends on <code>B</code> etc.
+    <br>
+    Of course, it has to be a DAG, no cycles are allowed.</p>
+   <h2 id="tasks-graph">Tasks graph<a href="#tasks-graph" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Every module type has a <em>set of tasks</em> defined for it.
+    <br>
+    These tasks can depend on each other, forming another DAG (e.g. <code>run</code> depends on <code>compile</code>).</p>
+   <p>Tasks can be <em>transitive</em>, meaning they invoke depending module tasks <em>with same name</em> transitively.
+    <br>
+    An example of a transitive task is the <code>compile</code> task.
+    <br>
+    If you say <code>deder -t compile -m A</code> where A depends on B, then B must be compiled before it.</p>
+   <h2 id="plan-graph-and-execution-stages">Plan graph and execution stages<a href="#plan-graph-and-execution-stages" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Say we have 2 tasks: <code>compile</code> and <code>run</code>.
+    <br>
+    When we invoke <code>deder -t run -m A</code> we need to execute <code>A.compile</code> and then <code>A.run</code>.</p>
+   <p>So we need a <em>subgraph of tasks</em>.
+    <br>
+    Additionally, we must not execute the same task more than once, <em>minimality</em>.</p>
+   <p>How can we build this subgraph? We start from <code>A.run</code>, and work our way backwards, collecting all depending tasks <em>recursively</em>.</p>
+   <p>Then we go the other way, starting from the tasks with no dependencies, and build "stages" of tasks.
+    <br>
+    At the end we will get a <code>List[List[Task]]</code>, where the outer <code>List</code> is a list of "stages".
+    <br>
+    The first stage contains a list of tasks which have <em>no dependencies</em>.
+    <br>
+    The second stage tasks depend on some tasks from first stage, and so on.</p>
+   <h2 id="plan-execution">Plan execution<a href="#plan-execution" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>We execute the first stage and collect the tasks results.
+    <br>
+    Then we <em>feed those results to the next stage</em> and so on, until we reach our given goal task.</p>
+   <blockquote>
+    <p>Notice that each stage can leverage concurrent execution, since the task in one stage are independent.</p>
+   </blockquote>
+   <p>We need to be careful about error handling, we usually want to exit early and print a nice error message.</p>
+   <h2 id="concurrent-execution-and-locking">Concurrent execution and locking<a href="#concurrent-execution-and-locking" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>A "task-instance" is a task on a specific module, e.g. <code>A.compile</code> or <code>B.run</code>.</p>
+   <p>Locking is done at task-instance level before starting execution.
+    <br>
+    All plan subgraph task-instances are locked first, and only then the execution starts.</p>
+   <p>The task-instances are <em>sorted by their ids</em>, so that <strong>global ordering</strong> is achieved. This makes sure there are <strong>no deadlocks</strong>.</p>
+   <h2 id="caching--minimality">Caching / minimality<a href="#caching--minimality" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <ul>
+    <li>if inputs hash hasnt changed, dont do it</li>
+    <li>Blake3 algo for file hashing</li>
+    <li>use relative paths as much as possible</li>
+   </ul>
+   <h2 id="bsp">BSP<a href="#bsp" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <ul>
+    <li>one server per BSP client (intellij/metals)</li>
+   </ul>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>
