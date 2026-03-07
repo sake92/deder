@@ -1,7 +1,7 @@
 # deder
 
 
-Config based, concurrent-first client-server build tool
+Config based, concurrent-first, client-server JVM build tool.
 
 See [dev docs](docs/dev/README.md) for more technical details
 
@@ -19,9 +19,9 @@ See [dev docs](docs/dev/README.md) for more technical details
 - some features only work for scala3, help welcome! :)
 
 ## Concepts
-- project is the root of your git repo
-- modules are "subprojects", like common/frontend/app..
-- modules have tasks defined for them
+- *project* is the root of your git repo
+- *module is a "subproject", like `common`/`frontend`/`app`..
+- *task* is something you can run on a module, like `compile`/`test`/`run`/`assembly`..
 
 See [examples/multi](examples/multi/) for a working example project.
 

@@ -30,6 +30,18 @@ modules {
 }
 ```
 
+This assumes you have a project folder structure like this:
+
+```
+deder.pkl
+my-module/
+    src/
+        Main.scala
+    test/
+        src/
+            MainTest.scala
+```
+
 ## Run Your First Task
 
 ```bash
@@ -59,7 +71,7 @@ deder plan -m my-module -t compile
 # Run the main class of my-module
 deder exec -t run -m my-module
 
-# Watch mode - recompile on changes
+# Watch mode - recompile automatically when source files change
 deder exec -t compile -m my-module --watch
 
 # Run tests

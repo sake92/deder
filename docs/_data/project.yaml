@@ -12,4 +12,12 @@ tutorials:
   - label: "Publishing"
     url: "/tutorials/publishing.html"
 
+references:
+  - label: "Architecture"
+    url: "/reference/architecture.html"
 
+philosophies:
+  - label: "Design Philosophy"
+    url: "/philosophy/design.html"
+  - label: "Why Pkl?"
+    url: "/philosophy/why-pkl.html"

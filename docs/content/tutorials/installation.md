@@ -5,7 +5,16 @@ description: Deder Installation
 
 # Installation
 
-1. Download `deder-client.jar` from the [early release](https://github.com/sake92/deder/releases/tag/early-access)
+### Homebrew (macOS and Linux)
+
+```shell
+brew install sake92/tap/deder
+```
+
+
+## Manual installation
+
+1. Download `deder-client.jar` (or a native executable for your OS) from the [early release](https://github.com/sake92/deder/releases/tag/early-access)
 2. Rename it to just `deder`:
 ```bash
 mv deder-client.jar deder
@@ -14,7 +23,7 @@ mv deder-client.jar deder
 ```bash
 chmod +x deder
 ```
-4. Put it in your `PATH`:
+4. Put it in your `PATH`, e.g. by moving it to `/usr/local/bin/`:
 ```bash
 sudo mv deder /usr/local/bin/
 ```

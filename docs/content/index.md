@@ -7,18 +7,19 @@ pagination:
 
 # Deder
 
-Deder is a config-based, concurrent-first client-server build tool designed for JVM projects (Java and Scala).  
+Deder is a config-based, concurrent-first, client-server build tool for JVM projects (Java and Scala).  
 It uses [Pkl](https://pkl-lang.org/) for configuration, providing type safety, IDE support, and powerful abstraction capabilities.
 
 ## Key Concepts
 
-A **project** is the root directory where your build configuration lives. (usually git repo root)
+**Project** is the root directory where your build configuration lives (usually the git repo root).
 
 **Modules** are subprojects within your project (like `common`, `frontend`, `backend`, etc.).
 They can depend on each other, forming a directed acyclic graph (DAG).
 
 **Tasks** are operations that can be performed on modules (like `compile`, `run`, `test`).
-Each module type has a predefined set of tasks available.
+Each module type has a predefined set of tasks available.  
+They also form a directed acyclic graph (DAG).
 
 ## Site Map
 - [Tutorials](/tutorials)
@@ -107,18 +108,19 @@ deder bsp install
 ## Dependencies
 
 Dependencies are written using Coursier's Dependency syntax.  
-See https://github.com/coursier/dependency for more details
+See https://github.com/coursier/dependency for more details.
 
 ## IDE setup
 
-Run `deder bsp install` and just open with VSCode or IntelliJ (open as a BSP project).
-The `reset.sh` script does this for you..
+Run `deder bsp install` and then open with VSCode or IntelliJ (open as a BSP project).  
+The `reset.sh` script in each of example folder does this for you.
 
 Currently working features:
 - import of project
 - navigation
 - compilation and diagnostics
 - run main scala classes (Java doesnt.. #todo-fixme )
+- run tests
 
 
 
