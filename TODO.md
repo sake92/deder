@@ -1,6 +1,9 @@
 
 
 - handle no deder.pkl present
+- summarize { ctx => }, e.g. for test task, show final result, which tests failed etc.
+  - currently each module prints its own test results, which is noisy and not ideal for CI etc.. 
+  - would be better to have a single summary at the end
 
 # CI
 - windows..

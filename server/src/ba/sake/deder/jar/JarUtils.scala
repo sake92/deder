@@ -52,7 +52,6 @@ object JarUtils {
       manifest.build
     )
     try {
-      assert(inputPaths.iterator.forall(os.exists(_)))
       if (includeDirs) {
         val _ = seen.add(os.sub / "META-INF")
         val entry = new JarEntry("META-INF/")
@@ -63,6 +62,7 @@ object JarUtils {
       // Note: we only sort each input path, but not the whole archive
       for {
         p <- inputPaths
+        if os.exists(p) // e.g. if no classes were compiled..
         (file, mapping) <-
           if (os.isFile(p)) Seq((p, os.sub / p.last))
           else os.walk(p).map(sub => (sub, sub.subRelativeTo(p))).sorted

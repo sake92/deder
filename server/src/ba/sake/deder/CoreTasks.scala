@@ -432,6 +432,41 @@ class CoreTasks() extends StrictLogging {
       pluginJars
     }
 
+  val compilerDepsTask = TaskBuilder
+    .make[Seq[Dependency]](
+      name = "compilerDeps"
+    )
+    .dependsOn(scalaVersionTask)
+    .build { ctx =>
+      val scalaVersion = ctx.depResults._1
+      // TODO scalajs compiler on scala2?
+      val compilerDeps =
+        if scalaVersion.startsWith("3.") then
+          ctx.module match {
+            case m: ScalaJsModule =>
+              Seq(
+                Dependency.make(
+                  s"org.scala-lang::scala3-compiler:${scalaVersion}",
+                  scalaVersion,
+                  ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
+                )
+              )
+            case m: ScalaModule =>
+              Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion))
+            case _ => Seq.empty
+          }
+        else
+          ctx.module match {
+            case m: ScalaModule =>
+              Seq(
+                Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
+                Dependency.make(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion)
+              )
+            case _ => Seq.empty
+          }
+      compilerDeps
+    }
+
   // returns classes dir
   val compileTask = TaskBuilder
     .make[DederPath](
@@ -445,6 +480,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(javacOptionsTask)
     .dependsOn(scalacOptionsTask)
     .dependsOn(scalaVersionTask)
+    .dependsOn(compilerDepsTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(classesTask)
     .dependsOn(semanticdbDirTask)
@@ -460,6 +496,7 @@ class CoreTasks() extends StrictLogging {
         javacOptions,
         scalacOptions,
         scalaVersion,
+        compilerDeps,
         compileClasspath,
         classesDir,
         semanticdbDir,
@@ -489,31 +526,6 @@ class CoreTasks() extends StrictLogging {
       // annotation processors need generated sources dir to exist
       os.makeDir.all(generatedSourcesDir)
 
-      // TODO scalajs compiler on scala2?
-      val compilerDeps =
-        if scalaVersion.startsWith("3.") then
-          ctx.module match {
-            case m: ScalaJsModule =>
-              Seq(
-                Dependency.make(
-                  s"org.scala-lang::scala3-compiler:${scalaVersion}",
-                  scalaVersion,
-                  ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
-                )
-              )
-            case m: ScalaModule =>
-              Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion))
-            case _ => Seq.empty
-          }
-        else
-          ctx.module match {
-            case m: ScalaModule =>
-              Seq(
-                Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
-                Dependency.make(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion)
-              )
-            case _ => Seq.empty
-          }
       val compilerJars = DependencyResolver.fetchFiles(compilerDeps)
 
       val zincCacheFile = ctx.out / "inc_compile.zip"
@@ -905,7 +917,7 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
-  val moduleDepsPomSettingsTask =   TaskBuilder
+  val moduleDepsPomSettingsTask = TaskBuilder
     .make[Seq[PomSettings]](
       name = "moduleDepsPomSettings",
       transitive = true
@@ -937,62 +949,83 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(scalaVersionTask)
     .dependsOn(pomSettingsTask)
     .dependsOn(sourcesTask)
+    .dependsOn(compilerDepsTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(compileTask)
     .dependsOn(classesTask)
     .build { ctx =>
-      val (scalaVersion, pomSettingsOpt, sources, compileClasspath, _, classesDir) = ctx.depResults
+      val (scalaVersion, pomSettingsOpt, sources, compilerDeps, compileClasspath, _, classesDir) = ctx.depResults
       pomSettingsOpt.map { pomSettings =>
         os.remove.all(ctx.out)
         os.makeDir.all(ctx.out)
         val generatedDir = ctx.out / "generated"
         os.makeDir.all(generatedDir)
 
-        // TODO java, scala2
-        // scala2 wants sources, scala3 tasty files..
-        val sourceFiles = sources
-          .map(_.absPath)
-          .flatMap { sourceDir =>
-            if os.exists(sourceDir) then
-              os.walk(
-                sourceDir,
-                skip = p => {
-                  if os.isDir(p) then false
-                  else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
-                  else true
-                }
-              )
-            else Seq.empty
-          }
-          .filter(os.isFile)
-        val tastyFiles =
-          if os.exists(classesDir) then
-            os.walk(
-              classesDir,
-              skip = p => {
-                if os.isDir(p) then false
-                else if os.isFile(p) then !(p.ext == "tasty")
-                else true
+        ctx.module match {
+          case module: ScalaModule =>
+            if scalaVersion.startsWith("3.") then {
+              val tastyFiles =
+                if os.exists(classesDir) then
+                  os.walk(
+                    classesDir,
+                    skip = p => {
+                      if os.isDir(p) then false
+                      else if os.isFile(p) then !(p.ext == "tasty")
+                      else true
+                    }
+                  )
+                else Seq.empty
+              if tastyFiles.isEmpty then
+                throw RuntimeException(s"No .tasty files found in ${classesDir} for generating scaladoc")
+              val deps = Seq(Dependency.make(s"org.scala-lang::scaladoc:${scalaVersion}", scalaVersion))
+              val depsJars = DependencyResolver.fetchFiles(deps, Some(ctx.notifications))
+              ClassLoaderUtils.withClassLoader(depsJars, parent = null) { classLoader =>
+                val scaladocClass = classLoader.loadClass("dotty.tools.scaladoc.Main")
+                val scaladocMethod = scaladocClass.getMethod("run", classOf[Array[String]])
+                val args = Array[String](
+                  "-d",
+                  generatedDir.toString,
+                  "-classpath",
+                  compileClasspath.mkString(File.pathSeparator),
+                  "--"
+                ) ++ tastyFiles.filter(os.isFile(_)).map(_.toString)
+                val scaladocObj = scaladocClass.getConstructor().newInstance()
+                scaladocMethod.invoke(scaladocObj, args)
               }
-            )
-          else Seq.empty
-
-        if tastyFiles.isEmpty then throw RuntimeException(s"No .tasty files found in ${classesDir} for generating scaladoc")
-
-        val deps = Seq(Dependency.make(s"org.scala-lang::scaladoc:${scalaVersion}", scalaVersion))
-        val depsJars = DependencyResolver.fetchFiles(deps, Some(ctx.notifications))
-        ClassLoaderUtils.withClassLoader(depsJars, parent = null) { classLoader =>
-          val scaladocClass = classLoader.loadClass("dotty.tools.scaladoc.Main")
-          val scaladocMethod = scaladocClass.getMethod("run", classOf[Array[String]])
-          val args = Array[String](
-            "-d",
-            generatedDir.toString,
-            "-classpath",
-            compileClasspath.mkString(File.pathSeparator),
-            "--"
-          ) ++ tastyFiles.filter(os.isFile(_)).map(_.toString)
-          val scaladocObj = scaladocClass.getConstructor().newInstance()
-          scaladocMethod.invoke(scaladocObj, args)
+            } else {
+              // TODO java, scala2
+              // scala2 wants sources, scala3 tasty files..
+              val sourceFiles = sources
+                .map(_.absPath)
+                .flatMap { sourceDir =>
+                  if os.exists(sourceDir) then
+                    os.walk(
+                      sourceDir,
+                      skip = p => {
+                        if os.isDir(p) then false
+                        else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
+                        else true
+                      }
+                    )
+                  else Seq.empty
+                }
+                .filter(os.isFile)
+              val depsJars = DependencyResolver.fetchFiles(compilerDeps, Some(ctx.notifications))
+              ClassLoaderUtils.withClassLoader(depsJars, parent = null) { classLoader =>
+                val scaladocClass = classLoader.loadClass("scala.tools.nsc.ScalaDoc")
+                val scaladocMethod = scaladocClass.getMethod("process", classOf[Array[String]])
+                val args = Array[String](
+                  "-d",
+                  generatedDir.toString,
+                  "-classpath",
+                  compileClasspath.mkString(File.pathSeparator),
+                  "--"
+                ) ++ sourceFiles.filter(os.isFile(_)).map(_.toString)
+                val scaladocObj = scaladocClass.getConstructor().newInstance()
+                scaladocMethod.invoke(scaladocObj, args)
+              }
+            }
+          case _ => ???
         }
 
         val resultJarPath = ctx.out / s"${pomSettings.artifactId}-javadoc.jar"
@@ -1020,7 +1053,16 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(sourcesJarTask)
     .dependsOn(javadocJarTask)
     .build { ctx =>
-      val (scalaVersion, pomOpt, moduleDepsPomSettings, mandatoryDependencies, dependencies, jar, sourcesJarOpt, javadocJarOpt) =
+      val (
+        scalaVersion,
+        pomOpt,
+        moduleDepsPomSettings,
+        mandatoryDependencies,
+        dependencies,
+        jar,
+        sourcesJarOpt,
+        javadocJarOpt
+      ) =
         ctx.depResults
       pomOpt.zip(sourcesJarOpt).zip(javadocJarOpt).map { case ((pom, sourcesJar), javadocJar) =>
         val artifactBaseName = s"${pom.artifactId}-${pom.version}"
@@ -1034,7 +1076,14 @@ class CoreTasks() extends StrictLogging {
         }
         val allDependencies = mandatoryDependencies ++ dependencies
         val pomXmlContent =
-          PomGenerator.generate(pom.groupId, pom.artifactId, pom.version, allDependencies, pomSettings, moduleDepsPomSettings.tail)
+          PomGenerator.generate(
+            pom.groupId,
+            pom.artifactId,
+            pom.version,
+            allDependencies,
+            pomSettings,
+            moduleDepsPomSettings.tail
+          )
         val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
         os.write.over(pomXmlPath, pomXmlContent)
         PublishArtifactsRes(pom, ctx.out)
@@ -1142,6 +1191,7 @@ class CoreTasks() extends StrictLogging {
     classesTask,
     semanticdbDirTask,
     allClassesDirsTask,
+    compilerDepsTask,
     compileClasspathTask,
     compileTask,
     jvmOptionsTask,
