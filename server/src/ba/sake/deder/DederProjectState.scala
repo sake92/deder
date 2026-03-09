@@ -29,10 +29,10 @@ class DederProjectState(
   private val configParser = ConfigParser(writeJson = true)
   private val configFile = DederGlobals.projectRootDir / "deder.pkl"
 
-  // TODO atomicref?
-  @volatile var current: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
+  private val stateLock = new AnyRef
+  private var current: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
   // used for BSP
-  @volatile var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
+  private var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
 
   private val lastRequestStartedAt = new java.util.concurrent.atomic.AtomicReference[Instant](null)
 
@@ -43,7 +43,13 @@ class DederProjectState(
 
   scheduleInactiveShutdownChecker()
 
-  def reloadProject(): Unit = current.synchronized {
+  def readState(useLastGood: Boolean): Either[String, DederProjectStateData] =
+    stateLock.synchronized { if useLastGood then lastGood else current }
+
+  private def readCurrentOrLastGood: Either[String, DederProjectStateData] =
+    stateLock.synchronized { current.orElse(lastGood) }
+
+  def reloadProject(): Unit = stateLock.synchronized {
     // TODO make sure no requests are running
     // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)
     try {
@@ -80,7 +86,7 @@ class DederProjectState(
       startWatch: Boolean = false,
       exitOnEnd: Boolean = true
   ): Unit = try {
-    val state = (if useLastGood then lastGood else current) match
+    val state = readState(useLastGood) match
       case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
       case Right(s)  => s
 
@@ -212,7 +218,7 @@ class DederProjectState(
       lastRequestStartedAt.set(Instant.now())
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
 
-      val state = (if useLastGood then lastGood else current) match
+      val state = readState(useLastGood) match
         case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
         case Right(s)  => s
 
@@ -253,7 +259,7 @@ class DederProjectState(
   }
 
   def cleanModules(moduleIds: Seq[String]): Boolean = {
-    current.orElse(lastGood) match {
+    readCurrentOrLastGood match {
       case Left(err) =>
         logger.error(s"Cannot clean modules, project state is not available: ${err}")
         false
@@ -415,7 +421,7 @@ class DederProjectState(
   }
 
   def getTabCompletions(commandLine: String, cursorPos: Int): Seq[String] =
-    current.orElse(lastGood) match {
+    readCurrentOrLastGood match {
       case Left(_) => Seq.empty
       case Right(state) =>
         val tabCompleter = TabCompleter(state.tasksResolver)

@@ -189,7 +189,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
-            projectState.current match {
+            projectState.readState(useLastGood = false) match {
               case Left(error) =>
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
@@ -217,7 +217,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
-            projectState.lastGood match {
+            projectState.readState(useLastGood = true) match {
               case Left(error) =>
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
@@ -263,7 +263,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
-            projectState.lastGood match {
+            projectState.readState(useLastGood = true) match {
               case Left(error) =>
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
@@ -328,7 +328,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           case Right(cliOptions) =>
-            projectState.lastGood match {
+            projectState.readState(useLastGood = true) match {
               case Left(error) =>
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))

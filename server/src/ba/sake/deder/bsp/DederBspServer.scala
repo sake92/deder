@@ -188,7 +188,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     javaFuture("workspaceBuildTargets") {
       logger.debug("workspaceBuildTargets called")
       ensureRunning()
-      val buildTargets = projectState.lastGood match {
+      val buildTargets = projectState.readState(useLastGood = true) match {
         case Left(errorMessage) =>
           List.empty
         case Right(projectStateData) =>
@@ -886,7 +886,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     withLastGoodState(None)(f)
 
   private def withLastGoodState[T](onError: Option[String => T])(f: DederProjectStateData => T): T =
-    projectState.lastGood match {
+    projectState.readState(useLastGood = true) match {
       case Left(errorMessage) =>
         onError
           .map(_.apply(errorMessage))
