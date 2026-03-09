@@ -26,6 +26,8 @@ import ba.sake.deder.scalanative.ScalaNativeLinker
 import ba.sake.deder.testing.*
 import dependency.ScalaVersion
 
+import javax.tools.ToolProvider
+
 class CoreTasks() extends StrictLogging {
 
   /** source folders */
@@ -451,18 +453,16 @@ class CoreTasks() extends StrictLogging {
                   ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
                 )
               )
-            case m: ScalaModule =>
+            case _ =>
               Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion))
-            case _ => Seq.empty
           }
         else
           ctx.module match {
-            case m: ScalaModule =>
+            case _ =>
               Seq(
                 Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
                 Dependency.make(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion)
               )
-            case _ => Seq.empty
           }
       compilerDeps
     }
@@ -960,7 +960,21 @@ class CoreTasks() extends StrictLogging {
         os.makeDir.all(ctx.out)
         val generatedDir = ctx.out / "generated"
         os.makeDir.all(generatedDir)
-
+        val sourceFiles = sources
+          .map(_.absPath)
+          .flatMap { sourceDir =>
+            if os.exists(sourceDir) then
+              os.walk(
+                sourceDir,
+                skip = p => {
+                  if os.isDir(p) then false
+                  else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
+                  else true
+                }
+              )
+            else Seq.empty
+          }
+          .filter(os.isFile)
         ctx.module match {
           case module: ScalaModule =>
             if scalaVersion.startsWith("3.") then {
@@ -993,23 +1007,6 @@ class CoreTasks() extends StrictLogging {
                 scaladocMethod.invoke(scaladocObj, args)
               }
             } else {
-              // TODO java, scala2
-              // scala2 wants sources, scala3 tasty files..
-              val sourceFiles = sources
-                .map(_.absPath)
-                .flatMap { sourceDir =>
-                  if os.exists(sourceDir) then
-                    os.walk(
-                      sourceDir,
-                      skip = p => {
-                        if os.isDir(p) then false
-                        else if os.isFile(p) then !(p.ext == "scala" || p.ext == "java")
-                        else true
-                      }
-                    )
-                  else Seq.empty
-                }
-                .filter(os.isFile)
               val depsJars = DependencyResolver.fetchFiles(compilerDeps, Some(ctx.notifications))
               ClassLoaderUtils.withClassLoader(depsJars, parent = null) { classLoader =>
                 val scaladocClass = classLoader.loadClass("scala.tools.nsc.ScalaDoc")
@@ -1025,7 +1022,16 @@ class CoreTasks() extends StrictLogging {
                 scaladocMethod.invoke(scaladocObj, args)
               }
             }
-          case _ => ???
+          case _ =>
+            val javadocTool = ToolProvider.getSystemDocumentationTool
+            val outStream = new java.io.ByteArrayOutputStream()
+            val args = Array(
+              "-classpath", compileClasspath.mkString(File.pathSeparator),
+              "-d", generatedDir.toString
+            ) ++ sourceFiles.filter(_.ext == "java").map(_.toString)
+            javadocTool.run(null, outStream, outStream, args*)
+            println(s"Running javadoc with args: ${args.mkString(" ")}") // TODO debug
+            println(s"Javadoc output: ${outStream.toString}") // TODO debug
         }
 
         val resultJarPath = ctx.out / s"${pomSettings.artifactId}-javadoc.jar"
