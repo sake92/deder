@@ -78,8 +78,11 @@ class ExecutionPlanner(
   def getExecSubgraph(moduleIds: Seq[String], taskName: String): AsSubgraph[TaskInstance, DefaultEdge] = {
     // collect every task to execute
     val execTasksSet = Set.newBuilder[TaskInstance]
+    val visited = scala.collection.mutable.Set.empty[String]
     def go(moduleId: String, taskName: String): Unit = {
       val taskInstanceToExecute = getTaskInstance(moduleId, taskName)
+      if visited.contains(taskInstanceToExecute.id) then return
+      visited += taskInstanceToExecute.id
       val deps = tasksGraph.outgoingEdgesOf(taskInstanceToExecute).asScala.toSeq
       deps.foreach { depEdge =>
         val d = tasksGraph.getEdgeTarget(depEdge)
@@ -113,8 +116,11 @@ class ExecutionPlanner(
 
   private def getRootDepTasks(moduleId: String, taskName: String): Set[TaskInstance] = {
     val affectingTasks = Set.newBuilder[TaskInstance]
+    val visited = scala.collection.mutable.Set.empty[String]
     def go(moduleId: String, taskName: String): Unit = {
       val taskInstance = getTaskInstance(moduleId, taskName)
+      if visited.contains(taskInstance.id) then return
+      visited += taskInstance.id
       val deps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
       deps.foreach { depEdge =>
         val d = tasksGraph.getEdgeTarget(depEdge)
