@@ -1,6 +1,6 @@
 package ba.sake.deder
 
-import java.util.concurrent.{Callable, ExecutorService}
+import java.util.concurrent.{Callable, ExecutionException, ExecutorService}
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 import scala.util.Using
@@ -77,8 +77,11 @@ class TasksExecutor(
             try {
               futures.map(f => f.get())
             } catch {
-              case NonFatal(e) =>
+              case e: ExecutionException =>
                 // if one task fails, cancel all other tasks in this stage
+                futures.foreach(_.cancel(true))
+                throw Option(e.getCause).getOrElse(e)
+              case NonFatal(e) =>
                 futures.foreach(_.cancel(true))
                 throw e
             }
