@@ -6,7 +6,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
 import scala.util.control.NonFatal
 import scala.util.Using
-import org.typelevel.jawn.ast.JValue
+import org.typelevel.jawn.ast.{CanonicalRenderer, JValue}
 import com.typesafe.scalalogging.StrictLogging
 import io.opentelemetry.api.trace.StatusCode
 import ba.sake.tupson.toJson
@@ -135,7 +135,9 @@ class DederProjectState(
             val jsonRes = taskInstance.task.rw.write(taskRes.asInstanceOf[taskInstance.task.Res])
             (moduleId, jsonRes)
           }.toMap
-          serverNotificationsLogger.add(ServerNotification.Output(jsonValues.toJson))
+          val jsonRW = summon[ba.sake.tupson.JsonRW[Map[String, JValue]]]
+          val jsonRes = CanonicalRenderer.render(jsonRW.write(jsonValues))
+          serverNotificationsLogger.add(ServerNotification.Output(jsonRes))
         }
         if startWatch then {
           relevantModuleAndTasks.foreach { case (moduleId, taskInstance) =>
