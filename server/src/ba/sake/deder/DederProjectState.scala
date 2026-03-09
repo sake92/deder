@@ -36,7 +36,7 @@ class DederProjectState(
 
   private val lastRequestStartedAt = new java.util.concurrent.atomic.AtomicReference[Instant](null)
 
-  // TODO concurrent?
+  private val watchedTasksLock = new AnyRef
   private var watchedTasks = Seq.empty[WatchedTaskData]
 
   reloadProject()
@@ -143,18 +143,20 @@ class DederProjectState(
           relevantModuleAndTasks.foreach { case (moduleId, taskInstance) =>
             val affectingSourceFileTasks = state.executionPlanner.getAffectingSourceFileTasks(moduleId, taskName)
             val affectingConfigValueTasks = state.executionPlanner.getAffectingConfigValueTasks(moduleId, taskName)
-            watchedTasks = watchedTasks.appended(
-              WatchedTaskData(
-                clientId,
-                taskInstance,
-                args,
-                serverNotificationsLogger,
-                useLastGood,
-                json,
-                affectingSourceFileTasks,
-                affectingConfigValueTasks
+            watchedTasksLock.synchronized {
+              watchedTasks = watchedTasks.appended(
+                WatchedTaskData(
+                  clientId,
+                  taskInstance,
+                  args,
+                  serverNotificationsLogger,
+                  useLastGood,
+                  json,
+                  affectingSourceFileTasks,
+                  affectingConfigValueTasks
+                )
               )
-            )
+            }
             serverNotificationsLogger.add(
               ServerNotification.logInfo(s"⌚ Executing ${moduleId}.${taskName} in watch mode...")
             )
@@ -297,7 +299,8 @@ class DederProjectState(
   }
 
   def triggerFileWatchedTasks(changedPaths: Set[os.Path]): Unit = {
-    watchedTasks.foreach { watchedTask =>
+    val snapshot = watchedTasksLock.synchronized { watchedTasks }
+    snapshot.foreach { watchedTask =>
       logger.debug(
         s"Checking if watched task is affected: ${watchedTask.taskInstance} by ${watchedTask.affectingConfigValueTasks}"
       )
@@ -353,7 +356,8 @@ class DederProjectState(
   }
 
   private def triggerConfigWatchedTasks(): Unit = {
-    watchedTasks.foreach { watchedTask =>
+    val snapshot = watchedTasksLock.synchronized { watchedTasks }
+    snapshot.foreach { watchedTask =>
       logger.debug(
         s"Checking if watched task is affected: ${watchedTask.taskInstance} by ${watchedTask.affectingConfigValueTasks}"
       )
@@ -405,7 +409,9 @@ class DederProjectState(
 
   def removeWatchedTasks(clientId: Int): Unit = {
     logger.debug(s"Removing watched tasks for client ${clientId}")
-    watchedTasks = watchedTasks.filterNot(_.clientId == clientId)
+    watchedTasksLock.synchronized {
+      watchedTasks = watchedTasks.filterNot(_.clientId == clientId)
+    }
   }
 
   def getTabCompletions(commandLine: String, cursorPos: Int): Seq[String] =
