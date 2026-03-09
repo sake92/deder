@@ -60,6 +60,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           Set(
             "common.allClassesDirs",
             "common.mandatoryDependencies",
+            "common.compilerDeps",
             "common.dependencies",
             "common.javacAnnotationProcessors",
             "common.scalaSemanticdbVersion"

@@ -339,8 +339,8 @@ class DederProjectState(
             )
           case _ => Seq.empty
         }
-        changedPaths.zip(sourceFiles).exists { (changedPath, sourceFile) =>
-          changedPath.startsWith(sourceFile)
+        changedPaths.exists { changedPath =>
+          sourceFiles.exists(changedPath.startsWith)
         }
       }
       if affected then {

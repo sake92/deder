@@ -81,6 +81,7 @@ class TasksResolverSuite extends munit.FunSuite {
       "classes",
       "allClassesDirs",
       "compileClasspath",
+      "compilerDeps",
       "compile",
       "runClasspath",
       "mainClass",
