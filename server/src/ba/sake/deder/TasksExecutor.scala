@@ -106,7 +106,10 @@ class TasksExecutor(
   ) = {
     var transitiveResultsMap = Map.empty[Int, Seq[(String, TaskResult[?])]]
     var maxDepth = 0
+    val visited = scala.collection.mutable.Set.empty[String]
     def go(ti: TaskInstance, depth: Int): Unit = {
+      if visited.contains(ti.id) then return
+      visited += ti.id
       if depth > maxDepth then maxDepth = depth
       val taskRes = taskResults(ti.id)
       transitiveResultsMap = transitiveResultsMap.updatedWith(depth) {
