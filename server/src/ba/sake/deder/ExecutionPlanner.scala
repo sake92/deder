@@ -18,7 +18,10 @@ class ExecutionPlanner(
 
     val execSubgraph = getExecSubgraph(moduleIds, taskName)
 
+    val findStartVisited = scala.collection.mutable.Set.empty[String]
     def findStartTaskInstances(taskInstance: TaskInstance): Seq[TaskInstance] = {
+      if findStartVisited.contains(taskInstance.id) then return Seq.empty
+      findStartVisited += taskInstance.id
       val depEdges = execSubgraph.outgoingEdgesOf(taskInstance).asScala.toSeq
       if depEdges.isEmpty then Seq(taskInstance)
       else
