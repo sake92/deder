@@ -17,6 +17,9 @@ class TasksExecutor(
     tasksExecutorService: ExecutorService
 ) extends StrictLogging {
 
+  // (taskInstance.id, TaskResult, changed)
+  private type StageResult = (String, TaskResult[?], Boolean)
+
   def execute(
       requestId: String,
       stages: Seq[Seq[TaskInstance]],
@@ -27,12 +30,12 @@ class TasksExecutor(
       serverNotificationsLogger: ServerNotificationsLogger
   ): Seq[TaskExecResult] = {
     var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
-    var finalTaskResults = Seq.newBuilder[TaskExecResult]
+    val finalTaskResults = Seq.newBuilder[TaskExecResult]
     for (taskInstances, stageIndex) <- stages.zipWithIndex do {
       val stageSpan = OTEL.TRACER.spanBuilder(s"Stage $stageIndex").startSpan()
       try {
         Using.resource(stageSpan.makeCurrent()) { _ =>
-          val taskExecutions: Seq[Callable[(String, TaskResult[?])]] = for taskInstance <- taskInstances yield {
+          val taskExecutions: Seq[Callable[StageResult]] = for taskInstance <- taskInstances yield {
             val allTaskDeps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
             val depResults = allTaskDeps.flatMap { depEdge =>
               val d = tasksGraph.getEdgeTarget(depEdge)
@@ -56,10 +59,7 @@ class TasksExecutor(
                       watch,
                       serverNotificationsLogger
                     )
-                  // collect final task results
-                  if taskInstance.task.name == taskName && moduleIds.contains(taskInstance.moduleId) then
-                    finalTaskResults = finalTaskResults.addOne(TaskExecResult(taskInstance, taskRes.value, changed))
-                  taskInstance.id -> taskRes
+                  (taskInstance.id, taskRes, changed)
                 }
               } catch {
                 case NonFatal(e) =>
@@ -73,7 +73,7 @@ class TasksExecutor(
               }
           }
           val futures = taskExecutions.map(tasksExecutorService.submit)
-          val results =
+          val results: Seq[StageResult] =
             try {
               futures.map(f => f.get())
             } catch {
@@ -82,7 +82,12 @@ class TasksExecutor(
                 futures.foreach(_.cancel(true))
                 throw e
             }
-          taskResults ++= results
+          taskResults ++= results.map { case (id, taskRes, _) => id -> taskRes }
+          // collect final task results on the caller thread (after all futures have completed)
+          // to avoid a data race: multiple worker threads writing to finalTaskResults concurrently
+          for (taskInstance, (_, taskRes, changed)) <- taskInstances.zip(results) do
+            if taskInstance.task.name == taskName && moduleIds.contains(taskInstance.moduleId) then
+              finalTaskResults.addOne(TaskExecResult(taskInstance, taskRes.value, changed))
         }
       } catch {
         case NonFatal(e) =>
