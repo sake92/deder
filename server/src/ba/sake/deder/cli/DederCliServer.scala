@@ -89,27 +89,29 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             CliClientMessage.Help(Seq.empty)
         }
       val requestId = message.getRequestId
-      val span = OTEL.TRACER
-        .spanBuilder(s"cli.${message.getClass.getSimpleName.toLowerCase}")
-        .setAttribute("clientId", clientId)
-        .setAttribute("request.id", requestId)
-        .startSpan()
-      try {
+
+      val t1 = new Thread(() => {
+        val span = OTEL.TRACER
+          .spanBuilder(s"cli.${message.getClass.getSimpleName.toLowerCase}")
+          .setAttribute("clientId", clientId)
+          .setAttribute("request.id", requestId)
+          .startSpan()
         Using.resource(span.makeCurrent()) { scope =>
-          val t1 = new Thread(() => {
+          try {
             handleClientMessage(clientId, requestId, message, serverMessages)
-          })
-          // run in another thread so we can cancel it if needed
-          t1.start()
+          } catch {
+            case e: IOException =>
+            // all good, client disconnected...
+            case e: Throwable =>
+              span.recordException(e)
+              span.setStatus(StatusCode.ERROR)
+              throw e
+          } finally span.end()
         }
-      } catch {
-        case e: IOException =>
-        // all good, client disconnected...
-        case e: Throwable =>
-          span.recordException(e)
-          span.setStatus(StatusCode.ERROR)
-          throw e
-      } finally span.end()
+      })
+      // run in another thread so we can cancel it if needed
+      t1.start()
+
     }
   }
 

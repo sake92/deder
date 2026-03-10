@@ -18,6 +18,10 @@ references:
   - label: "Files layout"
     url: "/reference/files-layout.html"
 
+howtos:
+  - label: "OTEL tracing/logging/metrics"
+    url: "/howtos/otel.html"
+
 philosophies:
   - label: "Design Philosophy"
     url: "/philosophy/design.html"

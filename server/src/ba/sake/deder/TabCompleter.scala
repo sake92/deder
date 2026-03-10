@@ -89,7 +89,7 @@ object TabCompleter {
        |_deder_completion() {
        |    local -a completions
        |    local raw_output
-       |    raw_output=$(/Users/sakibh/programs/bin/deder complete -s zsh -c "${(j: :)words}" -p "$CURSOR" 2>/dev/null)
+       |    raw_output=$(deder complete -s zsh -c "${(j: :)words}" -p "$CURSOR" 2>/dev/null)
        |    completions=(${(s: :)raw_output})
        |    if (( ${#completions} > 0 )); then
        |        compadd -a completions
