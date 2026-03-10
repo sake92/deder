@@ -8,6 +8,8 @@ import dependency.api.ops.*
 import ba.sake.deder.ServerNotificationsLogger
 import ba.sake.deder.ServerNotification
 
+import java.util.concurrent.ConcurrentHashMap
+
 object DependencyResolver {
 
   def doFetch(
@@ -41,12 +43,22 @@ object DependencyResolver {
 }
 
 class DederCoursierLogger(notifications: ServerNotificationsLogger) extends coursierapi.SimpleLogger {
+
+  private val downloadLengthMap = ConcurrentHashMap[String, Long]()
+
   override def starting(url: String): Unit =
     notifications.add(ServerNotification.logInfo(s"Download started: $url"))
 
+
+  override def length(url: String, total: Long, alreadyDownloaded: Long, watching: Boolean): Unit = {
+    downloadLengthMap.putIfAbsent(url, total)
+  }
+
   override def progress(url: String, downloaded: Long): Unit = {
+    val length = downloadLengthMap.getOrDefault(url, 0L)
+    val percentage = if length > 0 then (downloaded * 100 / length) else 0
     notifications.add(
-      ServerNotification.logInfo(s"Downloading: $url $downloaded / 100%")
+      ServerNotification.logInfo(s"Downloading $url ... (${percentage}%)")
     )
   }
 
