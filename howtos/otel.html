@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> OTEL tracing/logging/metrics | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#otel-tracingloggingmetrics">OTEL tracing/logging/metrics</a>
+         <ul>
+          <li><a href="#grafana-lgtm">Grafana LGTM</a></li>
+          <li><a href="#jaeger">Jaeger</a></li>
+          <li><a href="#configure-deder-server-to-use-otel">Configure Deder server to use OTEL</a></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="otel-tracingloggingmetrics">OTEL tracing/logging/metrics<a href="#otel-tracingloggingmetrics" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Enabling OTEL tracing in the Deder server will give you detailed traces of all the tasks executed by the server, including their dependencies and execution times. You can see exactly which tasks are taking time, which tasks are executed in parallel etc.</p>
+   <p>If your OTEL collector supports it, you can also see logs and metrics from the server, which can be very useful for debugging and performance monitoring.</p>
+   <p><img src="https://sake92.github.io/deder/images/grafana_trace.png" alt=""></p>
+   <h2 id="grafana-lgtm">Grafana LGTM<a href="#grafana-lgtm" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Grafana LGTM has support for traces, logs and metrics!</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">git clone git@github.com:grafana/docker-otel-lgtm.git
+cd docker-otel-lgtm
+./run-lgtm.sh
+</code></pre>
+   <h2 id="jaeger">Jaeger<a href="#jaeger" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Jaeger is a popular open-source distributed tracing system that supports OTEL.
+    <br>
+    It only supports tracing, but it has a nice UI to visualize the traces and is very easy to set up.</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">docker run --rm --name jaeger \
+  -p 16686:16686 \
+  -p 4317:4317 \
+  -p 4318:4318 \
+  -p 5778:5778 \
+  -p 9411:9411 \
+  cr.jaegertracing.io/jaegertracing/jaeger:2.14.0
+</code></pre>
+   <h2 id="configure-deder-server-to-use-otel">Configure Deder server to use OTEL<a href="#configure-deder-server-to-use-otel" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>After starting your OTEL collector, you need to configure the Deder server to use the OTEL java agent:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">curl -L -o otel.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash"><span class="hljs-built_in">set</span> the agent options <span class="hljs-keyword">in</span> .deder/server.properties:</span>
+JAVA_OPTS=-javaagent:path/to/otel.jar -Dotel.service.name=deder-server -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">see examples/multi/.deder/server.properties <span class="hljs-keyword">for</span> reference</span>
+</code></pre>
+   <p>The Deder server <em>only depends on OTEL API</em>, so if no agent is provided it will just run normally without tracing.</p>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>
