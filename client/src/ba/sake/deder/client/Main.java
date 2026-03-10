@@ -120,16 +120,25 @@ public class Main {
         }
         var serverVersion = props.getProperty("version", "early-access");
         var serverLocalPath = props.getProperty("localPath", "");
+        var versionCacheFile = Path.of(".deder/server.current.version");
         Path serverJarPath = Path.of(".deder/server.jar");
         if (serverLocalPath != null && !serverLocalPath.isBlank()) {
             // handy for development, use local server build
             Files.copy(Path.of(serverLocalPath), serverJarPath, StandardCopyOption.REPLACE_EXISTING);
+            Files.writeString(versionCacheFile, "local", StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } else {
-            // if (Files.exists(serverJarPath)) { // TODO figure out server.jar if == set version and avoid re-download..
-            // for now we just skip it, user can delete server.jar to force re-download
-            if (!Files.exists(serverJarPath)) {
-                download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
+            var cachedVersion = "";
+            if (Files.exists(versionCacheFile) && Files.isRegularFile(versionCacheFile)) {
+                cachedVersion = Files.readString(versionCacheFile, StandardCharsets.UTF_8).strip();
+            }
+            if (Files.exists(serverJarPath) && cachedVersion.equals(serverVersion) && !serverVersion.equals("early-access")) {
+                log("Server JAR already up-to-date (version " + serverVersion + "), skipping download.");
+            } else {
+                download("https://github.com/sake92/deder/releases/download/v" + serverVersion + "/deder-server.jar",
                         serverJarPath);
+                Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             }
         }
         startServerProcess(isBspClient, props);
@@ -228,7 +237,7 @@ public class Main {
                 .followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build()) {
             var request = HttpRequest.newBuilder().uri(URI.create(fileUrl)).GET().build();
             var response = client.send(request,
-                    HttpResponse.BodyHandlers.ofFile(destination, StandardOpenOption.CREATE, StandardOpenOption.WRITE));
+                    HttpResponse.BodyHandlers.ofFile(destination, StandardOpenOption.WRITE,StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING));
             if (response.statusCode() == 200) {
                 System.err.println("File downloaded successfully to: " + response.body());
             } else {
