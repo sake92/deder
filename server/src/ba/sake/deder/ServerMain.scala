@@ -64,6 +64,12 @@ object ServerMain extends StrictLogging {
       sys.exit(0)
     }
 
+    val configFile = projectRoot / "deder.pkl"
+    if !os.exists(configFile) || !os.isFile(configFile) then
+      logger.warn(
+        s"No deder.pkl found at '${configFile}'. Create a deder.pkl configuration file in your project root to get started."
+      )
+
     val coreTasks = CoreTasks()
     val tasksRegistry = TasksRegistry(coreTasks)
     val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
@@ -124,19 +130,19 @@ object ServerMain extends StrictLogging {
     }))
   }
 
-  def isServerConfigFile(p: os.Path): Boolean =
+  private def isServerConfigFile(p: os.Path): Boolean =
     p == DederGlobals.projectRootDir / ".deder/server.properties"
 
-  def isProjectConfigFile(p: os.Path): Boolean =
+  private def isProjectConfigFile(p: os.Path): Boolean =
     p == DederGlobals.projectRootDir / "deder.pkl"
 
-  def isTaskTriggerCandidate(p: os.Path): Boolean =
+  private def isTaskTriggerCandidate(p: os.Path): Boolean =
     !isServerConfigFile(p) && (
       isProjectConfigFile(p) ||
         !(isDederArtifact(p) || isDevArtifact(p))
     )
 
-  def isDederArtifact(p: os.Path): Boolean = {
+  private def isDederArtifact(p: os.Path): Boolean = {
     val pathSegments = p.segments.toSeq
     val pathSegments2 = pathSegments.sliding(2).map(s => (s(0), s(1))).toSet
     pathSegments2.contains(".deder" -> "out") ||
@@ -155,7 +161,6 @@ object ServerMain extends StrictLogging {
     pathSegments.contains(".idea") ||
     pathSegments.contains(".vscode") ||
     pathSegments.contains(".metals") ||
-    pathSegments.contains(".bsp") ||
     pathSegments.contains(".bsp") ||
     pathSegments.contains(".scala-build") ||
     pathSegments.contains("target") ||

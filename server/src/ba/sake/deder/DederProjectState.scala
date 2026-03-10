@@ -52,26 +52,34 @@ class DederProjectState(
   def reloadProject(): Unit = stateLock.synchronized {
     // TODO make sure no requests are running
     // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)
-    try {
-      val newProjectConfig = configParser.parse(configFile)
-      newProjectConfig match {
-        case Left(errorMessage) =>
+    if !os.exists(configFile) || !os.isFile(configFile) then {
+      val errorMessage =
+        s"No deder.pkl found at '${configFile}'. Create a deder.pkl configuration file in your project root to get started."
+      logger.warn(errorMessage)
+      current = Left(errorMessage)
+    } else
+      try {
+        val newProjectConfig = configParser.parse(configFile)
+        newProjectConfig match {
+          case Left(errorMessage) =>
+            logger.warn(s"Failed to load project config: $errorMessage")
+            current = Left(errorMessage)
+          case Right(newConfig) =>
+            val tasksResolver = TasksResolver(newConfig, tasksRegistry)
+            val executionPlanner =
+              ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
+            val goodProjectStateData =
+              DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner)
+            lastGood = Right(goodProjectStateData)
+            current = Right(goodProjectStateData)
+            triggerConfigWatchedTasks()
+        }
+      } catch {
+        case NonFatal(e) =>
+          val errorMessage = s"Error during project load: ${e.getMessage}"
+          logger.warn(errorMessage)
           current = Left(errorMessage)
-        case Right(newConfig) =>
-          val tasksResolver = TasksResolver(newConfig, tasksRegistry)
-          val executionPlanner =
-            ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
-          val goodProjectStateData =
-            DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner)
-          lastGood = Right(goodProjectStateData)
-          current = Right(goodProjectStateData)
-          triggerConfigWatchedTasks()
       }
-    } catch {
-      case NonFatal(e) =>
-        val errorMessage = s"Error during project load: ${e.getMessage}"
-        current = Left(errorMessage)
-    }
   }
 
   def executeCLI(

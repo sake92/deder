@@ -25,7 +25,15 @@ They also form a directed acyclic graph (DAG).
 - [Tutorials](/tutorials)
   {% for tut in site.data.project.tutorials %}- [{{ tut.label }}]({{ tut.url}})
   {% endfor %}
-
+- [How Tos](/howtos)
+    {% for tut in site.data.project.howtos %}- [{{ tut.label }}]({{ tut.url}})
+    {% endfor %}
+- [Reference](/reference)
+  {% for tut in site.data.project.references %}- [{{ tut.label }}]({{ tut.url}})
+  {% endfor %}
+- [Philosophy](/philosophy)
+  {% for tut in site.data.project.philosophies %}- [{{ tut.label }}]({{ tut.url}})
+  {% endfor %}
 
 ## At a glance
 
