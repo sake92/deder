@@ -1,5 +1,6 @@
 package ba.sake.deder.deps
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.jdk.CollectionConverters.*
 import coursierapi.Fetch
 import coursierapi.FetchResult
@@ -7,8 +8,6 @@ import coursierapi.Dependency as CoursierDependency
 import dependency.api.ops.*
 import ba.sake.deder.ServerNotificationsLogger
 import ba.sake.deder.ServerNotification
-
-import java.util.concurrent.ConcurrentHashMap
 
 object DependencyResolver {
 

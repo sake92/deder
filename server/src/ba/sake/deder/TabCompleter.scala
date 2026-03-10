@@ -1,14 +1,5 @@
 package ba.sake.deder
 
-import mainargs.{Leftover, Parser}
-
-@main def tabCompleterMain: Unit = {
-  val cmd = "deder exec -t "
-  println(
-    TabCompleter.shellSplit(cmd, cmd.length).toString()
-  )
-}
-
 class TabCompleter(tasksResolver: TasksResolver) {
 
   private val allSubcommands = Seq(
@@ -36,22 +27,27 @@ class TabCompleter(tasksResolver: TasksResolver) {
       case Seq("deder", rest*) =>
         rest match {
           case Seq("version", _*) => Seq.empty
-          case Seq("clean", _*)   => completeModule(prevWord, currentWord).getOrElse(Seq.empty)
-          case Seq("modules", _*) => Seq.empty
-          case Seq("tasks", _*)   => completeModule(prevWord, currentWord).getOrElse(Seq.empty)
+          case Seq("clean", _*)   => completeModule(prevWord, currentWord).getOrElse(Seq("-m", "--module"))
+          case Seq("modules", _*) => Seq("--json", "--ascii", "--dot").filter(_.startsWith(currentWord))
+          case Seq("tasks", _*) =>
+            completeModule(prevWord, currentWord).getOrElse(
+              Seq("-m", "--module", "--json", "--ascii", "--dot").filter(_.startsWith(currentWord))
+            )
           case Seq("plan", _*) =>
             completeModule(prevWord, currentWord)
               .orElse(completeTask(prevWord, currentWord))
-              .getOrElse(Seq.empty)
+              .getOrElse(
+                Seq("-m", "--module", "-t", "--task", "--json", "--ascii", "--dot").filter(_.startsWith(currentWord))
+              )
           case Seq("exec", _*) =>
             completeModule(prevWord, currentWord)
               .orElse(completeTask(prevWord, currentWord))
-              .getOrElse(Seq.empty)
+              .getOrElse(Seq("-m", "--module", "-t", "--task", "--json", "-w", "--watch").filter(_.startsWith(currentWord)))
           case Seq("shutdown", _*) => Seq.empty
           case Seq("import", _*)   => Seq.empty
           case Seq("complete", _*) => Seq.empty
           case Seq("help", _*)     => Seq.empty
-          case Seq(first, _*)      => allSubcommands
+          case Seq(first, _*)      => allSubcommands.filter(_.startsWith(first))
           case _                   => allSubcommands
         }
       case _ => Seq.empty
