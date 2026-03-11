@@ -81,7 +81,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           }
         case cd: ServerNotification.CompileDiagnostic =>
           val targetId = resolveModule(cd.moduleId).map(buildTargetId)
-          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cd.moduleId)
+          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cd.moduleId) &&
+            cd.problem.position.sourceFile.isPresent
           if isRelevantCompileNotification then {
             val file = cd.problem.position.sourceFile.get
             val problem = cd.problem
@@ -476,7 +477,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
                 .map(_.toNIO.toUri.toString)
                 .toList
             catch case e: TaskEvaluationException => Seq.empty
-          logger.info(s"compileClasspath for ${moduleId} : ${compileClasspath}")
+          //logger.debug(s"compileClasspath for ${moduleId} : ${compileClasspath}")
           val javacOptionsItem =
             new JavacOptionsItem(targetId, finalJavacOptions.asJava, compileClasspath.asJava, classesDir)
           List(javacOptionsItem)
@@ -525,11 +526,12 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     ensureRunning()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
-      val testModuleIds = projectStateData.projectConfig.modules.asScala.collect { case m: DederProject.ScalaTestModule =>
-        m.id
+      val testModuleIds = projectStateData.projectConfig.modules.asScala.collect {
+        case m: DederProject.ScalaTestModule =>
+          m.id
       }
       val serverNotificationsLogger = makeServerNotificationsLogger()
-      params.getTargets.asScala.filter(testModuleIds.contains ).flatMap { targetId =>
+      params.getTargets.asScala.filter(testModuleIds.contains).flatMap { targetId =>
         val moduleId = targetId.moduleId
         try {
           val frameworkTests =
@@ -835,8 +837,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       List(BuildTargetTag.LIBRARY).filter(_ => !isTestModule0 && !isAppModule)
     ).flatten
     val languageIds = module.`type` match {
-      case ModuleType.SCALA | ModuleType.SCALA_TEST | ModuleType.SCALA_JS | ModuleType.SCALA_NATIVE => List("scala", "java")
-      case ModuleType.JAVA                                                => List("java")
+      case ModuleType.SCALA | ModuleType.SCALA_TEST | ModuleType.SCALA_JS | ModuleType.SCALA_NATIVE =>
+        List("scala", "java")
+      case ModuleType.JAVA => List("java")
     }
     val dependencies = module.moduleDeps.asScala.map(buildTargetId)
     val capabilities = new BuildTargetCapabilities()

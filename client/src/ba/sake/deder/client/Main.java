@@ -125,6 +125,7 @@ public class Main {
         Path serverJarPath = Path.of(".deder/server.jar");
         if (serverLocalPath != null && !serverLocalPath.isBlank()) {
             // handy for development, use local server build
+            log("Using local server build from " + serverLocalPath);
             Files.copy(Path.of(serverLocalPath), serverJarPath, StandardCopyOption.REPLACE_EXISTING);
             Files.writeString(versionCacheFile, "local", StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
