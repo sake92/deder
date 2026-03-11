@@ -8,7 +8,7 @@ import ba.sake.tupson.*
 class IntegrationSuite extends munit.FunSuite {
 
   // first compile can take a while
-  override def munitTimeout = 1.minute
+  override def munitTimeout = 2.minute
   
   private val testResourceDir = os.Path(System.getenv("MILL_TEST_RESOURCE_DIR"))
   private val dederClientPath = System.getenv("DEDER_CLIENT_PATH")

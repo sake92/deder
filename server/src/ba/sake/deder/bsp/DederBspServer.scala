@@ -525,15 +525,15 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     ensureRunning()
     val items = withLastGoodState { projectStateData =>
       val coreTasks = projectStateData.tasksRegistry.coreTasks
-      val testModules = projectStateData.projectConfig.modules.asScala.collect { case m: DederProject.ScalaTestModule =>
-        m
+      val testModuleIds = projectStateData.projectConfig.modules.asScala.collect { case m: DederProject.ScalaTestModule =>
+        m.id
       }
       val serverNotificationsLogger = makeServerNotificationsLogger()
-      testModules.flatMap { module =>
-        val targetId = buildTargetId(module)
+      params.getTargets.asScala.filter(testModuleIds.contains ).flatMap { targetId =>
+        val moduleId = targetId.moduleId
         try {
           val frameworkTests =
-            try executeTask(serverNotificationsLogger, module.id, coreTasks.testClassesTask)
+            try executeTask(serverNotificationsLogger, moduleId, coreTasks.testClassesTask)
             catch case e: TaskEvaluationException => Seq.empty
           frameworkTests.map { ft =>
             val item = ScalaTestClassesItem(targetId, ft.testClasses.asJava)

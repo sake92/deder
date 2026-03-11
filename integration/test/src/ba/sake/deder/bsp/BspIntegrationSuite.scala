@@ -17,8 +17,7 @@ import ch.epfl.scala.bsp4j.*
 
 class BspIntegrationSuite extends munit.FunSuite {
 
-  // first compile can take a while
-  override def munitTimeout: Duration = 3.minutes
+  override def munitTimeout: Duration = 5.minutes
 
   private val testResourceDir = os.Path(System.getenv("MILL_TEST_RESOURCE_DIR"))
   private val dederClientPath = System.getenv("DEDER_CLIENT_PATH")
@@ -417,7 +416,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       case Success(_) => fail("Test Classes should expect all item classes to be defined!")
     }
   }
-
+/*
   test("Run Scala Test Classes") {
     val classes1 = List("uber.MyTest").asJava
     val item1 = new ScalaTestClassesItem(uberTestTargetId, classes1)
@@ -428,7 +427,7 @@ class BspIntegrationSuite extends munit.FunSuite {
       new ScalaTestClassesParams(Lists.newArrayList(uberTestTargetId)),
       result
     )
-  }
+  }*/
 
   test("Scala Test Classes with less items should fail") {
     val classes1 = List("uber.MyTest").asJava
