@@ -17,4 +17,35 @@ object ClassLoaderUtils {
       finally Thread.currentThread().setContextClassLoader(oldClassloader)
     }
   }
+  
+  /** Creates an isolated classloader that only delegates specified package prefixes to the app classloader, preventing
+    * Deder's own dependencies from leaking into user code. Everything else is loaded from the given classpath only.
+    */
+  def withIsolatedClassLoader[T](
+      classPath: Seq[os.Path],
+      sharedPrefixes: Seq[String]
+  )(f: ClassLoader => T): T = {
+    val appClassLoader = getClass.getClassLoader
+    val bridgeClassLoader = new ClassLoader(ClassLoader.getPlatformClassLoader) {
+      override def loadClass(name: String, resolve: Boolean): Class[?] = {
+        if (sharedPrefixes.exists(name.startsWith)) {
+          val c = appClassLoader.loadClass(name)
+          if (resolve) resolveClass(c)
+          c
+        } else {
+          super.loadClass(name, resolve)
+        }
+      }
+
+      override def getResource(name: String): java.net.URL = {
+        val pathPrefixes = sharedPrefixes.map(_.replace('.', '/'))
+        if (pathPrefixes.exists(name.startsWith)) {
+          appClassLoader.getResource(name)
+        } else {
+          super.getResource(name)
+        }
+      }
+    }
+    withClassLoader(classPath, parent = bridgeClassLoader)(f)
+  }
 }

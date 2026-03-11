@@ -28,6 +28,10 @@ import dependency.ScalaVersion
 
 import javax.tools.ToolProvider
 
+// sbt.testing.* interfaces must be shared between Deder and the test classloader,
+// since Deder casts loaded Framework/Runner/Task instances to these types.
+private val TestClassLoaderSharedPrefixes = Seq("sbt.testing.")
+
 class CoreTasks() extends StrictLogging {
 
   /** source folders */
@@ -722,7 +726,7 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (classesDir, runClasspath) = ctx.depResults
       val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
-      ClassLoaderUtils.withClassLoader(runtimeClasspath) { classLoader =>
+      ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
         val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
         val testDiscovery = DederTestDiscovery(
           classLoader = classLoader,
@@ -748,7 +752,7 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (classesDir, runClasspath) = ctx.depResults
       val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
-      ClassLoaderUtils.withClassLoader(runtimeClasspath) { classLoader =>
+      ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
         val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
         val logger = DederTestLogger(ctx.notifications, ctx.module.id)
         val testDiscovery = DederTestDiscovery(
@@ -1026,8 +1030,10 @@ class CoreTasks() extends StrictLogging {
             val javadocTool = ToolProvider.getSystemDocumentationTool
             val outStream = new java.io.ByteArrayOutputStream()
             val args = Array(
-              "-classpath", compileClasspath.mkString(File.pathSeparator),
-              "-d", generatedDir.toString
+              "-classpath",
+              compileClasspath.mkString(File.pathSeparator),
+              "-d",
+              generatedDir.toString
             ) ++ sourceFiles.filter(_.ext == "java").map(_.toString)
             javadocTool.run(null, outStream, outStream, args*)
             println(s"Running javadoc with args: ${args.mkString(" ")}") // TODO debug

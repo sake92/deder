@@ -67,58 +67,40 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       p.last.endsWith(".jar")
     }
 
-    // Bridge classloader: delegates xsbti.* to app classloader,
-    // everything else to platform classloader (effectively hidden)
-    val appClassLoader = getClass.getClassLoader
-    val bridgeClassLoader = new ClassLoader(ClassLoader.getPlatformClassLoader) {
-      override def loadClass(name: String, resolve: Boolean): Class[?] = {
-        if (name.startsWith("xsbti.") || name.startsWith("sbt.internal.inc.")) {
-          val c = appClassLoader.loadClass(name)
-          if (resolve) resolveClass(c)
-          c
-        } else {
-          super.loadClass(name, resolve)
-        }
-      }
-
-      override def getResource(name: String): java.net.URL = {
-        if (name.startsWith("xsbti/") || name.startsWith("sbt/internal/inc/")) {
-          appClassLoader.getResource(name)
-        } else {
-          super.getResource(name)
-        }
-      }
-    }
-
     // Only include compiler jars in the base classloader, NOT the compile classpath.
     // The compile classpath is passed separately via CompileOptions (classpathVFs).
     // Including it here would leak user dependencies into the compiler plugin classloader
     // hierarchy, causing conflicts when user deps contain classes overlapping with
     // compiler plugin internals (e.g. scalameta classes from scalafix-core conflicting
     // with the semanticdb-scalac plugin).
-    ClassLoaderUtils.withClassLoader(compilerJars, parent = bridgeClassLoader) { zincClassloader =>
-      ClassLoaderUtils.withClassLoader(scalaLibraryJars, parent = zincClassloader) { libraryClassloader =>
-        ClassLoaderUtils.withClassLoader(compilerJars, parent = libraryClassloader) { compilerClassloader =>
-          ClassLoaderUtils.withClassLoader(compilerJars ++ scalaLibraryJars, parent = zincClassloader) {
-            allJarsClassloader =>
-              doCompile(
-                javaHome = javaHome,
-                scalaVersion = scalaVersion,
-                compilerJars = compilerJars,
-                scalaLibraryJars = scalaLibraryJars,
-                compileClasspath = compileClasspath,
-                libraryClassloader = libraryClassloader,
-                compilerClassloader = compilerClassloader,
-                allJarsClassloader = allJarsClassloader,
-                zincCacheFile = zincCacheFile,
-                sources = sources,
-                classesDir = classesDir,
-                scalacOptions = scalacOptions,
-                javacOptions = javacOptions,
-                zincLogger = zincLogger,
-                moduleId = moduleId,
-                notifications = notifications
-              )
+    ClassLoaderUtils.withIsolatedClassLoader(
+      classPath = compilerJars,
+      sharedPrefixes = Seq("xsbti.", "sbt.internal.inc.")
+    ) { bridgeClassLoader =>
+      ClassLoaderUtils.withClassLoader(compilerJars, parent = bridgeClassLoader) { zincClassloader =>
+        ClassLoaderUtils.withClassLoader(scalaLibraryJars, parent = zincClassloader) { libraryClassloader =>
+          ClassLoaderUtils.withClassLoader(compilerJars, parent = libraryClassloader) { compilerClassloader =>
+            ClassLoaderUtils.withClassLoader(compilerJars ++ scalaLibraryJars, parent = zincClassloader) {
+              allJarsClassloader =>
+                doCompile(
+                  javaHome = javaHome,
+                  scalaVersion = scalaVersion,
+                  compilerJars = compilerJars,
+                  scalaLibraryJars = scalaLibraryJars,
+                  compileClasspath = compileClasspath,
+                  libraryClassloader = libraryClassloader,
+                  compilerClassloader = compilerClassloader,
+                  allJarsClassloader = allJarsClassloader,
+                  zincCacheFile = zincCacheFile,
+                  sources = sources,
+                  classesDir = classesDir,
+                  scalacOptions = scalacOptions,
+                  javacOptions = javacOptions,
+                  zincLogger = zincLogger,
+                  moduleId = moduleId,
+                  notifications = notifications
+                )
+            }
           }
         }
       }
