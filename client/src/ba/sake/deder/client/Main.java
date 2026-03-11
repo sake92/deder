@@ -118,6 +118,7 @@ public class Main {
                 props.load(inputStream);
             }
         }
+        // must be exactly tag version e.g. v0.1.0
         var serverVersion = props.getProperty("version", "early-access");
         var serverLocalPath = props.getProperty("localPath", "");
         var versionCacheFile = Path.of(".deder/server.current.version");
@@ -135,7 +136,7 @@ public class Main {
             if (Files.exists(serverJarPath) && cachedVersion.equals(serverVersion) && !serverVersion.equals("early-access")) {
                 log("Server JAR already up-to-date (version " + serverVersion + "), skipping download.");
             } else {
-                download("https://github.com/sake92/deder/releases/download/v" + serverVersion + "/deder-server.jar",
+                download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
                         serverJarPath);
                 Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
                         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
