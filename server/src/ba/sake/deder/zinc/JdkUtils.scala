@@ -1,5 +1,7 @@
 package ba.sake.deder.zinc
 
+import scala.math.Ordering.Implicits.infixOrderingOps
+
 import dependency.ScalaParameters
 
 case class JdkCompat(jdkVersion: Int, scalaVersion: String)
@@ -28,7 +30,7 @@ object JdkUtils {
   ).sortBy(-_.jdkVersion)
 
   def getVersion(javaSpecVersion: String): Int = {
-    if javaSpecVersion.startsWith("1.") then javaSpecVersion.split(".")(1).toInt
+    if javaSpecVersion.startsWith("1.") then javaSpecVersion.split("\\.")(1).toInt
     else javaSpecVersion.toInt
   }
 
@@ -37,9 +39,7 @@ object JdkUtils {
     val relevantChecks = minimumVersions.filter(_.scalaVersion.startsWith(binaryVersion))
     relevantChecks.find(_.jdkVersion <= jdkVersion) match {
       case Some(jdkCompat) =>
-        val minorVersion = scalaVersion.stripPrefix(binaryVersion)
-        val minMinorVersion = jdkCompat.scalaVersion.stripPrefix(binaryVersion)
-        if minorVersion < minMinorVersion then
+        if versionTuple(scalaVersion) < versionTuple(jdkCompat.scalaVersion) then
           throw RuntimeException(
             s"Minimum scalaVersion required for JDK ${jdkVersion} is ${jdkCompat.scalaVersion} but you are using ${scalaVersion}\n" +
               s"Check docs at ${docsUrl}"
@@ -51,6 +51,9 @@ object JdkUtils {
     }
   }
 
+  private def versionTuple(v: String): (Int, Int, Int) =
+    val parts = v.split("\\.")
+    (parts(0).toInt, parts(1).toInt, parts(2).toInt)
 }
 
 /*
