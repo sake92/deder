@@ -244,7 +244,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           val sourceDirs = executeTask(serverNotificationsLogger, m.id, coreTasks.sourcesTask)
           sourceDirs.exists { srcDir =>
             val srcDirUri = srcDir.absPath.toURI.toString()
-            srcDirUri.startsWith(params.getTextDocument.getUri)
+            params.getTextDocument.getUri.startsWith(srcDirUri)
           }
         }
         modules.map(buildTargetId)
@@ -438,12 +438,13 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       logger.debug(s"buildTargetOutputPaths for params ${params}")
       ensureRunning()
       val excludedDirNames = Seq(".deder", ".bsp", ".metals", ".idea", ".vscode")
-      val outputPathsItems = for {
+      val outputPathsItems = for
         dirName <- excludedDirNames
+      yield OutputPathItem(DederPath(dirName).absPath.toNIO.toUri.toString, OutputPathItemKind.DIRECTORY)
+      val modulesItems = for
         targetId <- params.getTargets.asScala
-        outputPathItems = OutputPathItem(DederPath(dirName).absPath.toNIO.toUri.toString, OutputPathItemKind.DIRECTORY)
-      } yield OutputPathsItem(targetId, List.empty.asJava)
-      val result = new OutputPathsResult(outputPathsItems.asJava)
+      yield OutputPathsItem(targetId, outputPathsItems.asJava)
+      val result = new OutputPathsResult(modulesItems.asJava)
       logger.debug(s"buildTargetOutputPaths for params ${params} return: ${result}")
       result
     }
