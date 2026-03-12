@@ -811,7 +811,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
 
   override def onBuildExit(): Unit = traced("onBuildExit") {
     logger.debug(s"onBuildExit")
-    ensureRunning()
     onExit() // just closes the unix socket connection
   }
 
