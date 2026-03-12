@@ -3,6 +3,7 @@ package ba.sake.deder.publish
 import java.security.MessageDigest
 import java.io.{File, FileInputStream}
 import java.nio.file.{Files, Paths}
+import scala.util.Using
 
 object Hasher {
 
@@ -24,11 +25,11 @@ object Hasher {
     val digest = MessageDigest.getInstance(algorithm)
     val buffer = new Array[Byte](8192)
     var read = 0
-    val fis = Files.newInputStream(file.toNIO)
-    while ({ read = fis.read(buffer); read != -1 }) {
-      digest.update(buffer, 0, read)
+    Using.resource(Files.newInputStream(file.toNIO)) { fis =>
+      while ({ read = fis.read(buffer); read != -1 }) {
+        digest.update(buffer, 0, read)
+      }
     }
-    fis.close()
     // Convert byte array to Hex String
     digest.digest().map("%02x".format(_)).mkString
   }

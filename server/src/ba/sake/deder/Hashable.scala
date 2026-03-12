@@ -1,6 +1,7 @@
 package ba.sake.deder
 
 import java.nio.ByteBuffer
+import scala.util.Using
 
 extension [T](value: T)(using hashable: Hashable[T]) {
   def hashStr: String = hashable.hashStr(value)
@@ -31,7 +32,10 @@ object Hashable {
   given Hashable[os.Path] with {
     // TODO add file path into hash
     def hashStr(value: os.Path): String = {
-      if os.isFile(value) then HashUtils.hashStr(os.read.inputStream(value))
+      if os.isFile(value) then
+        Using.resource(os.read.inputStream(value)) { inputStream =>
+          HashUtils.hashStr(inputStream)
+        }
       else if os.isDir(value) then {
         val childrenHashes = os.list(value, sort = true).map(Hashable[os.Path].hashStr)
         val combinedHash = childrenHashes.mkString("-")

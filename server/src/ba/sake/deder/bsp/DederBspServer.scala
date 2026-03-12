@@ -744,7 +744,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               RunResult(StatusCode.ERROR)
             } else {
               val wd = Option(params.getWorkingDirectory).map(os.Path(_)).getOrElse(os.pwd)
-              val runRes = os.proc(runCmd).call(cwd = wd, stdin = os.Pipe, stdout = os.Pipe, stderr = os.Pipe)
+              val runRes = os.proc(runCmd).call(cwd = wd, stdin = os.Pipe, stdout = os.Pipe, stderr = os.Pipe, check = false)
               val status = if runRes.exitCode == 0 then StatusCode.OK else StatusCode.ERROR
               RunResult(status)
             }
