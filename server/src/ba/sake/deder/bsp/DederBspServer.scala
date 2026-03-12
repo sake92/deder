@@ -531,7 +531,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           m.id
       }
       val serverNotificationsLogger = makeServerNotificationsLogger()
-      params.getTargets.asScala.filter(testModuleIds.contains).flatMap { targetId =>
+      params.getTargets.asScala.filter(targetId => testModuleIds.contains(targetId.moduleId)).flatMap { targetId =>
         val moduleId = targetId.moduleId
         try {
           val frameworkTests =
