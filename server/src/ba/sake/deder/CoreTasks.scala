@@ -418,7 +418,7 @@ class CoreTasks() extends StrictLogging {
       val semanticDbDeps =
         if scalaVersion.startsWith("3.") then Seq.empty
         else Option.when(semanticdbEnabled)(s"org.scalameta:::semanticdb-scalac:${scalaSemanticdbVersion}").toSeq
-      val scalaJsDeps =
+      val scalaPlatformDeps =
         if scalaVersion.startsWith("3.") then
           ctx.module match {
             case m: ScalaNativeModule => Seq(s"org.scala-native:::nscplugin:${m.scalaNativeVersion}")
@@ -430,7 +430,7 @@ class CoreTasks() extends StrictLogging {
             case m: ScalaNativeModule => Seq(s"org.scala-native:::nscplugin:${m.scalaNativeVersion}")
             case _                    => Seq.empty
           }
-      val allDeps = scalacPluginDeps ++ semanticDbDeps ++ scalaJsDeps
+      val allDeps = scalacPluginDeps ++ semanticDbDeps ++ scalaPlatformDeps
       val pluginJars = DependencyResolver.fetchFiles(
         allDeps.map(d => Dependency.make(d, scalaVersion)), // .exclude(dependency.Module("*", "*"))),
         Some(ctx.notifications)
@@ -451,11 +451,7 @@ class CoreTasks() extends StrictLogging {
           ctx.module match {
             case m: ScalaJsModule =>
               Seq(
-                Dependency.make(
-                  s"org.scala-lang::scala3-compiler:${scalaVersion}",
-                  scalaVersion,
-                  ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
-                )
+                Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion)
               )
             case _ =>
               Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion))
