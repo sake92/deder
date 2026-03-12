@@ -438,12 +438,12 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       logger.debug(s"buildTargetOutputPaths for params ${params}")
       ensureRunning()
       val excludedDirNames = Seq(".deder", ".bsp", ".metals", ".idea", ".vscode")
-      val outputPathsItems = for
-        dirName <- excludedDirNames
-      yield OutputPathItem(DederPath(dirName).absPath.toNIO.toUri.toString, OutputPathItemKind.DIRECTORY)
-      val modulesItems = for
-        targetId <- params.getTargets.asScala
-      yield OutputPathsItem(targetId, outputPathsItems.asJava)
+      val outputPathsItems =
+        for dirName <- excludedDirNames
+        yield OutputPathItem(DederPath(dirName).absPath.toNIO.toUri.toString, OutputPathItemKind.DIRECTORY)
+      val modulesItems =
+        for targetId <- params.getTargets.asScala
+        yield OutputPathsItem(targetId, outputPathsItems.asJava)
       val result = new OutputPathsResult(modulesItems.asJava)
       logger.debug(s"buildTargetOutputPaths for params ${params} return: ${result}")
       result
@@ -478,7 +478,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
                 .map(_.toNIO.toUri.toString)
                 .toList
             catch case e: TaskEvaluationException => Seq.empty
-          //logger.debug(s"compileClasspath for ${moduleId} : ${compileClasspath}")
+          // logger.debug(s"compileClasspath for ${moduleId} : ${compileClasspath}")
           val javacOptionsItem =
             new JavacOptionsItem(targetId, finalJavacOptions.asJava, compileClasspath.asJava, classesDir)
           List(javacOptionsItem)
@@ -744,7 +744,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
               RunResult(StatusCode.ERROR)
             } else {
               val wd = Option(params.getWorkingDirectory).map(os.Path(_)).getOrElse(os.pwd)
-              val runRes = os.proc(runCmd).call(cwd = wd, stdin = os.Pipe, stdout = os.Pipe, stderr = os.Pipe, check = false)
+              val runRes =
+                os.proc(runCmd).call(cwd = wd, stdin = os.Pipe, stdout = os.Pipe, stderr = os.Pipe, check = false)
               val status = if runRes.exitCode == 0 then StatusCode.OK else StatusCode.ERROR
               RunResult(status)
             }
@@ -851,14 +852,22 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     buildTarget.setDisplayName(module.id)
     buildTarget.setBaseDirectory(DederPath(module.root).absPath.toNIO.toUri.toString)
     module match {
+      case m: DederProject.ScalaJsModule =>
+        val binaryVersion = ScalaParameters(m.scalaVersion).scalaBinaryVersion
+        val scalaBuildTarget =
+          new ScalaBuildTarget("org.scala-lang", m.scalaVersion, binaryVersion, ScalaPlatform.JS, List.empty.asJava)
+        buildTarget.setData(scalaBuildTarget)
+        buildTarget.setDataKind(BuildTargetDataKind.SCALA)
+      case m: DederProject.ScalaNativeModule =>
+        val binaryVersion = ScalaParameters(m.scalaVersion).scalaBinaryVersion
+        val scalaBuildTarget =
+          new ScalaBuildTarget("org.scala-lang", m.scalaVersion, binaryVersion, ScalaPlatform.NATIVE, List.empty.asJava)
+        buildTarget.setData(scalaBuildTarget)
+        buildTarget.setDataKind(BuildTargetDataKind.SCALA)
       case m: DederProject.ScalaModule =>
         val binaryVersion = ScalaParameters(m.scalaVersion).scalaBinaryVersion
         val scalaBuildTarget =
           new ScalaBuildTarget("org.scala-lang", m.scalaVersion, binaryVersion, ScalaPlatform.JVM, List.empty.asJava)
-        // val jvmBuildTarget = new JvmBuildTarget()
-        // jvmBuildTarget.setJavaHome(m.javaHome)
-        // jvmBuildTarget.setJavaVersion(m.javaVersion)
-        // scalaBuildTarget.setJvmBuildTarget(jvmBuildTarget)
         buildTarget.setData(scalaBuildTarget)
         buildTarget.setDataKind(BuildTargetDataKind.SCALA)
       case m: DederProject.JavaModule =>

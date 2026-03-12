@@ -1032,8 +1032,6 @@ class CoreTasks() extends StrictLogging {
               generatedDir.toString
             ) ++ sourceFiles.filter(_.ext == "java").map(_.toString)
             javadocTool.run(null, outStream, outStream, args*)
-            println(s"Running javadoc with args: ${args.mkString(" ")}") // TODO debug
-            println(s"Javadoc output: ${outStream.toString}") // TODO debug
         }
 
         val resultJarPath = ctx.out / s"${pomSettings.artifactId}-javadoc.jar"
