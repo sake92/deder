@@ -6,11 +6,11 @@ import ba.sake.deder.config.DederProject.*
 
 class TasksResolverSuite extends munit.FunSuite {
 
+  private val testProjectsDir = os.pwd / "server/test/resources/sample-projects"
+
   test("TasksResolver builds correct modules and tasks graph") {
-    val projectPath = os.resource / "sample-projects/multi"
-    val projectConfigStr = os.read(projectPath / "deder.pkl")
     val configParser = ConfigParser(writeJson = false)
-    val parsedConfig = configParser.parse(projectConfigStr)
+    val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
     assert(parsedConfig.isRight, parsedConfig.left.get)
     val projectConfig = parsedConfig.toOption.get
     val coreTasks = CoreTasks()
@@ -98,7 +98,8 @@ class TasksResolverSuite extends munit.FunSuite {
       "moduleDepsPomSettings",
       "publishArtifacts",
       "publishLocal",
-      "publish"
+      "publish",
+      "runMvnApp"
     )
     val taskInstancesPerModule = tasksResolver.taskInstancesPerModule
     locally {

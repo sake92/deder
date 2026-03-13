@@ -11,9 +11,6 @@ import scala.util.Using
 
 class ConfigParser(writeJson: Boolean) {
 
-  def parse(str: String): Either[String, DederProject] =
-    parse(ModuleSource.text(str))
-
   def parse(configFile: os.Path): Either[String, DederProject] =
     parse(ModuleSource.file(configFile.toIO))
 

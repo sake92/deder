@@ -6,11 +6,11 @@ import ba.sake.deder.config.DederProject.*
 
 class ExecutionPlannerSuite extends munit.FunSuite {
 
+  private val testProjectsDir = os.pwd / "server/test/resources/sample-projects"
+
   test("ExecutionPlanner builds correct execution plan") {
-    val projectPath = os.resource / "sample-projects/multi"
-    val projectConfigStr = os.read(projectPath / "deder.pkl")
     val configParser = ConfigParser(writeJson = false)
-    val parsedConfig = configParser.parse(projectConfigStr)
+    val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
     val projectConfig = parsedConfig.toOption.get
     val tasksRegistry = TasksRegistry(CoreTasks())
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
@@ -75,10 +75,8 @@ class ExecutionPlannerSuite extends munit.FunSuite {
   }
 
   test("ExecutionPlanner returns correct tasks for getAffectingSourceFileTasks") {
-    val projectPath = os.resource / "sample-projects/multi"
-    val projectConfigStr = os.read(projectPath / "deder.pkl")
     val configParser = ConfigParser(writeJson = false)
-    val parsedConfig = configParser.parse(projectConfigStr)
+    val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
     val projectConfig = parsedConfig.toOption.get
     val tasksRegistry = TasksRegistry(CoreTasks())
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
@@ -96,10 +94,8 @@ class ExecutionPlannerSuite extends munit.FunSuite {
   }
 
   test("ExecutionPlanner returns correct tasks for getAffectingConfigValueTasks") {
-    val projectPath = os.resource / "sample-projects/multi"
-    val projectConfigStr = os.read(projectPath / "deder.pkl")
     val configParser = ConfigParser(writeJson = false)
-    val parsedConfig = configParser.parse(projectConfigStr)
+    val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
     val projectConfig = parsedConfig.toOption.get
     val tasksRegistry = TasksRegistry(CoreTasks())
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)

@@ -1,5 +1,5 @@
 
-rm -rf .metals/ .bsp/ .deder/out/ .deder/logs/
+rm -rf .metals/ .bsp/ .scala-build/ .idea/ .vscode/ .deder/out/ .deder/logs/
 mkdir -p .metals
 touch .metals/bsp.trace.json
 
