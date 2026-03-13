@@ -67,7 +67,16 @@ class PomSettings {
   scm: PomScm?
 }
 
+class MvnApp {
+  /// Maven dependency coordinate, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
+  dep: String(!isEmpty)
+  /// Fully qualified main class to run
+  mainClass: String(!isEmpty)
+  args: Listing<String> = new Listing {}
+}
+
 open class JavaModule extends DederModule {
+  local thisModule = this
   type = "java"
   resources: Listing<String> = new Listing { "resources" }
   javaHome: String?
@@ -82,6 +91,24 @@ open class JavaModule extends DederModule {
   // TODO manifest entries
   publish: Boolean = true
   pomSettings: PomSettings?
+  /// Named maven apps that can be run via `deder exec -t runMvnApp -- <name> [args...]`
+  mvnApps: Mapping<String, MvnApp> = new Mapping {
+    ["fmt"] = new MvnApp {
+      dep = "org.scalameta:scalafmt-cli_2.13:3.10.7"
+      mainClass = "org.scalafmt.cli.Cli"
+      args {
+        ...thisModule.sources.toList().map((src) -> "\(thisModule.root)/\(src)")
+      }
+    }
+    ["fmtCheck"] = new MvnApp {
+      dep = "org.scalameta:scalafmt-cli_2.13:3.10.7"
+      mainClass = "org.scalafmt.cli.Cli"
+      args {
+        "--check"
+        ...thisModule.sources.toList().map((src) -> "\(thisModule.root)/\(src)")
+      }
+    }
+  }
 }
 
 open class ScalaModule extends JavaModule {
