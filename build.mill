@@ -64,6 +64,7 @@ object server extends ScalaModule, VersionModule {
       mvn"org.scalameta::munit:1.2.1"
     )
     def testFramework = "munit.Framework"
+    def testSandboxWorkingDir = false
   }
 }
 
@@ -79,6 +80,7 @@ object integration extends ScalaModule {
       mvn"ch.epfl.scala::bsp-testkit:2.2.0-M2".withDottyCompat(integration.scalaVersion())
     )
     def testFramework = "munit.Framework"
+    def testSandboxWorkingDir = false
   }
 }
 

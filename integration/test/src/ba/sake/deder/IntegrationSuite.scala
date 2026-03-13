@@ -5,17 +5,12 @@ import scala.concurrent.duration.*
 import scala.util.Properties
 import ba.sake.tupson.*
 
-class IntegrationSuite extends munit.FunSuite {
+class IntegrationSuite extends BaseIntegrationSuite {
 
-  // first compile can take a while
   override def munitTimeout = 2.minute
-  
-  private val testResourceDir = os.Path(System.getenv("MILL_TEST_RESOURCE_DIR"))
-  private val dederClientPath = System.getenv("DEDER_CLIENT_PATH")
-  private val dederServerPath = System.getenv("DEDER_SERVER_PATH")
-  
+
   test("deder should work with multimodule project") {
-    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+    withTestProject("sample-projects/multi") { projectPath =>
       // deder version
       locally {
         val dederRes = executeDederCommand(projectPath, "version")
@@ -111,7 +106,7 @@ class IntegrationSuite extends munit.FunSuite {
   // default command is compile
   // and the logs go to stderr!
   test("deder should compile multimodule project") {
-    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+    withTestProject("sample-projects/multi") { projectPath =>
       locally {
         val dederOutputJson = executeDederCommand(projectPath, "exec -m uber -t compileClasspath --json").out.text()
         val dederOutput = dederOutputJson.parseJson[Map[String, List[String]]]
@@ -146,7 +141,7 @@ class IntegrationSuite extends munit.FunSuite {
   }
 
   test("deder should run multimodule project") {
-    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+    withTestProject("sample-projects/multi") { projectPath =>
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec -t run -m uber arg1 arg2 arg3").out.text()
         assert(dederOutput.contains("Args = arg1, arg2, arg3"))
@@ -181,17 +176,17 @@ class IntegrationSuite extends munit.FunSuite {
   }
 
   test("deder should run tests in multimodule/uber-test") {
-    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+    withTestProject("sample-projects/multi") { projectPath =>
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec -m uber-test -t test").err.text()
-        println(s"Test output:\n$dederOutput")
-        //assert(resText.contains("Args = argA, argB, argC"))
+       // println(s"Test output:\n$dederOutput")
+        // assert(resText.contains("Args = argA, argB, argC"))
       }
     }
   }
 
   test("deder should assembly multimodule/uber and run it") {
-    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+    withTestProject("sample-projects/multi") { projectPath =>
       locally {
         executeDederCommand(projectPath, "exec -m uber -t assembly")
         val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
@@ -205,7 +200,7 @@ class IntegrationSuite extends munit.FunSuite {
   }
 
   test("deder should write a BSP config file") {
-    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+    withTestProject("sample-projects/multi") { projectPath =>
       val bspConfigPath = projectPath / ".bsp/deder-bsp.json"
       assert(!os.exists(bspConfigPath))
       executeDederCommand(projectPath, "bsp install")
@@ -228,24 +223,5 @@ class IntegrationSuite extends munit.FunSuite {
       assert(languages.contains("java"))
       assert(languages.contains("scala"))
     }
-  }
-
-  private def withTestProject(testProjectPath: os.Path)(testCode: os.Path => Unit): Unit = {
-    // mill test runs in sandbox folder, so it is safe to create temp folders here
-    val tempDir = os.pwd / testProjectPath.last / s"temp-${System.currentTimeMillis()}"
-    try {
-      os.copy(testProjectPath, tempDir, createFolders = true, replaceExisting = true)
-      os.write.over(tempDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
-      testCode(tempDir)
-    } finally {
-      executeDederCommand(tempDir, "shutdown")
-      // os.remove.all(tempDir)
-    }
-  }
-
-  private def executeDederCommand(projectPath: os.Path, command: String): os.CommandResult = {
-    val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
-    val cmd = shell ++ Seq(s"$dederClientPath $command")
-    os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe)
   }
 }

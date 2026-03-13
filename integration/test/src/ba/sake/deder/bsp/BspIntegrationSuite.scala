@@ -3,6 +3,8 @@ package ba.sake.deder.bsp
 // adapted from
 // https://github.com/build-server-protocol/build-server-protocol/blob/v2.2.0-M2/tests/src/test/scala/tests/MockClientSuite.scala
 
+import ba.sake.deder.BaseIntegrationSuite
+
 import java.nio.file.{Files, Path}
 import java.util.Collections
 import java.util.concurrent.Executors
@@ -15,13 +17,9 @@ import com.google.common.collect.Lists
 import ch.epfl.scala.bsp.testkit.client.TestClient
 import ch.epfl.scala.bsp4j.*
 
-class BspIntegrationSuite extends munit.FunSuite {
+class BspIntegrationSuite extends BaseIntegrationSuite {
 
   override def munitTimeout: Duration = 5.minutes
-
-  private val testResourceDir = os.Path(System.getenv("MILL_TEST_RESOURCE_DIR"))
-  private val dederClientPath = System.getenv("DEDER_CLIENT_PATH")
-  private val dederServerPath = System.getenv("DEDER_SERVER_PATH")
 
   private val testDirectory = Files.createTempDirectory("BspIntegrationSuite").toAbsolutePath
   os.copy(
@@ -72,12 +70,6 @@ class BspIntegrationSuite extends munit.FunSuite {
     initializeBuildParams,
     //10.seconds.toJava
   )
-
-  private def executeDederCommand(projectPath: os.Path, command: String): os.CommandResult = {
-    val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
-    val cmd = shell ++ Seq(s"$dederClientPath $command")
-    os.proc(cmd).call(cwd = projectPath)
-  }
 
   private val coursierCacheDir = coursierapi.Cache.create().getLocation.toPath
 

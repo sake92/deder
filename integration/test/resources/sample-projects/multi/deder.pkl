@@ -1,6 +1,6 @@
 amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
-local const baseModule = new ScalaModule {
+local const baseModule: ScalaModule = new {
   scalaVersion = "3.7.1"
   // we normally disable semanticdb in CI because it isnt needed
   // but for integration tests we want to make sure it works, so we enable it
@@ -10,7 +10,7 @@ local const baseModule = new ScalaModule {
 local const common = (baseModule) {
   id = "common"
   deps {
-    //"org.jsoup:jsoup:1.21.1"
+  //"org.jsoup:jsoup:1.21.1"
   }
 }
 
@@ -28,7 +28,7 @@ local const uber = (baseModule) {
   id = "uber"
   moduleDeps { frontend; backend }
   deps {
-    //"com.lihaoyi::pprint:0.9.5"
+  //"com.lihaoyi::pprint:0.9.5"
   }
   mainClass = "uber.Main"
 }

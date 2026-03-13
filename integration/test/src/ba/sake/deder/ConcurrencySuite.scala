@@ -1,15 +1,13 @@
 package ba.sake.deder
 
+import java.util.UUID
 import scala.util.Random
 import ba.sake.deder.config.DederProject.ModuleType
 
-import java.util.UUID
-
-class ConcurrencySuite extends munit.FunSuite {
-  val testResourceDir = os.Path(System.getenv("MILL_TEST_RESOURCE_DIR"))
+class ConcurrencySuite extends BaseIntegrationSuite {
 
   test("executeTask should guard against concurrent executions of the same task") {
-    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+    withTestProject("sample-projects/multi") { projectPath =>
       val coreTasks = CoreTasks()
       val tasksRegistry = TasksRegistry(coreTasks)
       var globalVar = 0
@@ -42,7 +40,7 @@ class ConcurrencySuite extends munit.FunSuite {
   }
 
   test("executeTask should serialize locks by task instance id") {
-    withTestProject(testResourceDir / "sample-projects/multi") { projectPath =>
+    withTestProject("sample-projects/multi") { projectPath =>
       val coreTasks = CoreTasks()
       val tasksRegistry = TasksRegistry(coreTasks)
       var globalVar = 0
@@ -87,12 +85,4 @@ class ConcurrencySuite extends munit.FunSuite {
     }
   }
 
-  // just for easier setup of test project, config and all
-  private def withTestProject(testProjectPath: os.Path)(testCode: os.Path => Unit): Unit = {
-    // mill test runs in sandbox folder, so it is safe to create temp folders here
-    val tempDir = os.pwd / testProjectPath.last / s"temp-${System.currentTimeMillis()}"
-    os.copy(testProjectPath, tempDir, createFolders = true, replaceExisting = true)
-    System.setProperty("DEDER_PROJECT_ROOT_DIR", tempDir.toString)
-    testCode(tempDir)
-  }
 }

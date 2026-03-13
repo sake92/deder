@@ -4,19 +4,14 @@ import scala.concurrent.duration.*
 import scala.util.Properties
 import ba.sake.tupson.*
 
-class ScalaJsIntegrationSuite extends munit.FunSuite {
+class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
 
-  // first compile can take a while
   override def munitTimeout = 1.minute
-  
-  private val testResourceDir = os.Path(System.getenv("MILL_TEST_RESOURCE_DIR"))
-  private val dederClientPath = System.getenv("DEDER_CLIENT_PATH")
-  private val dederServerPath = System.getenv("DEDER_SERVER_PATH")
 
   // default command is compile
   // and the logs go to stderr!
   test("deder should compile scalajs project") {
-    withTestProject(testResourceDir / "sample-projects/scalajs") { projectPath =>
+    withTestProject("sample-projects/scalajs") { projectPath =>
       locally {
         val dederOutputJson = executeDederCommand(projectPath, "exec -m frontend -t compileClasspath --json").out.text()
         val dederOutput = dederOutputJson.parseJson[Map[String, List[String]]]
@@ -38,7 +33,7 @@ class ScalaJsIntegrationSuite extends munit.FunSuite {
   }
 
   test("deder should fastLinkJs scalajs project") {
-    withTestProject(testResourceDir / "sample-projects/scalajs") { projectPath =>
+    withTestProject("sample-projects/scalajs") { projectPath =>
       locally {
         executeDederCommand(projectPath, "exec -m frontend -t fastLinkJs")
         val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
@@ -51,22 +46,4 @@ class ScalaJsIntegrationSuite extends munit.FunSuite {
     }
   }
 
-  private def withTestProject(testProjectPath: os.Path)(testCode: os.Path => Unit): Unit = {
-    // mill test runs in sandbox folder, so it is safe to create temp folders here
-    val tempDir = os.pwd / testProjectPath.last / s"temp-${System.currentTimeMillis()}"
-    try {
-      os.copy(testProjectPath, tempDir, createFolders = true, replaceExisting = true)
-      os.write.over(tempDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
-      testCode(tempDir)
-    } finally {
-      executeDederCommand(tempDir, "shutdown")
-      // os.remove.all(tempDir)
-    }
-  }
-
-  private def executeDederCommand(projectPath: os.Path, command: String): os.CommandResult = {
-    val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
-    val cmd = shell ++ Seq(s"$dederClientPath $command")
-    os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe)
-  }
 }

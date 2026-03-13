@@ -1,6 +1,5 @@
 package ba.sake.deder
 
-import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.ConfigParser
 import ba.sake.deder.config.DederProject.*
 
@@ -10,7 +9,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
 
   test("ExecutionPlanner builds correct execution plan") {
     val configParser = ConfigParser(writeJson = false)
-    val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
+    val parsedConfig = configParser.parse(testProjectsDir / "multi/deder.pkl")
     val projectConfig = parsedConfig.toOption.get
     val tasksRegistry = TasksRegistry(CoreTasks())
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)

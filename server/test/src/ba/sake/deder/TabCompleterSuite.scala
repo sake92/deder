@@ -3,12 +3,12 @@ package ba.sake.deder
 import ba.sake.deder.config.ConfigParser
 
 class TabCompleterSuite extends munit.FunSuite {
-  
+
   private val testProjectsDir = os.pwd / "server/test/resources/sample-projects"
 
   test("TabCompleter completes subcommands") {
     val configParser = ConfigParser(writeJson = false)
-    val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
+    val parsedConfig = configParser.parse(testProjectsDir / "multi/deder.pkl")
     assert(parsedConfig.isRight, parsedConfig.left.get)
     val projectConfig = parsedConfig.toOption.get
     val coreTasks = CoreTasks()
