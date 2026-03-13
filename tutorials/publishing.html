@@ -43,6 +43,7 @@
        <ul>
         <li><a href="#publishing-tutorial">Publishing Tutorial</a>
          <ul>
+          <li><a href="#git-driven-versioning">Git driven versioning</a></li>
           <li><a href="#publish-to-local-maven-repository">Publish to Local Maven Repository</a></li>
           <li><a href="#publish-to-sonatype-maven-central">Publish to Sonatype Maven Central</a></li>
          </ul></li>
@@ -97,6 +98,16 @@ modules {
    <p>All this information is necessary for publishing to Maven repositories.
     <br>
     See the official <a href="https://central.sonatype.org/publish/requirements/#required-pom-metadata/">Sonatype Central Repository documentation</a> for more details.</p>
+   <h3 id="git-driven-versioning">Git driven versioning<a href="#git-driven-versioning" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>You can also use git driven versioning to automatically set the version based on your git tags.
+    <br>
+    To do this, you need <strong>remove the version</strong> from <code>pomSettings</code>. Deder will automatically set the version based on the latest semver-based git tag (with optional <code>v</code> prefix).</p>
+   <ul>
+    <li><code>1.0.0</code> -&gt; <code>1.0.0</code></li>
+    <li><code>v1.0.0</code> -&gt; <code>1.0.0</code></li>
+    <li><code>1.0.0</code> with uncommited changes -&gt; <code>1.0.1-SNAPSHOT</code></li>
+    <li><code>1.0.0</code> with few commited changes -&gt; <code>1.0.1-SNAPSHOT</code></li>
+   </ul>
    <h2 id="publish-to-local-maven-repository">Publish to Local Maven Repository<a href="#publish-to-local-maven-repository" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>To publish to your local <code>.m2</code> repository, run the following command:</p>
    <pre><code class="language-bash hljs" data-highlighted="yes">deder <span class="hljs-built_in">exec</span> -t publishLocal

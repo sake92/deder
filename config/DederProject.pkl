@@ -58,7 +58,7 @@ class PomScm {
 class PomSettings {
   groupId: String(!isEmpty)
   artifactId: String(!isEmpty)
-  version: String(!isEmpty)
+  version: String?
   name: String(!isEmpty)
   description: String?
   url: String?
