@@ -1,9 +1,6 @@
 
 
 - handle no deder.pkl present
-- summarize { ctx => }, e.g. for test task, show final result, which tests failed etc.
-  - currently each module prints its own test results, which is noisy and not ideal for CI etc.. 
-  - would be better to have a single summary at the end
 
 # CI
 - windows..
@@ -23,9 +20,11 @@
 ## Tests
 
 - optionally run as separate JVM process(es), for isolation etc..
-- on first run just randomly distribute between workers, record stats per test/suite
-- on next run use stats to figure out how to exec more performantly
-- use H2 db for coordination
+  - on first run just randomly distribute between workers, record stats per test/suite
+  - on next run use stats to figure out how to exec more performantly
+  - use H2 db for coordination
+
+- print summary of failed tests at the end, instead of just printing each module's test results, which is noisy and not ideal for CI etc..
 
 ## CLI
 - --mermaid diagrams

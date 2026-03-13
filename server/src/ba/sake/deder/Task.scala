@@ -23,6 +23,11 @@ case class TaskBuilder[T: JsonRW, Deps <: Tuple] private (
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
     TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes)
+
+  def buildWithSummary(execute: TaskExecContext[T, Deps] => T)(
+      summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit
+  ): Task[T, Deps] =
+    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, summarize = summarize)
 }
 
 object TaskBuilder {
@@ -93,6 +98,7 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
   def singleton: Boolean // e.g. you can only "run" ONE MODULE!
   def taskDeps: Deps
   def execute: TaskExecContext[T, Deps] => T
+  def summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit
   private[deder] def executeUnsafe(
       project: DederProject,
       module: DederModule,
@@ -102,6 +108,12 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger
   ): (res: TaskResult[T], changed: Boolean)
+
+  /** Type-erased summarize for use by the execution engine */
+  private[deder] def summarizeUnsafe(
+      results: Seq[(DederModule, Any)],
+      serverNotificationsLogger: ServerNotificationsLogger
+  ): Unit = summarize(results.asInstanceOf[Seq[(DederModule, T)]], serverNotificationsLogger)
 }
 
 class TaskImpl[T: JsonRW, Deps <: Tuple](
@@ -113,7 +125,9 @@ class TaskImpl[T: JsonRW, Deps <: Tuple](
     val transitive: Boolean = false,
     val singleton: Boolean = false,
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
-    val description: String = ""
+    val description: String = "",
+    val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
+      (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => ()
 )(using ev: TaskDeps[Deps] =:= true)
     extends Task[T, Deps] {
   override private[deder] def executeUnsafe(
@@ -162,7 +176,9 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     val transitive: Boolean = false,
     val singleton: Boolean = false,
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
-    val description: String = ""
+    val description: String = "",
+    val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
+      (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => ()
 )(using ev: TaskDeps[Deps] =:= true)
     extends Task[T, Deps] {
 
@@ -213,7 +229,9 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
         val cachedTaskResult = os.read(metadataFile).parseJson[TaskResult[T]]
         val hasDeps = allDepResults.nonEmpty
         val newRes = if hasDeps && inputsHash == cachedTaskResult.inputsHash then
-          serverNotificationsLogger.add(ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id)))
+          serverNotificationsLogger.add(
+            ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id))
+          )
           cachedTaskResult
         else computeTaskResult()
         val changed = newRes.outputHash != cachedTaskResult.outputHash

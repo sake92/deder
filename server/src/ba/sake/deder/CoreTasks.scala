@@ -745,7 +745,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(classesTask)
     .dependsOn(runClasspathTask)
     // cant reuse testClassesTask coz Framework is not Json-able...
-    .build { ctx =>
+    .buildWithSummary { ctx =>
       val (classesDir, runClasspath) = ctx.depResults
       val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
       ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
@@ -766,6 +766,34 @@ class CoreTasks() extends StrictLogging {
             testRunner.run(testOptions)
         }
       }
+    } { (results, notifications) =>
+      val totalResults = DederTestResults(
+        total = results.map(_._2.total).sum,
+        passed = results.map(_._2.passed).sum,
+        failed = results.map(_._2.failed).sum,
+        errors = results.map(_._2.errors).sum,
+        skipped = results.map(_._2.skipped).sum,
+        duration = results.map(_._2.duration).sum
+      )
+      val separator = "═" * 50
+      notifications.add(ServerNotification.logInfo(separator))
+      val statusIcon = if totalResults.success then "PASS ✅" else "FAIL \uD83D\uDD34"
+      notifications.add(
+        ServerNotification.logInfo(
+          s"$statusIcon Test Summary: ${totalResults.total} total, ${totalResults.passed} passed, ${totalResults.failed} failed, ${totalResults.errors} errors, ${totalResults.skipped} skipped"
+        )
+      )
+      results.foreach { case (module, res) =>
+        val icon = if res.success then "  PASS ✅" else "  FAIL \uD83D\uDD34"
+        val detail = Option.when(!res.success) {
+          Seq(
+            Option.when(res.failed > 0)(s"${res.failed} failed"),
+            Option.when(res.errors > 0)(s"${res.errors} errors")
+          ).flatten.mkString(", ")
+        }
+        notifications.add(ServerNotification.logInfo(s"$icon ${module.id}${detail.map(d => s" ($d)").getOrElse("")}"))
+      }
+      notifications.add(ServerNotification.logInfo(separator))
     }
 
   // TODO manifest config

@@ -141,6 +141,12 @@ class DederProjectState(
           serverNotificationsLogger,
           useLastGood = useLastGood
         )
+        // summarize across modules (only when >1 module)
+        if results.size > 1 then {
+          val task = results.head.taskInstance.task
+          val moduleResults = results.sortBy(_.taskInstance.moduleId).map(r => (r.taskInstance.module, r.res))
+          task.summarizeUnsafe(moduleResults, serverNotificationsLogger)
+        }
         if json then {
           val jsonValues = results.map { res =>
             val moduleId = res.taskInstance.moduleId
