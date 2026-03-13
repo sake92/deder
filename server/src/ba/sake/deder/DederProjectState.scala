@@ -182,7 +182,10 @@ class DederProjectState(
             )
           }
         }
-        if exitOnEnd then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
+        if exitOnEnd then {
+          val allSuccessful = results.forall(r => r.taskInstance.task.isResultSuccessfulUnsafe(r.res))
+          serverNotificationsLogger.add(ServerNotification.RequestFinished(success = allSuccessful))
+        }
     }
   } catch {
     case NonFatal(e) =>

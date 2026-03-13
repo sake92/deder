@@ -24,10 +24,10 @@ case class TaskBuilder[T: JsonRW, Deps <: Tuple] private (
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
     TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes)
 
-  def buildWithSummary(execute: TaskExecContext[T, Deps] => T)(
+  def buildWithSummary(execute: TaskExecContext[T, Deps] => T, isResultSuccessful: T => Boolean = _ => true)(
       summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit
   ): Task[T, Deps] =
-    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, summarize = summarize)
+    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, isResultSuccessful = isResultSuccessful, summarize = summarize)
 }
 
 object TaskBuilder {
@@ -99,6 +99,7 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
   def taskDeps: Deps
   def execute: TaskExecContext[T, Deps] => T
   def summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit
+  def isResultSuccessful: T => Boolean = _ => true
   private[deder] def executeUnsafe(
       project: DederProject,
       module: DederModule,
@@ -114,6 +115,10 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
       results: Seq[(DederModule, Any)],
       serverNotificationsLogger: ServerNotificationsLogger
   ): Unit = summarize(results.asInstanceOf[Seq[(DederModule, T)]], serverNotificationsLogger)
+
+  /** Type-erased success check for use by the execution engine */
+  private[deder] def isResultSuccessfulUnsafe(result: Any): Boolean =
+    isResultSuccessful(result.asInstanceOf[T])
 }
 
 class TaskImpl[T: JsonRW, Deps <: Tuple](
@@ -126,6 +131,7 @@ class TaskImpl[T: JsonRW, Deps <: Tuple](
     val singleton: Boolean = false,
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
     val description: String = "",
+    override val isResultSuccessful: T => Boolean = (_: T) => true,
     val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
       (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => ()
 )(using ev: TaskDeps[Deps] =:= true)

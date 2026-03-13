@@ -1,12 +1,19 @@
 
+# Misc
+
+- maybe use https://github.com/encalmo/graphs coz zero deps?
+
 # CI
 - windows..
 
 ## Config
 
 ## Scala.js
+- fullopt
 
 ## Scala Native
+- fullopt
+
 
 ## Scalafmt
 - add as a subcommand, `deder format`
