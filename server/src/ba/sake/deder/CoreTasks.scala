@@ -773,7 +773,8 @@ class CoreTasks() extends StrictLogging {
         failed = results.map(_._2.failed).sum,
         errors = results.map(_._2.errors).sum,
         skipped = results.map(_._2.skipped).sum,
-        duration = results.map(_._2.duration).sum
+        duration = results.map(_._2.duration).sum,
+        failedTestNames = results.flatMap(_._2.failedTestNames)
       )
       val separator = "═" * 50
       notifications.add(ServerNotification.logInfo(separator))
@@ -792,6 +793,9 @@ class CoreTasks() extends StrictLogging {
           ).flatten.mkString(", ")
         }
         notifications.add(ServerNotification.logInfo(s"$icon ${module.id}${detail.map(d => s" ($d)").getOrElse("")}"))
+        res.failedTestNames.foreach { testName =>
+          notifications.add(ServerNotification.logInfo(s"       - $testName"))
+        }
       }
       notifications.add(ServerNotification.logInfo(separator))
     }
