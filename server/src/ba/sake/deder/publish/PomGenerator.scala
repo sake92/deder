@@ -53,7 +53,7 @@ object PomGenerator {
       d.setGroupId(coursierDep.module.organization)
       d.setArtifactId(coursierDep.module.name)
       d.setVersion(coursierDep.version)
-      d.setScope(coursierDep.userParamsMap.getOrElse("scope", Seq.empty).headOption.flatten.getOrElse(""))
+      d.setScope(coursierDep.userParamsMap.getOrElse("scope", Seq.empty).headOption.flatten.orNull)
       mavenDependencies.add(d)
     }
     moduleDepsPomSettings.foreach { moduleDep =>
