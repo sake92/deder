@@ -79,7 +79,6 @@ public class Main {
         }, () -> log("No parent process"));
 
         client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(this::log, args);
-        var startedConnectingAt = Instant.now();
         var maxConnectDurationSeconds = 10;
         try {
             client.start();
@@ -90,6 +89,8 @@ public class Main {
                 return;
             }
             startServer(isBspClient);
+            // start the timer AFTER server process is launched, not before
+            var startedConnectingAt = Instant.now();
             var connected = false;
             while (!connected && (isBspClient
                     || Duration.between(startedConnectingAt, Instant.now()).getSeconds() < maxConnectDurationSeconds)) {
@@ -103,6 +104,13 @@ public class Main {
                 } catch (Exception ex) {
                     log("Error occurred while restarting client: " + ex.getMessage());
                 }
+            }
+            if (!connected) {
+                var msg = "Failed to connect to Deder server after " + maxConnectDurationSeconds + " seconds. Please check logs for details:";
+                log(msg);
+                System.err.println(msg);
+                System.err.println(logFile.toAbsolutePath());
+                System.exit(1);
             }
         }
     }
