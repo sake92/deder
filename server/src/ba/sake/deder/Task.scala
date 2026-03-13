@@ -24,10 +24,21 @@ case class TaskBuilder[T: JsonRW, Deps <: Tuple] private (
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
     TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes)
 
-  def buildWithSummary(execute: TaskExecContext[T, Deps] => T, isResultSuccessful: T => Boolean = _ => true)(
+  def buildWithSummary(
+      execute: TaskExecContext[T, Deps] => T,
+      isResultSuccessful: T => Boolean = _ => true,
       summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit
   ): Task[T, Deps] =
-    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, isResultSuccessful = isResultSuccessful, summarize = summarize)
+    TaskImpl(
+      name,
+      execute,
+      taskDeps,
+      transitive,
+      singleton,
+      supportedModuleTypes,
+      isResultSuccessful = isResultSuccessful,
+      summarize = summarize
+    )
 }
 
 object TaskBuilder {
