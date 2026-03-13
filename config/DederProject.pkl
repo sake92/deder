@@ -67,6 +67,14 @@ class PomSettings {
   scm: PomScm?
 }
 
+class MavenApp {
+  /// Maven dependency coordinate, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
+  dep: String(!isEmpty)
+  /// Fully qualified main class to run
+  mainClass: String(!isEmpty)
+  args: Listing<String> = new Listing {}
+}
+
 open class JavaModule extends DederModule {
   type = "java"
   resources: Listing<String> = new Listing { "resources" }
@@ -82,6 +90,8 @@ open class JavaModule extends DederModule {
   // TODO manifest entries
   publish: Boolean = true
   pomSettings: PomSettings?
+  /// Named maven apps that can be run via `deder exec -t runMvnApp -- <name> [args...]`
+  mvnApps: Mapping<String, MavenApp> = new Mapping {}
 }
 
 open class ScalaModule extends JavaModule {

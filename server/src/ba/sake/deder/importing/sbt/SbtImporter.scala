@@ -136,6 +136,7 @@ class SbtImporter(
           "0.11.1", // javaSemanticdbVersion
           false, // publish
           null, // pomSettings
+          java.util.Map.of(), // commands
           sbtProjectExport.scalaVersion,
           sbtProjectExport.scalacOptions.asJava,
           List.empty.asJava, // scalacPluginDeps
@@ -161,6 +162,7 @@ class SbtImporter(
           "0.11.1", // javaSemanticdbVersion
           false, // publish
           null, // pomSettings
+          java.util.Map.of(), // commands
           sbtProjectExport.scalaVersion,
           sbtProjectExport.scalacOptions.asJava,
           List.empty.asJava, // scalacPluginDeps

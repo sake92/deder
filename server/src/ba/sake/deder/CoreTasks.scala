@@ -712,6 +712,43 @@ class CoreTasks() extends StrictLogging {
       }
     }
 
+  val runMvnAppTask = TaskBuilder
+    .make[Seq[String]](
+      name = "runMvnApp",
+      singleton = true
+    )
+    .dependsOn(scalaVersionTask)
+    .dependsOn(jvmOptionsTask)
+    .build { ctx =>
+      val (scalaVersion, jvmOptions) = ctx.depResults
+      val mvnAppsMap = ctx.module match {
+        case m: JavaModule =>
+          m.mvnApps.asScala.map { case (name, tc) => name -> tc }.toMap
+        case _ => Map.empty
+      }
+      val mvnAppsMapName = ctx.args.headOption.getOrElse(
+        throw new RuntimeException(
+          s"No maven app name specified. Available maven apps: ${mvnAppsMap.keys.mkString(", ")}"
+        )
+      )
+      mvnAppsMap.get(mvnAppsMapName) match {
+        case Some(tc) =>
+          val dependency = Dependency.make(tc.dep, scalaVersion)
+          val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
+          val cp = jars.map(_.toString).mkString(File.pathSeparator)
+          val commandArgs = tc.args.asScala ++ ctx.args.tail
+          val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, tc.mainClass) ++ commandArgs
+          logger.info(s"Running maven app '${mvnAppsMapName}': ${cmd}")
+          ctx.notifications.add(ServerNotification.RunSubprocess(cmd, false))
+          cmd
+        case _ =>
+          throw new RuntimeException(
+            s"Maven app '${mvnAppsMapName}' not found for module '${ctx.module.id}'. " +
+              s"Available maven apps: ${mvnAppsMap.keys.mkString(", ")}"
+          )
+      }
+    }
+
   val testClassesTask = TaskBuilder
     .make[Seq[DiscoveredFrameworkTests]](
       name = "testClasses",
@@ -1246,6 +1283,7 @@ class CoreTasks() extends StrictLogging {
     finalMainClassTask,
     runTask,
     runMainTask,
+    runMvnAppTask,
     testClassesTask,
     testTask,
     jarTask,

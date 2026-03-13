@@ -60,4 +60,13 @@ object Hashable {
       HashUtils.hashStr(combinedHash)
     }
   }
+
+  given [K: Hashable, V: Hashable]: Hashable[Map[K, V]] with {
+    def hashStr(value: Map[K, V]): String = {
+      val combinedHash = value.toSeq.sortBy(_._1.hashStr).map { (k, v) =>
+        s"${k.hashStr}=${v.hashStr}"
+      }.mkString("-")
+      HashUtils.hashStr(combinedHash)
+    }
+  }
 }
