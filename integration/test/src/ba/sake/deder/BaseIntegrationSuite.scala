@@ -14,6 +14,7 @@ trait BaseIntegrationSuite extends munit.FunSuite {
     try {
       os.copy(testResourceDir /testProjectPath, tempDir, createFolders = true, replaceExisting = true)
       os.write.over(tempDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      System.setProperty("DEDER_PROJECT_ROOT_DIR", tempDir.toString)
       testCode(tempDir)
     } finally {
       executeDederCommand(tempDir, "shutdown")
