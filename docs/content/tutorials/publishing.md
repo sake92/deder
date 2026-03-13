@@ -50,6 +50,16 @@ modules {
 All this information is necessary for publishing to Maven repositories.  
 See the official [Sonatype Central Repository documentation](https://central.sonatype.org/publish/requirements/#required-pom-metadata/) for more details.
 
+### Git driven versioning
+
+You can also use git driven versioning to automatically set the version based on your git tags.  
+To do this, you need **remove the version** from `pomSettings`.
+Deder will automatically set the version based on the latest semver-based git tag (with optional `v` prefix).
+
+- `1.0.0` -> `1.0.0`
+- `v1.0.0` -> `1.0.0`
+- `1.0.0` with uncommited changes -> `1.0.1-SNAPSHOT`
+- `1.0.0` with few commited changes -> `1.0.1-SNAPSHOT`
 
 ## Publish to Local Maven Repository
 
