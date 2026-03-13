@@ -1,7 +1,4 @@
 
-
-- handle no deder.pkl present
-
 # CI
 - windows..
 

@@ -20,7 +20,7 @@ import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.jar.{JarManifest, JarUtils}
-import ba.sake.deder.publish.{Hasher, PgpSigner, PomGenerator, PomSettings, Publisher}
+import ba.sake.deder.publish.{GitSemVer, Hasher, PgpSigner, PomGenerator, PomSettings, Publisher}
 import ba.sake.deder.scalajs.ScalaJsLinker
 import ba.sake.deder.scalanative.ScalaNativeLinker
 import ba.sake.deder.testing.*
@@ -929,11 +929,14 @@ class CoreTasks() extends StrictLogging {
               case _ =>
                 pom.artifactId
             }
+            val resolvedVersion =
+              if pom.version != null then pom.version
+              else GitSemVer.detectVersion(DederGlobals.projectRootDir)
             Some(
               PomSettings(
                 groupId = pom.groupId,
                 artifactId = finalArtifactId,
-                version = pom.version
+                version = resolvedVersion
               )
             )
           } else {
