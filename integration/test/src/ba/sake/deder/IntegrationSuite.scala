@@ -90,8 +90,10 @@ class IntegrationSuite extends munit.FunSuite {
              |  common.sources
              |Stage #1:
              |  common.allClassesDirs
+             |  common.compilerDeps
              |  common.dependencies
              |  common.javacAnnotationProcessors
+             |  common.mandatoryDependencies
              |  common.scalaSemanticdbVersion
              |Stage #2:
              |  common.allDependencies
