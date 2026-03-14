@@ -7,6 +7,12 @@ local const mylibrary = new ScalaModule {
     "com.lihaoyi::os-lib:0.11.6"
   }
   pomSettings = makePomSettings("mylibrary")
+  manifest {
+    mainAttributes {
+      ["Implementation-Version"] = "0.0.1-SNAPSHOT"
+      ["Implementation-Title"] = "mylibrary"
+    }
+  }
 }
 
 local const myapp = new ScalaModule {

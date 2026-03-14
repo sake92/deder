@@ -23,7 +23,8 @@ object ImportingUtils {
     "scalacOptions",
     "scalacPluginDeps",
     "scalaSemanticdbVersion",
-    "testFrameworks"
+    "testFrameworks",
+    "manifest"
   )
 
   def sanitizeId(id: String): String =

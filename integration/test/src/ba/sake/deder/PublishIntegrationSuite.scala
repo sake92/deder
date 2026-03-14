@@ -1,5 +1,6 @@
 package ba.sake.deder
 
+import java.util.jar.JarFile
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader
@@ -38,6 +39,25 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
         assertEquals(deps.length, 2)
         assert(deps.exists(_.getArtifactId == "scala3-library_3"))
         assert(deps.exists(_.getArtifactId == "mylibrary_3"))
+      }
+    }
+  }
+
+  test("deder jar should contain custom manifest entries") {
+    withTestProject("sample-projects/publish") { projectPath =>
+      executeDederCommand(projectPath, "exec -t jar -m mylibrary").out.text()
+      val jarPath = projectPath / ".deder/out/mylibrary/jar/mylibrary.jar"
+      assert(os.exists(jarPath), s"JAR not found at $jarPath")
+      val jarFile = new JarFile(jarPath.toIO)
+      try {
+        val manifest = jarFile.getManifest
+        val mainAttrs = manifest.getMainAttributes
+        assertEquals(mainAttrs.getValue("Implementation-Version"), "0.0.1-SNAPSHOT")
+        assertEquals(mainAttrs.getValue("Implementation-Title"), "mylibrary")
+        assertEquals(mainAttrs.getValue("Created-By"), "Deder build tool")
+        assertEquals(mainAttrs.getValue("Manifest-Version"), "1.0")
+      } finally {
+        jarFile.close()
       }
     }
   }

@@ -134,6 +134,7 @@ class SbtImporter(
           List.empty.asJava, // javacAnnotationProcessorDeps
           true, // semanticdbEnabled
           "0.11.1", // javaSemanticdbVersion
+          new DederProject.ManifestSettings(java.util.Map.of(), java.util.Map.of()), // manifest
           false, // publish
           null, // pomSettings
           java.util.Map.of(), // commands
@@ -160,6 +161,7 @@ class SbtImporter(
           List.empty.asJava, // javacAnnotationProcessorDeps
           true, // semanticdbEnabled
           "0.11.1", // javaSemanticdbVersion
+          new DederProject.ManifestSettings(java.util.Map.of(), java.util.Map.of()), // manifest
           false, // publish
           null, // pomSettings
           java.util.Map.of(), // commands

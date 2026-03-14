@@ -638,6 +638,7 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
+
   val finalMainClassTask = TaskBuilder
     .make[Option[String]](
       name = "finalMainClass"
@@ -650,6 +651,75 @@ class CoreTasks() extends StrictLogging {
         .orElse {
           Option.when(discoveredMainClasses.length == 1)(discoveredMainClasses.head)
         }
+    }
+
+  case class ManifestEntries(
+      mainAttributes: Map[String, String],
+      groups: Map[String, Map[String, String]]
+  ) derives JsonRW {
+    def toJarManifest: JarManifest = {
+      val base = JarManifest.Default.add(mainAttributes.toSeq*)
+      groups.foldLeft(base) { case (m, (group, attrs)) =>
+        m.addGroup(group, attrs.toSeq*)
+      }
+    }
+  }
+
+  object ManifestEntries {
+    val Empty: ManifestEntries = ManifestEntries(Map.empty, Map.empty)
+
+    given Hashable[ManifestEntries] with {
+      override def hashStr(value: ManifestEntries): String =
+        Seq(value.mainAttributes.hashStr, value.groups.hashStr).hashStr
+    }
+  }
+
+  val manifestSettingsTask = ConfigValueTask[ManifestEntries](
+    name = "manifest",
+    execute = { ctx =>
+      ctx.module match {
+        case m: JavaModule =>
+          ManifestEntries(
+            mainAttributes = m.manifest.mainAttributes.asScala.toMap,
+            groups = m.manifest.groups.asScala.view.mapValues(_.asScala.toMap).toMap
+          )
+        case _ => ManifestEntries.Empty
+      }
+    }
+  )
+
+  val finalManifestSettingsTask = TaskBuilder
+    .make[ManifestEntries](name = "finalManifest")
+    .dependsOn(manifestSettingsTask)
+    .dependsOn(finalMainClassTask)
+    .dependsOn(pomSettingsTask)
+    .build { ctx =>
+      val (manifestEntries, mainClass, pomSettings) = ctx.depResults
+      import java.util.jar.Attributes.Name as JarName
+
+      // defaults from pom settings (when available)
+      val pomDefaults = pomSettings match {
+        case Some(pom) =>
+          Map(
+            JarName.IMPLEMENTATION_TITLE.toString -> pom.artifactId,
+            JarName.IMPLEMENTATION_VERSION.toString -> pom.version,
+            JarName.IMPLEMENTATION_VENDOR.toString -> pom.groupId,
+            JarName.SPECIFICATION_TITLE.toString -> pom.artifactId,
+            JarName.SPECIFICATION_VERSION.toString -> pom.version,
+            JarName.SPECIFICATION_VENDOR.toString -> pom.groupId
+          )
+        case None =>
+          Map(
+            JarName.IMPLEMENTATION_TITLE.toString -> ctx.module.id
+          )
+      }
+
+      // main class entry (when available)
+      val mainClassEntry = mainClass.map(mc => JarName.MAIN_CLASS.toString -> mc)
+
+      // precedence: pomDefaults < mainClass < user manifest entries
+      val merged = pomDefaults ++ mainClassEntry ++ manifestEntries.mainAttributes
+      manifestEntries.copy(mainAttributes = merged)
     }
 
   val runTask = TaskBuilder
@@ -856,24 +926,18 @@ class CoreTasks() extends StrictLogging {
       }
     )
 
-  // TODO manifest config
   val jarTask = TaskBuilder
     .make[os.Path](name = "jar")
     .dependsOn(compileTask)
-    .dependsOn(finalMainClassTask)
+    .dependsOn(finalManifestSettingsTask)
     .build { ctx =>
-      val (localClasspath, mainClass) = ctx.depResults
+      val (localClasspath, manifestEntries) = ctx.depResults
       val resultJarPath = ctx.out / s"${ctx.module.id}.jar"
       val jarInputPaths = Seq(localClasspath.absPath)
-      val manifest = mainClass match {
-        case Some(mc) =>
-          JarManifest.Default.add(java.util.jar.Attributes.Name.MAIN_CLASS.toString -> mc)
-        case None => JarManifest.Default
-      }
       JarUtils.createJar(
         resultJarPath,
         jarInputPaths,
-        manifest
+        manifestEntries.toJarManifest
       )
       resultJarPath
     }
@@ -895,12 +959,13 @@ class CoreTasks() extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(scalaVersionTask)
-    .dependsOn(finalMainClassTask)
+    .dependsOn(finalManifestSettingsTask)
     .dependsOn(mandatoryDependenciesTask)
     .dependsOn(allDependenciesTask)
     .dependsOn(allJarsTask)
     .build { ctx =>
-      val (scalaVersion, mainClass, mandatoryDependencies, dependencies, allModulesJars) = ctx.depResults
+      val (scalaVersion, manifestEntries, mandatoryDependencies, dependencies, allModulesJars) =
+        ctx.depResults
       val depsJars = DependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
       val tmpDir = ctx.out / "jars"
       os.makeDir.all(tmpDir)
@@ -909,13 +974,8 @@ class CoreTasks() extends StrictLogging {
         os.copy.over(jar, tmpDir / jarName)
       }
       val allJars = os.list(tmpDir) ++ depsJars
-      val manifest = mainClass match {
-        case Some(mc) =>
-          JarManifest.Default.add(java.util.jar.Attributes.Name.MAIN_CLASS.toString -> mc)
-        case None => JarManifest.Default
-      }
       val mergedJar = ctx.out / "mergedJar.jar"
-      JarUtils.mergeJars(mergedJar, allJars, manifest)
+      JarUtils.mergeJars(mergedJar, allJars, manifestEntries.toJarManifest)
       val resultJarPath = ctx.out / "out.jar"
       JarUtils.createAssemblyJar(resultJarPath, mergedJar)
       resultJarPath
@@ -1294,6 +1354,7 @@ class CoreTasks() extends StrictLogging {
     jvmOptionsTask,
     runClasspathTask,
     mainClassTask,
+    manifestSettingsTask,
     mainClassesTask,
     finalMainClassTask,
     runTask,
@@ -1301,12 +1362,13 @@ class CoreTasks() extends StrictLogging {
     runMvnAppTask,
     testClassesTask,
     testTask,
+    pomSettingsTask,
+    finalManifestSettingsTask,
     jarTask,
     allJarsTask,
     assemblyTask,
     fastLinkJsTask,
     nativeLinkTask,
-    pomSettingsTask,
     moduleDepsPomSettingsTask,
     sourcesJarTask,
     javadocJarTask,

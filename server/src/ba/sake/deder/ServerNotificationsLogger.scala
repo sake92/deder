@@ -2,7 +2,6 @@ package ba.sake.deder
 
 import com.typesafe.scalalogging.StrictLogging
 
-// TODO rename to ServerNotificationsHandler
 class ServerNotificationsLogger(callback: ServerNotification => Unit) extends StrictLogging {
   def add(serverNotification: ServerNotification): Unit = {
     serverNotification match {
