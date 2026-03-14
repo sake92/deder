@@ -3,9 +3,9 @@
 
 Config based, concurrent-first, client-server JVM build tool.
 
-See [dev docs](docs/dev/README.md) for more technical details
+:construction: Work in progress, expect rough edges and breaking changes.  
 
-:construction: Work in progress, expect rough edges and breaking changes. Feedback and contributions are very welcome! :heart:
+Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 
 ## Current status and features
 - CLI client with shell completions
@@ -24,10 +24,10 @@ Deder is used in some of my OSS projects:
 
 ## Concepts
 - *project* is the root of your git repo
-- *module is a "subproject", like `common`/`frontend`/`app`..
+- *module* is a "subproject", like `common`/`frontend`/`app`..
 - *task* is something you can run on a module, like `compile`/`test`/`run`/`assembly`..
 
-See [examples/multi](examples/multi/) for a working example project.
+The [examples](examples) folder has working projects that show you how to use Deder to build, cross-build, test, publish, use ScalaJS and ScalaNative etc.
 
 ## Installation
 
