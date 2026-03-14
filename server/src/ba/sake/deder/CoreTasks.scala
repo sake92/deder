@@ -714,37 +714,52 @@ class CoreTasks() extends StrictLogging {
 
   val runMvnAppTask = TaskBuilder
     .make[Seq[String]](
-      name = "runMvnApp",
-      singleton = true
+      name = "runMvnApp"
     )
+    .dependsOn(sourcesTask)
     .dependsOn(scalaVersionTask)
     .dependsOn(jvmOptionsTask)
     .build { ctx =>
-      val (scalaVersion, jvmOptions) = ctx.depResults
-      val mvnAppsMap = ctx.module match {
-        case m: JavaModule =>
-          m.mvnApps.asScala.map { case (name, tc) => name -> tc }.toMap
+      val (sources, scalaVersion, jvmOptions) = ctx.depResults
+      val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
+
+      val userMvnAppsMap: Map[String, DederProject.MvnApp] = ctx.module match {
+        case m: JavaModule => m.mvnApps.asScala.toMap
+        case _             => Map.empty
+      }
+      val autoMvnAppsMap: Map[String, DederProject.MvnApp] = ctx.module match {
+        case m: ScalaModule =>
+          val scalafmtDep = "org.scalameta:scalafmt-cli_2.13:3.10.7"
+          val scalafmtMain = "org.scalafmt.cli.Cli"
+          Map(
+            "fmt" -> DederProject.MvnApp(scalafmtDep, scalafmtMain, sourcePaths.asJava),
+            "fmtCheck" -> DederProject.MvnApp(scalafmtDep, scalafmtMain, (Seq("--check") ++ sourcePaths).asJava)
+          )
         case _ => Map.empty
       }
-      val mvnAppsMapName = ctx.args.headOption.getOrElse(
+      val effectiveMap = (userMvnAppsMap ++ autoMvnAppsMap).map { case (name, tc) =>
+        name -> (tc.dep, tc.mainClass, tc.args.asScala.toSeq)
+      }
+
+      val mvnAppName = ctx.args.headOption.getOrElse(
         throw new RuntimeException(
-          s"No maven app name specified. Available maven apps: ${mvnAppsMap.keys.mkString(", ")}"
+          s"No maven app name specified. Available maven apps: ${effectiveMap.keys.mkString(", ")}"
         )
       )
-      mvnAppsMap.get(mvnAppsMapName) match {
-        case Some(tc) =>
-          val dependency = Dependency.make(tc.dep, scalaVersion)
+      effectiveMap.get(mvnAppName) match {
+        case Some((dep, mainClass, args)) =>
+          val dependency = Dependency.make(dep, scalaVersion)
           val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
           val cp = jars.map(_.toString).mkString(File.pathSeparator)
-          val commandArgs = tc.args.asScala ++ ctx.args.tail
-          val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, tc.mainClass) ++ commandArgs
-          logger.info(s"Running maven app '${mvnAppsMapName}': ${cmd}")
+          val commandArgs = args ++ ctx.args.tail
+          val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, mainClass) ++ commandArgs
+          logger.info(s"Running maven app '${mvnAppName}': ${cmd}")
           ctx.notifications.add(ServerNotification.RunSubprocess(cmd, false))
           cmd
         case _ =>
           throw new RuntimeException(
-            s"Maven app '${mvnAppsMapName}' not found for module '${ctx.module.id}'. " +
-              s"Available maven apps: ${mvnAppsMap.keys.mkString(", ")}"
+            s"Maven app '${mvnAppName}' not found for module '${ctx.module.id}'. " +
+              s"Available maven apps: ${effectiveMap.keys.mkString(", ")}"
           )
       }
     }

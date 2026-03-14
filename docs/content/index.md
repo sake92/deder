@@ -111,6 +111,12 @@ deder exec -t test uber.MyTestSuite1#test1
 # write BSP config file for current project
 # and then open it in VSCode or IntelliJ (open as a BSP project)
 deder bsp install
+
+
+################ Misc
+# format all code in mymodule with scalafmt
+deder exec -t runMvnApp -m mymodule fmt
+deder exec -t runMvnApp -m mymodule fmtCheck
 ```
 
 ## Dependencies

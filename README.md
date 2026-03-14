@@ -5,7 +5,7 @@ Config based, concurrent-first, client-server JVM build tool.
 
 See [dev docs](docs/dev/README.md) for more technical details
 
-☢️ EXPERIMENTAL! ☢️
+:construction: Work in progress, expect rough edges and breaking changes. Feedback and contributions are very welcome! :heart:
 
 ## Current status and features
 - CLI client with shell completions
@@ -17,6 +17,10 @@ See [dev docs](docs/dev/README.md) for more technical details
 - import from sbt (experimental, feedback needed)
 - OTEL tracing support
 - some features only work for scala3, help welcome! :)
+
+## Adoption and feedback
+Deder is used in some of my OSS projects:
+- https://github.com/sake92/regenesca
 
 ## Concepts
 - *project* is the root of your git repo
@@ -117,6 +121,11 @@ deder exec -t test uber.MyTestSuite1#test1
 # write BSP config file for current project
 # and then open it in VSCode or IntelliJ (open as a BSP project)
 deder bsp install
+
+################ Misc
+# format all code in mymodule with scalafmt
+deder exec -t runMvnApp -m mymodule fmt
+deder exec -t runMvnApp -m mymodule fmtCheck
 ```
 
 ## IDE setup
