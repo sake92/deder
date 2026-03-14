@@ -19,6 +19,8 @@ references:
     url: "/reference/files-layout.html"
 
 howtos:
+  - label: "Invoking Maven applications"
+    url: "/howtos/mvn-apps.html"
   - label: "OTEL tracing/logging/metrics"
     url: "/howtos/otel.html"
 
