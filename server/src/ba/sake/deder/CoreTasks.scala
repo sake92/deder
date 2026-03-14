@@ -638,7 +638,6 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
-
   val finalMainClassTask = TaskBuilder
     .make[Option[String]](
       name = "finalMainClass"
@@ -684,6 +683,47 @@ class CoreTasks() extends StrictLogging {
             groups = m.manifest.groups.asScala.view.mapValues(_.asScala.toMap).toMap
           )
         case _ => ManifestEntries.Empty
+      }
+    }
+  )
+
+  val pomSettingsTask = ConfigValueTask[Option[PomSettings]](
+    name = "pomSettings",
+    execute = { ctx =>
+      ctx.module match {
+        case jm: JavaModule =>
+          val pom = jm.pomSettings
+          if jm.publish then {
+            if pom == null then throw RuntimeException(s"POM settings are not set for ${jm.id}")
+            val finalArtifactId = jm match {
+              case m: ScalaJsModule =>
+                s"${pom.artifactId}_sjs${ScalaVersion.jsBinary(m.scalaJsVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
+              case m: ScalaNativeModule =>
+                s"${pom.artifactId}_native${ScalaVersion.nativeBinary(m.scalaNativeVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
+              case m: ScalaModule =>
+                s"${pom.artifactId}_${ScalaVersion.binary(m.scalaVersion)}"
+              case _ =>
+                pom.artifactId
+            }
+            val resolvedVersion =
+              if pom.version != null then pom.version
+              else GitSemVer.detectVersion(DederGlobals.projectRootDir)
+            Some(
+              PomSettings(
+                groupId = pom.groupId,
+                artifactId = finalArtifactId,
+                version = resolvedVersion
+              )
+            )
+          } else {
+            ctx.notifications.add(
+              ServerNotification.logDebug(
+                s"Skipping POM generation for module ${jm.id} because publish is set to false"
+              )
+            )
+            None
+          }
+        case other => throw RuntimeException(s"POM settings cannot be applied to $other")
       }
     }
   )
@@ -1026,47 +1066,6 @@ class CoreTasks() extends StrictLogging {
       // TODO thread pool..
       ""
     }
-
-  val pomSettingsTask = ConfigValueTask[Option[PomSettings]](
-    name = "pomSettings",
-    execute = { ctx =>
-      ctx.module match {
-        case jm: JavaModule =>
-          val pom = jm.pomSettings
-          if jm.publish then {
-            if pom == null then throw RuntimeException(s"POM settings are not set for ${jm.id}")
-            val finalArtifactId = jm match {
-              case m: ScalaJsModule =>
-                s"${pom.artifactId}_sjs${ScalaVersion.jsBinary(m.scalaJsVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
-              case m: ScalaNativeModule =>
-                s"${pom.artifactId}_native${ScalaVersion.nativeBinary(m.scalaNativeVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
-              case m: ScalaModule =>
-                s"${pom.artifactId}_${ScalaVersion.binary(m.scalaVersion)}"
-              case _ =>
-                pom.artifactId
-            }
-            val resolvedVersion =
-              if pom.version != null then pom.version
-              else GitSemVer.detectVersion(DederGlobals.projectRootDir)
-            Some(
-              PomSettings(
-                groupId = pom.groupId,
-                artifactId = finalArtifactId,
-                version = resolvedVersion
-              )
-            )
-          } else {
-            ctx.notifications.add(
-              ServerNotification.logDebug(
-                s"Skipping POM generation for module ${jm.id} because publish is set to false"
-              )
-            )
-            None
-          }
-        case other => throw RuntimeException(s"POM settings cannot be applied to $other")
-      }
-    }
-  )
 
   val moduleDepsPomSettingsTask = TaskBuilder
     .make[Seq[PomSettings]](
