@@ -75,24 +75,6 @@ class MvnApp {
   args: Listing<String> = new Listing {}
 }
 
-local const function defaultMvnApps(m: JavaModule) = new Mapping<String, MvnApp> {
-  ["fmt"] = new MvnApp {
-    dep = "org.scalameta:scalafmt-cli_2.13:3.10.7"
-    mainClass = "org.scalafmt.cli.Cli"
-    args {
-      ...m.sources.toList().map((src) -> "\(m.root)/\(src)")
-    }
-  }
-  ["fmtCheck"] = new MvnApp {
-    dep = "org.scalameta:scalafmt-cli_2.13:3.10.7"
-    mainClass = "org.scalafmt.cli.Cli"
-    args {
-      "--check"
-      ...m.sources.toList().map((src) -> "\(m.root)/\(src)")
-    }
-  }
-}
-
 open class JavaModule extends DederModule {
   type = "java"
   resources: Listing<String> = new Listing { "resources" }
@@ -108,8 +90,9 @@ open class JavaModule extends DederModule {
   // TODO manifest entries
   publish: Boolean = true
   pomSettings: PomSettings?
-  /// Named maven apps that can be run via `deder exec -t runMvnApp -- <name> [args...]`
-  mvnApps: Mapping<String, MvnApp> = defaultMvnApps(this)
+  /// Named maven apps that can be run via `deder exec -t runMvnApp <name> [args...]`.
+  /// Server auto-provides `fmt`, `fmtCheck` (scalafmt) etc for scala modules.
+  mvnApps: Mapping<String, MvnApp> = new Mapping {}
 }
 
 open class ScalaModule extends JavaModule {
