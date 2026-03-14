@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="Deder How Tos">
-  <title> How Tos | Deder Documentation </title>
+  <meta name="description" content="">
+  <title> Invoking Maven applications | Deder Documentation </title>
   <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
@@ -41,7 +41,7 @@
       <summary>Table of Contents</summary>
       <div>
        <ul>
-        <li><a href="#how-tos">How Tos</a></li>
+        <li><a href="#invoking-custom-maven-applications">Invoking custom Maven applications</a></li>
        </ul>
       </div>
      </details>
@@ -50,11 +50,26 @@
     <div></div>
     <div></div>
    </div>
-   <h1 id="how-tos">How Tos<a href="#how-tos" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <ul>
-    <li><a href="https://sake92.github.io/deder/howtos/mvn-apps.html">Invoking Maven applications</a></li>
-    <li><a href="https://sake92.github.io/deder/howtos/otel.html">OTEL tracing/logging/metrics</a></li>
-   </ul>
+   <h1 id="invoking-custom-maven-applications">Invoking custom Maven applications<a href="#invoking-custom-maven-applications" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Deder provides a convenient way to invoke JARs from Maven as part of your build.
+    <br>
+    This can be useful for checking formatting, generating code etc.</p>
+   <pre><code class="language-pkl">mvnApps = new Mapping {
+  ["myapp"] = new MvnApp {
+    dep = "com.example:myapp:1.0.0"
+    mainClass = "com.example.myapp.Main"
+    args {
+      // e.g. pass in some arguments to the main class
+      "someparameter"
+      ...m.sources.toList().map((src) -&gt; "\(m.root)/\(src)")
+    }
+  }
+}
+</code></pre>
+   <p>then you can invoke the app from your build like this:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t runMvnApp myapp some_additional_args
+</code></pre>
+   <p>Note that <code>some_additional_args</code> will be appended to the <code>args</code> defined in the <code>MvnApp</code>.</p>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
  </body>

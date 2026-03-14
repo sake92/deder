@@ -67,6 +67,13 @@ class PomSettings {
   scm: PomScm?
 }
 
+class ManifestSettings {
+  /// Main JAR manifest attributes, e.g. "Implementation-Version" -> "1.0.0"
+  mainAttributes: Mapping<String, String> = new Mapping {}
+  /// Named manifest entry groups (rarely needed)
+  groups: Mapping<String, Mapping<String, String>> = new Mapping {}
+}
+
 class MvnApp {
   /// Maven dependency coordinate, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
   dep: String(!isEmpty)
@@ -87,7 +94,8 @@ open class JavaModule extends DederModule {
   javacAnnotationProcessorDeps: Listing<String> = new Listing {}
   semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default
   javaSemanticdbVersion: String = "0.11.1"
-  // TODO manifest entries
+  /// JAR manifest entries. Overrides defaults set by Deder.
+  manifest: ManifestSettings = new ManifestSettings {}
   publish: Boolean = true
   pomSettings: PomSettings?
   /// Named maven apps that can be run via `deder exec -t runMvnApp <name> [args...]`.
