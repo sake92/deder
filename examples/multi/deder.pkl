@@ -24,15 +24,15 @@ local const backend = (baseModule) {
 }
 
 local const uberModules = new CreateScalaModules {
-  _root = "uber"
-  _template = (baseModule) {
+  root = "uber"
+  template = (baseModule) {
     moduleDeps { frontend; backend }
     deps {
       "com.lihaoyi::pprint:0.9.5"
     }
     mainClass = "uber.Main"
   }
-  _testTemplate = (_template.asTest()) {
+  testTemplate = (template.asTest()) {
     deps {
       "org.scalameta::munit:1.2.1"
     }

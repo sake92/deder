@@ -4,12 +4,12 @@ amends "../../config/DederProject.pkl"
 //amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
 local const cliModules = new CreateScalaNativeModules {
-  _root = "cli"
-  _template = new {
+  root = "cli"
+  template = new {
     scalaVersion = "3.7.4"
     scalaNativeVersion = "0.5.10"
   }
-  _testTemplate = (_template.asTest()) {
+  testTemplate = (template.asTest()) {
     deps {
       "org.scalameta::munit::1.2.1"
     }

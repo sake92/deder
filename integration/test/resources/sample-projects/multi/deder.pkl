@@ -24,30 +24,26 @@ local const backend = (baseModule) {
   moduleDeps { common }
 }
 
-local const uber = (baseModule) {
-  id = "uber"
-  moduleDeps { frontend; backend }
-  deps {
-  //"com.lihaoyi::pprint:0.9.5"
+local const uberModules = new CreateScalaModules {
+  root = "uber"
+  template = (baseModule) {
+    moduleDeps { frontend; backend }
+    deps {
+      //"com.lihaoyi::pprint:0.9.5"
+    }
+    mainClass = "uber.Main"
   }
-  mainClass = "uber.Main"
-}
-
-local const uberTest = new ScalaTestModule {
-  id = "uber-test"
-  root = "uber/test"
-  scalaVersion = "3.7.1"
-  moduleDeps { uber }
-  deps {
-    "org.scalameta::munit:1.2.1"
+  testTemplate = (template.asTest()) {
+    deps {
+      "org.scalameta::munit:1.2.1"
+    }
+    semanticdbEnabled = true
   }
-  semanticdbEnabled = true
-}
+}.get
 
 modules {
   common
   frontend
   backend
-  uber
-  uberTest
+  ...uberModules.all
 }
