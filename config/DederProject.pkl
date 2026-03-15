@@ -200,6 +200,36 @@ const function scalaModules(
   }
 }
 
+class ScalaJsModules {
+  main: ScalaJsModule
+  test: ScalaJsTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateScalaJsModules {
+  _root: String
+  _template: ScalaJsModule
+  _testTemplate: ScalaJsTestModule = _template.asTest()
+  fixed get: ScalaJsModules = scalaJsModules(_template, _testTemplate, _root)
+}
+
+const function scalaJsModules(
+  _template: ScalaJsModule,
+  _testTemplate: ScalaJsTestModule,
+  _root: String,
+): ScalaJsModules = new {
+  main = (_template) {
+    id = _root
+    root = _root
+  }
+  test = (_testTemplate) {
+    id = "\(_root)-test"
+    root = "\(_root)/test"
+    moduleDeps {
+      main
+    }
+  }
+}
+
 class CrossModules {
   jvm: ScalaModule
   jvm_test: ScalaTestModule
