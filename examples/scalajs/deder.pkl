@@ -2,26 +2,22 @@
 amends "../../config/DederProject.pkl"
 //amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
-local const frontend: ScalaJsModule = new {
-  id = "frontend"
-  scalaVersion = "3.7.1"
-  scalaJsVersion = "1.20.2"
-  moduleKind = "es-module"
-  deps {
-    "org.scala-js::scalajs-dom::2.2.0"
+local const frontendModules = new CreateScalaJsModules {
+  _root = "frontend"
+  _template = new {
+    scalaVersion = "3.7.1"
+    scalaJsVersion = "1.20.2"
+    moduleKind = "es-module"
+    deps {
+      "org.scala-js::scalajs-dom::2.2.0"
+    }
   }
-}
-
-local const frontendTest: ScalaJsTestModule = new {
-  id = "frontend-test"
-  root = "frontend/test"
-  scalaVersion = "3.7.1"
-  scalaJsVersion = "1.20.2"
-  moduleKind = "es-module"
-  deps {
-    "org.scalameta::munit::1.2.1"
+  _testTemplate = (_template.asTest()) {
+    deps {
+      "org.scalameta::munit::1.2.1"
+    }
   }
-}
+}.get
 
 local const backend: ScalaModule = new {
   id = "backend"
@@ -36,7 +32,6 @@ local const backend: ScalaModule = new {
 }
 
 modules {
-  frontend
-  frontendTest
+  ...frontendModules.all
   backend
 }
