@@ -6,8 +6,8 @@ trait BaseIntegrationSuite extends munit.FunSuite {
 
   val testResourceDir: os.Path = os.pwd / "integration/test/resources"
 
-  val dederClientPath = System.getenv("DEDER_CLIENT_PATH")
-  val dederServerPath = System.getenv("DEDER_SERVER_PATH")
+  val dederClientPath: String = System.getenv("DEDER_CLIENT_PATH")
+  val dederServerPath: String = System.getenv("DEDER_SERVER_PATH")
 
   def withTestProject(testProjectPath: os.RelPath)(testCode: os.Path => Unit): Unit = {
     val tempDir = os.pwd / "tmp" / s"${testProjectPath.last}-${System.currentTimeMillis()}"

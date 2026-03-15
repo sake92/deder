@@ -18,12 +18,15 @@ class DederTestDiscovery(
 ) {
 
   def discover(): Seq[(Framework, Seq[(String, Fingerprint)])] =
-    discoverFrameworks().map { framework =>
-      val testClasses = discoverTests(framework)
+    discoverTests(discoverFrameworks())
+
+  def discoverTests(frameworks: Seq[Framework]): Seq[(Framework, Seq[(String, Fingerprint)])] =
+    frameworks.map { framework =>
+      val testClasses = discoverTestsForFramework(framework)
       (framework, testClasses)
     }
 
-  private def discoverFrameworks(): Seq[Framework] =
+  def discoverFrameworks(): Seq[Framework] =
     val frameworks = frameworkClassNames.flatMap { className =>
       try {
         val cls = classLoader.loadClass(className)
@@ -46,7 +49,7 @@ class DederTestDiscovery(
     frameworks
   end discoverFrameworks
 
-  private def discoverTests(framework: Framework): Seq[(String, Fingerprint)] = {
+  private def discoverTestsForFramework(framework: Framework): Seq[(String, Fingerprint)] = {
     if framework.name() == "Jupiter" then {
       discoverJupiterTests.map(_ -> framework.fingerprints.head)
     } else {

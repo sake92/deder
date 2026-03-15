@@ -50,21 +50,22 @@ class ScalaJsTestRunner(
         return DederTestResults.empty
 
       // Discover tests by scanning .class files and matching against framework fingerprints
-      val testsPerFramework = loadedFrameworks.flatMap { framework =>
-        val fingerprints = framework.fingerprints()
-        val testClasses = findClassFiles(classesDir)
-        val matched = testClasses.flatMap { className =>
-          fingerprints.collectFirst {
-            case fp if matchesFingerprint(className, fp, runtimeClasspath, classesDir) =>
-              (className, fp)
-          }
-        }
-        if matched.nonEmpty then Some((framework, matched)) else None
-      }
-
+      val urls = (Seq(classesDir) ++ runtimeClasspath).filter(os.exists(_)).map(_.toNIO.toUri.toURL).toArray
+      val classLoader = new java.net.URLClassLoader(urls, null)
       val dederLogger = new DederTestLogger(notifications, moduleId) {
         override def showStackTraces: Boolean = false
       }
+      val testsPerFramework = try {
+        val discovery = DederTestDiscovery(
+          classLoader = classLoader,
+          testClassesDir = classesDir,
+          testClasspath = runtimeClasspath,
+          frameworkClassNames = Seq.empty,
+          logger = dederLogger
+        )
+        discovery.discoverTests(loadedFrameworks)
+      } finally classLoader.close()
+
       val testRunner = DederTestRunner(executorService, testsPerFramework, getClass.getClassLoader, dederLogger)
       testRunner.run(testOptions)
     } finally {
@@ -95,48 +96,6 @@ class ScalaJsTestRunner(
       case ScalaJsModuleKind.NO_MODULE       => Seq(Input.Script(jsFile))
       case ScalaJsModuleKind.ES_MODULE       => Seq(Input.ESModule(jsFile))
       case ScalaJsModuleKind.COMMONJS_MODULE => Seq(Input.CommonJSModule(jsFile))
-    }
-  }
-
-  private def findClassFiles(classesDir: os.Path): Seq[String] = {
-    if os.exists(classesDir) then
-      os.walk(classesDir)
-        .filter(_.last.endsWith(".class"))
-        .map(_.subRelativeTo(classesDir))
-        .map(_.segments.mkString(".").stripSuffix(".class"))
-    else Seq.empty
-  }
-
-  private def matchesFingerprint(
-      className: String,
-      fingerprint: sbt.testing.Fingerprint,
-      runtimeClasspath: Seq[os.Path],
-      classesDir: os.Path
-  ): Boolean = {
-    import java.lang.annotation.Annotation
-    import java.lang.reflect.Modifier
-    try {
-      // Use an isolated classloader with the compiled .class files for fingerprint matching
-      val urls = (Seq(classesDir) ++ runtimeClasspath).filter(os.exists(_)).map(_.toNIO.toUri.toURL).toArray
-      val classLoader = new java.net.URLClassLoader(urls, null)
-      try {
-        val cls = classLoader.loadClass(className)
-        if cls.isInterface || Modifier.isAbstract(cls.getModifiers) then return false
-        fingerprint match {
-          case sub: sbt.testing.SubclassFingerprint =>
-            val superCls = classLoader.loadClass(sub.superclassName())
-            superCls.isAssignableFrom(cls) && sub.isModule == cls.getName.endsWith("$")
-          case f: sbt.testing.AnnotatedFingerprint =>
-            val annotationCls = classLoader.loadClass(f.annotationName()).asInstanceOf[Class[Annotation]]
-            f.isModule == cls.getName.endsWith("$") && (
-              cls.isAnnotationPresent(annotationCls) ||
-                cls.getDeclaredMethods.exists(_.isAnnotationPresent(annotationCls)) ||
-                cls.getMethods.exists(m => m.isAnnotationPresent(annotationCls) && Modifier.isPublic(m.getModifiers))
-            )
-        }
-      } finally classLoader.close()
-    } catch {
-      case _: Exception => false
     }
   }
 
