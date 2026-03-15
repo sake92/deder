@@ -165,7 +165,7 @@ class DederTestEventHandler(logger: DederTestLogger, frameworkName: String) exte
     val eventThrowable = Option.when(event.throwable().isDefined)(event.throwable().get())
     eventThrowable.foreach { t =>
       logger.error(s"  ${t.getMessage}")
-      if (logger.showStackTraces) {
+      if (shouldLogStackTrace(t)) {
         t.getStackTrace.take(10).foreach { line =>
           logger.error(s"    at $line")
         }
@@ -180,6 +180,17 @@ class DederTestEventHandler(logger: DederTestLogger, frameworkName: String) exte
   }
 
   def results: Seq[DederTestResult] = _results.toSeq
+
+  private def shouldLogStackTrace(t: Throwable): Boolean =
+    logger.showStackTraces && !isScalaJsMappedFailure(t)
+
+  private def isScalaJsMappedFailure(t: Throwable): Boolean = {
+    val message = Option(t.getMessage).getOrElse("")
+    message.contains(".scala:") &&
+    t.getStackTrace.exists { line =>
+      Option(line.getFileName).exists(_.endsWith("main.js"))
+    }
+  }
 }
 
 case class DederTestResult(

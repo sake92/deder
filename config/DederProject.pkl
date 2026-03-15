@@ -38,7 +38,7 @@ abstract class DederModule {
       true
 }
 
-typealias ModuleType = "java" | "scala" | "scala-test" | "scala-js" | "scala-native"
+typealias ModuleType = "java" | "scala" | "scala-test" | "scala-js" | "scala-js-test" | "scala-native"
 
 class PomLicense {
   name: String(!isEmpty)
@@ -141,6 +141,25 @@ open class ScalaJsModule extends ScalaModule {
   type = "scala-js"
   scalaJsVersion: String(!isEmpty)
   moduleKind: ScalaJsModuleKind = "no-module"
+  function asTest(): ScalaJsTestModule = (this.toDynamic().toTyped(ScalaJsTestModule)) {
+    type = "scala-js-test"
+    publish = false
+  }
+}
+
+class ScalaJsTestModule extends ScalaJsModule {
+  type = "scala-js-test"
+  publish = false
+  testFrameworks: Listing<String> = new Listing {
+    "com.novocode.junit.JUnitFramework"
+    "com.github.sbt.junit.jupiter.api.JupiterFramework"
+    "org.scalatest.tools.Framework"
+    "org.specs2.runner.Specs2Framework"
+    "munit.Framework"
+    "utest.runner.Framework"
+    "zio.test.sbt.ZTestFramework"
+    "weaver.framework.CatsEffect"
+  }
 }
 
 open class ScalaNativeModule extends ScalaModule {
@@ -185,14 +204,16 @@ class CrossModules {
   jvm: ScalaModule
   jvm_test: ScalaTestModule
   js: ScalaJsModule
+  js_test: ScalaJsTestModule
   native: ScalaNativeModule
-  all: Listing<DederModule> = new { jvm; jvm_test; js; native }
+  all: Listing<DederModule> = new { jvm; jvm_test; js; js_test; native }
 }
 
 class CreateCrossModules {
   _template: ScalaModule
   _testTemplate: ScalaTestModule = _template.asTest()
   _jsTemplate: ScalaJsModule = _template.asJs()
+  _jsTestTemplate: ScalaJsTestModule = _jsTemplate.asTest()
   _nativeTemplate: ScalaNativeModule = _template.asNative()
   _root: String
   fixed get: CrossModules =
@@ -200,6 +221,7 @@ class CreateCrossModules {
       _template,
       _testTemplate,
       _jsTemplate,
+      _jsTestTemplate,
       _nativeTemplate,
       _root,
     )
@@ -209,6 +231,7 @@ const function crossModules(
   _template: ScalaModule,
   _testTemplate: ScalaTestModule,
   _jsTemplate: ScalaJsModule,
+  _jsTestTemplate: ScalaJsTestModule,
   _nativeTemplate: ScalaNativeModule,
   _root: String,
 ): CrossModules = new {
@@ -234,6 +257,16 @@ const function crossModules(
     root = _root
     sources {
       "src-js"
+    }
+  }
+  js_test = (_jsTestTemplate) {
+    id = "\(_root)-js-test-\(_template.scalaVersion)"
+    root = "\(_root)/test"
+    sources {
+      "src-js"
+    }
+    moduleDeps {
+      js
     }
   }
   native = (_nativeTemplate) {

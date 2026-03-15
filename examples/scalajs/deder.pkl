@@ -12,6 +12,17 @@ local const frontend: ScalaJsModule = new {
   }
 }
 
+local const frontendTest: ScalaJsTestModule = new {
+  id = "frontend-test"
+  root = "frontend/test"
+  scalaVersion = "3.7.1"
+  scalaJsVersion = "1.20.2"
+  moduleKind = "es-module"
+  deps {
+    "org.scalameta::munit::1.2.1"
+  }
+}
+
 local const backend: ScalaModule = new {
   id = "backend"
   scalaVersion = "3.7.1"
@@ -26,5 +37,6 @@ local const backend: ScalaModule = new {
 
 modules {
   frontend
+  frontendTest
   backend
 }

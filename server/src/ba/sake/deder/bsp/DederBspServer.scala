@@ -777,7 +777,12 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         targets.foreach { targetId =>
           val moduleId = targetId.moduleId
           try {
-            val testRes = executeTask(serverNotificationsLogger, moduleId, coreTasks.testTask)
+            val module = projectStateData.tasksResolver.modulesMap(moduleId)
+            val testTask = module.`type` match {
+              case ModuleType.SCALA_JS_TEST => coreTasks.testJsTask
+              case _                        => coreTasks.testTask
+            }
+            val testRes = executeTask(serverNotificationsLogger, moduleId, testTask)
             if !testRes.success then allTestsSucceeded = false
           } catch case e: TaskEvaluationException => allTestsSucceeded = false
         }
@@ -820,7 +825,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   }
 
   private def isTestModule(module: DederModule): Boolean =
-    val testModuleTypes = Set(ModuleType.SCALA_TEST)
+    val testModuleTypes = Set(ModuleType.SCALA_TEST, ModuleType.SCALA_JS_TEST)
     testModuleTypes.contains(module.`type`)
 
   private def buildTarget(module: DederModule, projectStateData: DederProjectStateData): BuildTarget = {
@@ -838,7 +843,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       List(BuildTargetTag.LIBRARY).filter(_ => !isTestModule0 && !isAppModule)
     ).flatten
     val languageIds = module.`type` match {
-      case ModuleType.SCALA | ModuleType.SCALA_TEST | ModuleType.SCALA_JS | ModuleType.SCALA_NATIVE =>
+      case ModuleType.SCALA | ModuleType.SCALA_TEST | ModuleType.SCALA_JS | ModuleType.SCALA_JS_TEST | ModuleType.SCALA_NATIVE =>
         List("scala", "java")
       case ModuleType.JAVA => List("java")
     }

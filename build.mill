@@ -44,6 +44,8 @@ object server extends ScalaModule, VersionModule {
     mvn"com.eed3si9n.jarjarabrams::jarjar-abrams-core:1.16.0",
     mvn"com.lihaoyi::fansi:0.5.1",
     mvn"org.scala-js::scalajs-linker:1.20.2".withDottyCompat(scalaVersion()),
+    mvn"org.scala-js::scalajs-sbt-test-adapter:1.20.2".withDottyCompat(scalaVersion()),
+    mvn"org.scala-js::scalajs-env-nodejs:1.5.0".withDottyCompat(scalaVersion()),
     mvn"org.scala-native::tools:0.5.10",
     mvn"org.apache.maven:maven-model:3.9.12",
     mvn"org.bouncycastle:bcpg-jdk18on:1.78",

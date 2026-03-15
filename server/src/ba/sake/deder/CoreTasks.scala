@@ -1,32 +1,31 @@
 package ba.sake.deder
 
-import ba.sake.deder.config.DederProject
-
+import javax.tools.ToolProvider
 import java.io.File
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
+import dependency.ScalaVersion
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompilersCache}
 import ba.sake.deder.config.DederProject.{
   JavaModule,
   ModuleType,
   ScalaJsModule,
+  ScalaJsTestModule,
   ScalaModule,
   ScalaNativeModule,
   ScalaTestModule
 }
+import ba.sake.deder.config.DederProject
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.jar.{JarManifest, JarUtils}
 import ba.sake.deder.publish.{GitSemVer, Hasher, PgpSigner, PomGenerator, PomSettings, Publisher}
-import ba.sake.deder.scalajs.ScalaJsLinker
+import ba.sake.deder.scalajs.{ScalaJsLinker, ScalaJsTestRunner}
 import ba.sake.deder.scalanative.ScalaNativeLinker
 import ba.sake.deder.testing.*
-import dependency.ScalaVersion
-
-import javax.tools.ToolProvider
 
 // sbt.testing.* interfaces must be shared between Deder and the test classloader,
 // since Deder casts loaded Framework/Runner/Task instances to these types.
@@ -164,6 +163,22 @@ class CoreTasks() extends StrictLogging {
       val scalaLibDeps =
         if scalaVersion.startsWith("3.") then
           ctx.module match {
+            case m: ScalaJsTestModule =>
+              Seq(
+                Dependency.make(
+                  s"org.scala-lang::scala3-library::${scalaVersion}",
+                  scalaVersion,
+                  ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-js::scalajs-library:${m.scalaJsVersion}",
+                  if m.scalaVersion.startsWith("3.") then "2.13" else m.scalaVersion
+                ),
+                Dependency.make(
+                  s"org.scala-js::scalajs-test-bridge:${m.scalaJsVersion}",
+                  if m.scalaVersion.startsWith("3.") then "2.13" else m.scalaVersion
+                )
+              )
             case m: ScalaJsModule =>
               Seq(
                 Dependency.make(
@@ -221,6 +236,22 @@ class CoreTasks() extends StrictLogging {
           }
         else
           ctx.module match {
+            case m: ScalaJsTestModule =>
+              Seq(
+                Dependency.make(
+                  s"org.scala-lang:scala-library:${scalaVersion}",
+                  scalaVersion,
+                  ScalaVersion.jsBinary(m.scalaJsVersion).map("sjs" + _)
+                ),
+                Dependency.make(
+                  s"org.scala-js::scalajs-library:${m.scalaJsVersion}",
+                  if m.scalaVersion.startsWith("3.") then "2.13" else m.scalaVersion
+                ),
+                Dependency.make(
+                  s"org.scala-js::scalajs-test-bridge:${m.scalaJsVersion}",
+                  if m.scalaVersion.startsWith("3.") then "2.13" else m.scalaVersion
+                )
+              )
             case m: ScalaJsModule =>
               Seq(
                 Dependency.make(
@@ -966,6 +997,103 @@ class CoreTasks() extends StrictLogging {
       }
     )
 
+  val fastLinkJsTask = TaskBuilder
+    .make[String](
+      name = "fastLinkJs",
+      supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST)
+    )
+    .dependsOn(runClasspathTask)
+    .dependsOn(finalMainClassTask)
+    .build { ctx =>
+      val (classpath, mainClass) = ctx.depResults
+      val irContainers = classpath
+      os.makeDir.all(ctx.out)
+      import scala.concurrent.ExecutionContext.Implicits.global
+      val moduleInitializers = ctx.module match {
+        case _: ScalaJsTestModule =>
+          val init = org.scalajs.testing.adapter.TestAdapterInitializer
+          Seq(org.scalajs.linker.interface.ModuleInitializer.mainMethod(init.ModuleClassName, init.MainMethodName))
+        case _ =>
+          mainClass.map { mc =>
+            org.scalajs.linker.interface.ModuleInitializer.mainMethodWithArgs(mc, "main")
+          }.toSeq
+      }
+      val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
+      linker.link(
+        irContainers = irContainers,
+        outputDir = ctx.out,
+        moduleInitializers = moduleInitializers,
+        jsModuleKind = ctx.module.asInstanceOf[ScalaJsModule].moduleKind
+      )
+      // TODO thread pool..
+      ctx.out.toString
+    }
+
+  val testJsTask = TaskBuilder
+    .make[DederTestResults](
+      name = "test",
+      supportedModuleTypes = Set(ModuleType.SCALA_JS_TEST)
+    )
+    .dependsOn(classesTask)
+    .dependsOn(fastLinkJsTask)
+    .dependsOn(runClasspathTask)
+    .buildWithSummary(
+      execute = { ctx =>
+        val (classesDir, linkedJsDir, runClasspath) = ctx.depResults
+        val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
+        val jsModule = ctx.module.asInstanceOf[ScalaJsTestModule]
+        val frameworkClassNames = jsModule.testFrameworks.asScala.toSeq
+        val testOptions = DederTestOptions(ctx.args)
+        Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
+          executorService =>
+            val runner = new ScalaJsTestRunner(ctx.notifications, ctx.module.id)
+            runner.run(
+              classesDir = classesDir,
+              runtimeClasspath = runtimeClasspath,
+              linkedJsDir = os.Path(linkedJsDir),
+              moduleKind = jsModule.moduleKind,
+              testFrameworkNames = frameworkClassNames,
+              testOptions = testOptions,
+              executorService = executorService
+            )
+        }
+      },
+      isResultSuccessful = _.success,
+      summarize = { (results, notifications) =>
+        val totalResults = DederTestResults(
+          total = results.map(_._2.total).sum,
+          passed = results.map(_._2.passed).sum,
+          failed = results.map(_._2.failed).sum,
+          errors = results.map(_._2.errors).sum,
+          skipped = results.map(_._2.skipped).sum,
+          duration = results.map(_._2.duration).sum,
+          failedTestNames = results.flatMap(_._2.failedTestNames)
+        )
+        val separator = "═" * 50
+        notifications.add(ServerNotification.logInfo(separator))
+        val statusIcon = if totalResults.success then "PASS ✅" else "FAIL \uD83D\uDD34"
+        notifications.add(
+          ServerNotification.logInfo(
+            s"$statusIcon Test Summary: ${totalResults.total} total, ${totalResults.passed} passed, ${totalResults.failed} failed, ${totalResults.errors} errors, ${totalResults.skipped} skipped"
+          )
+        )
+        results.foreach { case (module, res) =>
+          val icon = if res.success then "  PASS ✅" else "  FAIL \uD83D\uDD34"
+          val detail = Option.when(!res.success) {
+            Seq(
+              Option.when(res.failed > 0)(s"${res.failed} failed"),
+              Option.when(res.errors > 0)(s"${res.errors} errors")
+            ).flatten.mkString(", ")
+          }
+          notifications.add(ServerNotification.logInfo(s"$icon ${module.id}${detail.map(d => s" ($d)").getOrElse("")}"))
+          res.failedTestNames.foreach { testName =>
+            notifications.add(ServerNotification.logInfo(s"       - $testName"))
+          }
+        }
+        notifications.add(ServerNotification.logInfo(separator))
+      }
+    )
+
   val jarTask = TaskBuilder
     .make[os.Path](name = "jar")
     .dependsOn(compileTask)
@@ -1021,28 +1149,7 @@ class CoreTasks() extends StrictLogging {
       resultJarPath
     }
 
-  val fastLinkJsTask = TaskBuilder
-    .make[String](
-      name = "fastLinkJs",
-      supportedModuleTypes = Set(ModuleType.SCALA_JS)
-    )
-    .dependsOn(runClasspathTask)
-    .dependsOn(finalMainClassTask)
-    .build { ctx =>
-      val (classpath, mainClass) = ctx.depResults
-      val irContainers = classpath
-      os.makeDir.all(ctx.out)
-      import scala.concurrent.ExecutionContext.Implicits.global
-      val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
-      linker.link(
-        irContainers = irContainers,
-        outputDir = ctx.out,
-        mainClass = mainClass,
-        jsModuleKind = ctx.module.asInstanceOf[ScalaJsModule].moduleKind
-      )
-      // TODO thread pool..
-      ""
-    }
+
 
   val nativeLinkTask = TaskBuilder
     .make[String](
@@ -1361,12 +1468,13 @@ class CoreTasks() extends StrictLogging {
     runMvnAppTask,
     testClassesTask,
     testTask,
+    fastLinkJsTask,
+    testJsTask,
     pomSettingsTask,
     finalManifestSettingsTask,
     jarTask,
     allJarsTask,
     assemblyTask,
-    fastLinkJsTask,
     nativeLinkTask,
     moduleDepsPomSettingsTask,
     sourcesJarTask,
@@ -1376,8 +1484,11 @@ class CoreTasks() extends StrictLogging {
     publishTask
   )
 
-  private val allNames = all.map(_.name)
-  private val distinctNames = allNames.distinct
-  private val diff = allNames.diff(distinctNames)
-  require(diff.isEmpty, s"Duplicate task names: ${diff.mkString(", ")}")
+  // Ensure no duplicate task names per module type
+  for moduleType <- ModuleType.values do {
+    val tasksForType = all.filter(t => t.supportedModuleTypes.isEmpty || t.supportedModuleTypes.contains(moduleType))
+    val names = tasksForType.map(_.name)
+    val dups = names.diff(names.distinct)
+    require(dups.isEmpty, s"Duplicate task names for ${moduleType}: ${dups.mkString(", ")}")
+  }
 }

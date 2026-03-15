@@ -14,9 +14,9 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
   def link(
       irContainers: Seq[os.Path], // classesDir + all JARs in compileClasspath
       outputDir: os.Path,
-      mainClass: Option[String],
+      moduleInitializers: Seq[ModuleInitializer],
       jsModuleKind: ScalaJsModuleKind
-  ): Unit = {
+  ): Report = {
     notifications.add(ServerNotification.logDebug("Linking: " + irContainers))
     val moduleKind = jsModuleKind match {
       case ScalaJsModuleKind.NO_MODULE       => ModuleKind.NoModule
@@ -39,8 +39,6 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
         cache.cached(irContainers)
       }
 
-    val moduleInitializers = mainClass.map { mc => ModuleInitializer.mainMethodWithArgs(mc, "main") }.toSeq
-
     val output = PathOutputDirectory(outputDir.toNIO)
     val logger = new DederScalaJsLogger(notifications, moduleId)
     val res = irFiles
@@ -53,5 +51,6 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
     notifications.add(
       ServerNotification.logInfo("Linking succeeded: " + publicModulePaths.mkString(", "))
     )
+    report
   }
 }
