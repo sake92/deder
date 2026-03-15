@@ -195,10 +195,10 @@ class ScalaModules {
   all: Listing<DederModule> = new { main; test }
 }
 class CreateScalaModules {
-  _root: String
-  _template: ScalaModule
-  _testTemplate: ScalaTestModule = _template.asTest()
-  fixed get: ScalaModules = scalaModules(_template, _testTemplate, _root)
+  root: String
+  template: ScalaModule
+  testTemplate: ScalaTestModule = template.asTest()
+  fixed get: ScalaModules = scalaModules(template, testTemplate, root)
 }
 
 const function scalaModules(
@@ -225,10 +225,10 @@ class ScalaJsModules {
   all: Listing<DederModule> = new { main; test }
 }
 class CreateScalaJsModules {
-  _root: String
-  _template: ScalaJsModule
-  _testTemplate: ScalaJsTestModule = _template.asTest()
-  fixed get: ScalaJsModules = scalaJsModules(_template, _testTemplate, _root)
+  root: String
+  template: ScalaJsModule
+  testTemplate: ScalaJsTestModule = template.asTest()
+  fixed get: ScalaJsModules = scalaJsModules(template, testTemplate, root)
 }
 
 const function scalaJsModules(
@@ -255,10 +255,10 @@ class ScalaNativeModules {
   all: Listing<DederModule> = new { main; test }
 }
 class CreateScalaNativeModules {
-  _root: String
-  _template: ScalaNativeModule
-  _testTemplate: ScalaNativeTestModule = _template.asTest()
-  fixed get: ScalaNativeModules = scalaNativeModules(_template, _testTemplate, _root)
+  root: String
+  template: ScalaNativeModule
+  testTemplate: ScalaNativeTestModule = template.asTest()
+  fixed get: ScalaNativeModules = scalaNativeModules(template, testTemplate, root)
 }
 
 const function scalaNativeModules(
@@ -290,22 +290,22 @@ class CrossModules {
 }
 
 class CreateCrossModules {
-  _template: ScalaModule
-  _testTemplate: ScalaTestModule = _template.asTest()
-  _jsTemplate: ScalaJsModule = _template.asJs()
-  _jsTestTemplate: ScalaJsTestModule = _jsTemplate.asTest()
-  _nativeTemplate: ScalaNativeModule = _template.asNative()
-  _nativeTestTemplate: ScalaNativeTestModule = _nativeTemplate.asTest()
-  _root: String
+  template: ScalaModule
+  testTemplate: ScalaTestModule = template.asTest()
+  jsTemplate: ScalaJsModule = template.asJs()
+  jsTestTemplate: ScalaJsTestModule = jsTemplate.asTest()
+  nativeTemplate: ScalaNativeModule = template.asNative()
+  nativeTestTemplate: ScalaNativeTestModule = nativeTemplate.asTest()
+  root: String
   fixed get: CrossModules =
     crossModules(
-      _template,
-      _testTemplate,
-      _jsTemplate,
-      _jsTestTemplate,
-      _nativeTemplate,
-      _nativeTestTemplate,
-      _root,
+      template,
+      testTemplate,
+      jsTemplate,
+      jsTestTemplate,
+      nativeTemplate,
+      nativeTestTemplate,
+      root,
     )
 }
 
