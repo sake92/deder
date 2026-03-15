@@ -16,23 +16,21 @@ out/
 
 _site/
 .flatmark-cache
+docs/static/**/*.pkl
 
 **/.deder/**
 !**/.deder/server.properties
-
 
 # PKL
 pkl-codegen-java
 config/resources
 config/src
 
-
-_site/
-.flatmark-cache
-docs/static/**/*.pkl
-
 # JS
 node_modules/
 package-lock.json
 yarn.lock
 dist/
+
+# other
+tmp/

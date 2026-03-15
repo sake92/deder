@@ -25,7 +25,7 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
       }
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
-        assert(dederOutput.contains("Executing 'compile' task on module: frontend"))
+        assert(dederOutput.contains("Executing 'compile' task on modules: frontend, frontend-test"))
         val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
         assertEquals(compilingCount, 1)
       }
@@ -43,6 +43,18 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
         val resText = res.out.text()
         assert(resText.contains("Hello, Scala.js!"))
       }
+    }
+  }
+
+  test("deder should test scalajs project") {
+    withTestProject("sample-projects/scalajs") { projectPath =>
+      val res = executeDederCommand(projectPath, "exec -t test")
+      val outText = res.err.text()
+      assert(
+        outText.contains("Test Summary: 3 total, 1 passed, 1 failed, 0 errors, 1 skipped"),
+        s"Expected test output to contain 'Test Summary: 3 total, 1 passed, 1 failed, 0 errors, 1 skipped', got: ${outText}"
+      )
+      assertEquals(res.exitCode, 1, s"Expected exit code 1, got ${res.exitCode}")
     }
   }
 
