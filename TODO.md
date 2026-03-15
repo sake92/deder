@@ -9,11 +9,13 @@
 ## Config
 
 ## Scala.js
+- run
 - fullopt
-
+- configuration..
 ## Scala Native
+- run
 - fullopt
-
+- configuration..
 
 ## Scalafmt
 - add as a subcommand, `deder format`

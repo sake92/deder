@@ -15,6 +15,7 @@ import ba.sake.deder.config.DederProject.{
   ScalaJsTestModule,
   ScalaModule,
   ScalaNativeModule,
+  ScalaNativeTestModule,
   ScalaTestModule
 }
 import ba.sake.deder.config.DederProject
@@ -24,7 +25,7 @@ import ba.sake.deder.deps.given
 import ba.sake.deder.jar.{JarManifest, JarUtils}
 import ba.sake.deder.publish.{GitSemVer, Hasher, PgpSigner, PomGenerator, PomSettings, Publisher}
 import ba.sake.deder.scalajs.{ScalaJsLinker, ScalaJsTestRunner}
-import ba.sake.deder.scalanative.ScalaNativeLinker
+import ba.sake.deder.scalanative.{ScalaNativeLinker, ScalaNativeTestRunner}
 import ba.sake.deder.testing.*
 
 // sbt.testing.* interfaces must be shared between Deder and the test classloader,
@@ -1089,7 +1090,7 @@ class CoreTasks() extends StrictLogging {
   val nativeLinkTask = TaskBuilder
     .make[String](
       name = "nativeLink",
-      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE)
+      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST)
     )
     .dependsOn(runClasspathTask)
     .dependsOn(finalMainClassTask)
@@ -1098,16 +1099,64 @@ class CoreTasks() extends StrictLogging {
       val nirPaths = classpath
       os.makeDir.all(ctx.out)
       import scala.concurrent.ExecutionContext.Implicits.global
+      val effectiveMainClass = ctx.module match {
+        case _: ScalaNativeTestModule =>
+          Some("scala.scalanative.testinterface.TestMain")
+        case _ => mainClass
+      }
       val linker = new ScalaNativeLinker(ctx.notifications, ctx.module.id)
       linker.link(
         nirPaths = nirPaths,
         outputDir = ctx.out,
-        mainClass = mainClass,
+        mainClass = effectiveMainClass,
         nativeLibs = Seq.empty
       )
       // TODO thread pool..
       ""
     }
+
+  val testNativeTask = TaskBuilder
+    .make[DederTestResults](
+      name = "test",
+      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE_TEST)
+    )
+    .dependsOn(classesTask)
+    .dependsOn(nativeLinkTask)
+    .dependsOn(runClasspathTask)
+    .buildWithSummary(
+      execute = { ctx =>
+        val (classesDir, _, runClasspath) = ctx.depResults
+        val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
+        val nativeModule = ctx.module.asInstanceOf[ScalaNativeTestModule]
+        val frameworkClassNames = nativeModule.testFrameworks.asScala.toSeq
+        val testOptions = DederTestOptions(ctx.args)
+        val nativeBinaryPath = findNativeBinary(ctx.out / os.up / "nativeLink")
+        Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
+          executorService =>
+            val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
+            runner.run(
+              classesDir = classesDir,
+              runtimeClasspath = runtimeClasspath,
+              nativeBinaryPath = nativeBinaryPath,
+              testFrameworkNames = frameworkClassNames,
+              testOptions = testOptions,
+              executorService = executorService
+            )
+        }
+      },
+      isResultSuccessful = _.success,
+      summarize = DederTestResults.summarize
+    )
+
+  private def findNativeBinary(nativeLinkDir: os.Path): os.Path = {
+    // ScalaNative linker outputs the binary in the nativeLink output directory
+    val candidates = os.list(nativeLinkDir).filter(p =>
+      os.isFile(p) && !p.last.endsWith(".ll") && !p.last.endsWith(".c") && !p.last.endsWith(".o") && !p.last.endsWith(".s")
+    )
+    candidates.headOption.getOrElse(
+      throw DederException(s"No native binary found in $nativeLinkDir. Files: ${os.list(nativeLinkDir).map(_.last).mkString(", ")}")
+    )
+  }
 
   val moduleDepsPomSettingsTask = TaskBuilder
     .make[Seq[PomSettings]](
@@ -1411,6 +1460,7 @@ class CoreTasks() extends StrictLogging {
     allJarsTask,
     assemblyTask,
     nativeLinkTask,
+    testNativeTask,
     moduleDepsPomSettingsTask,
     sourcesJarTask,
     javadocJarTask,

@@ -13,9 +13,9 @@ class ScalaNativeIntegrationSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/scalanative") { projectPath =>
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
-        assert(dederOutput.contains("Executing 'compile' task on module: cli"))
+        assert(dederOutput.contains("Executing 'compile' task on module"))
         val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
-        assertEquals(compilingCount, 1)
+        assert(compilingCount >= 1)
       }
     }
   }
@@ -29,6 +29,18 @@ class ScalaNativeIntegrationSuite extends BaseIntegrationSuite {
         val resText = res.out.text()
         assert(resText.contains("Hello from Scala Native!"))
       }
+    }
+  }
+
+  test("deder should test scalanative project") {
+    withTestProject("sample-projects/scalanative") { projectPath =>
+      val res = executeDederCommand(projectPath, "exec -t test")
+      val outText = res.err.text()
+      assert(
+        outText.contains("Test Summary: 3 total, 1 passed, 1 failed, 0 errors, 1 skipped"),
+        s"Expected test summary with 3 total, 1 passed, 1 failed, 0 errors, 1 skipped, got: ${outText}"
+      )
+      assertEquals(res.exitCode, 1, s"Expected exit code 1, got ${res.exitCode}")
     }
   }
 

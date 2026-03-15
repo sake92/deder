@@ -47,6 +47,7 @@ object server extends ScalaModule, VersionModule {
     mvn"org.scala-js::scalajs-sbt-test-adapter:1.20.2".withDottyCompat(scalaVersion()),
     mvn"org.scala-js::scalajs-env-nodejs:1.5.0".withDottyCompat(scalaVersion()),
     mvn"org.scala-native::tools:0.5.10",
+    mvn"org.scala-native::test-runner:0.5.10",
     mvn"org.apache.maven:maven-model:3.9.12",
     mvn"org.bouncycastle:bcpg-jdk18on:1.78",
     // https://github.com/bcgit/bc-java/issues/1629#issuecomment-2238898856
