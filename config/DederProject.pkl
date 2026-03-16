@@ -124,6 +124,7 @@ open class ScalaModule extends JavaModule {
 class ScalaTestModule extends ScalaModule {
   type = "scala-test"
   publish = false
+  fork: Boolean = true
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
