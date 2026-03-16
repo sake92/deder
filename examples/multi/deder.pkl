@@ -34,6 +34,7 @@ local const uberModules = new CreateScalaModules {
     mainClass = "uber.Main"
   }
   testTemplate = (template.asTest()) {
+    // fork = false
     deps {
       "org.scalameta::munit:1.2.1"
     }
