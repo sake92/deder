@@ -7,6 +7,7 @@ import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import dependency.ScalaVersion
 import ba.sake.tupson.JsonRW
+import ba.sake.deder.testing.OutputCaptureContext
 import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompilersCache}
 import ba.sake.deder.config.DederProject.{
   JavaModule,
@@ -940,24 +941,26 @@ class CoreTasks() extends StrictLogging {
     // cant reuse testClassesTask coz Framework is not Json-able...
     .buildWithSummary(
       execute = { ctx =>
-        val (classesDir, runClasspath) = ctx.depResults
-        val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
-        ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
-          val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
-          val logger = DederTestLogger(ctx.notifications, ctx.module.id)
-          val testDiscovery = DederTestDiscovery(
-            classLoader = classLoader,
-            testClassesDir = classesDir,
-            testClasspath = runtimeClasspath,
-            frameworkClassNames = frameworkClassNames,
-            logger = logger
-          )
-          val frameworkTests = testDiscovery.discover()
-          Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
-            executorService =>
-              val testRunner = DederTestRunner(executorService, frameworkTests, classLoader, logger)
-              val testOptions = DederTestOptions(ctx.args)
-              testRunner.run(testOptions)
+        OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
+          val (classesDir, runClasspath) = ctx.depResults
+          val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
+          ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
+            val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
+            val logger = DederTestLogger(ctx.notifications, ctx.module.id)
+            val testDiscovery = DederTestDiscovery(
+              classLoader = classLoader,
+              testClassesDir = classesDir,
+              testClasspath = runtimeClasspath,
+              frameworkClassNames = frameworkClassNames,
+              logger = logger
+            )
+            val frameworkTests = testDiscovery.discover()
+            Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
+              executorService =>
+                val testRunner = DederTestRunner(executorService, frameworkTests, classLoader, logger)
+                val testOptions = DederTestOptions(ctx.args)
+                testRunner.run(testOptions)
+            }
           }
         }
       },
@@ -1007,23 +1010,25 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(runClasspathTask)
     .buildWithSummary(
       execute = { ctx =>
-        val (classesDir, linkedJsDir, runClasspath) = ctx.depResults
-        val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
-        val jsModule = ctx.module.asInstanceOf[ScalaJsTestModule]
-        val frameworkClassNames = jsModule.testFrameworks.asScala.toSeq
-        val testOptions = DederTestOptions(ctx.args)
-        Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
-          executorService =>
-            val runner = new ScalaJsTestRunner(ctx.notifications, ctx.module.id)
-            runner.run(
-              classesDir = classesDir,
-              runtimeClasspath = runtimeClasspath,
-              linkedJsDir = os.Path(linkedJsDir),
-              moduleKind = jsModule.moduleKind,
-              testFrameworkNames = frameworkClassNames,
-              testOptions = testOptions,
-              executorService = executorService
-            )
+        OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
+          val (classesDir, linkedJsDir, runClasspath) = ctx.depResults
+          val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
+          val jsModule = ctx.module.asInstanceOf[ScalaJsTestModule]
+          val frameworkClassNames = jsModule.testFrameworks.asScala.toSeq
+          val testOptions = DederTestOptions(ctx.args)
+          Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
+            executorService =>
+              val runner = new ScalaJsTestRunner(ctx.notifications, ctx.module.id)
+              runner.run(
+                classesDir = classesDir,
+                runtimeClasspath = runtimeClasspath,
+                linkedJsDir = os.Path(linkedJsDir),
+                moduleKind = jsModule.moduleKind,
+                testFrameworkNames = frameworkClassNames,
+                testOptions = testOptions,
+                executorService = executorService
+              )
+          }
         }
       },
       isResultSuccessful = _.success,
@@ -1125,23 +1130,25 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(runClasspathTask)
     .buildWithSummary(
       execute = { ctx =>
-        val (classesDir, _, runClasspath) = ctx.depResults
-        val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
-        val nativeModule = ctx.module.asInstanceOf[ScalaNativeTestModule]
-        val frameworkClassNames = nativeModule.testFrameworks.asScala.toSeq
-        val testOptions = DederTestOptions(ctx.args)
-        val nativeBinaryPath = findNativeBinary(ctx.out / os.up / "nativeLink")
-        Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
-          executorService =>
-            val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
-            runner.run(
-              classesDir = classesDir,
-              runtimeClasspath = runtimeClasspath,
-              nativeBinaryPath = nativeBinaryPath,
-              testFrameworkNames = frameworkClassNames,
-              testOptions = testOptions,
-              executorService = executorService
-            )
+        OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
+          val (classesDir, _, runClasspath) = ctx.depResults
+          val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
+          val nativeModule = ctx.module.asInstanceOf[ScalaNativeTestModule]
+          val frameworkClassNames = nativeModule.testFrameworks.asScala.toSeq
+          val testOptions = DederTestOptions(ctx.args)
+          val nativeBinaryPath = findNativeBinary(ctx.out / os.up / "nativeLink")
+          Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
+            executorService =>
+              val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
+              runner.run(
+                classesDir = classesDir,
+                runtimeClasspath = runtimeClasspath,
+                nativeBinaryPath = nativeBinaryPath,
+                testFrameworkNames = frameworkClassNames,
+                testOptions = testOptions,
+                executorService = executorService
+              )
+          }
         }
       },
       isResultSuccessful = _.success,

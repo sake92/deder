@@ -13,6 +13,7 @@ import mainargs.*
 import org.slf4j.LoggerFactory
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
+import ba.sake.deder.testing
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
 import io.opentelemetry.context.Context
@@ -33,6 +34,10 @@ object ServerMain extends StrictLogging {
 
     val projectRoot = os.Path(projectRootDir)
     System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
+
+    // Tee stdout/stderr so test output reaches CLI clients
+    System.setOut(testing.TeePrintStream(System.out, isStdErr = false))
+    System.setErr(testing.TeePrintStream(System.err, isStdErr = true))
 
     acquireServerLock(projectRoot)
 

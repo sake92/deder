@@ -117,12 +117,23 @@ class DederTestRunner(
 
   private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Unit = {
     val currentRequestId = RequestContext.id.get()
+    val capturedNotificationsLogger = OutputCaptureContext.currentNotificationsLogger.get()
+    val capturedModuleId = OutputCaptureContext.currentModuleId.get()
     val futures = {
       tasks.map { task =>
         executorService.submit { () =>
-          val cancelled = currentRequestId != null && DederGlobals.cancellationTokens.get(currentRequestId).get()
-          if cancelled then throw CancelledException("Tests execution cancelled")
-          task.execute(handler, Array(logger))
+          if (capturedNotificationsLogger != null) {
+            OutputCaptureContext.currentNotificationsLogger.set(capturedNotificationsLogger)
+            OutputCaptureContext.currentModuleId.set(capturedModuleId)
+          }
+          try {
+            val cancelled = currentRequestId != null && DederGlobals.cancellationTokens.get(currentRequestId).get()
+            if cancelled then throw CancelledException("Tests execution cancelled")
+            task.execute(handler, Array(logger))
+          } finally {
+            OutputCaptureContext.currentNotificationsLogger.remove()
+            OutputCaptureContext.currentModuleId.remove()
+          }
         }
       }
       // val nestedTasks = ... TODO
