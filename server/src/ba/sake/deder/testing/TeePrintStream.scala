@@ -1,6 +1,7 @@
 package ba.sake.deder.testing
 
-import java.io.{OutputStream, PrintStream}
+import java.io.{ByteArrayOutputStream, OutputStream, PrintStream}
+import java.nio.charset.StandardCharsets
 import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
 
 class TeePrintStream(
@@ -12,18 +13,20 @@ class TeePrintStream(
     super.flush()
     val logger = OutputCaptureContext.currentNotificationsLogger.get()
     if (logger != null) {
-      val sb = TeePrintStream.lineBuffer.get()
-      if (sb.nonEmpty) {
-        TeePrintStream.flushLine(logger, sb.toString(), isStdErr)
-        sb.setLength(0)
+      val baos = TeePrintStream.byteBuffer.get()
+      if (baos.size() > 0) {
+        TeePrintStream.flushLine(logger, baos.toString(StandardCharsets.UTF_8), isStdErr)
+        TeePrintStream.byteBuffer.set(new ByteArrayOutputStream())
       }
     }
   }
 }
 
 object TeePrintStream {
-  private[testing] val lineBuffer: ThreadLocal[StringBuilder] =
-    ThreadLocal.withInitial(() => new StringBuilder())
+  private val MaxBufferSize = 8192
+
+  private[testing] val byteBuffer: ThreadLocal[ByteArrayOutputStream] =
+    ThreadLocal.withInitial(() => new ByteArrayOutputStream())
 
   private def flushLine(
       logger: ServerNotificationsLogger,
@@ -57,13 +60,16 @@ object TeePrintStream {
     private def bufferByte(b: Byte): Unit = {
       val logger = OutputCaptureContext.currentNotificationsLogger.get()
       if (logger == null) return
-      val ch = b.toChar
-      val sb = lineBuffer.get()
-      if (ch == '\n') {
-        flushLine(logger, sb.toString(), isStdErr)
-        sb.setLength(0)
+      val baos = byteBuffer.get()
+      if (b == '\n') {
+        flushLine(logger, baos.toString(StandardCharsets.UTF_8), isStdErr)
+        byteBuffer.set(new ByteArrayOutputStream())
       } else {
-        sb.append(ch)
+        baos.write(b)
+        if (baos.size() > MaxBufferSize) {
+          flushLine(logger, baos.toString(StandardCharsets.UTF_8), isStdErr)
+          byteBuffer.set(new ByteArrayOutputStream())
+        }
       }
     }
   }

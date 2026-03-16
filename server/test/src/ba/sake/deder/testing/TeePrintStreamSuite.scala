@@ -94,4 +94,16 @@ class TeePrintStreamSuite extends munit.FunSuite {
     assert(logMessages.exists(_.contains("from capture thread")))
     assert(!logMessages.exists(_.contains("from other thread")))
   }
+
+  test("handles multi-byte UTF-8 characters correctly") {
+    val (originalBaos, tee, notifications, slogger) = setup()
+    OutputCaptureContext.withCapture(slogger, "mod1") {
+      tee.println("Hello 世界 🎉")
+    }
+    assert(originalBaos.toString.contains("Hello 世界 🎉"))
+    val logMessages = notifications.collect {
+      case ServerNotification.Log(_, _, msg, _) => msg
+    }
+    assert(logMessages.exists(_.contains("Hello 世界 🎉")), s"Expected UTF-8 output, got: $logMessages")
+  }
 }
