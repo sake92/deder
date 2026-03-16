@@ -938,30 +938,47 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(classesTask)
     .dependsOn(runClasspathTask)
+    .dependsOn(jvmOptionsTask)
+    .dependsOn(javaHomeTask)
     // cant reuse testClassesTask coz Framework is not Json-able...
     .buildWithSummary(
       execute = { ctx =>
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
-          val (classesDir, runClasspath) = ctx.depResults
+          val (classesDir, runClasspath, jvmOptions, javaHome) = ctx.depResults
+          val testModule = ctx.module.asInstanceOf[ScalaTestModule]
           val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
-          ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
-            val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
-            val logger = DederTestLogger(ctx.notifications, ctx.module.id)
-            val testDiscovery = DederTestDiscovery(
-              classLoader = classLoader,
-              testClassesDir = classesDir,
-              testClasspath = runtimeClasspath,
+          val frameworkClassNames = testModule.testFrameworks.asScala.toSeq
+          val testOptions = DederTestOptions(ctx.args)
+          if testModule.fork then
+            ForkedTestOrchestrator.run(
+              classesDir = classesDir,
+              runtimeClasspath = runtimeClasspath,
               frameworkClassNames = frameworkClassNames,
-              logger = logger
+              jvmOptions = jvmOptions,
+              javaHome = javaHome.map(_.toString),
+              testOptions = testOptions,
+              notifications = ctx.notifications,
+              moduleId = ctx.module.id,
+              outDir = ctx.out,
+              workerThreads = DederGlobals.testWorkerThreads
             )
-            val frameworkTests = testDiscovery.discover()
-            Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
-              executorService =>
-                val testRunner = DederTestRunner(executorService, frameworkTests, classLoader, logger)
-                val testOptions = DederTestOptions(ctx.args)
-                testRunner.run(testOptions)
+          else
+            ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
+              val logger = DederTestLogger(ctx.notifications, ctx.module.id)
+              val testDiscovery = DederTestDiscovery(
+                classLoader = classLoader,
+                testClassesDir = classesDir,
+                testClasspath = runtimeClasspath,
+                frameworkClassNames = frameworkClassNames,
+                logger = logger
+              )
+              val frameworkTests = testDiscovery.discover()
+              Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
+                executorService =>
+                  val testRunner = DederTestRunner(executorService, frameworkTests, classLoader, logger)
+                  testRunner.run(testOptions)
+              }
             }
-          }
         }
       },
       isResultSuccessful = _.success,

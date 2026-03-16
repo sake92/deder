@@ -142,6 +142,7 @@ class SbtImporter(
           sbtProjectExport.scalacOptions.asJava,
           List.empty.asJava, // scalacPluginDeps
           "4.13.9", // scalaSemanticdbVersion
+          true, // fork
           List.empty.asJava // testFrameworks
         )
       else

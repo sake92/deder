@@ -4,6 +4,7 @@ const local function testModule(name: String) = new ScalaTestModule {
   id = name
   root = name
   scalaVersion = "3.7.1"
+  fork = true
 }
 
 local const junit4 = (testModule("junit4")) {
