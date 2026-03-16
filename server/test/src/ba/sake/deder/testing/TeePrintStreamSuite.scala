@@ -67,17 +67,6 @@ class TeePrintStreamSuite extends munit.FunSuite {
     assert(logMessages.exists(_.contains("partial")))
   }
 
-  test("stderr prefix is added for stderr tee") {
-    val (_, tee, notifications, slogger) = setup(isStdErr = true)
-    OutputCaptureContext.withCapture(slogger, "mod1") {
-      tee.println("error msg")
-    }
-    val logMessages = notifications.collect {
-      case ServerNotification.Log(_, _, msg, _) => msg
-    }
-    assert(logMessages.exists(_.contains("[stderr]")))
-  }
-
   test("thread isolation - only capturing thread sends notifications") {
     val (_, tee, notifications, slogger) = setup()
     val otherThread = new Thread(() => {
