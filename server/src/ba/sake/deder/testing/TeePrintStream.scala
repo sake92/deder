@@ -34,8 +34,7 @@ object TeePrintStream {
       isStdErr: Boolean
   ): Unit = {
     val moduleId = Option(OutputCaptureContext.currentModuleId.get())
-    val prefix = if isStdErr then "[stderr] " else ""
-    logger.add(ServerNotification.logInfo(s"$prefix$line", moduleId))
+    logger.add(ServerNotification.logInfo(line, moduleId))
   }
 
   private class TeeOutputStream(
