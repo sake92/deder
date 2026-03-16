@@ -8,6 +8,7 @@ local const commonModules: List<ScalaModule> =
       new CreateCrossModules {
         root = "common"
         template = new {
+          publish = false
           scalaVersion = sv
           deps {
             "com.softwaremill.sttp.client3::core::3.11.0"

@@ -2,6 +2,7 @@ amends "../../../../../config/DederProject.pkl"
 
 local const baseModule: ScalaModule = new {
   scalaVersion = "3.7.1"
+  publish = false
   // we normally disable semanticdb in CI because it isnt needed
   // but for integration tests we want to make sure it works, so we enable it
   semanticdbEnabled = true

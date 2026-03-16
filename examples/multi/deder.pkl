@@ -4,6 +4,7 @@ amends "../../config/DederProject.pkl"
 
 local const baseModule: ScalaModule = new {
   scalaVersion = "3.7.4"
+  publish = false
 }
 
 local const common = (baseModule) {
