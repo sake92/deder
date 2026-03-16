@@ -22,7 +22,6 @@ object ForkedTestMain {
         Some(cls.getDeclaredConstructor().newInstance().asInstanceOf[Framework])
       } catch {
         case e: Exception =>
-          System.err.println(s"[fork] Failed to load framework $className: ${e.getMessage}")
           None
       }
     }
@@ -61,9 +60,9 @@ object ForkedTestMain {
       fp: Fingerprint
   ): Boolean = (serialized, fp) match {
     case (s: SerializableSubclassFingerprint, f: SubclassFingerprint) =>
-      s.superclassName == f.superclassName() && s.isModule == f.isModule()
+      s.superclassName == f.superclassName() && s.isModule == f.isModule
     case (s: SerializableAnnotatedFingerprint, f: AnnotatedFingerprint) =>
-      s.annotationName == f.annotationName() && s.isModule == f.isModule()
+      s.annotationName == f.annotationName() && s.isModule == f.isModule
     case _ => false
   }
 }

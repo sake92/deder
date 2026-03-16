@@ -940,7 +940,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(runClasspathTask)
     .dependsOn(jvmOptionsTask)
     .dependsOn(javaHomeTask)
-    // cant reuse testClassesTask coz Framework is not Json-able...
+    // TODO reuse testClassesTask
     .buildWithSummary(
       execute = { ctx =>
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {

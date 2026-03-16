@@ -52,15 +52,10 @@ object ForkedTestOrchestrator {
     )
     os.write.over(argsFilePath, args.toJson)
 
-    // Step 3: Resolve java binary
     val javaBinary = resolveJavaBinary(javaHome)
-
-    // Step 4: Resolve harness classpath (Deder server classes for ForkedTestMain)
-    val harness = resolveHarnessClasspath()
-
-    // Step 5: Spawn subprocess
+    val serverClasspath = Seq(DederGlobals.projectRootDir / ".deder/server.jar")
     val fullClasspath =
-      (runtimeClasspath ++ harness).map(_.toString).mkString(java.io.File.pathSeparator)
+      (serverClasspath ++ runtimeClasspath).map(_.toString).mkString(java.io.File.pathSeparator)
     val cmd = Seq(javaBinary) ++ jvmOptions ++ Seq(
       "-cp",
       fullClasspath,
@@ -73,7 +68,7 @@ object ForkedTestOrchestrator {
       stderr = os.Pipe
     )
 
-    // Step 6: Stream stdout/stderr in daemon threads
+    // stream stdout/stderr in daemon threads
     val stderrLines = new java.util.concurrent.CopyOnWriteArrayList[String]()
 
     val stdoutThread = new Thread(() => {
@@ -111,7 +106,7 @@ object ForkedTestOrchestrator {
     stderrThread.setDaemon(true)
     stderrThread.start()
 
-    // Step 7: Wait for process (max 30 minutes) and collect results
+    // wait for process (max 30 minutes) and collect results
     val MaxTestTimeMs = 30L * 60 * 1000
     val finished = proc.waitFor(MaxTestTimeMs)
     if !finished then
@@ -139,8 +134,8 @@ object ForkedTestOrchestrator {
         DederTestResults(total = 0, passed = 0, failed = 0, errors = 1, skipped = 0, duration = 0)
 
     // Step 8: Cleanup
-    os.remove(argsFilePath)
-    if os.exists(resultsFilePath) then os.remove(resultsFilePath)
+  //  os.remove(argsFilePath)
+   // if os.exists(resultsFilePath) then os.remove(resultsFilePath)
 
     results
   }
@@ -150,21 +145,4 @@ object ForkedTestOrchestrator {
       .orElse(Option(System.getenv("JAVA_HOME")).filter(_.nonEmpty))
       .map(home => s"$home/bin/java")
       .getOrElse("java")
-
-  private def resolveHarnessClasspath(): Seq[os.Path] = {
-    val serverJar = DederGlobals.projectRootDir / ".deder" / "server.jar"
-    if os.exists(serverJar) then Seq(serverJar)
-    else {
-      getClass.getClassLoader match {
-        case urlCl: java.net.URLClassLoader =>
-          urlCl.getURLs.toSeq.map(url => os.Path(java.nio.file.Paths.get(url.toURI)))
-        case _ =>
-          System.getProperty("java.class.path", "")
-            .split(java.io.File.pathSeparator)
-            .filter(_.nonEmpty)
-            .map(os.Path(_))
-            .toSeq
-      }
-    }
-  }
 }
