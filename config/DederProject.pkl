@@ -38,7 +38,14 @@ abstract class DederModule {
       true
 }
 
-typealias ModuleType = "java" | "scala" | "scala-test" | "scala-js" | "scala-js-test" | "scala-native" | "scala-native-test"
+typealias ModuleType =
+  "java"
+    | "scala"
+    | "scala-test"
+    | "scala-js"
+    | "scala-js-test"
+    | "scala-native"
+    | "scala-native-test"
 
 class PomLicense {
   name: String(!isEmpty)
@@ -89,6 +96,7 @@ open class JavaModule extends DederModule {
   jvmOptions: Listing<String> = new Listing {}
   javaVersion: String?
   javacOptions: Listing<String> = new Listing {}
+  forkEnv: Mapping<String, String> = new Mapping {}
   mainClass: String?
   deps: Listing<String> = new Listing {}
   javacAnnotationProcessorDeps: Listing<String> = new Listing {}

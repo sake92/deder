@@ -11,6 +11,7 @@ object ForkedTestOrchestrator {
       discoveredTests: Seq[DiscoveredFrameworkTests],
       runtimeClasspath: Seq[os.Path],
       jvmOptions: Seq[String],
+      envVars: Map[String, String],
       javaHome: Option[String],
       testOptions: DederTestOptions,
       notifications: ServerNotificationsLogger,
@@ -45,6 +46,7 @@ object ForkedTestOrchestrator {
       .proc(cmd)
       .spawn(
         cwd = DederGlobals.projectRootDir,
+        env = envVars,
         stdout = os.Pipe,
         stderr = os.Pipe
       )

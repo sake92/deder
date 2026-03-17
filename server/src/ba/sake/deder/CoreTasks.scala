@@ -945,11 +945,13 @@ class CoreTasks() extends StrictLogging {
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
           val testModule = ctx.module.asInstanceOf[ScalaTestModule]
           val testOptions = DederTestOptions(ctx.args)
-          if testModule.fork then
+          if testModule.fork then {
+            val forkEnv = testModule.forkEnv.asScala.to(Map)
             ForkedTestOrchestrator.run(
               discoveredTests = discoveredTests,
               runtimeClasspath = runClasspath,
               jvmOptions = jvmOptions,
+              envVars = forkEnv,
               javaHome = javaHome.map(_.toString),
               testOptions = testOptions,
               notifications = ctx.notifications,
@@ -957,7 +959,7 @@ class CoreTasks() extends StrictLogging {
               outDir = ctx.out,
               workerThreads = DederGlobals.testWorkerThreads
             )
-          else
+          } else
             ClassLoaderUtils.withTestsClassLoader(runClasspath) { classLoader =>
               val logger = DederTestLogger(ctx.notifications, ctx.module.id)
               Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
