@@ -8,7 +8,8 @@ description: Deder Installation
 ### Homebrew (macOS and Linux)
 
 ```shell
-brew install sake92/tap/deder
+brew tap sake92/tap
+brew install deder
 ```
 
 

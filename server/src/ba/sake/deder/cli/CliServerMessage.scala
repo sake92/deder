@@ -3,11 +3,10 @@ package ba.sake.deder.cli
 import ba.sake.deder.{ServerNotification, cli}
 import ba.sake.tupson.JsonRW
 
-
 enum CliServerMessage derives JsonRW {
   case Output(text: String)
   case Log(text: String, level: LogLevel)
-  case RunSubprocess(cmd: Seq[String], watch: Boolean)
+  case RunSubprocess(cmd: Seq[String], envVars: Map[String, String], watch: Boolean)
   case Exit(exitCode: Int)
 }
 
@@ -25,11 +24,11 @@ object CliServerMessage {
       }
       val levelString = m.level.toString.toLowerCase
       val coloredLevel = level match {
-        case cli.LogLevel.ERROR => fansi.Color.Red(levelString)
+        case cli.LogLevel.ERROR   => fansi.Color.Red(levelString)
         case cli.LogLevel.WARNING => fansi.Color.Yellow(levelString)
-        case cli.LogLevel.INFO => fansi.Color.Green(levelString)
-        case cli.LogLevel.DEBUG => fansi.Color.LightGreen(levelString)
-        case cli.LogLevel.TRACE => fansi.Color.LightGray(levelString)
+        case cli.LogLevel.INFO    => fansi.Color.Green(levelString)
+        case cli.LogLevel.DEBUG   => fansi.Color.LightGreen(levelString)
+        case cli.LogLevel.TRACE   => fansi.Color.LightGray(levelString)
       }
       Some(CliServerMessage.Log(s"[${coloredLevel}] ${m.message}", level))
     case tp: ServerNotification.TaskProgress =>
@@ -43,7 +42,7 @@ object CliServerMessage {
     case cf: ServerNotification.CompileFailed =>
       None
     case rs: ServerNotification.RunSubprocess =>
-      Some(CliServerMessage.RunSubprocess(rs.cmd, rs.watch))
+      Some(CliServerMessage.RunSubprocess(rs.cmd, rs.envVars, rs.watch))
     case ServerNotification.RequestFinished(success) =>
       Some(CliServerMessage.Exit(if success then 0 else 1))
   }

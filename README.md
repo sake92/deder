@@ -34,7 +34,8 @@ The [examples](examples) folder has working projects that show you how to use De
 ### Homebrew (macOS and Linux)
 
 ```shell
-brew install sake92/tap/deder
+brew tap sake92/tap
+brew install deder
 ```
 
 ### Manual installation

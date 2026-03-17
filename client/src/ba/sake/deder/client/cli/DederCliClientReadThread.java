@@ -49,13 +49,13 @@ public class DederCliClientReadThread extends Thread {
                 System.out.println(text);
             } else if (message instanceof ServerMessage.Log(var logText, var level)) {
                 System.err.println(logText);
-            } else if (message instanceof ServerMessage.RunSubprocess(String[] cmd, boolean watch)) {
+            } else if (message instanceof ServerMessage.RunSubprocess(String[] cmd, var envVars, boolean watch)) {
                 if (subprocessRunningThread != null && subprocessRunningThread.isAlive()) {
                     logger.accept("Interrupting current subprocess...");
                     subprocessRunningThread.interrupt();
                     subprocessRunningThread.join();
                 }
-                subprocessRunningThread = new SubprocessRunningThread(cmd, logger);
+                subprocessRunningThread = new SubprocessRunningThread(cmd, envVars, logger);
                 subprocessRunningThread.start();
                 if (!watch) {
                     subprocessRunningThread.join();

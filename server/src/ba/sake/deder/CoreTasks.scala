@@ -806,7 +806,11 @@ class CoreTasks() extends StrictLogging {
           val cp = runClasspath.map(_.toString)
           val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp.mkString(File.pathSeparator), mc) ++ ctx.args
           logger.debug(s"Client should run command: ${cmd}")
-          ctx.notifications.add(ServerNotification.RunSubprocess(cmd, ctx.watch))
+          val forkEnv = ctx.module match {
+            case m: JavaModule => m.forkEnv.asScala.to(Map)
+            case _             => Map.empty
+          }
+          ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, ctx.watch))
           cmd
         case None =>
           if discoveredMainClasses.length > 1 then
@@ -840,7 +844,11 @@ class CoreTasks() extends StrictLogging {
           val cp = runClasspath.map(_.toString)
           val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp.mkString(File.pathSeparator), mc) ++ ctx.args.tail
           logger.debug(s"Client should run command: ${cmd}")
-          ctx.notifications.add(ServerNotification.RunSubprocess(cmd, ctx.watch))
+          val forkEnv = ctx.module match {
+            case m: JavaModule => m.forkEnv.asScala.to(Map)
+            case _             => Map.empty
+          }
+          ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, ctx.watch))
           cmd
         case None =>
           throw new RuntimeException(
@@ -892,7 +900,11 @@ class CoreTasks() extends StrictLogging {
           val commandArgs = args ++ ctx.args.tail
           val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, mainClass) ++ commandArgs
           logger.info(s"Running maven app '${mvnAppName}': ${cmd}")
-          ctx.notifications.add(ServerNotification.RunSubprocess(cmd, false))
+          val forkEnv = ctx.module match {
+            case m: JavaModule => m.forkEnv.asScala.to(Map)
+            case _             => Map.empty
+          }
+          ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, false))
           cmd
         case _ =>
           throw new RuntimeException(

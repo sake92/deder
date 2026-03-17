@@ -1,5 +1,6 @@
 package ba.sake.deder.client.cli;
 
+import java.util.Map;
 import java.util.function.Consumer;
 import java.io.*;
 import java.util.concurrent.TimeUnit;
@@ -7,13 +8,15 @@ import java.util.concurrent.TimeUnit;
 class SubprocessRunningThread extends Thread {
 
 	private final String[] command;
+	private final Map<String, String> envVars;
 	private final Consumer<String> log;
 	private Process runningSubprocess = null;
     private int exitCode = -1; // -1 means unknown
 
-	public SubprocessRunningThread(String[] command, Consumer<String> log) {
+	public SubprocessRunningThread(String[] command, Map<String, String> envVars, Consumer<String> log) {
         super("DederCliSubprocessRunningThread");
 		this.command = command;
+		this.envVars = envVars;
 		this.log = log;
 	}
 
@@ -21,6 +24,7 @@ class SubprocessRunningThread extends Thread {
 	public void run() {
 		try {
 			var processBuilder = new ProcessBuilder(command);
+			processBuilder.environment().putAll(envVars);
 			processBuilder.inheritIO();
 			runningSubprocess = processBuilder.start();
 			runningSubprocess.waitFor();
