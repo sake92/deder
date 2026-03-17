@@ -48,4 +48,14 @@ object ClassLoaderUtils {
     }
     withClassLoader(classPath, parent = bridgeClassLoader)(f)
   }
+
+  // sbt.testing.* interfaces must be shared between Deder and the test classloader,
+  // since Deder casts loaded Framework/Runner/Task instances to these types.
+  private val TestClassLoaderSharedPrefixes = Seq("sbt.testing.")
+  
+  def withTestsClassLoader[T](
+      classPath: Seq[os.Path]
+  )(f: ClassLoader => T): T = {
+    withIsolatedClassLoader(classPath, sharedPrefixes = TestClassLoaderSharedPrefixes)(f)
+  }
 }

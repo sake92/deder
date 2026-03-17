@@ -29,10 +29,6 @@ import ba.sake.deder.scalajs.{ScalaJsLinker, ScalaJsTestRunner}
 import ba.sake.deder.scalanative.{ScalaNativeLinker, ScalaNativeTestRunner}
 import ba.sake.deder.testing.*
 
-// sbt.testing.* interfaces must be shared between Deder and the test classloader,
-// since Deder casts loaded Framework/Runner/Task instances to these types.
-private val TestClassLoaderSharedPrefixes = Seq("sbt.testing.")
-
 class CoreTasks() extends StrictLogging {
 
   /** source folders */
@@ -916,7 +912,7 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (classesDir, runClasspath) = ctx.depResults
       val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
-      ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
+      ClassLoaderUtils.withTestsClassLoader(runtimeClasspath) { classLoader =>
         val frameworkClassNames = ctx.module match {
           case m: ScalaTestModule       => m.testFrameworks.asScala.toSeq
           case m: ScalaJsTestModule     => m.testFrameworks.asScala.toSeq
@@ -946,14 +942,13 @@ class CoreTasks() extends StrictLogging {
     .buildWithSummary(
       execute = { ctx =>
         val (runClasspath, jvmOptions, javaHome, discoveredTests) = ctx.depResults
-        val runtimeClasspath = runClasspath
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
           val testModule = ctx.module.asInstanceOf[ScalaTestModule]
           val testOptions = DederTestOptions(ctx.args)
           if testModule.fork then
             ForkedTestOrchestrator.run(
               discoveredTests = discoveredTests,
-              runtimeClasspath = runtimeClasspath,
+              runtimeClasspath = runClasspath,
               jvmOptions = jvmOptions,
               javaHome = javaHome.map(_.toString),
               testOptions = testOptions,
@@ -963,7 +958,7 @@ class CoreTasks() extends StrictLogging {
               workerThreads = DederGlobals.testWorkerThreads
             )
           else
-            ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
+            ClassLoaderUtils.withTestsClassLoader(runClasspath) { classLoader =>
               val logger = DederTestLogger(ctx.notifications, ctx.module.id)
               Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
                 executorService =>

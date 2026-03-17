@@ -179,10 +179,10 @@ class TasksResolverSuite extends munit.FunSuite {
 
   private def scalaTestModuleTaskEdges(moduleId: String): Set[(String, String)] =
     scalaModuleTaskEdges(moduleId) ++ Set(
-      (s"${moduleId}.test", s"${moduleId}.classes"),
       (s"${moduleId}.test", s"${moduleId}.runClasspath"),
       (s"${moduleId}.test", s"${moduleId}.jvmOptions"),
       (s"${moduleId}.test", s"${moduleId}.javaHome"),
+      (s"${moduleId}.test", s"${moduleId}.testClasses"),
       (s"${moduleId}.testClasses", s"${moduleId}.classes"),
       (s"${moduleId}.testClasses", s"${moduleId}.runClasspath")
     )
