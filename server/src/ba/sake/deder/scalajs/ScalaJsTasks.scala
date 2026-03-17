@@ -5,6 +5,11 @@ import ba.sake.deder.config.DederProject.{ModuleType, ScalaJsModule, ScalaJsTest
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, OutputCaptureContext}
 import ba.sake.deder.{CoreTasks, DederGlobals, Task, TaskBuilder}
 
+/*
+TODO
+- fullLinkJs
+- runJs
+ */
 class ScalaJsTasks(coreTasks: CoreTasks) {
 
   val fastLinkJsTask = TaskBuilder

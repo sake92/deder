@@ -5,6 +5,11 @@ import ba.sake.deder.config.DederProject.{ModuleType, ScalaNativeModule, ScalaNa
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, OutputCaptureContext}
 import ba.sake.deder.{CoreTasks, DederException, DederGlobals, Task, TaskBuilder}
 
+/*
+TODO
+- fullNativeLink
+- runNative
+ */
 class ScalaNativeTasks(coreTasks: CoreTasks) {
 
   val nativeLinkTask = TaskBuilder

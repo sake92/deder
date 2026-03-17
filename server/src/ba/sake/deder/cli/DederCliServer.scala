@@ -33,7 +33,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
     serverChannel.bind(address)
 
     // TODO better try catch
-    // TODO extract writer/reader threads to own classes
+    // TODO extract writer/reader threads to own classes, just like in client
     try {
       var clientId = 0
       while true do {
