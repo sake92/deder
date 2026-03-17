@@ -58,7 +58,10 @@ object server extends ScalaModule, VersionModule {
 
   def mainClass = Some("ba.sake.deder.ServerMain")
   // Pkl requires to be multi-release jar to support Java 8+
-  def manifest = super.manifest().add("Multi-Release" -> "true")
+  def manifest = super.manifest().add(
+    "Multi-Release" -> "true",
+    "Implementation-Version" -> version()
+  )
 
   def scalacOptions = super.scalacOptions() ++ Seq("-Yretain-trees")
 
@@ -98,12 +101,18 @@ object client extends JavaModule, VersionModule {
   def mvnDeps = Seq(
     mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
   )
+  def manifest = super.manifest().add(
+    "Implementation-Version" -> version()
+  )
 }
 
 object `client-native` extends JavaModule, NativeImageModule, VersionModule {
   def moduleDir = client.moduleDir
   def mainClass = client.mainClass
   def mvnDeps = client.mvnDeps
+  def manifest = super.manifest().add(
+    "Implementation-Version" -> version()
+  )
   def jvmId = "graalvm-community:25.0.1"
   def jvmIndexVersion = "0.0.4-128-8f0ad3"
   // https://github.com/oracle/graal/issues/3737

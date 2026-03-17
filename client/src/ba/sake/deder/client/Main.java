@@ -55,8 +55,16 @@ public class Main {
 
         var thisProcess = ProcessHandle.current();
 
+        var serverProps = new Properties();
+        var propFileName = Paths.get(".deder/server.properties");
+        if (Files.exists(propFileName) && Files.isRegularFile(propFileName)) {
+            try (FileInputStream inputStream = new FileInputStream(propFileName.toFile())) {
+                serverProps.load(inputStream);
+            }
+        }
+
         if (args.length == 2 && args[0].equals("bsp") && args[1].equals("install")) {
-            writeBspInstallScript(thisProcess);
+            writeBspInstallScript(thisProcess, serverProps);
             return;
         }
 
@@ -78,6 +86,7 @@ public class Main {
             pp.info().commandLine().ifPresent(cmd -> log("Parent Command: " + cmd));
         }, () -> log("No parent process"));
 
+
         client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(this::log, args);
         var maxConnectDurationSeconds = 10;
         try {
@@ -88,7 +97,7 @@ public class Main {
                 System.err.println("Deder server not running. No need to shutdown.");
                 return;
             }
-            startServer(isBspClient);
+            startServer(isBspClient, serverProps);
             // start the timer AFTER server process is launched, not before
             var startedConnectingAt = Instant.now();
             var connected = false;
@@ -115,20 +124,13 @@ public class Main {
         }
     }
 
-    private void startServer(boolean isBspClient) throws Exception {
+    private void startServer(boolean isBspClient, Properties serverProps) throws Exception {
         System.err.println("Deder server not running, starting it...");
         log("Deder server not running, starting it...");
         ensureJavaInstalled();
-        var props = new Properties();
-        var propFileName = Paths.get(".deder/server.properties");
-        if (Files.exists(propFileName) && Files.isRegularFile(propFileName)) {
-            try (FileInputStream inputStream = new FileInputStream(propFileName.toFile())) {
-                props.load(inputStream);
-            }
-        }
         // must be exactly tag version e.g. v0.1.0
-        var serverVersion = props.getProperty("version", "early-access");
-        var serverLocalPath = props.getProperty("localPath", "");
+        var serverVersion = serverProps.getProperty("version", "early-access");
+        var serverLocalPath = serverProps.getProperty("localPath", "");
         var versionCacheFile = Path.of(".deder/server.current.version");
         Path serverJarPath = Path.of(".deder/server.jar");
         if (serverLocalPath != null && !serverLocalPath.isBlank()) {
@@ -151,7 +153,7 @@ public class Main {
                         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             }
         }
-        startServerProcess(isBspClient, props);
+        startServerProcess(isBspClient, serverProps);
         System.err.println("Deder server started.");
         log("Deder server started.");
     }
@@ -216,7 +218,7 @@ public class Main {
         }
     }
 
-    private void writeBspInstallScript(ProcessHandle processHandle) throws IOException {
+    private void writeBspInstallScript(ProcessHandle processHandle, Properties serverProps) throws IOException {
         System.err.println("Installing BSP config...");
         var commandLineArgs = new ArrayList<String>();
         commandLineArgs.add(processHandle.info().command().get());
@@ -226,15 +228,20 @@ public class Main {
         var commandLineArgsJson = commandLineArgs.stream().map(arg -> "\"" + arg + "\"")
                 .collect(Collectors.joining(", "));
         Files.createDirectories(Path.of(".bsp"));
+        var serverVersion = serverProps.getProperty("version", "early-access");
+        var serverLocalPath = serverProps.getProperty("localPath");
+        if (serverLocalPath != null && !serverLocalPath.isBlank()) {
+            serverVersion = "local";
+        }
         var bspConfig = """
                 {
                 	"name": "deder-bsp",
                 	"argv": [ %s ],
-                	"version": "0.0.1",
+                	"version": "%s",
                 	"bspVersion": "2.2.0-M2",
                 	"languages": [ "java", "scala" ]
                 }
-                """.formatted(commandLineArgsJson);
+                """.formatted(commandLineArgsJson, serverVersion);
         var bspConfigPath = Path.of(".bsp/deder-bsp.json");
         Files.writeString(bspConfigPath, bspConfig, StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING);
@@ -247,7 +254,7 @@ public class Main {
                 .followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build()) {
             var request = HttpRequest.newBuilder().uri(URI.create(fileUrl)).GET().build();
             var response = client.send(request,
-                    HttpResponse.BodyHandlers.ofFile(destination, StandardOpenOption.WRITE,StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING));
+                    HttpResponse.BodyHandlers.ofFile(destination, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING));
             if (response.statusCode() == 200) {
                 System.err.println("File downloaded successfully to: " + response.body());
             } else {

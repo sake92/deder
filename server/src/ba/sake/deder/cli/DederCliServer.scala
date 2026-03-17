@@ -183,7 +183,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         }
         serverMessages.put(CliServerMessage.Exit(0))
       case m: CliClientMessage.Version =>
-        serverMessages.put(CliServerMessage.Output(s"Server version: 0.0.1"))
+        serverMessages.put(CliServerMessage.Output(s"Server version: ${DederGlobals.version}"))
         serverMessages.put(CliServerMessage.Exit(0))
       case m: CliClientMessage.Modules =>
         mainargs.Parser[DederCliModulesOptions].constructEither(m.args) match {

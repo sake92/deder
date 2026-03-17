@@ -56,7 +56,8 @@ public class DederCliClient implements DederClient {
                 message = switch (args[0]) {
                     case "version" -> {
                         // TODO send it to server? for formatting or whatevs/consistency
-                        System.out.println("Client version: 0.0.1");
+                        var version = getClass().getPackage().getImplementationVersion();
+                        System.out.println("Client version: " + version);
                         yield new ClientMessage.Version();
                     }
                     case "clean" -> new ClientMessage.Clean(leftoverArgs);

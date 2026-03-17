@@ -173,7 +173,7 @@ class DederBspServer(
       capabilities.setDependencySourcesProvider(true)
       capabilities.setDependencyModulesProvider(true)
       capabilities.setInverseSourcesProvider(true)
-      val result = new InitializeBuildResult("deder-bsp", "0.0.1", "2.2.0-M2", capabilities)
+      val result = new InitializeBuildResult("deder-bsp", DederGlobals.version, "2.2.0-M2", capabilities)
       logger.debug(s"buildInitialize for params: ${params} return: ${result}")
       result
     }

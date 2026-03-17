@@ -4,6 +4,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 object DederGlobals {
+  val version: String = getClass.getPackage.getImplementationVersion
+  
   val projectRootDir: os.Path = os.Path(System.getProperty("DEDER_PROJECT_ROOT_DIR"))
   
   var testWorkerThreads: Int = 16
