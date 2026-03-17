@@ -539,8 +539,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             try executeTask(serverNotificationsLogger, moduleId, coreTasks.testClassesTask)
             catch case e: TaskEvaluationException => Seq.empty
           frameworkTests.map { ft =>
-            val item = ScalaTestClassesItem(targetId, ft.testClasses.asJava)
-            item.setFramework(ft.framework)
+            val item = ScalaTestClassesItem(targetId, ft.testClasses.map(_.className).asJava)
+            item.setFramework(ft.frameworkName)
             item
           }
         } catch {
@@ -707,9 +707,9 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
             environmentVariables.asJava
           )
           val testClassItems = testClasses.flatMap { ft =>
-            ft.testClasses.map { testClass =>
-              val args = List.empty[String] // TODO
-              JvmMainClass(testClass, args.asJava)
+            ft.testClasses.map { test =>
+              val args = List.empty[String]
+              JvmMainClass(test.className, args.asJava)
             }
           }
           item.setMainClasses(testClassItems.asJava)

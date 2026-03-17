@@ -8,9 +8,8 @@ private val TestClassLoaderSharedPrefixes = Seq("sbt.testing.")
 object ForkedTestOrchestrator {
 
   def run(
-      classesDir: os.Path,
+      discoveredTests: Seq[DiscoveredFrameworkTests],
       runtimeClasspath: Seq[os.Path],
-      frameworkClassNames: Seq[String],
       jvmOptions: Seq[String],
       javaHome: Option[String],
       testOptions: DederTestOptions,
@@ -20,32 +19,12 @@ object ForkedTestOrchestrator {
       workerThreads: Int
   ): DederTestResults = {
 
-    // Step 1: In-process test discovery
-    val discoveredTests: Seq[SerializableTest] =
-      ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
-        val logger = DederTestLogger(notifications, moduleId)
-        val testDiscovery = DederTestDiscovery(
-          classLoader = classLoader,
-          testClassesDir = classesDir,
-          testClasspath = runtimeClasspath,
-          frameworkClassNames = frameworkClassNames,
-          logger = logger
-        )
-        testDiscovery.discover().flatMap { case (framework, tests) =>
-          tests.map { case (className, fingerprint) =>
-            SerializableTest(className, SerializableFingerprint.from(fingerprint))
-          }
-        }
-      }
-
-    // Step 2: Write args file
+    // write args file
     os.makeDir.all(outDir)
     val argsFilePath = outDir / "fork-args.json"
     val resultsFilePath = outDir / s"fork-results-${java.util.UUID.randomUUID()}.json"
     val args = ForkedTestArgs(
-      runtimeClasspath = runtimeClasspath.map(_.toString),
-      frameworks = frameworkClassNames,
-      tests = discoveredTests,
+      discoveredTests = discoveredTests,
       testSelectors = testOptions.testSelectors,
       workerThreads = workerThreads,
       resultsFile = resultsFilePath.toString
@@ -62,11 +41,13 @@ object ForkedTestOrchestrator {
       "ba.sake.deder.testing.ForkedTestMain",
       argsFilePath.toString
     )
-    val proc = os.proc(cmd).spawn(
-      cwd = DederGlobals.projectRootDir,
-      stdout = os.Pipe,
-      stderr = os.Pipe
-    )
+    val proc = os
+      .proc(cmd)
+      .spawn(
+        cwd = DederGlobals.projectRootDir,
+        stdout = os.Pipe,
+        stderr = os.Pipe
+      )
 
     // stream stdout/stderr in daemon threads
     val stderrLines = new java.util.concurrent.CopyOnWriteArrayList[String]()
@@ -122,8 +103,7 @@ object ForkedTestOrchestrator {
     stderrThread.join(2000)
 
     val results =
-      if os.exists(resultsFilePath) then
-        os.read(resultsFilePath).parseJson[DederTestResults]
+      if os.exists(resultsFilePath) then os.read(resultsFilePath).parseJson[DederTestResults]
       else
         notifications.add(
           ServerNotification.logError(
@@ -134,8 +114,8 @@ object ForkedTestOrchestrator {
         DederTestResults(total = 0, passed = 0, failed = 0, errors = 1, skipped = 0, duration = 0)
 
     // Step 8: Cleanup
-  //  os.remove(argsFilePath)
-   // if os.exists(resultsFilePath) then os.remove(resultsFilePath)
+    // os.remove(argsFilePath)
+    // if os.exists(resultsFilePath) then os.remove(resultsFilePath)
 
     results
   }

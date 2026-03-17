@@ -13,37 +13,27 @@ object ForkedTestMain {
     val argsFilePath = args(0)
     val forkedArgs = os.read(os.Path(argsFilePath)).parseJson[ForkedTestArgs]
 
-    // The forked JVM already has the full classpath on -cp; use the system classloader directly.
+    // forked JVM already has the full classpath on -cp; use the system classloader directly.
     val classLoader = ClassLoader.getSystemClassLoader
 
-    val frameworks: Seq[Framework] = forkedArgs.frameworks.flatMap { className =>
+    val frameworks: Seq[Framework] = forkedArgs.discoveredTests.flatMap { dt =>
       try {
-        val cls = classLoader.loadClass(className)
+        val cls = classLoader.loadClass(dt.frameworkClassName)
         Some(cls.getDeclaredConstructor().newInstance().asInstanceOf[Framework])
       } catch {
         case e: Exception =>
           None
       }
     }
-
-    val frameworkTests: Seq[(Framework, Seq[(String, Fingerprint)])] = frameworks.map { framework =>
-      val frameworkFingerprints = framework.fingerprints()
-      val matchedTests: Seq[(String, Fingerprint)] = forkedArgs.tests.flatMap { serTest =>
-        frameworkFingerprints.collectFirst {
-          case fp if fingerprintMatches(serTest.fingerprint, fp) =>
-            (serTest.className, SerializableFingerprint.toSbt(serTest.fingerprint))
-        }
-      }
-      (framework, matchedTests)
-    }
-
+    
     val executorService = Executors.newFixedThreadPool(forkedArgs.workerThreads)
     val logger = new ForkedTestLogger(moduleId = "fork")
 
     try {
       val testRunner = new DederTestRunner(
         executorService = executorService,
-        tests = frameworkTests,
+        discoveredTests = forkedArgs.discoveredTests,
+        frameworkOverrides = Map.empty,
         classLoader = classLoader,
         logger = logger
       )
@@ -55,14 +45,5 @@ object ForkedTestMain {
     }
   }
 
-  private def fingerprintMatches(
-      serialized: SerializableFingerprint,
-      fp: Fingerprint
-  ): Boolean = (serialized, fp) match {
-    case (s: SerializableSubclassFingerprint, f: SubclassFingerprint) =>
-      s.superclassName == f.superclassName() && s.isModule == f.isModule
-    case (s: SerializableAnnotatedFingerprint, f: AnnotatedFingerprint) =>
-      s.annotationName == f.annotationName() && s.isModule == f.isModule
-    case _ => false
-  }
+
 }

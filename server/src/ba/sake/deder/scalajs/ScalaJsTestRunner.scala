@@ -18,11 +18,9 @@ class ScalaJsTestRunner(
 ) extends StrictLogging {
 
   def run(
-      classesDir: os.Path,
-      runtimeClasspath: Seq[os.Path],
+      discoveredTests: Seq[DiscoveredFrameworkTests],
       linkedJsDir: os.Path,
       moduleKind: ScalaJsModuleKind,
-      testFrameworkNames: Seq[String],
       testOptions: DederTestOptions,
       executorService: ExecutorService
   ): DederTestResults = {
@@ -32,41 +30,32 @@ class ScalaJsTestRunner(
     val jsEnv = forwardProcessOutput(
       new NodeJSEnv(NodeJSEnv.Config().withArgs(List("--enable-source-maps")))
     )
-    val config = TestAdapter.Config()
+    val config = TestAdapter
+      .Config()
       .withLogger(new DederScalaJsLogger(notifications, moduleId))
 
     val adapter = new TestAdapter(jsEnv, inputs, config)
     try {
-      // Load frameworks via the JS runtime bridge
-      val loadedFrameworks = adapter
-        .loadFrameworks(testFrameworkNames.map(n => List(n)).toList)
-        .flatten
+      val testFrameworkNames = discoveredTests.map(_.frameworkClassName).distinct
+      val loadedFrameworks = testFrameworkNames
+        .zip(adapter.loadFrameworks(testFrameworkNames.map(n => List(n)).toList))
+        .collect { case (name, Some(f)) => name -> f }
+        .toMap
 
       if loadedFrameworks.isEmpty then
-        notifications.add(ServerNotification.logWarning(
-          s"No test frameworks found for Scala.js module '$moduleId'. Tried: ${testFrameworkNames.mkString(", ")}",
-          Some(moduleId)
-        ))
+        notifications.add(
+          ServerNotification.logWarning(
+            s"No test frameworks found for Scala.js module '$moduleId'. Tried: ${testFrameworkNames.mkString(", ")}",
+            Some(moduleId)
+          )
+        )
         return DederTestResults.empty
 
-      // Discover tests by scanning .class files and matching against framework fingerprints
-      val urls = (Seq(classesDir) ++ runtimeClasspath).filter(os.exists(_)).map(_.toNIO.toUri.toURL).toArray
-      val classLoader = new java.net.URLClassLoader(urls, null)
       val dederLogger = new DederTestLogger(notifications, moduleId) {
         override def showStackTraces: Boolean = false
       }
-      val testsPerFramework = try {
-        val discovery = DederTestDiscovery(
-          classLoader = classLoader,
-          testClassesDir = classesDir,
-          testClasspath = runtimeClasspath,
-          frameworkClassNames = Seq.empty,
-          logger = dederLogger
-        )
-        discovery.discoverTests(loadedFrameworks)
-      } finally classLoader.close()
 
-      val testRunner = DederTestRunner(executorService, testsPerFramework, getClass.getClassLoader, dederLogger)
+      val testRunner = DederTestRunner(executorService, discoveredTests, loadedFrameworks, getClass.getClassLoader, dederLogger)
       testRunner.run(testOptions)
     } finally {
       adapter.close()
@@ -115,8 +104,12 @@ class ScalaJsTestRunner(
 
   private def withForwardedOutput(runConfig: RunConfig): RunConfig =
     runConfig.withOnOutputStream { (stdout, stderr) =>
-      stdout.foreach(stream => startForwarding(stream, message => notifications.add(ServerNotification.logInfo(message, Some(moduleId)))))
-      stderr.foreach(stream => startForwarding(stream, message => notifications.add(ServerNotification.logError(message, Some(moduleId)))))
+      stdout.foreach(stream =>
+        startForwarding(stream, message => notifications.add(ServerNotification.logInfo(message, Some(moduleId))))
+      )
+      stderr.foreach(stream =>
+        startForwarding(stream, message => notifications.add(ServerNotification.logError(message, Some(moduleId))))
+      )
     }
 
   private def startForwarding(stream: InputStream, log: String => Unit): Unit = {

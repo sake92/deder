@@ -42,6 +42,7 @@
 - temp override of settings, say scalacOptions when running BSP request??? hmmm
 
 ## BSP
+- fix tests
 - java main classes cant be run..??
 
 

@@ -2,12 +2,9 @@ package ba.sake.deder.testing
 
 // peek at https://github.com/scala-js/scala-js/blob/main/test-bridge/src/main/scala/org/scalajs/testing/bridge/HTMLRunner.scala
 
-// TODO forked execution
-
 import java.time.Duration
 import java.util.concurrent.ExecutorService
 import scala.collection.mutable
-import scala.util.control.NonFatal
 import sbt.testing.{Task as SbtTestTask, *}
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject.DederModule
@@ -15,7 +12,8 @@ import ba.sake.tupson.JsonRW
 
 class DederTestRunner(
     executorService: ExecutorService,
-    tests: Seq[(Framework, Seq[(String, Fingerprint)])],
+    discoveredTests: Seq[DiscoveredFrameworkTests],
+    frameworkOverrides: Map[String, Framework],
     classLoader: ClassLoader,
     logger: DederTestLogger
 ) {
@@ -24,15 +22,18 @@ class DederTestRunner(
   // TODO print how to re-run just those
   def run(options: DederTestOptions): DederTestResults = {
     val startedAt = System.currentTimeMillis()
-    val res = if (tests.isEmpty) {
+    val res = if (discoveredTests.isEmpty) {
       logger.warn("No tests found on the classpath.")
       DederTestResults.empty
     } else {
-      logger.debug(s"Found ${tests.size} test framework(s): ${tests.map(_._1.name()).mkString(", ")}")
-      val allResults = tests.flatMap { case (framework, testClasses) =>
-        val testClassNames = testClasses.map(_._1)
+      logger.debug(
+        s"Found ${discoveredTests.size} test framework(s): ${discoveredTests.map(_.frameworkName).mkString(", ")}"
+      )
+      val allResults = discoveredTests.flatMap { t =>
+        val testClassNames = t.testClasses.map(_.className)
         val selectedTestClasses: Seq[(String, Fingerprint, Selector)] =
-          if options.testSelectors.isEmpty then testClasses.map(tc => (tc._1, tc._2, new SuiteSelector))
+          if options.testSelectors.isEmpty then
+            t.testClasses.map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
           else {
             options.testSelectors.flatMap { ts =>
               ts.split("#") match {
@@ -40,20 +41,24 @@ class DederTestRunner(
                   val matchedClassNames = WildcardUtils.getMatches(testClassNames, classNameSelector)
                   matchedClassNames
                     .flatMap { n =>
-                      testClasses.find(_._1 == n)
+                      t.testClasses.find(_.className == n)
                     }
-                    .map(tc => (tc._1, tc._2, new TestSelector(testSelector)))
+                    .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new TestSelector(testSelector)))
                 // TODO add TestWildcardSelector? hmm just a substring
                 case _ =>
                   val matchedClassNames = WildcardUtils.getMatches(testClassNames, ts)
                   matchedClassNames
                     .flatMap { n =>
-                      testClasses.find(_._1 == n)
+                      t.testClasses.find(_.className == n)
                     }
-                    .map(tc => (tc._1, tc._2, new SuiteSelector))
+                    .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
               }
             }
           }
+        val framework = frameworkOverrides.getOrElse(
+          t.frameworkClassName,
+          classLoader.loadClass(t.frameworkClassName).getDeclaredConstructor().newInstance().asInstanceOf[Framework]
+        )
         runFramework(framework, selectedTestClasses)
       }
       DederTestResults.aggregate(allResults)

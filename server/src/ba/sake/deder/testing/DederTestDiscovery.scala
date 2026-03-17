@@ -5,9 +5,43 @@ import java.lang.reflect.Modifier
 import sbt.testing.*
 import ba.sake.deder.*
 import ba.sake.tupson.JsonRW
+import org.typelevel.jawn.ast.{JString, JValue}
 
+enum JsonableFingerprint derives JsonRW {
+  case Subclass(superclassName: String, isModule: Boolean, requireNoArgConstructor: Boolean)
+  case Annotated(annotationName: String, isModule: Boolean)
 
-case class DiscoveredFrameworkTests(framework: String, testClasses: Seq[String]) derives JsonRW
+  def toSbtFingerprint: Fingerprint = this match {
+    case Subclass(scName, issModule, reqNoArgConstructor) =>
+      new SubclassFingerprint {
+        def superclassName(): String = scName
+        def isModule: Boolean = issModule
+        def requireNoArgConstructor(): Boolean = reqNoArgConstructor
+      }
+    case Annotated(annName, issModule) =>
+      new AnnotatedFingerprint {
+        def annotationName(): String = annName
+        def isModule: Boolean = issModule
+      }
+  }
+}
+
+object JsonableFingerprint {
+  def fromSbt(fp: Fingerprint): JsonableFingerprint = fp match {
+    case sub: SubclassFingerprint =>
+      Subclass(sub.superclassName(), sub.isModule, sub.requireNoArgConstructor())
+    case ann: AnnotatedFingerprint =>
+      Annotated(ann.annotationName(), ann.isModule)
+  }
+}
+
+case class DiscoveredFrameworkTest(className: String, fingerprint: JsonableFingerprint) derives JsonRW
+
+case class DiscoveredFrameworkTests(
+    frameworkName: String,
+    frameworkClassName: String,
+    testClasses: Seq[DiscoveredFrameworkTest]
+) derives JsonRW
 
 class DederTestDiscovery(
     classLoader: ClassLoader,
@@ -17,16 +51,22 @@ class DederTestDiscovery(
     logger: DederTestLogger
 ) {
 
-  def discover(): Seq[(Framework, Seq[(String, Fingerprint)])] =
-    discoverTests(discoverFrameworks())
+  def discover(): Seq[DiscoveredFrameworkTests] =
+    discoverTests(discoverFrameworks()).map { case (framework, tests) =>
+      DiscoveredFrameworkTests(
+        framework.name(),
+        framework.getClass.getName,
+        tests.map(t => DiscoveredFrameworkTest(t._1, JsonableFingerprint.fromSbt(t._2)))
+      )
+    }
 
-  def discoverTests(frameworks: Seq[Framework]): Seq[(Framework, Seq[(String, Fingerprint)])] =
+  private def discoverTests(frameworks: Seq[Framework]): Seq[(Framework, Seq[(String, Fingerprint)])] =
     frameworks.map { framework =>
       val testClasses = discoverTestsForFramework(framework)
       (framework, testClasses)
     }
 
-  def discoverFrameworks(): Seq[Framework] =
+  private def discoverFrameworks(): Seq[Framework] =
     val frameworks = frameworkClassNames.flatMap { className =>
       try {
         val cls = classLoader.loadClass(className)
@@ -66,10 +106,10 @@ class DederTestDiscovery(
 
   private def findClassFiles(): Seq[String] = {
     if os.exists(testClassesDir) then
-    os.walk(testClassesDir)
-      .filter(_.last.endsWith(".class"))
-      .map(_.subRelativeTo(testClassesDir))
-      .map(_.segments.mkString(".").stripSuffix(".class"))
+      os.walk(testClassesDir)
+        .filter(_.last.endsWith(".class"))
+        .map(_.subRelativeTo(testClassesDir))
+        .map(_.segments.mkString(".").stripSuffix(".class"))
     else Seq.empty
   }
 

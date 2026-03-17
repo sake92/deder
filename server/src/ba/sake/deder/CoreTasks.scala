@@ -909,7 +909,7 @@ class CoreTasks() extends StrictLogging {
   val testClassesTask = TaskBuilder
     .make[Seq[DiscoveredFrameworkTests]](
       name = "testClasses",
-      supportedModuleTypes = Set(ModuleType.SCALA_TEST)
+      supportedModuleTypes = Set(ModuleType.SCALA_TEST, ModuleType.SCALA_JS_TEST, ModuleType.SCALA_NATIVE_TEST)
     )
     .dependsOn(classesTask)
     .dependsOn(runClasspathTask)
@@ -917,7 +917,12 @@ class CoreTasks() extends StrictLogging {
       val (classesDir, runClasspath) = ctx.depResults
       val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
       ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
-        val frameworkClassNames = ctx.module.asInstanceOf[ScalaTestModule].testFrameworks.asScala.toSeq
+        val frameworkClassNames = ctx.module match {
+          case m: ScalaTestModule       => m.testFrameworks.asScala.toSeq
+          case m: ScalaJsTestModule     => m.testFrameworks.asScala.toSeq
+          case m: ScalaNativeTestModule => m.testFrameworks.asScala.toSeq
+          case _                        => Seq.empty
+        }
         val testDiscovery = DederTestDiscovery(
           classLoader = classLoader,
           testClassesDir = classesDir,
@@ -925,9 +930,7 @@ class CoreTasks() extends StrictLogging {
           frameworkClassNames = frameworkClassNames,
           logger = DederTestLogger(ctx.notifications, ctx.module.id)
         )
-        testDiscovery.discover().map { case (framework, tests) =>
-          DiscoveredFrameworkTests(framework.name(), tests.map(_._1))
-        }
+        testDiscovery.discover()
       }
     }
 
@@ -936,24 +939,21 @@ class CoreTasks() extends StrictLogging {
       name = "test",
       supportedModuleTypes = Set(ModuleType.SCALA_TEST)
     )
-    .dependsOn(classesTask)
     .dependsOn(runClasspathTask)
     .dependsOn(jvmOptionsTask)
     .dependsOn(javaHomeTask)
-    // TODO reuse testClassesTask
+    .dependsOn(testClassesTask)
     .buildWithSummary(
       execute = { ctx =>
+        val (runClasspath, jvmOptions, javaHome, discoveredTests) = ctx.depResults
+        val runtimeClasspath = runClasspath
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
-          val (classesDir, runClasspath, jvmOptions, javaHome) = ctx.depResults
           val testModule = ctx.module.asInstanceOf[ScalaTestModule]
-          val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
-          val frameworkClassNames = testModule.testFrameworks.asScala.toSeq
           val testOptions = DederTestOptions(ctx.args)
           if testModule.fork then
             ForkedTestOrchestrator.run(
-              classesDir = classesDir,
+              discoveredTests = discoveredTests,
               runtimeClasspath = runtimeClasspath,
-              frameworkClassNames = frameworkClassNames,
               jvmOptions = jvmOptions,
               javaHome = javaHome.map(_.toString),
               testOptions = testOptions,
@@ -965,17 +965,9 @@ class CoreTasks() extends StrictLogging {
           else
             ClassLoaderUtils.withIsolatedClassLoader(runtimeClasspath, TestClassLoaderSharedPrefixes) { classLoader =>
               val logger = DederTestLogger(ctx.notifications, ctx.module.id)
-              val testDiscovery = DederTestDiscovery(
-                classLoader = classLoader,
-                testClassesDir = classesDir,
-                testClasspath = runtimeClasspath,
-                frameworkClassNames = frameworkClassNames,
-                logger = logger
-              )
-              val frameworkTests = testDiscovery.discover()
               Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
                 executorService =>
-                  val testRunner = DederTestRunner(executorService, frameworkTests, classLoader, logger)
+                  val testRunner = DederTestRunner(executorService, discoveredTests, Map.empty, classLoader, logger)
                   testRunner.run(testOptions)
               }
             }
@@ -1022,30 +1014,26 @@ class CoreTasks() extends StrictLogging {
       name = "test",
       supportedModuleTypes = Set(ModuleType.SCALA_JS_TEST)
     )
-    .dependsOn(classesTask)
     .dependsOn(fastLinkJsTask)
-    .dependsOn(runClasspathTask)
+    .dependsOn(testClassesTask)
     .buildWithSummary(
       execute = { ctx =>
+        val (linkedJsDir, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
-          val (classesDir, linkedJsDir, runClasspath) = ctx.depResults
-          val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
           val jsModule = ctx.module.asInstanceOf[ScalaJsTestModule]
-          val frameworkClassNames = jsModule.testFrameworks.asScala.toSeq
           val testOptions = DederTestOptions(ctx.args)
           Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
             executorService =>
               val runner = new ScalaJsTestRunner(ctx.notifications, ctx.module.id)
               runner.run(
-                classesDir = classesDir,
-                runtimeClasspath = runtimeClasspath,
+                discoveredTests = discoveredTests,
                 linkedJsDir = os.Path(linkedJsDir),
                 moduleKind = jsModule.moduleKind,
-                testFrameworkNames = frameworkClassNames,
                 testOptions = testOptions,
                 executorService = executorService
               )
           }
+
         }
       },
       isResultSuccessful = _.success,
@@ -1107,8 +1095,6 @@ class CoreTasks() extends StrictLogging {
       resultJarPath
     }
 
-
-
   val nativeLinkTask = TaskBuilder
     .make[String](
       name = "nativeLink",
@@ -1142,26 +1128,20 @@ class CoreTasks() extends StrictLogging {
       name = "test",
       supportedModuleTypes = Set(ModuleType.SCALA_NATIVE_TEST)
     )
-    .dependsOn(classesTask)
     .dependsOn(nativeLinkTask)
-    .dependsOn(runClasspathTask)
+    .dependsOn(testClassesTask)
     .buildWithSummary(
       execute = { ctx =>
+        val (_, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
-          val (classesDir, _, runClasspath) = ctx.depResults
-          val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
-          val nativeModule = ctx.module.asInstanceOf[ScalaNativeTestModule]
-          val frameworkClassNames = nativeModule.testFrameworks.asScala.toSeq
           val testOptions = DederTestOptions(ctx.args)
           val nativeBinaryPath = findNativeBinary(ctx.out / os.up / "nativeLink")
           Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
             executorService =>
               val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
               runner.run(
-                classesDir = classesDir,
-                runtimeClasspath = runtimeClasspath,
+                discoveredTests = discoveredTests,
                 nativeBinaryPath = nativeBinaryPath,
-                testFrameworkNames = frameworkClassNames,
                 testOptions = testOptions,
                 executorService = executorService
               )
@@ -1174,11 +1154,16 @@ class CoreTasks() extends StrictLogging {
 
   private def findNativeBinary(nativeLinkDir: os.Path): os.Path = {
     // ScalaNative linker outputs the binary in the nativeLink output directory
-    val candidates = os.list(nativeLinkDir).filter(p =>
-      os.isFile(p) && !p.last.endsWith(".ll") && !p.last.endsWith(".c") && !p.last.endsWith(".o") && !p.last.endsWith(".s")
-    )
+    val candidates = os
+      .list(nativeLinkDir)
+      .filter(p =>
+        os.isFile(p) && !p.last.endsWith(".ll") && !p.last.endsWith(".c") && !p.last.endsWith(".o") && !p.last
+          .endsWith(".s")
+      )
     candidates.headOption.getOrElse(
-      throw DederException(s"No native binary found in $nativeLinkDir. Files: ${os.list(nativeLinkDir).map(_.last).mkString(", ")}")
+      throw DederException(
+        s"No native binary found in $nativeLinkDir. Files: ${os.list(nativeLinkDir).map(_.last).mkString(", ")}"
+      )
     )
   }
 
