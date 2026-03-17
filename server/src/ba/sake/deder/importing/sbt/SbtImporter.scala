@@ -129,6 +129,7 @@ class SbtImporter(
           List.empty.asJava, // jvmOptions
           null, // javaVersion
           sbtProjectExport.javacOptions.asJava,
+          null, // forkEnv
           null, // mainClass
           deps.asJava,
           List.empty.asJava, // javacAnnotationProcessorDeps
@@ -157,6 +158,7 @@ class SbtImporter(
           List.empty.asJava, // jvmOptions
           null, // javaVersion
           sbtProjectExport.javacOptions.asJava,
+          null, // forkEnv
           null, // mainClass
           deps.asJava,
           List.empty.asJava, // javacAnnotationProcessorDeps
