@@ -12,7 +12,7 @@ class TabCompleterSuite extends munit.FunSuite {
     assert(parsedConfig.isRight, parsedConfig.left.get)
     val projectConfig = parsedConfig.toOption.get
     val coreTasks = CoreTasks()
-    val tasksRegistry = TasksRegistry(coreTasks)
+    val tasksRegistry = TasksRegistry(coreTasks.all)
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
     val completer = new TabCompleter(tasksResolver)
 

@@ -1,17 +1,24 @@
 package ba.sake.deder.bsp
 
+import ba.sake.deder.scalajs.ScalaJsTasks
+import ba.sake.deder.scalanative.ScalaNativeTasks
+
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
 import java.nio.channels.{ServerSocketChannel, SocketChannel}
 import java.nio.file.{Files, Path, Paths}
 import java.nio.channels.Channels
 import org.eclipse.lsp4j.jsonrpc.Launcher
-import ch.epfl.scala.bsp4j._
+import ch.epfl.scala.bsp4j.*
 import com.typesafe.scalalogging.StrictLogging
-import ba.sake.deder.DederProjectState
-import ba.sake.deder.DederGlobals
+import ba.sake.deder.{CoreTasks, DederGlobals, DederProjectState}
 
-class DederBspProxyServer(projectState: DederProjectState) extends StrictLogging {
+class DederBspProxyServer(
+    coreTasks: CoreTasks,
+    scalaJsTasks: ScalaJsTasks,
+    scalaNativeTasks: ScalaNativeTasks,
+    projectState: DederProjectState
+) extends StrictLogging {
 
   def start(): Unit = {
     val relativeSocketPath = ".deder/server-bsp.sock"
@@ -29,7 +36,8 @@ class DederBspProxyServer(projectState: DederProjectState) extends StrictLogging
         var clientChannel: SocketChannel = null
         try {
           clientChannel = serverChannel.accept()
-          val localServer = new DederBspServer(projectState, () => clientChannel.close())
+          val localServer =
+            new DederBspServer(coreTasks, scalaJsTasks, scalaNativeTasks, projectState, () => clientChannel.close())
           val os = Channels.newOutputStream(clientChannel)
           val is = Channels.newInputStream(clientChannel)
           val launcher = new Launcher.Builder[BuildClient]()

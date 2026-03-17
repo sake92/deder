@@ -972,69 +972,6 @@ class CoreTasks() extends StrictLogging {
       summarize = DederTestResults.summarize
     )
 
-  val fastLinkJsTask = TaskBuilder
-    .make[String](
-      name = "fastLinkJs",
-      supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST)
-    )
-    .dependsOn(runClasspathTask)
-    .dependsOn(finalMainClassTask)
-    .build { ctx =>
-      val (classpath, mainClass) = ctx.depResults
-      val irContainers = classpath
-      os.makeDir.all(ctx.out)
-      import scala.concurrent.ExecutionContext.Implicits.global
-      val moduleInitializers = ctx.module match {
-        case _: ScalaJsTestModule =>
-          val init = org.scalajs.testing.adapter.TestAdapterInitializer
-          Seq(org.scalajs.linker.interface.ModuleInitializer.mainMethod(init.ModuleClassName, init.MainMethodName))
-        case _ =>
-          mainClass.map { mc =>
-            org.scalajs.linker.interface.ModuleInitializer.mainMethodWithArgs(mc, "main")
-          }.toSeq
-      }
-      val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
-      linker.link(
-        irContainers = irContainers,
-        outputDir = ctx.out,
-        moduleInitializers = moduleInitializers,
-        jsModuleKind = ctx.module.asInstanceOf[ScalaJsModule].moduleKind
-      )
-      // TODO thread pool..
-      ctx.out.toString
-    }
-
-  val testJsTask = TaskBuilder
-    .make[DederTestResults](
-      name = "test",
-      supportedModuleTypes = Set(ModuleType.SCALA_JS_TEST)
-    )
-    .dependsOn(fastLinkJsTask)
-    .dependsOn(testClassesTask)
-    .buildWithSummary(
-      execute = { ctx =>
-        val (linkedJsDir, discoveredTests) = ctx.depResults
-        OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
-          val jsModule = ctx.module.asInstanceOf[ScalaJsTestModule]
-          val testOptions = DederTestOptions(ctx.args)
-          Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
-            executorService =>
-              val runner = new ScalaJsTestRunner(ctx.notifications, ctx.module.id)
-              runner.run(
-                discoveredTests = discoveredTests,
-                linkedJsDir = os.Path(linkedJsDir),
-                moduleKind = jsModule.moduleKind,
-                testOptions = testOptions,
-                executorService = executorService
-              )
-          }
-
-        }
-      },
-      isResultSuccessful = _.success,
-      summarize = DederTestResults.summarize
-    )
-
   val jarTask = TaskBuilder
     .make[os.Path](name = "jar")
     .dependsOn(compileTask)
@@ -1089,78 +1026,6 @@ class CoreTasks() extends StrictLogging {
       JarUtils.createAssemblyJar(resultJarPath, mergedJar)
       resultJarPath
     }
-
-  val nativeLinkTask = TaskBuilder
-    .make[String](
-      name = "nativeLink",
-      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST)
-    )
-    .dependsOn(runClasspathTask)
-    .dependsOn(finalMainClassTask)
-    .build { ctx =>
-      val (classpath, mainClass) = ctx.depResults
-      val nirPaths = classpath
-      os.makeDir.all(ctx.out)
-      import scala.concurrent.ExecutionContext.Implicits.global
-      val effectiveMainClass = ctx.module match {
-        case _: ScalaNativeTestModule =>
-          Some("scala.scalanative.testinterface.TestMain")
-        case _ => mainClass
-      }
-      val linker = new ScalaNativeLinker(ctx.notifications, ctx.module.id)
-      linker.link(
-        nirPaths = nirPaths,
-        outputDir = ctx.out,
-        mainClass = effectiveMainClass,
-        nativeLibs = Seq.empty
-      )
-      // TODO thread pool..
-      ""
-    }
-
-  val testNativeTask = TaskBuilder
-    .make[DederTestResults](
-      name = "test",
-      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE_TEST)
-    )
-    .dependsOn(nativeLinkTask)
-    .dependsOn(testClassesTask)
-    .buildWithSummary(
-      execute = { ctx =>
-        val (_, discoveredTests) = ctx.depResults
-        OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
-          val testOptions = DederTestOptions(ctx.args)
-          val nativeBinaryPath = findNativeBinary(ctx.out / os.up / "nativeLink")
-          Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
-            executorService =>
-              val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
-              runner.run(
-                discoveredTests = discoveredTests,
-                nativeBinaryPath = nativeBinaryPath,
-                testOptions = testOptions,
-                executorService = executorService
-              )
-          }
-        }
-      },
-      isResultSuccessful = _.success,
-      summarize = DederTestResults.summarize
-    )
-
-  private def findNativeBinary(nativeLinkDir: os.Path): os.Path = {
-    // ScalaNative linker outputs the binary in the nativeLink output directory
-    val candidates = os
-      .list(nativeLinkDir)
-      .filter(p =>
-        os.isFile(p) && !p.last.endsWith(".ll") && !p.last.endsWith(".c") && !p.last.endsWith(".o") && !p.last
-          .endsWith(".s")
-      )
-    candidates.headOption.getOrElse(
-      throw DederException(
-        s"No native binary found in $nativeLinkDir. Files: ${os.list(nativeLinkDir).map(_.last).mkString(", ")}"
-      )
-    )
-  }
 
   val moduleDepsPomSettingsTask = TaskBuilder
     .make[Seq[PomSettings]](
@@ -1456,15 +1321,11 @@ class CoreTasks() extends StrictLogging {
     runMvnAppTask,
     testClassesTask,
     testTask,
-    fastLinkJsTask,
-    testJsTask,
     pomSettingsTask,
     finalManifestSettingsTask,
     jarTask,
     allJarsTask,
     assemblyTask,
-    nativeLinkTask,
-    testNativeTask,
     moduleDepsPomSettingsTask,
     sourcesJarTask,
     javadocJarTask,
@@ -1473,11 +1334,4 @@ class CoreTasks() extends StrictLogging {
     publishTask
   )
 
-  // Ensure no duplicate task names per module type
-  for moduleType <- ModuleType.values do {
-    val tasksForType = all.filter(t => t.supportedModuleTypes.isEmpty || t.supportedModuleTypes.contains(moduleType))
-    val names = tasksForType.map(_.name)
-    val dups = names.diff(names.distinct)
-    require(dups.isEmpty, s"Duplicate task names for ${moduleType}: ${dups.mkString(", ")}")
-  }
 }

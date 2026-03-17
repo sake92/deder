@@ -7,11 +7,12 @@ class ExecutionPlannerSuite extends munit.FunSuite {
 
   private val testProjectsDir = os.pwd / "server/test/resources/sample-projects"
 
+  val tasksRegistry = TasksRegistry(CoreTasks().all)
+
   test("ExecutionPlanner builds correct execution plan") {
     val configParser = ConfigParser(writeJson = false)
     val parsedConfig = configParser.parse(testProjectsDir / "multi/deder.pkl")
     val projectConfig = parsedConfig.toOption.get
-    val tasksRegistry = TasksRegistry(CoreTasks())
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
     val executionPlanner = ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
     val modules = tasksResolver.allModules.map(_.asInstanceOf[ScalaModule])
@@ -77,7 +78,6 @@ class ExecutionPlannerSuite extends munit.FunSuite {
     val configParser = ConfigParser(writeJson = false)
     val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
     val projectConfig = parsedConfig.toOption.get
-    val tasksRegistry = TasksRegistry(CoreTasks())
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
     val executionPlanner = ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
     val modules = tasksResolver.allModules.map(_.asInstanceOf[ScalaModule])
@@ -96,7 +96,6 @@ class ExecutionPlannerSuite extends munit.FunSuite {
     val configParser = ConfigParser(writeJson = false)
     val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
     val projectConfig = parsedConfig.toOption.get
-    val tasksRegistry = TasksRegistry(CoreTasks())
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
     val executionPlanner = ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
     val modules = tasksResolver.allModules.map(_.asInstanceOf[ScalaModule])

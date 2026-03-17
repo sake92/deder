@@ -14,13 +14,20 @@ import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.config.DederProject.ModuleType
+import ba.sake.deder.scalajs.ScalaJsTasks
+import ba.sake.deder.scalanative.ScalaNativeTasks
 import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
 
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.util.Using
 
-class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
-    extends BuildServer,
+class DederBspServer(
+    coreTasks: CoreTasks,
+    scalaJsTasks: ScalaJsTasks,
+    scalaNativeTasks: ScalaNativeTasks,
+    projectState: DederProjectState,
+    onExit: () => Unit
+) extends BuildServer,
       JvmBuildServer,
       JavaBuildServer,
       ScalaBuildServer,
@@ -208,7 +215,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         val moduleId = targetId.moduleId
         val serverNotificationsLogger = makeServerNotificationsLogger()
         withLastGoodState { projectStateData =>
-          val coreTasks = projectStateData.tasksRegistry.coreTasks
           val sourceDirs = executeTask(serverNotificationsLogger, moduleId, coreTasks.sourcesTask)
           sourceDirs.map { srcDir =>
             val srcDirPath = srcDir.absPath
@@ -239,7 +245,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       ensureRunning()
       val serverNotificationsLogger = makeServerNotificationsLogger()
       val targetIds = withLastGoodState { projectStateData =>
-        val coreTasks = projectStateData.tasksRegistry.coreTasks
         val modules = projectStateData.tasksResolver.allModules.filter { m =>
           val sourceDirs = executeTask(serverNotificationsLogger, m.id, coreTasks.sourcesTask)
           sourceDirs.exists { srcDir =>
@@ -262,7 +267,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       val resourcesItems = params.getTargets.asScala.flatMap { targetId =>
         val moduleId = targetId.moduleId
         withLastGoodState { projectStateData =>
-          val coreTasks = projectStateData.tasksRegistry.coreTasks
           val resourceDirs = executeTask(serverNotificationsLogger, moduleId, coreTasks.resourcesTask)
           resourceDirs.map { resourceDir =>
             val resourceDirPath = resourceDir.absPath
@@ -299,7 +303,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
         client.onBuildTaskStart(taskStartParams)
         var allCompileSucceeded = true
         withLastGoodState { projectStateData =>
-          val coreTasks = projectStateData.tasksRegistry.coreTasks
           params.getTargets.asScala.foreach { targetId =>
             val moduleId = targetId.moduleId
             val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
@@ -343,7 +346,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       logger.debug(s"buildTargetCleanCache for params: ${params}")
       ensureRunning()
       withLastGoodState(_ => CleanCacheResult(false)) { projectStateData =>
-        val coreTasks = projectStateData.tasksRegistry.coreTasks
         val cleaned = params.getTargets.asScala.forall { targetId =>
           val moduleId = targetId.moduleId
           projectState.cleanModules(Seq(moduleId))
@@ -361,7 +363,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     logger.debug(s"buildTargetDependencyModules for params: ${params}")
     ensureRunning()
     val items = withLastGoodState { projectStateData =>
-      val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
@@ -404,7 +405,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     logger.debug(s"buildTargetDependencySources for params ${params}")
     ensureRunning()
     val items = withLastGoodState { projectStateData =>
-      val coreTasks = projectStateData.tasksRegistry.coreTasks
+
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
@@ -454,7 +455,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       logger.debug(s"buildTargetJavacOptions for params ${params}")
       ensureRunning()
       val javacOptionsItems = withLastGoodState { projectStateData =>
-        val coreTasks = projectStateData.tasksRegistry.coreTasks
+
         val serverNotificationsLogger = makeServerNotificationsLogger()
         params.getTargets.asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
@@ -495,7 +496,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     logger.debug(s"buildTargetScalaMainClasses for params ${params}")
     ensureRunning()
     val items = withLastGoodState { projectStateData =>
-      val coreTasks = projectStateData.tasksRegistry.coreTasks
+
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
@@ -526,7 +527,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     logger.debug(s"buildTargetScalaTestClasses for params ${params}")
     ensureRunning()
     val items = withLastGoodState { projectStateData =>
-      val coreTasks = projectStateData.tasksRegistry.coreTasks
+
       val testModuleIds = projectStateData.projectConfig.modules.asScala.collect {
         case m: DederProject.ScalaTestModule =>
           m.id
@@ -560,7 +561,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       logger.debug(s"buildTargetScalacOptions for params ${params}")
       ensureRunning()
       val scalacOptionsItems = withLastGoodState { projectStateData =>
-        val coreTasks = projectStateData.tasksRegistry.coreTasks
+
         val serverNotificationsLogger = makeServerNotificationsLogger()
         params.getTargets.asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
@@ -613,7 +614,6 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
     logger.debug(s"buildTargetJvmCompileClasspath for params ${params}")
     ensureRunning()
     val items = withLastGoodState { projectStateData =>
-      val coreTasks = projectStateData.tasksRegistry.coreTasks
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
@@ -638,7 +638,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       logger.debug(s"buildTargetJvmRunEnvironment for params ${params}")
       ensureRunning()
       val items = withLastGoodState { projectStateData =>
-        val coreTasks = projectStateData.tasksRegistry.coreTasks
+
         val serverNotificationsLogger = makeServerNotificationsLogger()
         params.getTargets.asScala.map { targetId =>
           val moduleId = targetId.moduleId
@@ -683,7 +683,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       logger.debug(s"buildTargetJvmTestEnvironment for params ${params}")
       ensureRunning()
       val items = withLastGoodState { projectStateData =>
-        val coreTasks = projectStateData.tasksRegistry.coreTasks
+
         val serverNotificationsLogger = makeServerNotificationsLogger()
         params.getTargets.asScala.map { targetId =>
           val moduleId = targetId.moduleId
@@ -726,7 +726,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       logger.debug(s"buildTargetRun for params ${params}")
       ensureRunning()
       val result = withLastGoodState { projectStateData =>
-        val coreTasks = projectStateData.tasksRegistry.coreTasks
+
         val moduleId = params.getTarget.moduleId
         val serverNotificationsLogger = makeServerNotificationsLogger(
           originId = Option(params.getOriginId),
@@ -763,7 +763,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       logger.debug(s"buildTargetTest for params ${params}")
       ensureRunning()
       val result = withLastGoodState { projectStateData =>
-        val coreTasks = projectStateData.tasksRegistry.coreTasks
+
         val serverNotificationsLogger =
           makeServerNotificationsLogger(originId = Option(params.getOriginId), isCompileTask = true)
         var allTestsSucceeded = true
@@ -779,8 +779,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
           try {
             val module = projectStateData.tasksResolver.modulesMap(moduleId)
             val testTask = module.`type` match {
-              case ModuleType.SCALA_JS_TEST     => coreTasks.testJsTask
-              case ModuleType.SCALA_NATIVE_TEST => coreTasks.testNativeTask
+              case ModuleType.SCALA_JS_TEST     => scalaJsTasks.testJsTask
+              case ModuleType.SCALA_NATIVE_TEST => scalaNativeTasks.testNativeTask
               case _                            => coreTasks.testTask
             }
             val testRes = executeTask(serverNotificationsLogger, moduleId, testTask)
@@ -832,7 +832,7 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
   private def buildTarget(module: DederModule, projectStateData: DederProjectStateData): BuildTarget = {
     val id = buildTargetId(module)
     val isTestModule0 = isTestModule(module)
-    val coreTasks = projectStateData.tasksRegistry.coreTasks
+
     val serverNotificationsLogger = makeServerNotificationsLogger(
       moduleId = Some(module.id),
       isCompileTask = true
@@ -844,7 +844,8 @@ class DederBspServer(projectState: DederProjectState, onExit: () => Unit)
       List(BuildTargetTag.LIBRARY).filter(_ => !isTestModule0 && !isAppModule)
     ).flatten
     val languageIds = module.`type` match {
-      case ModuleType.SCALA | ModuleType.SCALA_TEST | ModuleType.SCALA_JS | ModuleType.SCALA_JS_TEST | ModuleType.SCALA_NATIVE | ModuleType.SCALA_NATIVE_TEST =>
+      case ModuleType.SCALA | ModuleType.SCALA_TEST | ModuleType.SCALA_JS | ModuleType.SCALA_JS_TEST |
+          ModuleType.SCALA_NATIVE | ModuleType.SCALA_NATIVE_TEST =>
         List("scala", "java")
       case ModuleType.JAVA => List("java")
     }
