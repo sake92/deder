@@ -1,4 +1,4 @@
-//| mill-version: 1.1.0-RC3
+//| mill-version: 1.1.3
 //| mill-jvm-version: system
 package build
 
@@ -10,7 +10,7 @@ trait VersionModule extends Module {
   def version = Task {
     val state = VcsVersion.vcsState()
     val lt = state.lastTag.getOrElse("0.0.0")
-    if state.commitsSinceLastTag == 0 then lt
+    if state.commitsSinceLastTag == 0 && state.dirtyHash.isEmpty then lt
     else lt.split("\\.").toList match {
       case List(major, minor, patch) =>
         s"${major}.${minor}.${patch.toInt + 1}-SNAPSHOT"
@@ -96,7 +96,7 @@ object config extends JavaModule {
   )
 }
 
-object client extends JavaModule, VersionModule {
+trait ClientBase extends JavaModule, VersionModule {
   def mainClass = Some("ba.sake.deder.client.Main")
   def mvnDeps = Seq(
     mvn"com.fasterxml.jackson.core:jackson-databind:2.20.1"
@@ -104,17 +104,24 @@ object client extends JavaModule, VersionModule {
   def manifest = super.manifest().add(
     "Implementation-Version" -> version()
   )
+  override def resources = Task {
+    super.resources() ++ Seq(versionFile())
+  }
+
+  def versionFile = Task {
+    val dest = Task.dest / "ba/sake/deder/client"
+    os.makeDir.all(dest)
+    os.write(dest / "version.properties", s"version=${version()}\n")
+    PathRef(Task.dest)
+  }
 }
 
-object `client-native` extends JavaModule, NativeImageModule, VersionModule {
+object client extends ClientBase
+
+object `client-native` extends ClientBase, NativeImageModule {
   def moduleDir = client.moduleDir
-  def mainClass = client.mainClass
-  def mvnDeps = client.mvnDeps
-  def manifest = super.manifest().add(
-    "Implementation-Version" -> version()
-  )
-  def jvmId = "graalvm-community:25.0.1"
+  def jvmVersion = "graalvm-community:25.0.1"
   def jvmIndexVersion = "0.0.4-128-8f0ad3"
   // https://github.com/oracle/graal/issues/3737
-  def nativeImageOptions = Seq("--no-fallback", "-H:+StaticExecutableWithDynamicLibC")
+  def nativeImageOptions = super.nativeImageOptions() ++ Seq("--no-fallback", "-H:+StaticExecutableWithDynamicLibC")
 }

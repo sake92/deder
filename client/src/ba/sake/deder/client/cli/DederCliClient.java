@@ -34,6 +34,19 @@ public class DederCliClient implements DederClient {
         this.args = args;
     }
 
+    private String clientVersion() {
+        try (var stream = getClass().getResourceAsStream("/ba/sake/deder/client/version.properties")) {
+            if (stream != null) {
+                var props = new java.util.Properties();
+                props.load(stream);
+                return props.getProperty("version", "unknown");
+            }
+        } catch (IOException e) {
+            // ignore
+        }
+        return "unknown";
+    }
+
     @Override
     public void start() throws Exception {
         running.set(true);
@@ -56,7 +69,7 @@ public class DederCliClient implements DederClient {
                 message = switch (args[0]) {
                     case "version" -> {
                         // TODO send it to server? for formatting or whatevs/consistency
-                        var version = getClass().getPackage().getImplementationVersion();
+                        var version = clientVersion();
                         System.out.println("Client version: " + version);
                         yield new ClientMessage.Version();
                     }
