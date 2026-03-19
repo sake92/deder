@@ -217,11 +217,11 @@ const function scalaModules(
   _root: String,
 ): ScalaModules = new {
   main = (_template) {
-    id = _root
+    id = _root.replaceAll("/", "-")
     root = _root
   }
   test = (_testTemplate) {
-    id = "\(_root)-test"
+    id = "\(_root.replaceAll("/", "-"))-test"
     root = "\(_root)/test"
     moduleDeps {
       main
@@ -247,11 +247,11 @@ const function scalaJsModules(
   _root: String,
 ): ScalaJsModules = new {
   main = (_template) {
-    id = _root
+    id = _root.replaceAll("/", "-")
     root = _root
   }
   test = (_testTemplate) {
-    id = "\(_root)-test"
+    id = "\(_root.replaceAll("/", "-"))-test"
     root = "\(_root)/test"
     moduleDeps {
       main
@@ -277,11 +277,11 @@ const function scalaNativeModules(
   _root: String,
 ): ScalaNativeModules = new {
   main = (_template) {
-    id = _root
+    id = _root.replaceAll("/", "-")
     root = _root
   }
   test = (_testTemplate) {
-    id = "\(_root)-test"
+    id = "\(_root.replaceAll("/", "-"))-test"
     root = "\(_root)/test"
     moduleDeps {
       main

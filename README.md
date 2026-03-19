@@ -21,6 +21,8 @@ Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 ## Adoption and feedback
 Deder is used in some of my OSS projects:
 - https://github.com/sake92/regenesca
+- https://github.com/sake92/squery
+- https://github.com/sake92/tupson
 
 ## Concepts
 - *project* is the root of your git repo
