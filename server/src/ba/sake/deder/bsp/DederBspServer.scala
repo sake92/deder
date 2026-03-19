@@ -16,6 +16,7 @@ import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.config.DederProject.ModuleType
 import ba.sake.deder.scalajs.ScalaJsTasks
 import ba.sake.deder.scalanative.ScalaNativeTasks
+import coursierapi.error.DownloadingArtifactsError
 import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
 
 import java.util.concurrent.atomic.AtomicBoolean
@@ -211,14 +212,14 @@ class DederBspServer(
     javaFuture("buildTargetSources") {
       logger.debug(s"buildTargetSources for params: ${params}")
       ensureRunning()
-      val sourcesItems = params.getTargets.asScala.flatMap { targetId =>
+      val sourcesItems = params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val serverNotificationsLogger = makeServerNotificationsLogger()
         withLastGoodState { projectStateData =>
           val sourceDirs = executeTask(serverNotificationsLogger, moduleId, coreTasks.sourcesTask)
-          sourceDirs.map { srcDir =>
+          val sourceItems = sourceDirs.flatMap { srcDir =>
             val srcDirPath = srcDir.absPath
-            val sourceItems =
+            val subPaths =
               if os.exists(srcDirPath) then
                 os.walk(srcDirPath).map { srcFile =>
                   new SourceItem(
@@ -228,10 +229,11 @@ class DederBspServer(
                   )
                 }
               else List.empty
-            val sourcesItem = SourcesItem(targetId, sourceItems.asJava)
-            sourcesItem.setRoots(List(srcDirPath.toNIO.toUri.toString).asJava)
-            sourcesItem
+            List(new SourceItem(srcDirPath.toNIO.toUri.toString, SourceItemKind.DIRECTORY, false)) ++ subPaths
           }
+          val sourcesItem = SourcesItem(targetId, sourceItems.asJava)
+          sourcesItem.setRoots(sourceDirs.map(_.absPath.toNIO.toUri.toString).asJava)
+          sourcesItem
         }
       }
       val result = new SourcesResult(sourcesItems.asJava)
@@ -248,7 +250,7 @@ class DederBspServer(
         val modules = projectStateData.tasksResolver.allModules.filter { m =>
           val sourceDirs = executeTask(serverNotificationsLogger, m.id, coreTasks.sourcesTask)
           sourceDirs.exists { srcDir =>
-            val srcDirUri = srcDir.absPath.toURI.toString()
+            val srcDirUri = srcDir.absPath.toURI.toString
             params.getTextDocument.getUri.startsWith(srcDirUri)
           }
         }
@@ -418,13 +420,19 @@ class DederBspServer(
           dep.withClassifier("sources").withType("jar").withConfiguration("sources")
         }
         logger.debug(s"Fetching sources for dependencies: ${depSources.map(_.toString).mkString(", ")}")
-        val sourceArtifactFiles = DependencyResolver
-          .doFetch(depSources.toSeq)
-          .getArtifacts
-          .asScala
-          .map(_.getValue())
-          .toSeq
-          .filter(_.getName.endsWith("-sources.jar")) // TODO coursier returns main artifact too..???
+        val sourceArtifactFiles =
+          try {
+            DependencyResolver
+              .doFetch(depSources.toSeq)
+              .getArtifacts
+              .asScala
+              .map(_.getValue())
+              .toSeq
+              .filter(_.getName.endsWith("-sources.jar")) // TODO coursier returns main artifact too..???
+          } catch {
+            // if a dep doesnt have source jars, coursier throws an error, we can ignore and return empty sources...
+            case _: DownloadingArtifactsError => Seq.empty
+          }
         DependencySourcesItem(targetId, sourceArtifactFiles.map(f => f.toURI.toString).asJava)
       }
     }

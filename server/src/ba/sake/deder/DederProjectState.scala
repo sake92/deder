@@ -121,9 +121,10 @@ class DederProjectState(
             Seq.empty
           case Right(values) =>
             val plural = if values.size > 1 then "s" else ""
+            val modulesString = values.take(5).map(_._1).mkString(", ") + (if values.size > 5 then s", and ${values.size - 5} more" else "")
             serverNotificationsLogger.add(
               ServerNotification.logInfo(
-                s"Executing '${taskName}' task on module${plural}: ${values.map(_._1).mkString(", ")}"
+                s"Executing '${taskName}' task on module${plural}: ${modulesString}"
               )
             )
             values

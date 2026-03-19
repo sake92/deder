@@ -30,7 +30,8 @@ object CliServerMessage {
         case cli.LogLevel.DEBUG   => fansi.Color.LightGreen(levelString)
         case cli.LogLevel.TRACE   => fansi.Color.LightGray(levelString)
       }
-      Some(CliServerMessage.Log(s"[${coloredLevel}] ${m.message}", level))
+      val modulePrefix = m.moduleId.map(mod => fansi.Color.Cyan(s" [${mod}]")).getOrElse("")
+      Some(CliServerMessage.Log(s"[${coloredLevel}]${modulePrefix} ${m.message}", level))
     case tp: ServerNotification.TaskProgress =>
       None
     case cs: ServerNotification.CompileStarted =>
