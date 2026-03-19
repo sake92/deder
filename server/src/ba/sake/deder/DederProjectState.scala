@@ -179,7 +179,7 @@ class DederProjectState(
               )
             }
             serverNotificationsLogger.add(
-              ServerNotification.logInfo(s"⌚ Executing ${moduleId}.${taskName} in watch mode...")
+              ServerNotification.logInfo(s"⌚ Executing ${moduleId}.${taskName} in watch mode...", moduleId)
             )
           }
         }
@@ -373,7 +373,7 @@ class DederProjectState(
           watchedTask.useLastGood
         )
         watchedTask.serverNotificationsLogger.add(
-          ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...")
+          ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...", watchedTask.taskInstance.moduleId)
         )
       }
     }
@@ -425,7 +425,7 @@ class DederProjectState(
           exitOnEnd = false
         )
         watchedTask.serverNotificationsLogger.add(
-          ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...")
+          ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...", watchedTask.taskInstance.moduleId)
         )
       }
     }

@@ -251,7 +251,8 @@ object DederTestResults {
     val statusIcon = if totalResults.success then "PASS ✅" else "FAIL \uD83D\uDD34"
     notifications.add(
       ServerNotification.logInfo(
-        s"$statusIcon Test Summary: ${totalResults.total} total, ${totalResults.passed} passed, ${totalResults.failed} failed, ${totalResults.errors} errors, ${totalResults.skipped} skipped"
+        s"$statusIcon Test Summary: ${totalResults.total} total, ${totalResults.passed} passed, ${totalResults.failed} failed," +
+          s" ${totalResults.errors} errors, ${totalResults.skipped} skipped"
       )
     )
     results.foreach { case (module, res) =>

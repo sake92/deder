@@ -47,6 +47,9 @@ object ServerNotification {
   def logInfo(message: String, moduleId: Option[String] = None): ServerNotification =
     log(ServerNotification.LogLevel.INFO, message, moduleId)
 
+  def logInfo(message: String, moduleId: String): ServerNotification =
+      log(ServerNotification.LogLevel.INFO, message, Some(moduleId))
+
   def logDebug(message: String, moduleId: Option[String] = None): ServerNotification =
     log(ServerNotification.LogLevel.DEBUG, message, moduleId)
 

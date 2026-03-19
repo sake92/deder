@@ -8,13 +8,13 @@ import java.util.Base64
 import java.nio.file.Path
 import com.github.mizosoft.methanol.{Methanol, MultipartBodyPublisher}
 
-class Publisher(notifications: ServerNotificationsLogger) {
+class Publisher(notifications: ServerNotificationsLogger, moduleId: String) {
 
   def publishLocalM2(pom: PomSettings, files: Seq[os.Path]): Unit = {
     // ~/.m2/repository/group/artifact/version
     val home = System.getProperty("user.home")
     val m2Repo = os.home / ".m2/repository" / pom.groupId.split('.') / pom.artifactId / pom.version
-    notifications.add(ServerNotification.logInfo(s"Publishing to local M2 repository at ${m2Repo} ..."))
+    notifications.add(ServerNotification.logInfo(s"Publishing to local M2 repository at ${m2Repo} ...", moduleId))
     os.makeDir.all(m2Repo)
     // copy all artifacts
     files.foreach { file =>
@@ -23,7 +23,8 @@ class Publisher(notifications: ServerNotificationsLogger) {
     }
     notifications.add(
       ServerNotification.logInfo(
-        s"Successfully published ${pom.groupId}:${pom.artifactId}:${pom.version} to local M2 repository"
+        s"Successfully published ${pom.groupId}:${pom.artifactId}:${pom.version} to repository at ${m2Repo}",
+        moduleId
       )
     )
   }
@@ -31,7 +32,9 @@ class Publisher(notifications: ServerNotificationsLogger) {
   // file by file, old style
   def publishSonatypeSnapshot(username: String, password: String, pom: PomSettings, files: Seq[os.Path]): Unit = {
     val baseUrl = "https://central.sonatype.com/repository/maven-snapshots"
-    notifications.add(ServerNotification.logInfo(s"Publishing to Sonatype Snapshots repository at ${baseUrl}"))
+    notifications.add(
+      ServerNotification.logInfo(s"Publishing to Sonatype Snapshots repository at ${baseUrl}", moduleId)
+    )
     val client = HttpClient.newBuilder().build()
     val auth = Base64.getEncoder.encodeToString(s"$username:$password".getBytes("UTF-8"))
     val groupPath = pom.groupId.replace('.', '/')
@@ -43,7 +46,7 @@ class Publisher(notifications: ServerNotificationsLogger) {
         .header("Authorization", s"Basic $auth")
         .PUT(HttpRequest.BodyPublishers.ofFile(file.toNIO))
         .build()
-      notifications.add(ServerNotification.logInfo(s"Uploading ${file.last} ..."))
+      notifications.add(ServerNotification.logInfo(s"Uploading ${file.last} ...", moduleId))
       val res = client.send(request, HttpResponse.BodyHandlers.ofString())
       if res.statusCode() < 200 || res.statusCode() >= 300 then {
         throw RuntimeException(s"Failed to upload ${file.last}: ${res.statusCode()} - ${res.body()}")
@@ -51,7 +54,8 @@ class Publisher(notifications: ServerNotificationsLogger) {
     }
     notifications.add(
       ServerNotification.logInfo(
-        s"Successfully published ${pom.groupId}:${pom.artifactId}:${pom.version} to Sonatype Snapshots repository"
+        s"Successfully published ${pom.groupId}:${pom.artifactId}:${pom.version} to Sonatype Snapshots repository",
+        moduleId
       )
     )
   }
@@ -60,7 +64,7 @@ class Publisher(notifications: ServerNotificationsLogger) {
   def publishSonatypeCentral(username: String, password: String, pom: PomSettings, filesZip: os.Path): Unit = {
     val client = Methanol.create
     val auth = Base64.getEncoder.encodeToString(s"${username}:${password}".getBytes("UTF-8"))
-    notifications.add(ServerNotification.logInfo(s"Publishing to Sonatype Central repository ..."))
+    notifications.add(ServerNotification.logInfo(s"Publishing to Sonatype Central repository ...", moduleId))
     val baseUrl = "https://central.sonatype.com/api/v1/publisher"
     val multipartBody = MultipartBodyPublisher
       .newBuilder()
@@ -77,7 +81,8 @@ class Publisher(notifications: ServerNotificationsLogger) {
       throw RuntimeException(s"${res.statusCode()} - ${res.body()}")
     notifications.add(
       ServerNotification.logInfo(
-        s"Successfully published ${pom.groupId}:${pom.artifactId}:${pom.version} to Sonatype Central repository"
+        s"Successfully published ${pom.groupId}:${pom.artifactId}:${pom.version} to Sonatype Central repository",
+        moduleId
       )
     )
   }

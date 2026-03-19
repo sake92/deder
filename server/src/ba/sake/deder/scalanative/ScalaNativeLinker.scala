@@ -14,7 +14,7 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
       mainClass: Option[String],
       nativeLibs: Seq[String]
   ): Unit = Scope { implicit scope =>
-    notifications.add(ServerNotification.logInfo("Linking scala-native binary..."))
+    notifications.add(ServerNotification.logInfo("Linking scala-native binary...", Some(moduleId)))
 
     val clang = Discover.clang()
     val clangpp = Discover.clangpp()
@@ -40,7 +40,7 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
 
     val binaryPath = Build.buildCachedAwait(config)
     notifications.add(
-      ServerNotification.logInfo("Linking succeeded: " + binaryPath)
+      ServerNotification.logInfo("Linking succeeded: " + binaryPath, Some(moduleId))
     )
   }
 }

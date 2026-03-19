@@ -1237,11 +1237,11 @@ class CoreTasks() extends StrictLogging {
         ctx.module match {
           case javaModule: JavaModule =>
             if javaModule.publish then {
-              val publisher = Publisher(ctx.notifications)
+              val publisher = Publisher(ctx.notifications, ctx.module.id)
               publisher.publishLocalM2(pom, allFiles)
             } else {
               ctx.notifications.add(
-                ServerNotification.logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled")
+                ServerNotification.logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled", ctx.module.id)
               )
             }
           case _ =>
@@ -1290,7 +1290,7 @@ class CoreTasks() extends StrictLogging {
         allFiles.foreach(f => os.copy(f, filesDir / f.last))
         val filesZip = ctx.out / s"${pom.artifactId}_bundle.zip"
         os.zip(filesZip, Seq(ctx.out / "final"))
-        val publisher = Publisher(ctx.notifications)
+        val publisher = Publisher(ctx.notifications, ctx.module.id)
         if pom.version.endsWith("-SNAPSHOT") then publisher.publishSonatypeSnapshot(username, password, pom, allFiles)
         else publisher.publishSonatypeCentral(username, password, pom, filesZip)
       }

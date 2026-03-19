@@ -17,7 +17,8 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
       moduleInitializers: Seq[ModuleInitializer],
       jsModuleKind: ScalaJsModuleKind
   ): Report = {
-    notifications.add(ServerNotification.logDebug("Linking: " + irContainers))
+    notifications.add(ServerNotification.logInfo("Linking scalajs module...", Some(moduleId)))
+
     val moduleKind = jsModuleKind match {
       case ScalaJsModuleKind.NO_MODULE       => ModuleKind.NoModule
       case ScalaJsModuleKind.ES_MODULE       => ModuleKind.ESModule
@@ -49,7 +50,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
     val report = Await.result(res, Duration.Inf)
     val publicModulePaths = report.publicModules.map(_.jsFileName).map(outputDir / _)
     notifications.add(
-      ServerNotification.logInfo("Linking succeeded: " + publicModulePaths.mkString(", "))
+      ServerNotification.logInfo("Linking succeeded: " + publicModulePaths.mkString(", "), Some(moduleId))
     )
     report
   }
