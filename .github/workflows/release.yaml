@@ -40,6 +40,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -77,6 +80,9 @@ jobs:
     runs-on: ${{ matrix.os.gh-name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - name: Setup Java # for mill itself
         uses: actions/setup-java@v4
         with:
