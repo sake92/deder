@@ -9,7 +9,7 @@ class ConcurrencySuite extends BaseIntegrationSuite {
   test("executeTask should guard against concurrent executions of the same task") {
     withTestProject("sample-projects/multi") { projectPath =>
       val coreTasks = CoreTasks()
-      val tasksRegistry = TasksRegistry(coreTasks)
+      val tasksRegistry = TasksRegistry(coreTasks.all)
       var globalVar = 0
       val task1 = TaskBuilder
         .make[String](name = "task1", supportedModuleTypes = Set(ModuleType.SCALA))
@@ -42,7 +42,7 @@ class ConcurrencySuite extends BaseIntegrationSuite {
   test("executeTask should serialize locks by task instance id") {
     withTestProject("sample-projects/multi") { projectPath =>
       val coreTasks = CoreTasks()
-      val tasksRegistry = TasksRegistry(coreTasks)
+      val tasksRegistry = TasksRegistry(coreTasks.all)
       var globalVar = 0
       val task1 = TaskBuilder
         .make[String](name = "task1", supportedModuleTypes = Set(ModuleType.SCALA))
