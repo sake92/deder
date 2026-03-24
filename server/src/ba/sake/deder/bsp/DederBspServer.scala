@@ -21,6 +21,7 @@ import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
 
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.util.Using
+import scala.util.control.NonFatal
 
 // TODO maybe allow partial import, e.g. if a module does not compile at all
 class DederBspServer(
@@ -101,8 +102,8 @@ class DederBspServer(
               // Zinc's range starts at 1 whereas BSP at 0
               val startLine = pos.startLine().orElse(1) - 1
               val startColumn = pos.startColumn().orElse(1) - 1
-              val endLine = pos.endLine().orElse(1) - 1
-              val endColumn = pos.endColumn().orElse(1) - 1
+              val endLine = pos.endLine().orElse(pos.startLine().orElse(1)) - 1
+              val endColumn = pos.endColumn().orElse(pos.startColumn().orElse(1)) - 1
               new bsp4j.Range(
                 new bsp4j.Position(startLine, startColumn),
                 new bsp4j.Position(endLine, endColumn)
@@ -117,7 +118,6 @@ class DederBspServer(
             diagnostic.setSeverity(severity)
             diagnostic.setCode(problem.category())
             diagnostic.setSource("deder")
-            val targetId = resolveModule(cd.moduleId).map(buildTargetId)
             val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List(diagnostic).asJava, false)
             client.onBuildPublishDiagnostics(params)
           }
@@ -305,28 +305,30 @@ class DederBspServer(
         taskStartParams.setMessage(s"Compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}")
         client.onBuildTaskStart(taskStartParams)
         var allCompileSucceeded = true
-        withLastGoodState { projectStateData =>
-          params.getTargets.asScala.foreach { targetId =>
-            val moduleId = targetId.moduleId
-            val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
-            subtaskId.setParents(List(taskId.getId).asJava)
-            logger.debug(s"buildTargetCompile subtaskId ${subtaskId}")
-            val serverNotificationsLogger = makeServerNotificationsLogger(
-              originId = Option(params.getOriginId),
-              taskId = Some(subtaskId),
-              moduleId = Some(moduleId),
-              isCompileTask = true
-            )
-            val module = projectStateData.tasksResolver.modulesMap(moduleId)
-            var currentModuleCompileSucceeded = true
-            try {
-              executeTask(serverNotificationsLogger, moduleId, coreTasks.compileTask)
-            } catch {
-              case e: TaskEvaluationException =>
-                currentModuleCompileSucceeded = false
-                allCompileSucceeded = false
+        try
+          withLastGoodState { projectStateData =>
+            params.getTargets.asScala.foreach { targetId =>
+              val moduleId = targetId.moduleId
+              val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
+              subtaskId.setParents(List(taskId.getId).asJava)
+              logger.debug(s"buildTargetCompile subtaskId ${subtaskId}")
+              val serverNotificationsLogger = makeServerNotificationsLogger(
+                originId = Option(params.getOriginId),
+                taskId = Some(subtaskId),
+                moduleId = Some(moduleId),
+                isCompileTask = true
+              )
+              val module = projectStateData.tasksResolver.modulesMap(moduleId)
+              try {
+                executeTask(serverNotificationsLogger, moduleId, coreTasks.compileTask)
+              } catch {
+                case e: TaskEvaluationException =>
+                  allCompileSucceeded = false
+              }
             }
           }
+        catch {
+          case NonFatal(_) => allCompileSucceeded = false
         }
 
         val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
@@ -752,7 +754,9 @@ class DederBspServer(
               logger.error(s"Failed to run module ${moduleId} via BSP")
               RunResult(StatusCode.ERROR)
             } else {
-              val wd = Option(params.getWorkingDirectory).map(os.Path(_)).getOrElse(os.pwd)
+              val wd = Option(params.getWorkingDirectory)
+                .map(uri => os.Path(java.nio.file.Path.of(new java.net.URI(uri))))
+                .getOrElse(os.pwd)
               val runRes =
                 os.proc(runCmd).call(cwd = wd, stdin = os.Pipe, stdout = os.Pipe, stderr = os.Pipe, check = false)
               val status = if runRes.exitCode == 0 then StatusCode.OK else StatusCode.ERROR
@@ -903,7 +907,7 @@ class DederBspServer(
     )
 
   private def resolveModule(moduleId: String): Option[DederModule] =
-    withLastGoodState { projectStateData =>
+    withLastGoodState(_ => None) { projectStateData =>
       projectStateData.tasksResolver.modulesMap.get(moduleId)
     }
 
