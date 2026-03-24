@@ -22,6 +22,7 @@ import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.util.Using
 
+// TODO maybe allow partial import, e.g. if a module does not compile at all
 class DederBspServer(
     coreTasks: CoreTasks,
     scalaJsTasks: ScalaJsTasks,

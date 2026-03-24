@@ -8,7 +8,6 @@ import java.net.http.*;
 import java.util.concurrent.TimeUnit;
 import java.util.Arrays;
 import java.util.ArrayList;
-import java.util.stream.Collectors;
 import java.util.Properties;
 import java.time.Duration;
 import java.time.Instant;
@@ -220,13 +219,8 @@ public class Main {
 
     private void writeBspInstallScript(ProcessHandle processHandle, Properties serverProps) throws IOException {
         System.err.println("Installing BSP config...");
-        var commandLineArgs = new ArrayList<String>();
-        commandLineArgs.add(processHandle.info().command().get());
-        commandLineArgs.addAll(Arrays.asList(processHandle.info().arguments().get()));
-        // this is called with "bsp install", need to remove "install"
-        commandLineArgs.removeLast();
-        var commandLineArgsJson = commandLineArgs.stream().map(arg -> "\"" + arg + "\"")
-                .collect(Collectors.joining(", "));
+        var clientPath = resolveClientPath(processHandle);
+        var commandLineArgsJson = "\"" + clientPath + "\", \"bsp\"";
         Files.createDirectories(Path.of(".bsp"));
         var serverVersion = serverProps.getProperty("version", "early-access");
         var serverLocalPath = serverProps.getProperty("localPath");
@@ -246,6 +240,25 @@ public class Main {
         Files.writeString(bspConfigPath, bspConfig, StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING);
         System.err.println("BSP config installed at " + bspConfigPath);
+    }
+
+
+    private String resolveClientPath(ProcessHandle processHandle) {
+        // resolve "deder" via PATH (stable across brew/package-manager upgrades)
+        try {
+            var osname = System.getProperty("os.name").toLowerCase();
+            var lookupCmd = osname.contains("win") ? "where" : "which";
+            var proc = new ProcessBuilder(lookupCmd, "deder").start();
+            var result = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
+            proc.waitFor();
+            if (!result.isBlank()) {
+                return result;
+            }
+        } catch (Exception ignored) {
+        }
+        // fall back to the current process path
+        return processHandle.info().command().orElseThrow(
+                () -> new IllegalStateException("Cannot determine client executable path"));
     }
 
     private void download(String fileUrl, Path destination) throws Exception {
