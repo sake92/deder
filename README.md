@@ -16,10 +16,10 @@ Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 - watch mode with concurrent execution in multiple terminals
 - import from sbt (experimental, feedback needed)
 - OTEL tracing support
-- some features only work for scala3, help welcome! :)
 
 ## Adoption and feedback
 Deder is used in some of my OSS projects:
+- https://github.com/sake92/sharaf
 - https://github.com/sake92/regenesca
 - https://github.com/sake92/squery
 - https://github.com/sake92/tupson
