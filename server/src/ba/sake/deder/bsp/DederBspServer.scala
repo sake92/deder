@@ -3,12 +3,15 @@ package ba.sake.deder.bsp
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.*
+import java.util.concurrent.atomic.AtomicBoolean
+import scala.util.Using
 import scala.jdk.CollectionConverters.*
 import com.typesafe.scalalogging.StrictLogging
 import ch.epfl.scala.bsp4j
 import ch.epfl.scala.bsp4j.*
-import org.eclipse.lsp4j.jsonrpc.Launcher
 import dependency.ScalaParameters
+import coursierapi.error.DownloadingArtifactsError
+import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
@@ -16,14 +19,7 @@ import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.config.DederProject.ModuleType
 import ba.sake.deder.scalajs.ScalaJsTasks
 import ba.sake.deder.scalanative.ScalaNativeTasks
-import coursierapi.error.DownloadingArtifactsError
-import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
 
-import java.util.concurrent.atomic.AtomicBoolean
-import scala.util.Using
-import scala.util.control.NonFatal
-
-// TODO maybe allow partial import, e.g. if a module does not compile at all
 class DederBspServer(
     coreTasks: CoreTasks,
     scalaJsTasks: ScalaJsTasks,
@@ -91,35 +87,45 @@ class DederBspServer(
           }
         case cd: ServerNotification.CompileDiagnostic =>
           val targetId = resolveModule(cd.moduleId).map(buildTargetId)
-          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cd.moduleId) &&
-            cd.problem.position.sourceFile.isPresent
+          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cd.moduleId)
           if isRelevantCompileNotification then {
-            val file = cd.problem.position.sourceFile.get
-            val problem = cd.problem
-            val fileUri = TextDocumentIdentifier(file.toURI.toString)
-            val range = {
-              val pos = problem.position
-              // Zinc's range starts at 1 whereas BSP at 0
-              val startLine = pos.startLine().orElse(1) - 1
-              val startColumn = pos.startColumn().orElse(1) - 1
-              val endLine = pos.endLine().orElse(pos.startLine().orElse(1)) - 1
-              val endColumn = pos.endColumn().orElse(pos.startColumn().orElse(1)) - 1
-              new bsp4j.Range(
-                new bsp4j.Position(startLine, startColumn),
-                new bsp4j.Position(endLine, endColumn)
-              )
+            if cd.problem.position.sourceFile.isPresent then {
+              val file = cd.problem.position.sourceFile.get
+              val problem = cd.problem
+              val fileUri = TextDocumentIdentifier(file.toURI.toString)
+              val range = {
+                val pos = problem.position
+                logger.info(s"Diagnostic position for ${problem.message()} : ${pos.startLine()}:${pos
+                    .startColumn()} - ${pos.endLine()}:${pos.endColumn()}")
+                // Zinc's range starts at 1 whereas BSP at 0
+                val startLine = pos.startLine().orElse(1) - 1
+                val startColumn = pos.startColumn().orElse(1)
+                val endLine = pos.endLine().orElse(pos.startLine().orElse(1)) - 1
+                val endColumn = pos.endColumn().orElse(pos.startColumn().orElse(0)) // - 1
+                new bsp4j.Range(
+                  new bsp4j.Position(startLine, startColumn),
+                  new bsp4j.Position(endLine, endColumn)
+                )
+              }
+              val severity = problem.severity() match {
+                case xsbti.Severity.Error => DiagnosticSeverity.ERROR
+                case xsbti.Severity.Warn  => DiagnosticSeverity.WARNING
+                case xsbti.Severity.Info  => DiagnosticSeverity.INFORMATION
+              }
+              val diagnostic = new Diagnostic(range, problem.message())
+              diagnostic.setSeverity(severity)
+              diagnostic.setCode(problem.category())
+              diagnostic.setSource("deder")
+              val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List(diagnostic).asJava, false)
+              client.onBuildPublishDiagnostics(params)
+            } else {
+              val msgType = cd.problem.severity() match {
+                case xsbti.Severity.Error => MessageType.ERROR
+                case xsbti.Severity.Warn  => MessageType.WARNING
+                case xsbti.Severity.Info  => MessageType.INFO
+              }
+              client.onBuildShowMessage(new ShowMessageParams(msgType, cd.problem.message()))
             }
-            val severity = problem.severity() match {
-              case xsbti.Severity.Error => DiagnosticSeverity.ERROR
-              case xsbti.Severity.Warn  => DiagnosticSeverity.WARNING
-              case xsbti.Severity.Info  => DiagnosticSeverity.INFORMATION
-            }
-            val diagnostic = new Diagnostic(range, problem.message())
-            diagnostic.setSeverity(severity)
-            diagnostic.setCode(problem.category())
-            diagnostic.setSource("deder")
-            val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List(diagnostic).asJava, false)
-            client.onBuildPublishDiagnostics(params)
           }
         case cf: ServerNotification.CompileFinished =>
           val targetId = resolveModule(cf.moduleId).map(buildTargetId)
@@ -198,8 +204,10 @@ class DederBspServer(
     javaFuture("workspaceBuildTargets") {
       logger.debug("workspaceBuildTargets called")
       ensureRunning()
+      projectState.reloadProject()
       val buildTargets = projectState.readState(useLastGood = true) match {
         case Left(errorMessage) =>
+          client.onBuildShowMessage(new ShowMessageParams(MessageType.ERROR, s"Failed to load project state: ${errorMessage}"))
           List.empty
         case Right(projectStateData) =>
           projectStateData.projectConfig.modules.asScala.map(m => buildTarget(m, projectStateData)).toList
@@ -213,11 +221,11 @@ class DederBspServer(
     javaFuture("buildTargetSources") {
       logger.debug(s"buildTargetSources for params: ${params}")
       ensureRunning()
-      val sourcesItems = params.getTargets.asScala.map { targetId =>
-        val moduleId = targetId.moduleId
-        val serverNotificationsLogger = makeServerNotificationsLogger()
-        withLastGoodState { projectStateData =>
-          val sourceDirs = executeTask(serverNotificationsLogger, moduleId, coreTasks.sourcesTask)
+      val sourcesItems = withLastGoodState(_ => List.empty) { projectStateData =>
+        params.getTargets.asScala.map { targetId =>
+          val moduleId = targetId.moduleId
+          val serverNotificationsLogger = makeServerNotificationsLogger()
+          val sourceDirs = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.sourcesTask)(Seq.empty)
           val sourceItems = sourceDirs.flatMap { srcDir =>
             val srcDirPath = srcDir.absPath
             val subPaths =
@@ -247,9 +255,9 @@ class DederBspServer(
       logger.debug(s"buildTargetInverseSources for params: ${params}")
       ensureRunning()
       val serverNotificationsLogger = makeServerNotificationsLogger()
-      val targetIds = withLastGoodState { projectStateData =>
+      val targetIds = withLastGoodState(_ => List.empty) { projectStateData =>
         val modules = projectStateData.tasksResolver.allModules.filter { m =>
-          val sourceDirs = executeTask(serverNotificationsLogger, m.id, coreTasks.sourcesTask)
+          val sourceDirs = tryExecuteTask(serverNotificationsLogger, m.id, coreTasks.sourcesTask)(Seq.empty)
           sourceDirs.exists { srcDir =>
             val srcDirUri = srcDir.absPath.toURI.toString
             params.getTextDocument.getUri.startsWith(srcDirUri)
@@ -269,8 +277,8 @@ class DederBspServer(
       val serverNotificationsLogger = makeServerNotificationsLogger()
       val resourcesItems = params.getTargets.asScala.flatMap { targetId =>
         val moduleId = targetId.moduleId
-        withLastGoodState { projectStateData =>
-          val resourceDirs = executeTask(serverNotificationsLogger, moduleId, coreTasks.resourcesTask)
+        withLastGoodState(_ => List.empty) { projectStateData =>
+          val resourceDirs = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.resourcesTask)(Seq.empty)
           resourceDirs.map { resourceDir =>
             val resourceDirPath = resourceDir.absPath
             val resourceItems =
@@ -305,30 +313,23 @@ class DederBspServer(
         taskStartParams.setMessage(s"Compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}")
         client.onBuildTaskStart(taskStartParams)
         var allCompileSucceeded = true
-        try
-          withLastGoodState { projectStateData =>
-            params.getTargets.asScala.foreach { targetId =>
-              val moduleId = targetId.moduleId
-              val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
-              subtaskId.setParents(List(taskId.getId).asJava)
-              logger.debug(s"buildTargetCompile subtaskId ${subtaskId}")
-              val serverNotificationsLogger = makeServerNotificationsLogger(
-                originId = Option(params.getOriginId),
-                taskId = Some(subtaskId),
-                moduleId = Some(moduleId),
-                isCompileTask = true
-              )
-              val module = projectStateData.tasksResolver.modulesMap(moduleId)
-              try {
-                executeTask(serverNotificationsLogger, moduleId, coreTasks.compileTask)
-              } catch {
-                case e: TaskEvaluationException =>
-                  allCompileSucceeded = false
-              }
+        withLastGoodState(_ => allCompileSucceeded = false) { projectStateData =>
+          params.getTargets.asScala.foreach { targetId =>
+            val moduleId = targetId.moduleId
+            val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
+            subtaskId.setParents(List(taskId.getId).asJava)
+            logger.debug(s"buildTargetCompile subtaskId ${subtaskId}")
+            val serverNotificationsLogger = makeServerNotificationsLogger(
+              originId = Option(params.getOriginId),
+              taskId = Some(subtaskId),
+              moduleId = Some(moduleId),
+              isCompileTask = true
+            )
+            val module = projectStateData.tasksResolver.modulesMap(moduleId)
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty) { _ =>
+              allCompileSucceeded = false
             }
           }
-        catch {
-          case NonFatal(_) => allCompileSucceeded = false
         }
 
         val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
@@ -367,14 +368,12 @@ class DederBspServer(
   ): CompletableFuture[DependencyModulesResult] = javaFuture("buildTargetDependencyModules") {
     logger.debug(s"buildTargetDependencyModules for params: ${params}")
     ensureRunning()
-    val items = withLastGoodState { projectStateData =>
+    val items = withLastGoodState(_ => List.empty) { projectStateData =>
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
-        val dependencies =
-          try executeTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)
-          catch case e: TaskEvaluationException => Seq.empty
+        val dependencies = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)(Seq.empty)
         val fetchRes = DependencyResolver.fetch(dependencies)
         // assuming that dependencies and artifacts are in the same order, 1:1 mapping
         val depsWithArtifacts = fetchRes.getDependencies.asScala
@@ -409,15 +408,12 @@ class DederBspServer(
   ): CompletableFuture[DependencySourcesResult] = javaFuture("buildTargetDependencySources") {
     logger.debug(s"buildTargetDependencySources for params ${params}")
     ensureRunning()
-    val items = withLastGoodState { projectStateData =>
-
+    val items = withLastGoodState(_ => List.empty) { projectStateData =>
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
-        val dependencies =
-          try executeTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)
-          catch case e: TaskEvaluationException => Seq.empty
+        val dependencies = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)(Seq.empty)
         val fetchRes = DependencyResolver.fetch(dependencies)
         val depSources = fetchRes.getDependencies.asScala.map { dep =>
           dep.withClassifier("sources").withType("jar").withConfiguration("sources")
@@ -465,19 +461,15 @@ class DederBspServer(
     javaFuture("buildTargetJavacOptions") {
       logger.debug(s"buildTargetJavacOptions for params ${params}")
       ensureRunning()
-      val javacOptionsItems = withLastGoodState { projectStateData =>
-
+      val javacOptionsItems = withLastGoodState(_ => List.empty) { projectStateData =>
         val serverNotificationsLogger = makeServerNotificationsLogger()
         params.getTargets.asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
-          val classesDir =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).toNIO.toUri.toString
-          val semanticdbDir =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask)
-          val javacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.javacOptionsTask)
+          val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).toNIO.toUri.toString
+          val semanticdbDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask)
+          val javacOptions = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.javacOptionsTask)(Seq.empty)
           val javacAnnotationProcessors =
-            try executeTask(serverNotificationsLogger, moduleId, coreTasks.javacAnnotationProcessorsTask)
-            catch case e: TaskEvaluationException => Seq.empty
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.javacAnnotationProcessorsTask)(Seq.empty)
           val finalJavacOptions = javacOptions ++
             Seq(
               "-processorpath",
@@ -485,11 +477,9 @@ class DederBspServer(
               s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${semanticdbDir} -build-tool:sbt"
             )
           val compileClasspath =
-            try
-              executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
-                .map(_.toNIO.toUri.toString)
-                .toList
-            catch case e: TaskEvaluationException => Seq.empty
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)(Seq.empty)
+              .map(_.toNIO.toUri.toString)
+              .toList
           // logger.debug(s"compileClasspath for ${moduleId} : ${compileClasspath}")
           val javacOptionsItem =
             new JavacOptionsItem(targetId, finalJavacOptions.asJava, compileClasspath.asJava, classesDir)
@@ -506,23 +496,16 @@ class DederBspServer(
   ): CompletableFuture[ScalaMainClassesResult] = javaFuture("buildTargetScalaMainClasses", Option(params.getOriginId)) {
     logger.debug(s"buildTargetScalaMainClasses for params ${params}")
     ensureRunning()
-    val items = withLastGoodState { projectStateData =>
-
+    val items = withLastGoodState(_ => List.empty) { projectStateData =>
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
+        val jvmOptions = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)(Seq.empty)
         val items =
-          try {
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.finalMainClassTask).map { mainClass =>
-              // TODO arguments + JVM opts
-              ScalaMainClass(mainClass, List.empty.asJava, List.empty.asJava)
-            }.toList
-          } catch {
-            case e: TaskEvaluationException =>
-              // module failed to compile for example
-              List.empty
-          }
+          tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.finalMainClassTask)(None).map { mainClass =>
+            ScalaMainClass(mainClass, List.empty.asJava, jvmOptions.asJava)
+          }.toList
         ScalaMainClassesItem(targetId, items.asJava)
       }
     }
@@ -537,8 +520,7 @@ class DederBspServer(
   ): CompletableFuture[ScalaTestClassesResult] = javaFuture("buildTargetScalaTestClasses", Option(params.getOriginId)) {
     logger.debug(s"buildTargetScalaTestClasses for params ${params}")
     ensureRunning()
-    val items = withLastGoodState { projectStateData =>
-
+    val items = withLastGoodState(_ => List.empty) { projectStateData =>
       val testModuleIds = projectStateData.projectConfig.modules.asScala.collect {
         case m: DederProject.ScalaTestModule =>
           m.id
@@ -547,9 +529,7 @@ class DederBspServer(
       params.getTargets.asScala.filter(targetId => testModuleIds.contains(targetId.moduleId)).flatMap { targetId =>
         val moduleId = targetId.moduleId
         try {
-          val frameworkTests =
-            try executeTask(serverNotificationsLogger, moduleId, coreTasks.testClassesTask)
-            catch case e: TaskEvaluationException => Seq.empty
+          val frameworkTests = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.testClassesTask)(Seq.empty)
           frameworkTests.map { ft =>
             val item = ScalaTestClassesItem(targetId, ft.testClasses.map(_.className).asJava)
             item.setFramework(ft.frameworkName)
@@ -571,18 +551,16 @@ class DederBspServer(
     javaFuture("buildTargetScalacOptions") {
       logger.debug(s"buildTargetScalacOptions for params ${params}")
       ensureRunning()
-      val scalacOptionsItems = withLastGoodState { projectStateData =>
-
+      val scalacOptionsItems = withLastGoodState(_ => List.empty) { projectStateData =>
         val serverNotificationsLogger = makeServerNotificationsLogger()
         params.getTargets.asScala.flatMap { targetId =>
           val moduleId = targetId.moduleId
           val scalaVersion = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalaVersionTask)
-          val scalacOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacOptionsTask)
-          val semanticdbDir =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask)
+          val scalacOptions =
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.scalacOptionsTask)(Seq.empty)
+          val semanticdbDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask)
           val scalacPlugins =
-            try executeTask(serverNotificationsLogger, moduleId, coreTasks.scalacPluginsTask)
-            catch case e: TaskEvaluationException => Seq.empty
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.scalacPluginsTask)(Seq.empty)
           val semanticdbOptions =
             if scalaVersion.startsWith("3.") then
               scalacPlugins.map(p => s"-Xplugin:${p.toString}") ++
@@ -602,13 +580,10 @@ class DederBspServer(
                 scalacPlugins.map(p => s"-Xplugin:${p.toString}")
           val finalScalacOptions = scalacOptions ++ semanticdbOptions
           val compileClasspath =
-            try
-              executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
-                .map(_.toNIO.toUri.toString)
-                .toList
-            catch case e: TaskEvaluationException => List.empty
-          val classesDir =
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).toNIO.toUri.toString
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)(Seq.empty)
+              .map(_.toNIO.toUri.toString)
+              .toList
+          val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).toNIO.toUri.toString
           val scalacOptionsItem =
             ScalacOptionsItem(targetId, finalScalacOptions.asJava, compileClasspath.asJava, classesDir)
           List(scalacOptionsItem)
@@ -624,16 +599,14 @@ class DederBspServer(
   ): CompletableFuture[JvmCompileClasspathResult] = javaFuture("buildTargetJvmCompileClasspath") {
     logger.debug(s"buildTargetJvmCompileClasspath for params ${params}")
     ensureRunning()
-    val items = withLastGoodState { projectStateData =>
+    val items = withLastGoodState(_ => List.empty) { projectStateData =>
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.map { targetId =>
         val moduleId = targetId.moduleId
         val compileClasspath =
-          try
-            executeTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)
-              .map(_.toNIO.toUri.toString)
-              .toList
-          catch case e: TaskEvaluationException => List.empty
+          tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)(Seq.empty)
+            .map(_.toNIO.toUri.toString)
+            .toList
         JvmCompileClasspathItem(targetId, compileClasspath.asJava)
       }
     }
@@ -648,22 +621,17 @@ class DederBspServer(
     javaFuture("buildTargetJvmRunEnvironment", Option(params.getOriginId)) {
       logger.debug(s"buildTargetJvmRunEnvironment for params ${params}")
       ensureRunning()
-      val items = withLastGoodState { projectStateData =>
-
+      val items = withLastGoodState(_ => List.empty) { projectStateData =>
         val serverNotificationsLogger = makeServerNotificationsLogger()
         params.getTargets.asScala.map { targetId =>
           val moduleId = targetId.moduleId
           val module = projectStateData.tasksResolver.modulesMap(moduleId)
-          val mainClasses =
-            try executeTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)
-            catch case e: TaskEvaluationException => Seq.empty
+          val mainClasses = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)(Seq.empty)
           val classpath =
-            try
-              executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
-                .map(_.toNIO.toUri.toString)
-                .toList
-            catch case e: TaskEvaluationException => List.empty
-          val jvmOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)(Seq.empty)
+              .map(_.toNIO.toUri.toString)
+              .toList
+          val jvmOptions = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)(Seq.empty)
           val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
           val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
           val item = JvmEnvironmentItem(
@@ -693,21 +661,17 @@ class DederBspServer(
     javaFuture("buildTargetJvmTestEnvironment", Option(params.getOriginId)) {
       logger.debug(s"buildTargetJvmTestEnvironment for params ${params}")
       ensureRunning()
-      val items = withLastGoodState { projectStateData =>
-
+      val items = withLastGoodState(_ => List.empty) { projectStateData =>
         val serverNotificationsLogger = makeServerNotificationsLogger()
         params.getTargets.asScala.map { targetId =>
           val moduleId = targetId.moduleId
           val testClasses =
-            try executeTask(serverNotificationsLogger, moduleId, coreTasks.testClassesTask)
-            catch case e: TaskEvaluationException => Seq.empty
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.testClassesTask)(Seq.empty)
           val classpath =
-            try
-              executeTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)
-                .map(_.toNIO.toUri.toString)
-                .toList
-            catch case e: TaskEvaluationException => List.empty
-          val jvmOptions = executeTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)(Seq.empty)
+              .map(_.toNIO.toUri.toString)
+              .toList
+          val jvmOptions = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)(Seq.empty)
           val workingDirectory = DederGlobals.projectRootDir.toNIO.toUri.toString
           val environmentVariables = Map.empty[String, String] // TODO: Get environment variables
           val item = JvmEnvironmentItem(
@@ -737,7 +701,6 @@ class DederBspServer(
       logger.debug(s"buildTargetRun for params ${params}")
       ensureRunning()
       val result = withLastGoodState { projectStateData =>
-
         val moduleId = params.getTarget.moduleId
         val serverNotificationsLogger = makeServerNotificationsLogger(
           originId = Option(params.getOriginId),
@@ -748,8 +711,7 @@ class DederBspServer(
           case Some(mainClass) =>
             val args = Option(params.getArguments).map(_.asScala.toSeq).getOrElse(Seq.empty)
             val runCmd =
-              try executeTask(serverNotificationsLogger, moduleId, coreTasks.runTask, args = args)
-              catch case e: TaskEvaluationException => Seq.empty
+              tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.runTask, args = args)(Seq.empty)
             if runCmd.isEmpty then {
               logger.error(s"Failed to run module ${moduleId} via BSP")
               RunResult(StatusCode.ERROR)
@@ -776,9 +738,6 @@ class DederBspServer(
       logger.debug(s"buildTargetTest for params ${params}")
       ensureRunning()
       val result = withLastGoodState { projectStateData =>
-
-        val serverNotificationsLogger =
-          makeServerNotificationsLogger(originId = Option(params.getOriginId), isCompileTask = true)
         var allTestsSucceeded = true
         val targets = params.getTargets.asScala
         val untestableTargets = targets.filterNot { targetId =>
@@ -796,6 +755,12 @@ class DederBspServer(
               case ModuleType.SCALA_NATIVE_TEST => scalaNativeTasks.testNativeTask
               case _                            => coreTasks.testTask
             }
+            val serverNotificationsLogger =
+              makeServerNotificationsLogger(
+                originId = Option(params.getOriginId),
+                moduleId = Some(moduleId),
+                isCompileTask = true
+              )
             val testRes = executeTask(serverNotificationsLogger, moduleId, testTask)
             if !testRes.success then allTestsSucceeded = false
           } catch case e: TaskEvaluationException => allTestsSucceeded = false
@@ -850,7 +815,7 @@ class DederBspServer(
       moduleId = Some(module.id),
       isCompileTask = true
     )
-    val isAppModule = executeTask(serverNotificationsLogger, module.id, coreTasks.finalMainClassTask).isDefined
+    val isAppModule = tryExecuteTask(serverNotificationsLogger, module.id, coreTasks.finalMainClassTask)(None).isDefined
     val tags = List(
       List(BuildTargetTag.APPLICATION).filter(_ => isAppModule),
       List(BuildTargetTag.TEST).filter(_ => isTestModule0),
@@ -926,6 +891,24 @@ class DederBspServer(
       case Right(projectStateData) =>
         f(projectStateData)
     }
+
+  private def tryExecuteTask[T](
+      serverNotificationsLogger: ServerNotificationsLogger,
+      moduleId: String,
+      task: Task[T, ?],
+      args: Seq[String] = Seq.empty
+  )(fallback: => T): T =
+    try executeTask(serverNotificationsLogger, moduleId, task, args)
+    catch case _: TaskEvaluationException => fallback
+
+  private def tryExecuteTask[T](
+      serverNotificationsLogger: ServerNotificationsLogger,
+      moduleId: String,
+      task: Task[T, ?],
+      args: Seq[String]
+  )(onError: TaskEvaluationException => Unit): Unit =
+    try executeTask(serverNotificationsLogger, moduleId, task, args)
+    catch case e: TaskEvaluationException => onError(e)
 
   private def executeTask[T](
       serverNotificationsLogger: ServerNotificationsLogger,

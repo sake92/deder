@@ -44,7 +44,13 @@ class DederProjectState(
   scheduleInactiveShutdownChecker()
 
   def readState(useLastGood: Boolean): Either[String, DederProjectStateData] =
-    stateLock.synchronized { if useLastGood then lastGood else current }
+    stateLock.synchronized {
+      if useLastGood then lastGood match {
+        case Left(_) => current // current has latest error message!
+        case Right(value) => Right(value)
+      }
+      else current
+    }
 
   private def readCurrentOrLastGood: Either[String, DederProjectStateData] =
     stateLock.synchronized { current.orElse(lastGood) }
