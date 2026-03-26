@@ -13,7 +13,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
   // and the logs go to stderr!
   test("deder should make publishArtifacts") {
     withTestProject("sample-projects/publish") { projectPath =>
-      executeDederCommand(projectPath, "exec -t publishArtifacts").out.text()
+      executeDederCommand(projectPath, "exec -m mylibrary -t publishArtifacts").out.text()
       locally {
         val publishArtifactsPath = projectPath / ".deder/out/mylibrary/publishArtifacts"
         val pomContent = os.read(publishArtifactsPath / "mylibrary_3-0.0.1-SNAPSHOT.pom")

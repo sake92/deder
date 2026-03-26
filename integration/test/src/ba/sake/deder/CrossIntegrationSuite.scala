@@ -31,7 +31,7 @@ class CrossIntegrationSuite extends BaseIntegrationSuite {
         expectedModules.foreach { moduleId =>
           assert(dederCompileResOutput.contains(moduleId), s"Expected module '$moduleId' was not compiled")
         }
-        assert(dederCompileResOutput.contains("and 7 more"), s"Expected 'and 7 more' was not compiled")
+        assert(dederCompileResOutput.contains("and 13 more"), s"Expected 'and 13 more' but got ${dederCompileResOutput}")
       }
     }
   }

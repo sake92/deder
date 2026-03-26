@@ -9,7 +9,7 @@ import org.eclipse.lsp4j.jsonrpc.Launcher
 import ba.sake.deder.BaseIntegrationSuite
 
 // Combined interface so the lsp4j proxy exposes both core and Scala-specific methods
-trait BspServerAll extends BuildServer, ScalaBuildServer
+trait BspServerAll extends BuildServer, JvmBuildServer, JavaBuildServer, ScalaBuildServer
 
 class BspIntegrationSuite extends BaseIntegrationSuite {
 
@@ -101,6 +101,19 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
       assert(sources.forall(_.startsWith("file://")), s"sources should be file URIs: $sources")
   }
 
+  test("buildTargetJavacOptions returns Java compiler options and classpath") {
+    val params = new JavacOptionsParams(List(targetId("common")).asJava)
+    val result = buildServer.buildTargetJavacOptions(params).get(30, TimeUnit.SECONDS)
+    val items = result.getItems.asScala
+    assertEquals(items.size, 1)
+    val item = items.head
+    val options = item.getOptions.asScala
+    assert(options.exists(_.contains("-Xplugin:semanticdb")), "should include semanticdb plugin")
+    val classpath = item.getClasspath.asScala
+    assert(classpath.nonEmpty, "classpath should not be empty")
+    assert(item.getClassDirectory.nonEmpty, "classDirectory should be set")
+  }
+
   test("buildTargetScalacOptions contains scala3-library and semanticdb flags") {
     val result = buildServer
       .buildTargetScalacOptions(new ScalacOptionsParams(List(targetId("common")).asJava))
@@ -187,6 +200,51 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
         .get(2, TimeUnit.MINUTES)
     }
   }
+
+  test("buildTargetDependencyModules returns Maven dependencies with artifacts") {
+    val params = new DependencyModulesParams(List(targetId("uber-test")).asJava)
+    val result = buildServer.buildTargetDependencyModules(params).get(30, TimeUnit.SECONDS)
+    val items = result.getItems.asScala
+    assertEquals(items.size, 1)
+    val item = items.head
+    val depModules = item.getModules.asScala
+    assert(depModules.map(_.getName()).contains("scala3-library_3"), "should contain scala3-library_3 dependency")
+    assert(depModules.map(_.getName()).contains("munit_3"), "should contain munit_3 dependency")
+  }
+
+  test("buildTargetResources returns resource directories for module") {
+    val params = new ResourcesParams(List(targetId("common")).asJava)
+    val result = buildServer.buildTargetResources(params).get(30, TimeUnit.SECONDS)
+    val items = result.getItems.asScala
+    assertEquals(items.size, 1)
+    val item = items.head
+    assert(item.getResources.asScala.exists(_.endsWith("bla.properties")), "should contain bla.properties resource")
+  }
+
+  test("buildTargetCleanCache cleans task cache for targets") {
+    val cleanParams = new CleanCacheParams(List(targetId("common")).asJava)
+    val result = buildServer.buildTargetCleanCache(cleanParams).get(30, TimeUnit.SECONDS)
+    assert(result.getCleaned, "cache should be cleaned for common module")
+  }
+
+  test("buildTargetInverseSources returns targets containing source file") {
+    val params = new InverseSourcesParams(new TextDocumentIdentifier(s"${baseUri}common/src/Common.scala"))
+    val result = buildServer.buildTargetInverseSources(params).get(30, TimeUnit.SECONDS)
+    val targetIds = result.getTargets.asScala.toList.map(_.getUri()).map(_.split("#").last)
+    assertEquals(targetIds, List("common"), "Common.scala should be included in common module")
+  }
+
+  test("buildTargetOutputPaths returns excluded directory paths") {
+    val params = new OutputPathsParams(List(targetId("common")).asJava)
+    val result = buildServer.buildTargetOutputPaths(params).get(30, TimeUnit.SECONDS)
+    val items = result.getItems.asScala
+    assertEquals(items.size, 1)
+    val item = items.head
+    val paths = item.getOutputPaths.asScala
+    assert(paths.exists(_.getUri.contains(".deder")), "should include .deder in excluded paths")
+    assert(paths.exists(_.getUri.contains(".metals")), "should include .metals in excluded paths")
+  }
+
 }
 
 class CapturingBuildClient extends BuildClient {
