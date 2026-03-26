@@ -1,477 +1,210 @@
 package ba.sake.deder.bsp
 
-// adapted from
-// https://github.com/build-server-protocol/build-server-protocol/blob/v2.2.0-M2/tests/src/test/scala/tests/MockClientSuite.scala
-
-import ba.sake.deder.BaseIntegrationSuite
-
-import java.nio.file.{Files, Path}
-import java.util.Collections
-import java.util.concurrent.Executors
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import java.util.concurrent.*
+import scala.compiletime.uninitialized
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.jdk.DurationConverters.*
-import scala.util.*
-import com.google.common.collect.Lists
-import ch.epfl.scala.bsp.testkit.client.TestClient
 import ch.epfl.scala.bsp4j.*
+import org.eclipse.lsp4j.jsonrpc.Launcher
+import ba.sake.deder.BaseIntegrationSuite
 
-// TODO this is incredibly fragile and flaky test
-// better to reimplement manually somehow...
+// Combined interface so the lsp4j proxy exposes both core and Scala-specific methods
+trait BspServerAll extends BuildServer, ScalaBuildServer
+
 class BspIntegrationSuite extends BaseIntegrationSuite {
 
-  test("bla") {
-    println("BSP tests are currently disabled.")
+  override def munitTimeout: Duration = 5.minutes
+
+  private var testDir: os.Path = uninitialized
+  private var bspProcess: os.SubProcess = uninitialized
+  private var buildServer: BspServerAll = uninitialized
+  private val capturingClient = CapturingBuildClient()
+
+  private def baseUri = testDir.toNIO.toUri.toString
+  private def targetId(module: String) = new BuildTargetIdentifier(s"$baseUri#$module")
+
+  override def beforeEach(context: BeforeEach): Unit = {
+    capturingClient.clear()
   }
 
-/*
-  override def munitTimeout: Duration = 2.minutes
+  override def beforeAll(): Unit = {
+    testDir = os.pwd / "tmp" / s"multi-bsp-${System.currentTimeMillis()}"
+    os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+    val lines = os.read.lines(testDir / "deder.pkl")
+    os.write.over(
+      testDir / "deder.pkl",
+      (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+    )
+    os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+    executeDederCommand(testDir, "bsp install")
+    bspProcess = os.proc(dederClientPath, "bsp").spawn(cwd = testDir)
 
-  private val testDirectory = Files.createTempDirectory("BspIntegrationSuite").toAbsolutePath
-  os.copy(
-    testResourceDir / "sample-projects/multi",
-    os.Path(testDirectory),
-    createFolders = true,
-    replaceExisting = true
-  )
-  os.write.over(
-    os.Path(testDirectory) / ".deder/server.properties",
-    s"localPath=$dederServerPath\n", // logLevel=DEBUG\n
-    createFolders = true
-  )
+    val launcher = new Launcher.Builder[BuildServer]()
+      .setInput(bspProcess.stdout)
+      .setOutput(bspProcess.stdin)
+      .setLocalService(capturingClient)
+      .setRemoteInterface(classOf[BspServerAll])
+      .create()
+    buildServer = launcher.getRemoteProxy.asInstanceOf[BspServerAll]
+    launcher.startListening()
 
-  println(testDirectory.toAbsolutePath)
-
-  private val initializeBuildParams =
-    new InitializeBuildParams(
-      "Mock-Client",
+    val initParams = new InitializeBuildParams(
+      "test-client",
       "0.0",
       "2.0",
-      testDirectory.toUri.toString,
-      new BuildClientCapabilities(Collections.singletonList("scala"))
+      testDir.toNIO.toUri.toString,
+      new BuildClientCapabilities(List("scala", "java").asJava)
     )
-
-  private val baseUri = testDirectory.toUri.toString
-  private given ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newCachedThreadPool())
-
-  private val languageIds = List("scala", "java").asJava
-
-  override def beforeAll(): Unit =
-    executeDederCommand(os.Path(testDirectory), "bsp install")
+    buildServer.buildInitialize(initParams).get(30, TimeUnit.SECONDS)
+    buildServer.onBuildInitialized()
+  }
 
   override def afterAll(): Unit = {
-    Thread.sleep(1000)
-    executeDederCommand(os.Path(testDirectory), "shutdown")
+    if buildServer != null then scala.util.Try(buildServer.buildShutdown().get(10, TimeUnit.SECONDS))
+    if bspProcess != null then bspProcess.close()
+    executeDederCommand(testDir, "shutdown")
   }
 
-  private val client = TestClient(
-    () => {
-      val bspServerProcess =
-        os.proc(dederClientPath, "bsp")
-          .spawn(cwd = os.Path(testDirectory))
-      val out: java.io.OutputStream = bspServerProcess.stdin
-      val in: java.io.InputStream = bspServerProcess.stdout
-      (out, in, () => bspServerProcess.destroy(shutdownGracePeriod = 0))
-    },
-    initializeBuildParams,
-    //10.seconds.toJava
-  )
+  test("workspaceBuildTargets returns all modules with correct structure") {
+    val result = buildServer.workspaceBuildTargets().get(30, TimeUnit.SECONDS)
+    val targets = result.getTargets.asScala
+    val ids = targets.map(_.getId.getUri).toSet
 
-  private val coursierCacheDir = coursierapi.Cache.create().getLocation.toPath
+    assert(ids.contains(s"$baseUri#common"), s"missing 'common' in $ids")
+    assert(ids.contains(s"$baseUri#frontend"), s"missing 'frontend' in $ids")
+    assert(ids.contains(s"$baseUri#backend"), s"missing 'backend' in $ids")
+    assert(ids.contains(s"$baseUri#uber"), s"missing 'uber' in $ids")
+    assert(ids.contains(s"$baseUri#uber-test"), s"missing 'uber-test' in $ids")
 
-  private def coursierCachedFile(dep: String): Path = {
-    // file:///home/sake/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar
-    val depPath = s"https/repo1.maven.org/maven2/${dep}"
-    coursierCacheDir.resolve(depPath)
+    val frontend = targets.find(_.getId.getUri.endsWith("#frontend")).get
+    assert(frontend.getCapabilities.getCanCompile, "frontend should be compilable")
+    val frontendDeps = frontend.getDependencies.asScala.map(_.getUri).toSet
+    assert(frontendDeps.contains(s"$baseUri#common"), "frontend should depend on common")
+
+    val uber = targets.find(_.getId.getUri.endsWith("#uber")).get
+    assertEquals(uber.getTags.asScala.toList, List(BuildTargetTag.APPLICATION))
+    assert(uber.getCapabilities.getCanRun, "uber should be runnable")
+
+    val uberTest = targets.find(_.getId.getUri.endsWith("#uber-test")).get
+    assertEquals(uberTest.getTags.asScala.toList, List(BuildTargetTag.APPLICATION, BuildTargetTag.TEST))
+    assert(uberTest.getCapabilities.getCanTest, "uber-test should be testable")
   }
 
-  // targets / modules
-  val commonTargetId = new BuildTargetIdentifier(s"${baseUri}#common")
-  val commonTarget = new BuildTarget(
-    commonTargetId,
-    List(BuildTargetTag.LIBRARY).asJava,
-    languageIds,
-    Collections.emptyList(), {
-      val capabilities = new BuildTargetCapabilities()
-      capabilities.setCanCompile(true)
-      capabilities.setCanRun(false)
-      capabilities.setCanTest(false)
-      capabilities.setCanDebug(false)
-      capabilities
+  test("buildTargetSources returns source directories for each module") {
+    val params = new SourcesParams(List("common", "frontend", "backend").map(targetId).asJava)
+    val result = buildServer.buildTargetSources(params).get(30, TimeUnit.SECONDS)
+    val items = result.getItems.asScala
+    assertEquals(items.size, 3)
+    for item <- items do
+      val sources = item.getSources.asScala.map(_.getUri)
+      assert(sources.nonEmpty, s"no sources for target ${item.getTarget.getUri}")
+      assert(sources.forall(_.startsWith("file://")), s"sources should be file URIs: $sources")
+  }
+
+  test("buildTargetScalacOptions contains scala3-library and semanticdb flags") {
+    val result = buildServer
+      .buildTargetScalacOptions(new ScalacOptionsParams(List(targetId("common")).asJava))
+      .get(30, TimeUnit.SECONDS)
+    val items = result.getItems.asScala
+    assertEquals(items.size, 1)
+    val item = items.head
+    val classpath = item.getClasspath.asScala
+    assert(classpath.exists(_.contains("scala3-library")), s"scala3-library not in classpath: $classpath")
+    val options = item.getOptions.asScala
+    assert(options.contains("-Xsemanticdb"), s"missing -Xsemanticdb in options: $options")
+    assert(item.getClassDirectory.nonEmpty, "classDirectory should be set")
+  }
+
+  test("buildTargetScalacOptions for module with deps includes dependency classes on classpath") {
+    val result = buildServer
+      .buildTargetScalacOptions(new ScalacOptionsParams(List(targetId("frontend")).asJava))
+      .get(30, TimeUnit.SECONDS)
+    val classpath = result.getItems.asScala.head.getClasspath.asScala
+    assert(classpath.exists(_.contains("scala3-library")), s"scala3-library missing: $classpath")
+    assert(classpath.exists(_.contains("/common/")), s"common classes not on frontend classpath: $classpath")
+  }
+
+  test("buildTargetCompile succeeds and emits task start/finish notifications") {
+    val params = new CompileParams(List(targetId("common")).asJava)
+    params.setOriginId("test-compile-common")
+    val result = buildServer.buildTargetCompile(params).get(2, TimeUnit.MINUTES)
+    assertEquals(result.getStatusCode, StatusCode.OK)
+
+    val taskFinish = capturingClient.awaitTaskFinish(predicate = _.getDataKind == TaskFinishDataKind.COMPILE_REPORT)
+    assert(taskFinish.isDefined, "expected a COMPILE_REPORT task-finish notification")
+    val report = new com.google.gson.Gson().fromJson(
+      taskFinish.get.getData.asInstanceOf[com.google.gson.JsonObject],
+      classOf[CompileReport]
+    )
+    assertEquals(report.getErrors.intValue(), 0)
+    assertEquals(report.getWarnings.intValue(), 0)
+
+    val taskStart = capturingClient.taskStarts.asScala
+      .find(_.getDataKind == TaskStartDataKind.COMPILE_TASK)
+    assert(taskStart.isDefined, "expected a COMPILE_TASK task-start notification")
+  }
+
+  test("buildTargetCompile with a type error emits error diagnostics") {
+    val badFile = testDir / "common/src/bad.scala"
+    os.write(badFile, "package common\nval notValid: Int = \"wrong type\"")
+    try {
+      val result = buildServer
+        .buildTargetCompile(new CompileParams(List(targetId("common")).asJava))
+        .get(2, TimeUnit.MINUTES)
+      assertEquals(result.getStatusCode, StatusCode.ERROR)
+
+      val diagParams = capturingClient.awaitDiagnostic(predicate = _.getDiagnostics.asScala.nonEmpty)
+      assert(diagParams.isDefined, "expected diagnostics to be published for the bad file")
+      val diag = diagParams.get.getDiagnostics.asScala.head
+      assertEquals(diag.getSeverity, DiagnosticSeverity.ERROR)
+      assert(diagParams.get.getTextDocument.getUri.contains("bad.scala"), "diagnostic should point to bad.scala")
+    } finally {
+      os.remove(badFile)
+      // restore clean state for subsequent tests
+      buildServer
+        .buildTargetCompile(new CompileParams(List(targetId("common")).asJava))
+        .get(2, TimeUnit.MINUTES)
     }
-  )
-  val frontendTargetId = new BuildTargetIdentifier(s"${baseUri}#frontend")
-  val frontendTarget = new BuildTarget(
-    frontendTargetId,
-    List(BuildTargetTag.LIBRARY).asJava,
-    languageIds,
-    Lists.newArrayList(commonTargetId), {
-      val capabilities = new BuildTargetCapabilities()
-      capabilities.setCanCompile(true)
-      capabilities.setCanRun(false)
-      capabilities.setCanTest(false)
-      capabilities.setCanDebug(false)
-      capabilities
-    }
-  )
-  val backendTargetId = new BuildTargetIdentifier(s"${baseUri}#backend")
-  val backendTarget = new BuildTarget(
-    backendTargetId,
-    List(BuildTargetTag.LIBRARY).asJava,
-    languageIds,
-    Lists.newArrayList(commonTargetId), {
-      val capabilities = new BuildTargetCapabilities()
-      capabilities.setCanCompile(true)
-      capabilities.setCanRun(false)
-      capabilities.setCanTest(false)
-      capabilities.setCanDebug(false)
-      capabilities
-    }
-  )
-  val uberTargetId = new BuildTargetIdentifier(s"${baseUri}#uber")
-  val uberTarget = new BuildTarget(
-    uberTargetId,
-    List(BuildTargetTag.APPLICATION).asJava,
-    languageIds,
-    Lists.newArrayList(frontendTargetId, backendTargetId), {
-      val capabilities = new BuildTargetCapabilities()
-      capabilities.setCanCompile(true)
-      capabilities.setCanRun(true)
-      capabilities.setCanTest(false)
-      capabilities.setCanDebug(false)
-      capabilities
-    }
-  )
-  val uberTestTargetId = new BuildTargetIdentifier(s"${baseUri}#uber-test")
-  val uberTestTarget = new BuildTarget(
-    uberTestTargetId,
-    List(BuildTargetTag.TEST).asJava,
-    languageIds,
-    Lists.newArrayList(uberTargetId), {
-      val capabilities = new BuildTargetCapabilities()
-      capabilities.setCanCompile(true)
-      capabilities.setCanRun(false)
-      capabilities.setCanTest(true)
-      capabilities.setCanDebug(false)
-      capabilities
-    }
-  )
-
-  private val allTargets = List(commonTarget, frontendTarget, backendTarget, uberTarget, uberTestTarget)
-  private val allTargetIds = allTargets.map(_.getId)
-  allTargets.foreach { t =>
-    val scalaBuildTarget =
-      new ScalaBuildTarget("org.scala-lang", "3.7.1", "3", ScalaPlatform.JVM, List.empty.asJava)
-    t.setData(scalaBuildTarget)
-    t.setDataKind(BuildTargetDataKind.SCALA)
   }
+}
 
-  test("Initialize connection followed by its shutdown") {
-    client.testInitializeAndShutdown()
-  }
+class CapturingBuildClient extends BuildClient {
+  val taskStarts = new ConcurrentLinkedQueue[TaskStartParams]()
+  val taskFinishes = new ConcurrentLinkedQueue[TaskFinishParams]()
+  val diagnostics = new ConcurrentLinkedQueue[PublishDiagnosticsParams]()
 
-  test("Workspace Build Targets") {
-    val targets = allTargets.asJava
-    val workspaceBuildTargetsResult = new WorkspaceBuildTargetsResult(targets)
-    client.testCompareWorkspaceTargetsResults(workspaceBuildTargetsResult)
-  }
+  def clear(): Unit =
+    taskStarts.clear()
+    taskFinishes.clear()
+    diagnostics.clear()
 
-  test("Initial imports") {
-    client.testResolveProject()
-  }
+  def awaitTaskFinish(
+      timeout: FiniteDuration = 15.seconds,
+      predicate: TaskFinishParams => Boolean = _ => true
+  ): Option[TaskFinishParams] =
+    pollUntil(timeout)(taskFinishes.asScala.find(predicate))
 
-  test("Test server capabilities") {
-    client.testTargetCapabilities()
-  }
+  def awaitDiagnostic(
+      timeout: FiniteDuration = 15.seconds,
+      predicate: PublishDiagnosticsParams => Boolean = _ => true
+  ): Option[PublishDiagnosticsParams] =
+    pollUntil(timeout)(diagnostics.asScala.find(predicate))
 
-  test("Running batch tests") {
-    client.wrapTest(session => {
-      client
-        .testResolveProject(session, false, false)
-        .map(_ => client.targetsCompileSuccessfully(session))
-        .flatMap(_ => client.cleanCacheSuccessfully(session))
-    })
-  }
+  private def pollUntil[T](timeout: FiniteDuration)(check: => Option[T]): Option[T] =
+    val deadline = System.currentTimeMillis() + timeout.toMillis
+    while System.currentTimeMillis() < deadline do
+      check match
+        case s @ Some(_) => return s
+        case None        => Thread.sleep(50)
+    None
 
-  test("Test Compile of all targets") {
-    client.testTargetsCompileSuccessfully(true)
-  }
-
-  test("Clean cache") {
-    client.testCleanCacheSuccessfully()
-  }
-
-  test("Run Targets") {
-    client.testTargetsRunSuccessfully(
-      Lists.newArrayList(uberTarget)
-    )
-  }
-
-  test("Run Tests") {
-    client.testTargetsTestSuccessfully(
-      Lists.newArrayList(uberTestTarget)
-    )
-  }
-
-  test("Run javacOptions") {
-    def classDirectory(moduleId: String) =
-      testDirectory.resolve(s".deder/out/${moduleId}/classes").toUri.toString
-    def semanticdbDirectory(moduleId: String) =
-      testDirectory.resolve(s".deder/out/${moduleId}/semanticdb").toString
-    def javacOptions(moduleId: String) = List(
-      "-processorpath",
-      coursierCachedFile("com/sourcegraph/semanticdb-javac/0.11.1/semanticdb-javac-0.11.1.jar").toString,
-      s"-Xplugin:semanticdb -sourceroot:${testDirectory} -targetroot:${semanticdbDirectory(moduleId)} -build-tool:sbt"
-    ).asJava
-    val javacOptionsItems = List(
-      new JavacOptionsItem(
-        commonTargetId,
-        javacOptions("common"),
-        List(
-          classDirectory("common"),
-          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
-          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
-        ).asJava,
-        classDirectory("common")
-      ),
-      new JavacOptionsItem(
-        frontendTargetId,
-        javacOptions("frontend"),
-        List(
-          classDirectory("frontend"),
-          classDirectory("common"),
-          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
-          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
-        ).asJava,
-        classDirectory("frontend")
-      ),
-      new JavacOptionsItem(
-        backendTargetId,
-        javacOptions("backend"),
-        List(
-          classDirectory("backend"),
-          classDirectory("common"),
-          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
-          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
-        ).asJava,
-        classDirectory("backend")
-      ),
-      new JavacOptionsItem(
-        uberTargetId,
-        javacOptions("uber"),
-        List(
-          classDirectory("uber"),
-          classDirectory("backend"),
-          classDirectory("frontend"),
-          classDirectory("common"),
-          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
-          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
-        ).asJava,
-        classDirectory("uber")
-      ),
-      new JavacOptionsItem(
-        uberTestTargetId,
-        javacOptions("uber-test"),
-        List(
-          classDirectory("uber-test"),
-          classDirectory("uber"),
-          classDirectory("backend"),
-          classDirectory("frontend"),
-          classDirectory("common"),
-          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
-          coursierCachedFile("org/scalameta/munit_3/1.2.1/munit_3-1.2.1.jar").toUri.toString,
-          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString,
-          coursierCachedFile("org/scalameta/junit-interface/1.2.1/junit-interface-1.2.1.jar").toUri.toString,
-          coursierCachedFile("org/scalameta/munit-diff_3/1.2.1/munit-diff_3-1.2.1.jar").toUri.toString,
-          coursierCachedFile("junit/junit/4.13.2/junit-4.13.2.jar").toUri.toString,
-          coursierCachedFile("org/scala-sbt/test-interface/1.0/test-interface-1.0.jar").toUri.toString,
-          coursierCachedFile("org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar").toUri.toString
-        ).asJava,
-        classDirectory("uber-test")
-      )
-    ).asJava
-    client.testJavacOptions(
-      new JavacOptionsParams(allTargetIds.asJava),
-      new JavacOptionsResult(javacOptionsItems)
-    )
-  }
-
-  test("Run scalacOptions") {
-    def classDirectory(moduleId: String) =
-      testDirectory.resolve(s".deder/out/${moduleId}/classes").toUri.toString
-    def semanticdbDirectory(moduleId: String) =
-      testDirectory.resolve(s".deder/out/${moduleId}/semanticdb").toString
-    def scalacOptions(moduleId: String) = List(
-      "-Xsemanticdb",
-      "-sourceroot",
-      testDirectory.toString,
-      "-semanticdb-target",
-      semanticdbDirectory(moduleId)
-    ).asJava
-
-    val scalacOptionsItems = List(
-      new ScalacOptionsItem(
-        commonTargetId,
-        scalacOptions("common"),
-        List(
-          classDirectory("common"),
-          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
-          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
-        ).asJava,
-        classDirectory("common")
-      ),
-      new ScalacOptionsItem(
-        frontendTargetId,
-        scalacOptions("frontend"),
-        List(
-          classDirectory("frontend"),
-          classDirectory("common"),
-          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
-          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
-        ).asJava,
-        classDirectory("frontend")
-      ),
-      new ScalacOptionsItem(
-        backendTargetId,
-        scalacOptions("backend"),
-        List(
-          classDirectory("backend"),
-          classDirectory("common"),
-          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
-          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
-        ).asJava,
-        classDirectory("backend")
-      ),
-      new ScalacOptionsItem(
-        uberTargetId,
-        scalacOptions("uber"),
-        List(
-          classDirectory("uber"),
-          classDirectory("backend"),
-          classDirectory("frontend"),
-          classDirectory("common"),
-          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
-          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString
-        ).asJava,
-        classDirectory("uber")
-      ),
-      new ScalacOptionsItem(
-        uberTestTargetId,
-        scalacOptions("uber-test"),
-        List(
-          classDirectory("uber-test"),
-          classDirectory("uber"),
-          classDirectory("backend"),
-          classDirectory("frontend"),
-          classDirectory("common"),
-          coursierCachedFile("org/scala-lang/scala3-library_3/3.7.1/scala3-library_3-3.7.1.jar").toUri.toString,
-          coursierCachedFile("org/scalameta/munit_3/1.2.1/munit_3-1.2.1.jar").toUri.toString,
-          coursierCachedFile("org/scala-lang/scala-library/2.13.16/scala-library-2.13.16.jar").toUri.toString,
-          coursierCachedFile("org/scalameta/junit-interface/1.2.1/junit-interface-1.2.1.jar").toUri.toString,
-          coursierCachedFile("org/scalameta/munit-diff_3/1.2.1/munit-diff_3-1.2.1.jar").toUri.toString,
-          coursierCachedFile("junit/junit/4.13.2/junit-4.13.2.jar").toUri.toString,
-          coursierCachedFile("org/scala-sbt/test-interface/1.0/test-interface-1.0.jar").toUri.toString,
-          coursierCachedFile("org/hamcrest/hamcrest-core/1.3/hamcrest-core-1.3.jar").toUri.toString
-        ).asJava,
-        classDirectory("uber-test")
-      )
-    ).asJava
-    client.testScalacOptions(
-      new ScalacOptionsParams(allTargetIds.asJava),
-      new ScalacOptionsResult(scalacOptionsItems)
-    )
-  }
-
-  test("Run Scala Main Classes") {
-    val classes1 = List(
-      new ScalaMainClass("uber.Main", List().asJava, List().asJava)
-    ).asJava
-    val mainClassesItems = List(
-      new ScalaMainClassesItem(uberTargetId, classes1)
-    ).asJava
-    val result = new ScalaMainClassesResult(mainClassesItems)
-    client.testScalaMainClasses(
-      new ScalaMainClassesParams(Lists.newArrayList(uberTargetId)),
-      result
-    )
-  }
-
-  test("Scala Main Classes with less items should fail") {
-    val classes1 = List(
-      new ScalaMainClass("uber.Main", List().asJava, List().asJava)
-    ).asJava
-    val mainClassesItems = List(
-      new ScalaMainClassesItem(uberTargetId, classes1)
-    ).asJava
-    val result = new ScalaMainClassesResult(mainClassesItems)
-    Try(
-      client.testScalaMainClasses(
-        new ScalaMainClassesParams(Collections.emptyList()),
-        result
-      )
-    ) match {
-      case Failure(_) => assert(true)
-      case Success(_) => fail("Test Classes should expect all item classes to be defined!")
-    }
-  }*/
-/*
-  test("Run Scala Test Classes") {
-    val classes1 = List("uber.MyTest").asJava
-    val item1 = new ScalaTestClassesItem(uberTestTargetId, classes1)
-    item1.setFramework("munit")
-    val testClassesItems = List(item1).asJava
-    val result = new ScalaTestClassesResult(testClassesItems)
-    client.testScalaTestClasses(
-      new ScalaTestClassesParams(Lists.newArrayList(uberTestTargetId)),
-      result
-    )
-  }*/
-/*
-  test("Scala Test Classes with less items should fail") {
-    val classes1 = List("uber.MyTest").asJava
-    val testClassesItems = List(new ScalaTestClassesItem(uberTestTargetId, classes1)).asJava
-    val result = new ScalaTestClassesResult(testClassesItems)
-    Try(
-      client.testScalaTestClasses(
-        new ScalaTestClassesParams(Collections.emptyList()),
-        result
-      )
-    ) match {
-      case Failure(_) => assert(true)
-      case Success(_) => fail("Test Classes should expect all item classes to be defined!")
-    }
-  }*/
-
-  /*
-  test("Jvm Run Environment") {
-    client.testJvmRunEnvironment(
-      new JvmRunEnvironmentParams(Collections.emptyList()),
-      new JvmRunEnvironmentResult(environmentItem(testing = false))
-    )
-  }
-
-  test("Jvm Test Environment") {
-    client.testJvmTestEnvironment(
-      new JvmTestEnvironmentParams(Collections.emptyList()),
-      new JvmTestEnvironmentResult(environmentItem(testing = true))
-    )
-  }
-
-  private def environmentItem(testing: Boolean) = {
-    val classpath = List("scala-library.jar").asJava
-    val jvmOptions = List("-Xms256m").asJava
-    val environmentVariables = Map("A" -> "a", "TESTING" -> testing.toString).asJava
-    val workdir = "/tmp"
-    val item1 = new JvmEnvironmentItem(
-      commonTargetId,
-      classpath,
-      jvmOptions,
-      workdir,
-      environmentVariables
-    )
-    val mainClass = new JvmMainClass("MainClass.java", List.empty[String].asJava)
-    item1.setMainClasses(List(mainClass).asJava)
-    List(item1).asJava
-  }*/
+  override def onBuildTaskStart(p: TaskStartParams): Unit = taskStarts.add(p)
+  override def onBuildTaskFinish(p: TaskFinishParams): Unit = taskFinishes.add(p)
+  override def onBuildPublishDiagnostics(p: PublishDiagnosticsParams): Unit = diagnostics.add(p)
+  override def onBuildShowMessage(p: ShowMessageParams): Unit = ()
+  override def onBuildLogMessage(p: LogMessageParams): Unit = ()
+  override def onBuildTargetDidChange(p: DidChangeBuildTarget): Unit = ()
+  override def onBuildTaskProgress(p: TaskProgressParams): Unit = ()
+  override def onRunPrintStdout(p: PrintParams): Unit = ()
+  override def onRunPrintStderr(p: PrintParams): Unit = ()
 }

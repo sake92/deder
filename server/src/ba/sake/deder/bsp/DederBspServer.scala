@@ -207,10 +207,14 @@ class DederBspServer(
       projectState.reloadProject()
       val buildTargets = projectState.readState(useLastGood = true) match {
         case Left(errorMessage) =>
-          client.onBuildShowMessage(new ShowMessageParams(MessageType.ERROR, s"Failed to load project state: ${errorMessage}"))
+          client.onBuildShowMessage(
+            new ShowMessageParams(MessageType.ERROR, s"Failed to load project state: ${errorMessage}")
+          )
           List.empty
         case Right(projectStateData) =>
-          projectStateData.projectConfig.modules.asScala.map(m => buildTarget(m, projectStateData)).toList
+          projectStateData.projectConfig.modules.asScala.sortBy(_.id)
+            .map(m => buildTarget(m, projectStateData))
+            .toList
       }
       val result = new WorkspaceBuildTargetsResult(buildTargets.asJava)
       logger.debug(s"workspaceBuildTargets return: ${result}")
