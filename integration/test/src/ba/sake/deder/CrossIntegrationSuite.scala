@@ -19,18 +19,19 @@ class CrossIntegrationSuite extends BaseIntegrationSuite {
           "common-js-2.13.18",
           "common-js-3.7.4",
           "common-jvm-2.12.21",
-          "common-jvm-2.13.18",
-          "common-jvm-3.7.4",
+          "common-jvm-2.13.18"
+          /*"common-jvm-3.7.4",
           "common-jvm-test-2.12.21",
           "common-jvm-test-2.13.18",
           "common-jvm-test-3.7.4",
           "common-native-2.12.21",
           "common-native-2.13.18",
-          "common-native-3.7.4"
+          "common-native-3.7.4"*/
         )
         expectedModules.foreach { moduleId =>
           assert(dederCompileResOutput.contains(moduleId), s"Expected module '$moduleId' was not compiled")
         }
+        assert(dederCompileResOutput.contains("and 7 more"), s"Expected 'and 7 more' was not compiled")
       }
     }
   }

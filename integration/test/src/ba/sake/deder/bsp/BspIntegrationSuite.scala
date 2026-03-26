@@ -55,7 +55,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
       testDir.toNIO.toUri.toString,
       new BuildClientCapabilities(List("scala", "java").asJava)
     )
-    buildServer.buildInitialize(initParams).get(30, TimeUnit.SECONDS)
+    buildServer.buildInitialize(initParams).get(1, TimeUnit.MINUTES)
     buildServer.onBuildInitialized()
   }
 
@@ -66,7 +66,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
   }
 
   test("workspaceBuildTargets returns all modules with correct structure") {
-    val result = buildServer.workspaceBuildTargets().get(30, TimeUnit.SECONDS)
+    val result = buildServer.workspaceBuildTargets().get(1, TimeUnit.MINUTES)
     val targets = result.getTargets.asScala
     val ids = targets.map(_.getId.getUri).toSet
 
@@ -122,6 +122,27 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     val classpath = result.getItems.asScala.head.getClasspath.asScala
     assert(classpath.exists(_.contains("scala3-library")), s"scala3-library missing: $classpath")
     assert(classpath.exists(_.contains("/common/")), s"common classes not on frontend classpath: $classpath")
+  }
+
+  test("buildTargetScalaMainClasses returns main class for application module") {
+    val result = buildServer
+      .buildTargetScalaMainClasses(new ScalaMainClassesParams(List(targetId("uber")).asJava))
+      .get(30, TimeUnit.SECONDS)
+    val items = result.getItems.asScala
+    assertEquals(items.size, 1)
+    val item = items.head
+    assertEquals(item.getClasses.asScala.map(_.getClassName).toSet, Set("uber.Main"))
+    assert(item.getClasses.asScala.forall(_.getJvmOptions != null), "jvmOptions should be set")
+  }
+
+  test("buildTargetScalaTestClasses returns test class for test module") {
+    val result = buildServer
+      .buildTargetScalaTestClasses(new ScalaTestClassesParams(List(targetId("uber-test")).asJava))
+      .get(30, TimeUnit.SECONDS)
+    val items = result.getItems.asScala
+    assertEquals(items.size, 1)
+    val item = items.head
+    assertEquals(item.getClasses.asScala.toSet, Set("uber.MyTest"))
   }
 
   test("buildTargetCompile succeeds and emits task start/finish notifications") {

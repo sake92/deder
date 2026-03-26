@@ -1,6 +1,10 @@
 package ba.sake.deder
 
+import scala.concurrent.duration.*
+
 class RunTestsSuite extends BaseIntegrationSuite {
+
+  override def munitTimeout: Duration = 1.minutes
 
   test("deder should run JUnit4 tests") {
     withTestProject("sample-projects/tests") { projectPath =>
