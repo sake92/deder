@@ -133,6 +133,8 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             |  plan [options]          Show execution plan for a task
             |  exec [options]          Execute a task
             |  clean [options]         Clean modules
+            |  bsp install             Generate BSP configuration for this project
+            |  bsp                     Start BSP server for this project
             |  import [options]        Import from other build tool
             |  complete [options]      Generate shell completion script
             |  shutdown                Shutdown the server
@@ -140,7 +142,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             |Use help -c <command> for more details about each command.
             |""".stripMargin
 
-        mainargs.Parser[DederCliHelpOptions].constructEither(m.args) match {
+        mainargs.Parser[DederCliHelpOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
           case Left(_) =>
             serverMessages.put(CliServerMessage.Output(defaultHelpText))
           case Right(cliOptions) =>
@@ -186,7 +188,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         serverMessages.put(CliServerMessage.Output(s"Server version: ${DederGlobals.version}"))
         serverMessages.put(CliServerMessage.Exit(0))
       case m: CliClientMessage.Modules =>
-        mainargs.Parser[DederCliModulesOptions].constructEither(m.args) match {
+        mainargs.Parser[DederCliModulesOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
           case Left(error) =>
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
@@ -214,7 +216,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             }
         }
       case m: CliClientMessage.Tasks =>
-        mainargs.Parser[DederCliTasksOptions].constructEither(m.args) match {
+        mainargs.Parser[DederCliTasksOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
           case Left(error) =>
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
@@ -260,7 +262,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
       case m: CliClientMessage.Plan =>
         // TODO handle errors better, when task not found etc
-        mainargs.Parser[DederCliPlanOptions].constructEither(m.args) match {
+        mainargs.Parser[DederCliPlanOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
           case Left(error) =>
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
@@ -296,7 +298,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             }
         }
       case m: CliClientMessage.Exec =>
-        mainargs.Parser[DederCliExecOptions].constructEither(m.args) match {
+        mainargs.Parser[DederCliExecOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
           case Left(error) =>
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
@@ -325,7 +327,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         projectState.cancelRequest(m.requestId)
         serverMessages.put(CliServerMessage.Exit(130))
       case m: CliClientMessage.Clean =>
-        mainargs.Parser[DederCliCleanOptions].constructEither(m.args) match {
+        mainargs.Parser[DederCliCleanOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
           case Left(error) =>
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
@@ -343,7 +345,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             }
         }
       case m: CliClientMessage.Import =>
-        mainargs.Parser[DederCliImportOptions].constructEither(m.args) match {
+        mainargs.Parser[DederCliImportOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
           case Left(error) =>
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
@@ -358,7 +360,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             serverMessages.put(CliServerMessage.Exit(exitCode))
         }
       case m: CliClientMessage.Complete =>
-        mainargs.Parser[DederCliCompleteOptions].constructEither(m.args) match {
+        mainargs.Parser[DederCliCompleteOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
           case Left(error) =>
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
