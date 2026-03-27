@@ -2,15 +2,15 @@ amends "../../config/DederProject.pkl"
 // use this in prod:
 //amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
-local const mylibrary = new ScalaModule {
+local const lib1 = new ScalaModule {
   scalaVersion = "3.7.1"
-  id = "mylibrary"
+  id = "lib1"
   deps {
     "ba.sake::sharaf-undertow:0.13.0"
   }
   pomSettings {
     groupId = "com.example"
-    artifactId = "deder-example-library"
+    artifactId = "lib1"
     version = "0.0.1-SNAPSHOT"
     name = "Deder Publish Example"
     description = "Deder example library"
@@ -34,6 +34,24 @@ local const mylibrary = new ScalaModule {
   }
 }
 
+local const lib2 = (lib1) {
+  id = "lib2"
+  moduleDeps { lib1 }
+  pomSettings {
+    artifactId = "lib2"
+  }
+}
+
+local const lib3 = (lib1) {
+  id = "lib3"
+  moduleDeps { lib2 }
+  pomSettings {
+    artifactId = "lib3"
+  }
+}
+
 modules {
-  mylibrary
+  lib1
+  lib2
+  lib3
 }

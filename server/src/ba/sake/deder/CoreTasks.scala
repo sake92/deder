@@ -1042,15 +1042,14 @@ class CoreTasks() extends StrictLogging {
     }
 
   val moduleDepsPomSettingsTask = TaskBuilder
-    .make[Seq[PomSettings]](
+    .make[Seq[Seq[PomSettings]]](
       name = "moduleDepsPomSettings",
       transitive = true
     )
     .dependsOn(pomSettingsTask)
     .build { ctx =>
       val pom: Option[PomSettings] = ctx.depResults._1
-      // just the first level, direct module dependencies
-      pom.toSeq ++ ctx.transitiveResults.headOption.getOrElse(Seq.empty).flatten
+      Seq(pom.toSeq) ++ ctx.transitiveResults.flatten.flatten
     }
 
   val sourcesJarTask = TaskBuilder
@@ -1192,8 +1191,7 @@ class CoreTasks() extends StrictLogging {
         jar,
         sourcesJarOpt,
         javadocJarOpt
-      ) =
-        ctx.depResults
+      ) = ctx.depResults
       pomOpt.zip(sourcesJarOpt).zip(javadocJarOpt).map { case ((pom, sourcesJar), javadocJar) =>
         val artifactBaseName = s"${pom.artifactId}-${pom.version}"
         os.remove.all(ctx.out)
@@ -1205,6 +1203,9 @@ class CoreTasks() extends StrictLogging {
           case jm: JavaModule => jm.pomSettings
         }
         val allDependencies = mandatoryDependencies ++ dependencies
+        // drop this module's pom settings
+        // then take just the first level, direct module dependencies
+        val moduleDepsPomSettingsClean = moduleDepsPomSettings.take(2).drop(1).flatten
         val pomXmlContent =
           PomGenerator.generate(
             pom.groupId,
@@ -1212,7 +1213,7 @@ class CoreTasks() extends StrictLogging {
             pom.version,
             allDependencies,
             pomSettings,
-            moduleDepsPomSettings.tail
+            moduleDepsPomSettingsClean
           )
         val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
         os.write.over(pomXmlPath, pomXmlContent)
@@ -1241,7 +1242,8 @@ class CoreTasks() extends StrictLogging {
               publisher.publishLocalM2(pom, allFiles)
             } else {
               ctx.notifications.add(
-                ServerNotification.logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled", ctx.module.id)
+                ServerNotification
+                  .logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled", ctx.module.id)
               )
             }
           case _ =>

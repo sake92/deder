@@ -1,32 +1,42 @@
 amends "../../../../../config/DederProject.pkl"
 
-local const mylibrary = new ScalaModule {
+local const lib1 = new ScalaModule {
   scalaVersion = "3.7.1"
-  id = "mylibrary"
+  id = "lib1"
   deps {
     "com.lihaoyi::os-lib:0.11.6"
   }
-  pomSettings = makePomSettings("mylibrary")
+  pomSettings = makePomSettings("lib1")
   manifest {
     mainAttributes {
       ["Implementation-Version"] = "0.0.1-SNAPSHOT"
-      ["Implementation-Title"] = "mylibrary"
+      ["Implementation-Title"] = "lib1"
     }
   }
 }
 
-local const myapp = new ScalaModule {
+local const lib2 = new ScalaModule {
   scalaVersion = "3.7.1"
-  id = "myapp"
+  id = "lib2"
   moduleDeps {
-    mylibrary
+    lib1
   }
-  pomSettings = makePomSettings("myapp")
+  pomSettings = makePomSettings("lib2")
+}
+
+local const lib3 = new ScalaModule {
+  scalaVersion = "3.7.1"
+  id = "lib3"
+  moduleDeps {
+    lib2
+  }
+  pomSettings = makePomSettings("lib3")
 }
 
 modules {
-  mylibrary
-  myapp
+  lib1
+  lib2
+  lib3
 }
 
 local const function makePomSettings(_artifactId: String): PomSettings = new {
