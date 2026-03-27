@@ -1,4 +1,5 @@
 ---
+layout: tutorial.html
 title: Scala.js Tutorial
 description: Deder Scala.js Tutorial
 ---

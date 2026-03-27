@@ -1,4 +1,5 @@
 ---
+layout: philosophy.html
 title: Deder Design
 ---
 

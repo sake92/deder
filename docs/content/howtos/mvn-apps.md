@@ -1,4 +1,5 @@
 ---
+layout: howto.html
 title: Invoking Maven applications
 ---
 

@@ -1,4 +1,5 @@
 ---
+layout: howto.html
 title: OTEL tracing/logging/metrics
 ---
 

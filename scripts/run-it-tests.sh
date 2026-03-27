@@ -1,4 +1,6 @@
 
+rm -rf ./tmp
+
 ./scripts/gen-config-bindings.sh
 
 ./mill -i server.assembly

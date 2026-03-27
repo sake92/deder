@@ -1,4 +1,5 @@
 ---
+layout: reference.html
 title: Files layout
 ---
 

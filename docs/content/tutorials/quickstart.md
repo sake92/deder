@@ -1,4 +1,5 @@
 ---
+layout: tutorial.html
 title: Quickstart Guide
 description: Deder Quickstart Guide
 ---

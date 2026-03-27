@@ -1,4 +1,5 @@
 ---
+layout: tutorial.html
 title: Cross Project Tutorial
 description: Deder Cross Project Tutorial
 ---

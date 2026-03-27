@@ -1,4 +1,5 @@
 ---
+layout: tutorial.html
 title: Publishing Tutorial
 description: Deder Publishing Tutorial
 ---

@@ -1,4 +1,5 @@
 ---
+layout: tutorial.html
 title: Scala Native Tutorial
 description: Deder Scala Native Tutorial
 ---

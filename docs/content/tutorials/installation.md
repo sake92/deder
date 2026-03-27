@@ -1,4 +1,5 @@
 ---
+layout: tutorial.html
 title: Installation
 description: Deder Installation
 ---
