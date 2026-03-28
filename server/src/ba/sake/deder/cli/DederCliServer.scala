@@ -193,80 +193,84 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
           serverMessages.put(CliServerMessage.Exit(0))
         else
           mainargs.Parser[DederCliModulesOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-          case Left(error) =>
-            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-            serverMessages.put(CliServerMessage.Exit(1))
-          case Right(cliOptions) =>
-            projectState.readState(useLastGood = false) match {
-              case Left(error) =>
-                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-                serverMessages.put(CliServerMessage.Exit(1))
-              case Right(state) =>
-                if cliOptions.json.value then {
-                  val allModules = state.tasksResolver.allModules.sortBy(_.id)
-                  serverMessages.put(CliServerMessage.Output(allModules.map(_.id).toJson))
-                } else if cliOptions.dot.value then {
-                  val dot =
-                    GraphUtils.generateDOT(state.tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id))
-                  serverMessages.put(CliServerMessage.Output(dot))
-                } else if cliOptions.ascii.value then {
-                  val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.modulesGraph, v => v.id)
-                  serverMessages.put(CliServerMessage.Output(asciiGraph))
-                } else {
-                  val allModules = state.tasksResolver.allModules.sortBy(_.id)
-                  serverMessages.put(CliServerMessage.Output(allModules.map(_.id).mkString("\n")))
-                }
-                serverMessages.put(CliServerMessage.Exit(0))
-            }
-        }
+            case Left(error) =>
+              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+              serverMessages.put(CliServerMessage.Exit(1))
+            case Right(cliOptions) =>
+              projectState.readState(useLastGood = false) match {
+                case Left(error) =>
+                  serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                  serverMessages.put(CliServerMessage.Exit(1))
+                case Right(state) =>
+                  if cliOptions.json.value then {
+                    val allModules = state.tasksResolver.allModules.sortBy(_.id)
+                    serverMessages.put(CliServerMessage.Output(allModules.map(_.id).toJson))
+                  } else if cliOptions.dot.value then {
+                    val dot =
+                      GraphUtils.generateDOT(state.tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id))
+                    serverMessages.put(CliServerMessage.Output(dot))
+                  } else if cliOptions.ascii.value then {
+                    val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.modulesGraph, v => v.id)
+                    serverMessages.put(CliServerMessage.Output(asciiGraph))
+                  } else {
+                    val allModules = state.tasksResolver.allModules.sortBy(_.id)
+                    serverMessages.put(CliServerMessage.Output(allModules.map(_.id).mkString("\n")))
+                  }
+                  serverMessages.put(CliServerMessage.Exit(0))
+              }
+          }
       case m: CliClientMessage.Tasks =>
         if m.args == Seq("--help") || m.args == Seq("-h") then
           serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliTasksOptions].helpText()))
           serverMessages.put(CliServerMessage.Exit(0))
         else
           mainargs.Parser[DederCliTasksOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-          case Left(error) =>
-            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-            serverMessages.put(CliServerMessage.Exit(1))
-          case Right(cliOptions) =>
-            projectState.readState(useLastGood = true) match {
-              case Left(error) =>
-                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-                serverMessages.put(CliServerMessage.Exit(1))
-              case Right(state) =>
-                if cliOptions.json.value then {
-                  val taskNamesPerModule = state.tasksResolver.taskInstancesPerModule.map { case (moduleId, tasks) =>
-                    moduleId -> tasks.map(_.task.name)
+            case Left(error) =>
+              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+              serverMessages.put(CliServerMessage.Exit(1))
+            case Right(cliOptions) =>
+              projectState.readState(useLastGood = true) match {
+                case Left(error) =>
+                  serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                  serverMessages.put(CliServerMessage.Exit(1))
+                case Right(state) =>
+                  if cliOptions.json.value then {
+                    val taskNamesPerModule = state.tasksResolver.taskInstancesPerModule.map { case (moduleId, tasks) =>
+                      moduleId -> tasks.map(_.task.name)
+                    }
+                    serverMessages.put(CliServerMessage.Output(taskNamesPerModule.toJson))
+                    serverMessages.put(CliServerMessage.Exit(0))
+                  } else if cliOptions.dot.value then {
+                    val dot =
+                      GraphUtils.generateDOT(
+                        state.tasksResolver.taskInstancesGraph,
+                        v => v.id,
+                        v => Map("label" -> v.id)
+                      )
+                    serverMessages.put(CliServerMessage.Output(dot))
+                    serverMessages.put(CliServerMessage.Exit(0))
+                  } else if cliOptions.ascii.value then {
+                    val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.taskInstancesGraph, v => v.id)
+                    serverMessages.put(CliServerMessage.Output(asciiGraph))
+                    serverMessages.put(CliServerMessage.Exit(0))
+                  } else {
+                    val modules = cliOptions.module match {
+                      case Some(moduleId) =>
+                        state.tasksResolver.allModules.filter(_.id == moduleId)
+                      case None =>
+                        state.tasksResolver.allModules
+                    }
+                    val sortedModules = modules.sortBy(_.id)
+                    val modulesWithTasks = sortedModules.map { module =>
+                      val moduleTaskNames =
+                        state.tasksResolver.taskInstancesPerModule(module.id).map(t => s"  ${t.task.name}")
+                      s"${module.id}:\n${moduleTaskNames.mkString("\n")}"
+                    }
+                    serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
+                    serverMessages.put(CliServerMessage.Exit(0))
                   }
-                  serverMessages.put(CliServerMessage.Output(taskNamesPerModule.toJson))
-                  serverMessages.put(CliServerMessage.Exit(0))
-                } else if cliOptions.dot.value then {
-                  val dot =
-                    GraphUtils.generateDOT(state.tasksResolver.taskInstancesGraph, v => v.id, v => Map("label" -> v.id))
-                  serverMessages.put(CliServerMessage.Output(dot))
-                  serverMessages.put(CliServerMessage.Exit(0))
-                } else if cliOptions.ascii.value then {
-                  val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.taskInstancesGraph, v => v.id)
-                  serverMessages.put(CliServerMessage.Output(asciiGraph))
-                  serverMessages.put(CliServerMessage.Exit(0))
-                } else {
-                  val modules = cliOptions.module match {
-                    case Some(moduleId) =>
-                      state.tasksResolver.allModules.filter(_.id == moduleId)
-                    case None =>
-                      state.tasksResolver.allModules
-                  }
-                  val sortedModules = modules.sortBy(_.id)
-                  val modulesWithTasks = sortedModules.map { module =>
-                    val moduleTaskNames =
-                      state.tasksResolver.taskInstancesPerModule(module.id).map(t => s"  ${t.task.name}")
-                    s"${module.id}:\n${moduleTaskNames.mkString("\n")}"
-                  }
-                  serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
-                  serverMessages.put(CliServerMessage.Exit(0))
-                }
-            }
-        }
+              }
+          }
 
       case m: CliClientMessage.Plan =>
         if m.args == Seq("--help") || m.args == Seq("-h") then
@@ -274,70 +278,71 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
           serverMessages.put(CliServerMessage.Exit(0))
         else
           mainargs.Parser[DederCliPlanOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-          case Left(error) =>
-            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-            serverMessages.put(CliServerMessage.Exit(1))
-          case Right(cliOptions) =>
-            projectState.readState(useLastGood = true) match {
-              case Left(error) =>
-                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-                serverMessages.put(CliServerMessage.Exit(1))
-              case Right(state) =>
-                val selectedModuleIds =
-                  if cliOptions.modules.isEmpty then state.tasksResolver.allModules.map(_.id)
-                  else cliOptions.modules
-                val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(selectedModuleIds, cliOptions.task)
-                if cliOptions.json.value then {
-                  val tasksExecStages = state.executionPlanner.getExecStages(selectedModuleIds, cliOptions.task)
-                  serverMessages.put(CliServerMessage.Output(tasksExecStages.map(_.map(_.id)).toJson))
-                } else if cliOptions.dot.value then {
-                  val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
-                  serverMessages.put(CliServerMessage.Output(dot))
-                } else if cliOptions.ascii.value then {
-                  val asciiGraph = GraphUtils.generateAscii(tasksExecSubgraph, v => v.id)
-                  serverMessages.put(CliServerMessage.Output(asciiGraph))
-                } else {
-                  val tasksExecStages = state.executionPlanner.getExecStages(selectedModuleIds, cliOptions.task)
-                  val stagesStr = tasksExecStages.zipWithIndex
-                    .map { case (stage, idx) =>
-                      s"Stage #${idx}:\n" + stage.map(ti => s"  ${ti.id}").mkString("\n")
-                    }
-                    .mkString("\n")
-                  serverMessages.put(CliServerMessage.Output(stagesStr))
-                }
-                serverMessages.put(CliServerMessage.Exit(0))
-            }
-        }
+            case Left(error) =>
+              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+              serverMessages.put(CliServerMessage.Exit(1))
+            case Right(cliOptions) =>
+              projectState.readState(useLastGood = true) match {
+                case Left(error) =>
+                  serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                  serverMessages.put(CliServerMessage.Exit(1))
+                case Right(state) =>
+                  val selectedModuleIds =
+                    if cliOptions.modules.isEmpty then state.tasksResolver.allModules.map(_.id)
+                    else cliOptions.modules
+                  val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(selectedModuleIds, cliOptions.task)
+                  if cliOptions.json.value then {
+                    val tasksExecStages = state.executionPlanner.getExecStages(selectedModuleIds, cliOptions.task)
+                    serverMessages.put(CliServerMessage.Output(tasksExecStages.map(_.map(_.id)).toJson))
+                  } else if cliOptions.dot.value then {
+                    val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
+                    serverMessages.put(CliServerMessage.Output(dot))
+                  } else if cliOptions.ascii.value then {
+                    val asciiGraph = GraphUtils.generateAscii(tasksExecSubgraph, v => v.id)
+                    serverMessages.put(CliServerMessage.Output(asciiGraph))
+                  } else {
+                    val tasksExecStages = state.executionPlanner.getExecStages(selectedModuleIds, cliOptions.task)
+                    val stagesStr = tasksExecStages.zipWithIndex
+                      .map { case (stage, idx) =>
+                        s"Stage #${idx}:\n" + stage.map(ti => s"  ${ti.id}").mkString("\n")
+                      }
+                      .mkString("\n")
+                    serverMessages.put(CliServerMessage.Output(stagesStr))
+                  }
+                  serverMessages.put(CliServerMessage.Exit(0))
+              }
+          }
       case m: CliClientMessage.Exec =>
         if m.args == Seq("--help") || m.args == Seq("-h") then
           serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliExecOptions].helpText()))
           serverMessages.put(CliServerMessage.Exit(0))
         else
           mainargs.Parser[DederCliExecOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-          case Left(error) =>
-            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-            serverMessages.put(CliServerMessage.Exit(1))
-          case Right(cliOptions) =>
-            logger.debug(s"Executing $cliOptions")
-            val notificationCallback: ServerNotification => Unit = {
-              case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
-              // skip
-              case sn =>
-                CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
-            }
-            val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
-            projectState.executeCLI(
-              clientId,
-              requestId,
-              cliOptions.modules,
-              cliOptions.task,
-              args = cliOptions.args.value,
-              serverNotificationsLogger,
-              json = cliOptions.json.value,
-              startWatch = cliOptions.watch.value,
-              exitOnEnd = !cliOptions.watch.value
-            )
-        }
+            case Left(error) =>
+              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+              serverMessages.put(CliServerMessage.Exit(1))
+            case Right(cliOptions) =>
+              logger.debug(s"Executing $cliOptions")
+              val notificationCallback: ServerNotification => Unit = {
+                case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
+                // skip
+                case sn =>
+                  CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
+              }
+              val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
+              val argss = if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail else cliOptions.args.value
+              projectState.executeCLI(
+                clientId,
+                requestId,
+                cliOptions.modules,
+                cliOptions.task,
+                args = argss,
+                serverNotificationsLogger,
+                json = cliOptions.json.value,
+                startWatch = cliOptions.watch.value,
+                exitOnEnd = !cliOptions.watch.value
+              )
+          }
       case m: CliClientMessage.Cancel =>
         projectState.cancelRequest(m.requestId)
         serverMessages.put(CliServerMessage.Exit(130))
@@ -347,66 +352,69 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
           serverMessages.put(CliServerMessage.Exit(0))
         else
           mainargs.Parser[DederCliCleanOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-          case Left(error) =>
-            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-            serverMessages.put(CliServerMessage.Exit(1))
-          case Right(cliOptions) =>
-            projectState.readState(useLastGood = true) match {
-              case Left(error) =>
-                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-                serverMessages.put(CliServerMessage.Exit(1))
-              case Right(state) =>
-                val moduleIds =
-                  if cliOptions.modules.nonEmpty then cliOptions.modules
-                  else state.tasksResolver.allModules.map(_.id)
-                projectState.cleanModules(moduleIds)
-                serverMessages.put(CliServerMessage.Exit(0))
-            }
-        }
+            case Left(error) =>
+              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+              serverMessages.put(CliServerMessage.Exit(1))
+            case Right(cliOptions) =>
+              projectState.readState(useLastGood = true) match {
+                case Left(error) =>
+                  serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                  serverMessages.put(CliServerMessage.Exit(1))
+                case Right(state) =>
+                  val moduleIds =
+                    if cliOptions.modules.nonEmpty then cliOptions.modules
+                    else state.tasksResolver.allModules.map(_.id)
+                  projectState.cleanModules(moduleIds)
+                  serverMessages.put(CliServerMessage.Exit(0))
+              }
+          }
       case m: CliClientMessage.Import =>
         if m.args == Seq("--help") || m.args == Seq("-h") then
           serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliImportOptions].helpText()))
           serverMessages.put(CliServerMessage.Exit(0))
         else
           mainargs.Parser[DederCliImportOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-          case Left(error) =>
-            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-            serverMessages.put(CliServerMessage.Exit(1))
-          case Right(cliOptions) =>
-            val notificationCallback: ServerNotification => Unit = { sn =>
-              CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
-            }
-            val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
-            val importer = new Importer(serverNotificationsLogger)
-            val success = importer.doImport(cliOptions.from)
-            val exitCode = if success then 0 else 1
-            serverMessages.put(CliServerMessage.Exit(exitCode))
-        }
+            case Left(error) =>
+              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+              serverMessages.put(CliServerMessage.Exit(1))
+            case Right(cliOptions) =>
+              val notificationCallback: ServerNotification => Unit = { sn =>
+                CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
+              }
+              val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
+              val importer = new Importer(serverNotificationsLogger)
+              val success = importer.doImport(cliOptions.from)
+              val exitCode = if success then 0 else 1
+              serverMessages.put(CliServerMessage.Exit(exitCode))
+          }
       case m: CliClientMessage.Complete =>
         if m.args == Seq("--help") || m.args == Seq("-h") then
           serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliCompleteOptions].helpText()))
           serverMessages.put(CliServerMessage.Exit(0))
         else
           mainargs.Parser[DederCliCompleteOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-          case Left(error) =>
-            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-            serverMessages.put(CliServerMessage.Exit(1))
-          case Right(cliOptions) =>
-            val res = if cliOptions.output.value then {
-              cliOptions.shell match {
-                case ShellType.bash       => TabCompleter.bashScript
-                case ShellType.zsh        => TabCompleter.zshScript
-                case ShellType.fish       => TabCompleter.fishScript
-                case ShellType.powershell => TabCompleter.powershellScript
+            case Left(error) =>
+              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+              serverMessages.put(CliServerMessage.Exit(1))
+            case Right(cliOptions) =>
+              val res = if cliOptions.output.value then {
+                cliOptions.shell match {
+                  case ShellType.bash       => TabCompleter.bashScript
+                  case ShellType.zsh        => TabCompleter.zshScript
+                  case ShellType.fish       => TabCompleter.fishScript
+                  case ShellType.powershell => TabCompleter.powershellScript
+                }
+              } else {
+                val tabCompletions =
+                  projectState.getTabCompletions(
+                    cliOptions.commandLine.getOrElse(""),
+                    cliOptions.cursorPos.getOrElse(-1)
+                  )
+                tabCompletions.mkString(" ")
               }
-            } else {
-              val tabCompletions =
-                projectState.getTabCompletions(cliOptions.commandLine.getOrElse(""), cliOptions.cursorPos.getOrElse(-1))
-              tabCompletions.mkString(" ")
-            }
-            serverMessages.put(CliServerMessage.Output(res))
-            serverMessages.put(CliServerMessage.Exit(0))
-        }
+              serverMessages.put(CliServerMessage.Output(res))
+              serverMessages.put(CliServerMessage.Exit(0))
+          }
       case _: CliClientMessage.Shutdown =>
         logger.info(s"Client $clientId requested server shutdown.")
         serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))

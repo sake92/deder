@@ -12,7 +12,7 @@ Deder instantiates a file watcher in the project root.
 If `deder.pkl` changes, the config is reloaded automatically, no need to do anything.  
 
 If any source files change, the affected watched tasks are re-executed.  
-E.g. if you do `deder -t compile --watch`, then the `compile` task is re-executed whenever source files change.
+E.g. if you do `deder exec -t compile --watch`, then the `compile` task is re-executed whenever source files change.
 
 
 ## Modules graph
@@ -27,12 +27,12 @@ These tasks can depend on each other, forming another DAG (e.g. `run` depends on
 
 Tasks can be *transitive*, meaning they invoke depending module tasks *with same name* transitively.  
 An example of a transitive task is the `compile` task.  
-If you say `deder -t compile -m A` where A depends on B, then B must be compiled before it.
+If you say `deder exec -t compile -m A` where A depends on B, then B must be compiled before it.
 
 
 ## Plan graph and execution stages
 Say we have 2 tasks: `compile` and `run`.  
-When we invoke `deder -t run -m A` we need to execute `A.compile` and then `A.run`.
+When we invoke `deder exec -t run -m A` we need to execute `A.compile` and then `A.run`.
 
 So we need a *subgraph of tasks*.  
 Additionally, we must not execute the same task more than once, *minimality*.  

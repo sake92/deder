@@ -133,7 +133,7 @@ Currently working features:
 - import of project
 - navigation
 - compilation and diagnostics
-- run main scala classes (Java doesnt.. #todo-fixme )
+- run main classes
 - run tests
 
 
