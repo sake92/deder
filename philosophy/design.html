@@ -66,7 +66,7 @@
    <p>If <code>deder.pkl</code> changes, the config is reloaded automatically, no need to do anything.</p>
    <p>If any source files change, the affected watched tasks are re-executed.
     <br>
-    E.g. if you do <code>deder -t compile --watch</code>, then the <code>compile</code> task is re-executed whenever source files change.</p>
+    E.g. if you do <code>deder exec -t compile --watch</code>, then the <code>compile</code> task is re-executed whenever source files change.</p>
    <h2 id="modules-graph">Modules graph<a href="#modules-graph" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>A graph of modules is formed from the config. E.g <code>A</code> depends on <code>B</code> etc.
     <br>
@@ -79,11 +79,11 @@
     <br>
     An example of a transitive task is the <code>compile</code> task.
     <br>
-    If you say <code>deder -t compile -m A</code> where A depends on B, then B must be compiled before it.</p>
+    If you say <code>deder exec -t compile -m A</code> where A depends on B, then B must be compiled before it.</p>
    <h2 id="plan-graph-and-execution-stages">Plan graph and execution stages<a href="#plan-graph-and-execution-stages" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Say we have 2 tasks: <code>compile</code> and <code>run</code>.
     <br>
-    When we invoke <code>deder -t run -m A</code> we need to execute <code>A.compile</code> and then <code>A.run</code>.</p>
+    When we invoke <code>deder exec -t run -m A</code> we need to execute <code>A.compile</code> and then <code>A.run</code>.</p>
    <p>So we need a <em>subgraph of tasks</em>.
     <br>
     Additionally, we must not execute the same task more than once, <em>minimality</em>.</p>
@@ -119,6 +119,9 @@
    <ul>
     <li>one server per BSP client (intellij/metals)</li>
    </ul>
+   <div role="group">
+    <span></span> <span></span> <a role="button" href="https://sake92.github.io/deder/philosophy/why-pkl.html">Why Pkl? ➡️</a>
+   </div>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
  </body>

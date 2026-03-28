@@ -62,12 +62,12 @@
    <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
 local const myModules = new CreateScalaModules {
-  _root = "my-module"
-  _template = new {
+  root = "my-module"
+  template = new {
     scalaVersion = "3.7.4"
     mainClass = "mymodule.Main"
   }
-  _testTemplate = (_template.asTest()) {
+  testTemplate = (template.asTest()) {
     deps {
       "org.scalameta::munit:1.2.1"
     }
@@ -114,6 +114,9 @@ deder <span class="hljs-built_in">exec</span> -t compile -m my-module --watch
 <span class="hljs-comment"># Run tests</span>
 deder <span class="hljs-built_in">exec</span> -t <span class="hljs-built_in">test</span> -m my-test-module
 </code></pre>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/tutorials/installation.html">⬅️ Installation</a> <span></span> <a role="button" href="https://sake92.github.io/deder/tutorials/scalajs.html">Scala.js ➡️</a>
+   </div>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
  </body>

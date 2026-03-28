@@ -68,14 +68,14 @@ local <span class="hljs-keyword">const</span> <span class="hljs-attr">commonModu
   scalaVersions
     .<span class="hljs-title function_">map</span>((sv) -&gt;
         <span class="hljs-keyword">new</span> <span class="hljs-title class_">CreateCrossModules</span> {
-          _root = <span class="hljs-string">"common"</span>
-          _template = <span class="hljs-keyword">new</span> {
+          root = <span class="hljs-string">"common"</span>
+          template = <span class="hljs-keyword">new</span> {
             scalaVersion = sv
           }
-          _jsTemplate = (_template.<span class="hljs-title function_">asJs</span>()) {
+          jsTemplate = (template.<span class="hljs-title function_">asJs</span>()) {
             scalaJsVersion = <span class="hljs-string">"1.20.2"</span>
           }
-          _nativeTemplate = (_template.<span class="hljs-title function_">asNative</span>()) {
+          nativeTemplate = (template.<span class="hljs-title function_">asNative</span>()) {
             scalaNativeVersion = <span class="hljs-string">"0.5.10"</span>
           }
         }
@@ -117,6 +117,9 @@ common-native-3.7.4
   ...commonModules.filter((m) -&gt; !m.id.endsWith("-native-3.7.4"))
 }
 </code></pre>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/tutorials/scalanative.html">⬅️ Scala Native</a> <span></span> <a role="button" href="https://sake92.github.io/deder/tutorials/publishing.html">Publishing ➡️</a>
+   </div>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
  </body>
