@@ -14,12 +14,12 @@ Create a `deder.pkl` file in your project root:
 amends "https://sake92.github.io/deder/config/DederProject.pkl"
 
 local const myModules = new CreateScalaModules {
-  _root = "my-module"
-  _template = new {
+  root = "my-module"
+  template = new {
     scalaVersion = "3.7.4"
     mainClass = "mymodule.Main"
   }
-  _testTemplate = (_template.asTest()) {
+  testTemplate = (template.asTest()) {
     deps {
       "org.scalameta::munit:1.2.1"
     }

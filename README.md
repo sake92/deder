@@ -126,9 +126,9 @@ deder exec -t test uber.MyTestSuite1#test1
 deder bsp install
 
 ################ Misc
-# format all code in mymodule with scalafmt
-deder exec -t runMvnApp -m mymodule fmt
-deder exec -t runMvnApp -m mymodule fmtCheck
+# format with scalafmt
+deder exec -t runMvnApp fmt
+deder exec -t runMvnApp fmtCheck
 ```
 
 ## IDE setup

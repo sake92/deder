@@ -23,14 +23,14 @@ local const commonModules: List<ScalaModule> =
   scalaVersions
     .map((sv) ->
         new CreateCrossModules {
-          _root = "common"
-          _template = new {
+          root = "common"
+          template = new {
             scalaVersion = sv
           }
-          _jsTemplate = (_template.asJs()) {
+          jsTemplate = (template.asJs()) {
             scalaJsVersion = "1.20.2"
           }
-          _nativeTemplate = (_template.asNative()) {
+          nativeTemplate = (template.asNative()) {
             scalaNativeVersion = "0.5.10"
           }
         }
