@@ -16,6 +16,8 @@ tutorials:
   
 
 references:
+  - label: "Cheatsheet"
+    url: "/reference/cheatsheet.html"
   - label: "Architecture"
     url: "/reference/architecture.html"
   - label: "Files layout"
@@ -26,6 +28,8 @@ references:
 howtos:
   - label: "Adding dependencies"
     url: "/howtos/dependencies.html"
+  - label: "Environment variables and JVM options"
+    url: "/howtos/env-vars.html"
   - label: "Invoking Maven applications"
     url: "/howtos/mvn-apps.html"
   - label: "OTEL tracing/logging/metrics"

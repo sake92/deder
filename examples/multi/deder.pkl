@@ -24,22 +24,30 @@ local const backend = (baseModule) {
   moduleDeps { common }
 }
 
-local const uberModules = new CreateScalaModules {
-  root = "uber"
-  template = (baseModule) {
-    moduleDeps { frontend; backend }
-    deps {
-      "com.lihaoyi::pprint:0.9.5"
+local const uberModules =
+  new CreateScalaModules {
+    root = "uber"
+    template = (baseModule) {
+      moduleDeps { frontend; backend }
+      deps {
+        "com.lihaoyi::pprint:0.9.5"
+      }
+      mainClass = "uber.Main"
+      forkEnv {
+        ["MY_VAR"] = "true"
+      }
+      jvmOptions {
+        "-Xmx128m"
+        "-XX:+PrintCompilation"
+      }
     }
-    mainClass = "uber.Main"
-  }
-  testTemplate = (template.asTest()) {
-    // fork = false
-    deps {
-      "org.scalameta::munit:1.2.1"
+    testTemplate = (template.asTest()) {
+      // fork = false
+      deps {
+        "org.scalameta::munit:1.2.1"
+      }
     }
-  }
-}.get
+  }.get
 
 modules {
   common

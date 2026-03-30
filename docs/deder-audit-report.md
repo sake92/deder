@@ -63,11 +63,7 @@ Compared to **sbt**, **Mill**, **Gradle**, and **Maven**:
 
 9. **No module type reference** - Which tasks are available for which module types (Java vs Scala vs ScalaJS vs ScalaNative)? The `tasks` command shows all tasks per-module, but there's no reference for what each task does.
 
-10. **No `mvnApps` configuration reference** - The `mvn-apps.md` howto shows a brief snippet but doesn't explain all fields of `MvnApp` or how the fmt/fmtCheck shorthand works.
 
-11. **Missing `manifest` and `ManifestSettings` docs** - The Pkl config has `ManifestSettings` class with `mainClass`, `classpathPrefix`, `extraAttributes` but none of this is documented.
-
-12. **No `forkEnv` / `jvmOptions` documentation** - These module config fields are not documented despite being useful for passing env vars and JVM options.
 
 13. **No Windows support notes** - Docs mention Unix sockets but don't state whether Windows is supported, partially supported, or not supported at all.
 
@@ -75,7 +71,6 @@ Compared to **sbt**, **Mill**, **Gradle**, and **Maven**:
 
 14. **No "how it works" section for caching** - `design.md` mentions Blake3 hashing and relative paths but doesn't explain it practically. When does the cache invalidate? How do you force a rebuild?
 
-15. **The `index.md` is doing too much** - It's simultaneously a landing page, cheat sheet, IDE setup guide, and tips section. Should be split into focused pages.
 
 16. **No migration guide** - For users coming from sbt/Mill/Gradle, a mapping of concepts would be very helpful.
 
