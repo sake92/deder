@@ -1,11 +1,11 @@
 # Deder Audit Report
 
-**5. `--ascii` plan output is unusably wide**
+**5. TODO `--ascii` plan output is unusably wide**
 - `deder plan -m uber -t compile --ascii` produces output that is hundreds of thousands of characters wide (the truncated output was 391KB+). This makes it unusable in a terminal.
 - `--dot` format works well and can be piped to graphviz.
 - **Fix:** Either limit line width with wrapping/truncation, or make the ASCII renderer use a more compact layout (vertical instead of horizontal).
 
-**8. Empty modules in `java-scala` example**
+**8. TODO make tests: Empty modules in `java-scala` example**
 - `java-project/src/` and `scala-project/src/` directories exist but are completely empty. The compilation succeeds (no sources to compile) but this is confusing for someone studying the example.
 - **Fix:** Add at least a trivial `Main.java` and `Main.scala` to demonstrate these module types.
 
@@ -25,22 +25,16 @@ Compared to **sbt**, **Mill**, **Gradle**, and **Maven**:
 | **Dependency updates checker** | Missing | sbt-updates, Mill's dependency updates. Shows available version bumps. |
 | **Custom task definition** | Missing | All tasks are predefined. Users can't define custom tasks in the config. sbt/Mill/Gradle all support this. |
 | **Console/REPL** | Missing | sbt has `console`, Mill has `console`. Starts a Scala REPL with project classpath. |
-| **Multi-repo/composite builds** | Missing | Gradle composite builds, sbt's `ProjectRef`. Building across repo boundaries. |
 | **Resource generation** | Partial | `generatedSources` exists but no `generatedResources` task visible. |
-| **Test filtering by tag/category** | Partial | Can filter by suite name and test name, but no tag-based filtering (sbt `testOnly -- -t tag`). |
 | **Parallel test execution** | Unclear | Not documented whether tests within a suite run in parallel. |
 | **Code coverage** | Missing | sbt-scoverage, JaCoCo integration. |
 | **Benchmarking (JMH)** | Missing | sbt-jmh, Mill JMH module. |
-| **Docker image building** | Missing | sbt-native-packager, Jib (Gradle/Maven). |
-| **Release/CI automation** | Partial | Has `publish` but no release workflow (bumping versions, creating tags, changelog). |
 | **Bill of Materials (BOM) support** | Missing | Maven BOM imports for dependency management. |
 | **Init/scaffold command** | Missing | `sbt new`, `mill init`, `gradle init` - create project from template. |
 | **Dependency exclusions** | Not documented | Not clear if you can exclude transitive dependencies. |
 | **Repository configuration** | Not documented | No way to add custom Maven repositories (private artifactory, etc.) visible in config. |
-| **Source JARs download** | Unclear | Not documented for IDE sources attachment beyond BSP. |
 | **Multi-JDK testing** | Missing | Gradle toolchains, sbt-javaversions for matrix testing across JDK versions. |
 | **Incremental test execution** | Unclear | Not documented whether only affected tests re-run after changes. |
-| **Build scan/report** | Partial | OTEL tracing exists (nice!) but no HTML build report like Gradle. |
 
 ---
 
@@ -57,11 +51,8 @@ Compared to **sbt**, **Mill**, **Gradle**, and **Maven**:
 5. **No error handling / troubleshooting guide** - Common errors (Pkl evaluation failures, dependency resolution failures, compilation errors) and how to debug them.
 
 
-7. **No `assembly` task documentation** - Assembly (uber jar) is mentioned in the index.md cheat sheet but has no dedicated tutorial.
-
-8. **No `jar` task documentation** - Creating a regular JAR (non-assembly) is not documented.
-
-9. **No module type reference** - Which tasks are available for which module types (Java vs Scala vs ScalaJS vs ScalaNative)? The `tasks` command shows all tasks per-module, but there's no reference for what each task does.
+9. **No module type reference** - Which tasks are available for which module types (Java vs Scala vs ScalaJS vs ScalaNative)? 
+The `tasks` command shows all tasks per-module, but there's no reference for what each task does.
 
 
 
