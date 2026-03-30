@@ -41,7 +41,7 @@
       <summary>Table of Contents</summary>
       <div>
        <ul>
-        <li><a href="#invoking-custom-maven-applications">Invoking custom Maven applications</a></li>
+        <li><a href="#invoking-maven-applications">Invoking Maven applications</a></li>
        </ul>
       </div>
      </details>
@@ -50,7 +50,7 @@
     <div></div>
     <div></div>
    </div>
-   <h1 id="invoking-custom-maven-applications">Invoking custom Maven applications<a href="#invoking-custom-maven-applications" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <h1 id="invoking-maven-applications">Invoking Maven applications<a href="#invoking-maven-applications" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
    <p>Deder provides a convenient way to invoke JARs from Maven as part of your build.
     <br>
     This can be useful for checking formatting, generating code etc.</p>
@@ -67,11 +67,11 @@
 }
 </code></pre>
    <p>then you can invoke the app from your build like this:</p>
-   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t runMvnApp myapp some_additional_args
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t runMvnApp myapp -- some_additional_args
 </code></pre>
    <p>Note that <code>some_additional_args</code> will be appended to the <code>args</code> defined in the <code>MvnApp</code>.</p>
    <div role="group">
-    <span></span> <span></span> <a role="button" href="https://sake92.github.io/deder/howtos/otel.html">OTEL tracing/logging/metrics ➡️</a>
+    <a role="button" href="https://sake92.github.io/deder/howtos/env-vars.html">⬅️ Environment variables and JVM options</a> <span></span> <a role="button" href="https://sake92.github.io/deder/howtos/otel.html">OTEL tracing/logging/metrics ➡️</a>
    </div>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>

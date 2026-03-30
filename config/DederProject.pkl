@@ -2,6 +2,7 @@ module ba.sake.deder.config.DederProject
 
 // TODO write tests https://pkl-lang.org/blog/testing-in-pkl.html#writing-tests
 
+/// list of modules in the project. Each module corresponds to a subproject with its own source directories, dependencies, and tasks.
 modules: Listing<DederModule>(modulesValidation)
 
 hidden modulesValidation = (value: Listing<DederModule>) ->
@@ -17,7 +18,7 @@ abstract class DederModule {
   /// Module root directory, relative to project root
   root: String(rootValidation) = id
 
-  /// Source directories
+  /// Source directories, relative to module root. Defaults to `src`.
   sources: Listing<String> = new Listing { "src" }
 
   /// Module dependencies
@@ -48,7 +49,9 @@ typealias ModuleType =
     | "scala-native-test"
 
 class PomLicense {
+  /// SPDX identifier or full license name, e.g. "MIT" or "MIT License"
   name: String(!isEmpty)
+  /// URL to the license text
   url: String(!isEmpty)
 }
 class PomDeveloper {
@@ -57,16 +60,23 @@ class PomDeveloper {
   email: String(!isEmpty)
 }
 class PomScm {
+  /// URL of the SCM repository, e.g. GitHub URL
   url: String?
+  /// SCM connection string, e.g. "scm:git:github.com:user/repo.git"
   connection: String?
   developerConnection: String?
+  /// Optional tag/branch to point to, e.g. "v1.0.0" or "main". Not commonly used but can be helpful for linking to the exact code corresponding to a release.
   tag: String?
 }
 class PomSettings {
+  /// Group ID for publishing, e.g. "com.example". Required for publishing to Maven Central. Not strictly required for local publishing but recommended to avoid conflicts.
   groupId: String(!isEmpty)
+  /// Artifact ID for publishing, e.g. "my-library". Required for publishing to Maven Central. Not strictly required for local publishing but recommended to avoid conflicts.
   artifactId: String(!isEmpty)
+  /// Version for publishing, e.g. "1.0.0". Required for publishing to Maven Central. Not strictly required for local publishing but recommended to avoid conflicts.
+  /// If not provided, Deder will use a default semver versioning scheme based on git tags and commits (e.g. "0.1.0-SNAPSHOT" for a non-tagged commit, "1.0.0" for a commit tagged with "v1.0.0").
   version: String?
-  name: String(!isEmpty)
+  name: String(!isEmpty) = artifactId
   description: String?
   url: String?
   licenses: Listing<PomLicense> = new Listing {}
@@ -86,21 +96,30 @@ class MvnApp {
   dep: String(!isEmpty)
   /// Fully qualified main class to run
   mainClass: String(!isEmpty)
+  /// Arguments to pass to the main class when running the app. Can also be provided at runtime via `deder exec -t runMvnApp <name> -- [args...]`, which will be appended to these defaults.
   args: Listing<String> = new Listing {}
 }
 
 open class JavaModule extends DederModule {
   type = "java"
+  /// Resource directories, relative to module root. Defaults to `resources/`.
   resources: Listing<String> = new Listing { "resources" }
+  /// Java path to use for compilation and running. Can be a JDK path or a JDK version if using toolchains. If not provided, Deder will use the Java version running Deder server itself.
   javaHome: String?
+  /// JVM options to use for running and testing
   jvmOptions: Listing<String> = new Listing {}
+  /// Java version to use for compilation, e.g. "1.8", "11", "17". This is used for setting the `--release` flag during compilation and for selecting the appropriate Java runtime when running the app.
   javaVersion: String?
   javacOptions: Listing<String> = new Listing {}
+  /// Environment variables to set when running/testing the app, e.g. "ENV_VAR" -> "value".
   forkEnv: Mapping<String, String> = new Mapping {}
+  /// Main class to run
   mainClass: String?
+  /// Dependencies to include when compiling/running the app
   deps: Listing<String> = new Listing {}
   javacAnnotationProcessorDeps: Listing<String> = new Listing {}
-  semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default
+  /// Whether to enable SemanticDB generation. By default, it's disabled in CI to speed up builds (checks the `CI` environment variable).
+  semanticdbEnabled: Boolean = read?("env:CI") != "true"
   javaSemanticdbVersion: String = "0.11.1"
   /// JAR manifest entries. Overrides defaults set by Deder.
   manifest: ManifestSettings = new ManifestSettings {}
@@ -132,6 +151,7 @@ open class ScalaModule extends JavaModule {
 class ScalaTestModule extends ScalaModule {
   type = "scala-test"
   publish = false
+  /// Whether to run tests in a separate JVM process. By default, it's enabled for better isolation and to avoid classpath issues, but it can be disabled for faster test runs during development (not recommended for CI).
   fork: Boolean = true
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"

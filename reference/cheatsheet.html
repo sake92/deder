@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Cheatsheet | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#cheatsheet">Cheatsheet</a></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="cheatsheet">Cheatsheet<a href="#cheatsheet" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder version
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">shutdown server</span>
+deder shutdown
+
+deder import --from sbt
+<span class="hljs-meta prompt_">
+#</span><span class="language-bash"><span class="hljs-comment">############### install shell completions</span></span>
+deder complete -s bash -o &gt; ~/.local/share/bash-completion/completions/deder
+<span class="hljs-meta prompt_"># </span><span class="language-bash">open another shell to <span class="hljs-built_in">test</span> it</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">also supports zsh, fish, powershell</span>
+<span class="hljs-meta prompt_">
+#</span><span class="language-bash"><span class="hljs-comment">############### explore the build</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">list modules</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --ascii, --dot</span>
+deder modules
+<span class="hljs-meta prompt_">
+#</span><span class="language-bash"><span class="hljs-comment">###############</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">list tasks</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --ascii, --dot</span>
+deder tasks
+<span class="hljs-meta prompt_">
+#</span><span class="language-bash"><span class="hljs-comment">###############</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash"><span class="hljs-built_in">print</span> execution plan <span class="hljs-keyword">for</span> a task</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --ascii, --dot</span>
+deder plan -m common -t compileClasspath
+<span class="hljs-meta prompt_">
+
+#</span><span class="language-bash"><span class="hljs-comment">############### run tasks</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">by default executes compile on all modules</span>
+deder exec
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">execute <span class="hljs-string">"compile"</span> task explicitly, on all modules</span>
+deder exec -t compile
+<span class="hljs-meta prompt_"># </span><span class="language-bash">compile the <span class="hljs-string">"common"</span> module</span>
+deder exec -t compile -m common
+<span class="hljs-meta prompt_"># </span><span class="language-bash">compile modules that start with <span class="hljs-string">"uber"</span></span>
+deder exec -t compile -m uber%
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">run the <span class="hljs-string">"uber"</span> module</span>
+deder exec -t run -m uber
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">execute <span class="hljs-string">"run"</span> <span class="hljs-keyword">in</span> watch mode</span>
+deder exec -t run -m frontend --watch
+<span class="hljs-meta prompt_"># </span><span class="language-bash">even <span class="hljs-keyword">in</span> multiple terminals at the same <span class="hljs-keyword">time</span>!!!</span>
+deder exec -t run -m backend --watch
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">generate an <span class="hljs-string">"uber"</span> jar, assembly of all deps and your code</span>
+deder exec -t assembly -m uber
+java -jar .deder/out/uber/assembly/out.jar
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">execute all tests on all <span class="hljs-built_in">test</span> modules</span>
+deder exec -t test
+<span class="hljs-meta prompt_"># </span><span class="language-bash">execute tests on <span class="hljs-string">"uber-test"</span> module</span>
+deder exec -t test -m uber-test
+<span class="hljs-meta prompt_"># </span><span class="language-bash">execute a specific <span class="hljs-built_in">test</span> suite</span>
+deder exec -t test uber.MyTestSuite1
+<span class="hljs-meta prompt_"># </span><span class="language-bash">execute <span class="hljs-built_in">test</span> suites that start with <span class="hljs-string">"uber"</span></span>
+deder exec -t test uber.%
+<span class="hljs-meta prompt_"># </span><span class="language-bash">execute specific <span class="hljs-built_in">test</span> called <span class="hljs-string">"test1"</span> <span class="hljs-keyword">in</span> suite uber.MyTestSuite1</span>
+deder exec -t test uber.MyTestSuite1#test1
+<span class="hljs-meta prompt_">
+#</span><span class="language-bash"><span class="hljs-comment">############### Misc</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">write BSP config file</span>
+deder bsp install
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">format with scalafmt</span>
+deder exec -t runMvnApp fmt
+deder exec -t runMvnApp fmtCheck
+</code></pre>
+   <div role="group">
+    <span></span> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/architecture.html">Architecture ➡️</a>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>

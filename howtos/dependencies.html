@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Dependencies | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#dependencies">Dependencies</a>
+         <ul>
+          <li><a href="#how-to-add-a-java-library-dependency">How to add a Java library dependency?</a></li>
+          <li><a href="#how-to-add-a-scala-library-dependency">How to add a Scala library dependency?</a></li>
+          <li><a href="#how-to-add-a-scalajsscalanative-library-dependency">How to add a ScalaJS/ScalaNative library dependency?</a></li>
+          <li><a href="#how-to-add-a-scalac-plugin-dependency">How to add a Scalac plugin dependency?</a></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="dependencies">Dependencies<a href="#dependencies" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Dependencies are written using Coursier's Dependency syntax.
+    <br>
+    See <a href="https://github.com/coursier/dependency">https://github.com/coursier/dependency</a> for more details.</p>
+   <h2 id="how-to-add-a-java-library-dependency">How to add a Java library dependency?<a href="#how-to-add-a-java-library-dependency" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Similar to gradle syntax, you use colons to separate <code>groupId</code>, <code>artifactId</code> and <code>version</code>:</p>
+   <pre><code class="language- hljs language-fsharp" data-highlighted="yes"><span class="hljs-keyword">deps</span> {
+  <span class="hljs-string">"org.immutables:value-annotations:2.12.0"</span>
+}
+</code></pre>
+   <h2 id="how-to-add-a-scala-library-dependency">How to add a Scala library dependency?<a href="#how-to-add-a-scala-library-dependency" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Here you need to use double-colon syntax for first separator:</p>
+   <pre><code class="language- hljs language-fsharp" data-highlighted="yes"><span class="hljs-keyword">deps</span> {
+  <span class="hljs-string">"ba.sake::sharaf-undertow:0.17.0"</span>
+}
+</code></pre>
+   <p>If this is a scala 3 module, then it will resolve to <code>"ba.sake:sharaf-undertow_3:0.17.0"</code>.
+    <br>
+    Notice how it adds the scala binary version suffix <code>_3</code>, and goes back to single-colon.</p>
+   <blockquote>
+    <p>This can be used if you want to add a scala 2 library to a scala 3 project! E.g. <code>"com.example:my_scala2_lib_2.13:0.0.1"</code></p>
+   </blockquote>
+   <h2 id="how-to-add-a-scalajsscalanative-library-dependency">How to add a ScalaJS/ScalaNative library dependency?<a href="#how-to-add-a-scalajsscalanative-library-dependency" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Here you need to use double-colon syntax in BOTH places:</p>
+   <pre><code class="language- hljs language-dns" data-highlighted="yes">deps {
+  "org.scala-js<span class="hljs-number">::</span>scalajs-dom<span class="hljs-number">::2</span>.<span class="hljs-number">2</span>.<span class="hljs-number">0</span>"
+}
+</code></pre>
+   <p>Besides scala binary version suffix <code>_3</code>, it will also prepend the <em>platform suffix</em>, it will resolve to <code>"org.scala-js:scalajs-dom_sjs1_3:2.2.0"</code>.
+    <br>
+    Notice the <code>_sjs1</code> suffix, this means it is a ScalaJS version 1 dependency.</p>
+   <blockquote>
+    <p>Similar is done for ScalaNative but the suffix is something like <code>_native0.5</code></p>
+   </blockquote>
+   <h2 id="how-to-add-a-scalac-plugin-dependency">How to add a Scalac plugin dependency?<a href="#how-to-add-a-scalac-plugin-dependency" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Here you need to use triple-colon syntax as first separator:</p>
+   <pre><code class="language- hljs language-fsharp" data-highlighted="yes"><span class="hljs-keyword">scalacPluginDeps</span> {
+  <span class="hljs-string">"org.wartremover:::wartremover:3.5.0"</span>
+}
+</code></pre>
+   <p>If this is a scala <code>3.7.2</code> module, then it will resolve to <code>"org.wartremover:wartremover_3.7.2:3.5.0"</code>.</p>
+   <p>Notice how it adds the <em>full scala version</em> suffix <code>_3.7.2</code>, not just the binary version.
+    <br>
+    This is because compiler plugins depend on compiler internals, so they have to use a specific version.</p>
+   <div role="group">
+    <span></span> <span></span> <a role="button" href="https://sake92.github.io/deder/howtos/env-vars.html">Environment variables and JVM options ➡️</a>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>

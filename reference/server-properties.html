@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Server Properties File | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#server-properties-file">Server Properties File</a></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="server-properties-file">Server Properties File<a href="#server-properties-file" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>You can use <code>.deder/server.properties</code> file to specify the server properties when client starts it.
+    <br>
+    Example</p>
+   <pre><code class="language-properties hljs" data-highlighted="yes"><span class="hljs-attr">localPath</span>=<span class="hljs-string">myprojects/deder/out/server/assembly.dest/out.jar</span>
+<span class="hljs-attr">workerThreads</span>=<span class="hljs-string">32</span>
+<span class="hljs-attr">logLevel</span>=<span class="hljs-string">debug</span>
+<span class="hljs-attr">JAVA_OPTS</span>=<span class="hljs-string">-javaagent:otel.jar -Dotel.service.name=deder-server -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317</span>
+</code></pre>
+   <p>If you make changes to it, make sure you restart server manually:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder shutdown
+deder
+</code></pre>
+   <p>Availabel properties:</p>
+   <ul>
+    <li><code>logLevel</code> - log level used for server log at <code>.deder/logs/server.log</code>, one of <code>ERROR</code>, <code>WARNING</code>, <code>INFO</code>, <code>DEBUG</code>, <code>TRACE</code></li>
+    <li><code>workerThreads</code> - number of threads to use for executing tasks</li>
+    <li><code>maxInactiveSeconds</code> - max number of seconds server is inactive before it shuts down automatically</li>
+    <li><code>bspEnabled</code> - specifies if BSP protocol is enabled. If false, the BSP Deder server is never started (useful in CI or to save memory/CPU)</li>
+    <li><code>JAVA_OPTS</code> - java options passed to server java process</li>
+    <li><code>localPath</code> - fixed local path to server JAR, useful for developing Deder and debugging</li>
+   </ul>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/reference/files-layout.html">⬅️ Files layout</a> <span></span> <span></span>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>

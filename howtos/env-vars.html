@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light dark">
-  <meta name="description" content="Deder Scala.js Tutorial">
-  <title> Scala.js Tutorial | Deder Documentation </title>
+  <meta name="description" content="">
+  <title> Environment Variables and JVM options | Deder Documentation </title>
   <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
@@ -41,7 +41,11 @@
       <summary>Table of Contents</summary>
       <div>
        <ul>
-        <li><a href="#scalajs-tutorial">Scala.js Tutorial</a></li>
+        <li><a href="#environment-variables-and-jvm-options">Environment Variables and JVM options</a>
+         <ul>
+          <li><a href="#how-to-pass-environment-variables-to-runtest">How to pass environment variables to run/test</a></li>
+          <li><a href="#how-to-pass-jvm-options-to-runtest">How to pass JVM options to run/test</a></li>
+         </ul></li>
        </ul>
       </div>
      </details>
@@ -50,33 +54,26 @@
     <div></div>
     <div></div>
    </div>
-   <h1 id="scalajs-tutorial">Scala.js Tutorial<a href="#scalajs-tutorial" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <p>Create a <code>deder.pkl</code> file in your project root:</p>
-   <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/DederProject.pkl"
-
-local const frontend: ScalaJsModule = new {
-  id = "frontend"
-  scalaVersion = "3.7.1"
-  scalaJsVersion = "1.20.2"
-  moduleKind = "es-module"
-  deps {
-    "org.scala-js::scalajs-dom::2.2.0"
-  }
-}
-
-modules {
-  frontend
+   <h1 id="environment-variables-and-jvm-options">Environment Variables and JVM options<a href="#environment-variables-and-jvm-options" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <h2 id="how-to-pass-environment-variables-to-runtest">How to pass environment variables to run/test<a href="#how-to-pass-environment-variables-to-runtest" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>You need to use the <code>forkEnv</code> property in module config:</p>
+   <pre><code class="language-pkl">forkEnv {
+  ["MY_VAR"] = "true"
 }
 </code></pre>
-   <p>Run in watch mode:</p>
-   <pre><code class="language-bash hljs" data-highlighted="yes">deder <span class="hljs-built_in">exec</span> -m frontend -t fastLinkJs -w
+   <p>Then you can read this env var when running your app with <code>deder exec -t run</code>, or when you run tests with <code>deder exec -t test</code>.</p>
+   <blockquote>
+    <p>Note that <code>fork</code> must be set to <code>true</code> on test module in order for this to work!</p>
+   </blockquote>
+   <h2 id="how-to-pass-jvm-options-to-runtest">How to pass JVM options to run/test<a href="#how-to-pass-jvm-options-to-runtest" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>You need to use the <code>jvmOptions</code> property in module config:</p>
+   <pre><code class="language-pkl">jvmOptions {
+  "-Xmx128m"
+  "-XX:+PrintCompilation"
+}
 </code></pre>
-   <p>The output will be in <code>.deder/out/frontend/fastLinkJs/main.js</code>.
-    <br>
-    You can include this in an HTML page to run your Scala.js code in the browser.</p>
-   <p>For a more elaborate example, you can check out the <a href="https://github.com/sake92/deder/tree/main/examples/scalajs">Example with Vite + Sharaf backend</a></p>
    <div role="group">
-    <a role="button" href="https://sake92.github.io/deder/tutorials/publishing.html">⬅️ Publishing</a> <span></span> <a role="button" href="https://sake92.github.io/deder/tutorials/scalanative.html">Scala Native ➡️</a>
+    <a role="button" href="https://sake92.github.io/deder/howtos/dependencies.html">⬅️ Adding dependencies</a> <span></span> <a role="button" href="https://sake92.github.io/deder/howtos/mvn-apps.html">Invoking Maven applications ➡️</a>
    </div>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>

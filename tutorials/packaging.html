@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Deder Packaging Tutorial">
+  <title> Packaging Tutorial | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#packaging-tutorial">Packaging Tutorial</a>
+         <ul>
+          <li><a href="#packaging-a-jar">Packaging a JAR</a></li>
+          <li><a href="#packaging-an-assemby-jar-uber-jar">Packaging an assemby JAR (uber JAR)</a></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="packaging-tutorial">Packaging Tutorial<a href="#packaging-tutorial" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Create this <code>deder.pkl</code> file:</p>
+   <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/DederProject.pkl"
+
+local const myappModules = new CreateScalaModules {
+  root = "myapp"
+  template = new {
+    scalaVersion = "3.7.1"
+    deps {
+      "com.lihaoyi::pprint:0.9.5"
+    }
+    mainClass = "myapp.Main"
+  }
+  testTemplate = (template.asTest()) {
+    deps {
+      "org.scalameta::munit:1.2.1"
+    }
+  }
+}.get
+
+modules {
+  ...myappModules.all
+}
+</code></pre>
+   <p>then add <code>myapp/src/myapp/Main.scala</code>:</p>
+   <pre><code class="language- hljs language-ruby" data-highlighted="yes">package myapp
+
+<span class="hljs-variable">@main</span> <span class="hljs-keyword">def</span> <span class="hljs-title function_">Main</span>() =
+  println(<span class="hljs-string">"Hello world!"</span>)
+</code></pre>
+   <p>then run it just to verify it works: <code>deder exec -t run -m myapp</code>.
+    <br>
+    You should see <code>Hello world!</code> printed in console.</p>
+   <h2 id="packaging-a-jar">Packaging a JAR<a href="#packaging-a-jar" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>If we try to run the <code>jar</code> task we will get an error:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t jar -m myapp
+[info] Executing 'jar' task on module: myapp
+[error] POM settings are not set for myapp
+</code></pre>
+   <p>Let's add just the minimal <code>pomSettings</code> so we can build it, add this inside <code>template</code> block:</p>
+   <pre><code class="language- hljs language-abnf" data-highlighted="yes">pomSettings {
+  groupId <span class="hljs-operator">=</span> <span class="hljs-string">"com.example"</span>
+  artifactId <span class="hljs-operator">=</span> <span class="hljs-string">"myapp"</span>
+  name <span class="hljs-operator">=</span> <span class="hljs-string">"myapp"</span>
+}
+</code></pre>
+   <p>then run this:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t jar -m myapp --json
+<span class="hljs-meta prompt_"># </span><span class="language-bash">will <span class="hljs-built_in">print</span> {<span class="hljs-string">"myapp"</span>:<span class="hljs-string">"/&lt;your_path&gt;/myapp/.deder/out/myapp/jar/myapp.jar"</span>}</span>
+</code></pre>
+   <p>then if you try to run it you will get an error (expected):</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">(base) sake@pop-os:~/projects/sake92/tmp/deder_tmp/myapp$ java -jar /home/sake/projects/sake92/tmp/deder_tmp/myapp/.deder/out/myapp/jar/myapp.jar
+Error: Unable to initialize main class myapp.Main
+Caused by: java.lang.NoClassDefFoundError: scala/util/CommandLineParser$ParseError
+</code></pre>
+   <p>This is expected because the <code>jar</code> task only bundles <em>your module classes</em> and nothing else!
+    <br>
+    It does not go recursively through your module deps and add those JARs..</p>
+   <p>The <code>jar</code> task is used as part of publishing process. A <code>pom.xml</code> file will be distributed together with it, so that users of your jar (usually a library) know which dependencies it needs. Then the build tool will download those and add to the classpath (you don't need to worry about this too much)</p>
+   <h2 id="packaging-an-assemby-jar-uber-jar">Packaging an assemby JAR (uber JAR)<a href="#packaging-an-assemby-jar-uber-jar" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>If you build an <em>assembly JAR</em>, you will be able to run it:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t assembly -m myapp --json
+<span class="hljs-meta prompt_"># </span><span class="language-bash">will <span class="hljs-built_in">print</span> {<span class="hljs-string">"myapp"</span>:<span class="hljs-string">"/&lt;your_path&gt;/myapp/.deder/out/myapp/assembly/out.jar"</span>}</span>
+
+java -jar .deder/out/myapp/assembly/out.jar
+<span class="hljs-meta prompt_"># </span><span class="language-bash">Hello world!</span>
+</code></pre>
+   <p>This is because the <code>assembly</code> task does a lot more than just packaging your code.
+    <br>
+    It will also:</p>
+   <ul>
+    <li>resolve the dependencies and add them to final JAR</li>
+    <li>add you module classes to final JAR</li>
+    <li>add a <code>META-INF/MANIFETS.MF</code> file with <code>Main-Class</code> entry, so you dont have to specify the main class on CLI</li>
+   </ul>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/tutorials/quickstart.html">⬅️ Quickstart</a> <span></span> <a role="button" href="https://sake92.github.io/deder/tutorials/publishing.html">Publishing ➡️</a>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>

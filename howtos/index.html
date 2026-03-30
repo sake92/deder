@@ -41,7 +41,10 @@
       <summary>Table of Contents</summary>
       <div>
        <ul>
-        <li><a href="#how-tos">How Tos</a></li>
+        <li><a href="#how-tos">How Tos</a>
+         <ul>
+          <li><a href="#how-to-clean-output-artifacts">How to clean output artifacts?</a></li>
+         </ul></li>
        </ul>
       </div>
      </details>
@@ -52,9 +55,14 @@
    </div>
    <h1 id="how-tos">How Tos<a href="#how-tos" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
    <ul>
+    <li><a href="https://sake92.github.io/deder/howtos/dependencies.html">Adding dependencies</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/env-vars.html">Environment variables and JVM options</a></li>
     <li><a href="https://sake92.github.io/deder/howtos/mvn-apps.html">Invoking Maven applications</a></li>
     <li><a href="https://sake92.github.io/deder/howtos/otel.html">OTEL tracing/logging/metrics</a></li>
    </ul>
+   <h2 id="how-to-clean-output-artifacts">How to clean output artifacts?<a href="#how-to-clean-output-artifacts" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>You can use <code>deder clean</code> to clean all modules outputs.</p>
+   <p>Or specify modules(s) to clean explicitly with <code>deder clean -m mymodule ...</code>. This will delete the whole <code>.deder/out/mymodule</code> folder.</p>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
  </body>
