@@ -3,22 +3,29 @@ tutorials:
     url: "/tutorials/installation.html"
   - label: "Quickstart"
     url: "/tutorials/quickstart.html"
+  - label: "Packaging"
+    url: "/tutorials/packaging.html"
+  - label: "Publishing"
+    url: "/tutorials/publishing.html"
   - label: "Scala.js"
     url: "/tutorials/scalajs.html"
   - label: "Scala Native"
     url: "/tutorials/scalanative.html"
   - label: "Cross Project"
     url: "/tutorials/cross-project.html"
-  - label: "Publishing"
-    url: "/tutorials/publishing.html"
+  
 
 references:
   - label: "Architecture"
     url: "/reference/architecture.html"
   - label: "Files layout"
     url: "/reference/files-layout.html"
+  - label: "Server Properties"
+    url: "/reference/server-properties.html"
 
 howtos:
+  - label: "Adding dependencies"
+    url: "/howtos/dependencies.html"
   - label: "Invoking Maven applications"
     url: "/howtos/mvn-apps.html"
   - label: "OTEL tracing/logging/metrics"

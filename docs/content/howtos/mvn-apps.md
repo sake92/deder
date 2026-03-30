@@ -3,7 +3,7 @@ layout: howto.html
 title: Invoking Maven applications
 ---
 
-# Invoking custom Maven applications
+# {{page.title}}
 
 Deder provides a convenient way to invoke JARs from Maven as part of your build.  
 This can be useful for checking formatting, generating code etc.
@@ -25,7 +25,7 @@ mvnApps = new Mapping {
 then you can invoke the app from your build like this:
 
 ```shell
-deder exec -t runMvnApp myapp some_additional_args
+deder exec -t runMvnApp myapp -- some_additional_args
 ```
 
 Note that `some_additional_args` will be appended to the `args` defined in the `MvnApp`.
