@@ -7,14 +7,20 @@ const local function testModule(name: String) = new ScalaTestModule {
   fork = true
 }
 
-local const junit4 = (testModule("junit4")) {
+const local function javaTestModule(name: String) = new JavaTestModule {
+  id = name
+  root = name
+  fork = true
+}
+
+local const junit4 = (javaTestModule("junit4")) {
   deps {
     "com.github.sbt:junit-interface:0.13.2"
     "junit:junit:4.13"
   }
 }
 
-local const junit5 = (testModule("junit5")) {
+local const junit5 = (javaTestModule("junit5")) {
   deps {
     "com.github.sbt.junit:jupiter-interface:0.16.0"
     "org.junit.jupiter:junit-jupiter-api:5.10.1"

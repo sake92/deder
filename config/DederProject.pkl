@@ -41,6 +41,7 @@ abstract class DederModule {
 
 typealias ModuleType =
   "java"
+    | "java-test"
     | "scala"
     | "scala-test"
     | "scala-js"
@@ -128,6 +129,21 @@ open class JavaModule extends DederModule {
   /// Named maven apps that can be run via `deder exec -t runMvnApp <name> [args...]`.
   /// Server auto-provides `fmt`, `fmtCheck` (scalafmt) etc for scala modules.
   mvnApps: Mapping<String, MvnApp> = new Mapping {}
+  function asTest(): JavaTestModule = (this.toDynamic().toTyped(JavaTestModule)) {
+    type = "java-test"
+    publish = false
+  }
+}
+
+class JavaTestModule extends JavaModule {
+  type = "java-test"
+  publish = false
+  /// Whether to run tests in a separate JVM process. By default, it's enabled for better isolation and to avoid classpath issues, but it can be disabled for faster test runs during development (not recommended for CI).
+  fork: Boolean = true
+  testFrameworks: Listing<String> = new Listing {
+    "com.novocode.junit.JUnitFramework"
+    "com.github.sbt.junit.jupiter.api.JupiterFramework"
+  }
 }
 
 open class ScalaModule extends JavaModule {
@@ -397,6 +413,36 @@ const function crossModules(
     }
     moduleDeps {
       native
+    }
+  }
+}
+
+class JavaModules {
+  main: JavaModule
+  test: JavaTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateJavaModules {
+  root: String
+  template: JavaModule
+  testTemplate: JavaTestModule = template.asTest()
+  fixed get: JavaModules = javaModules(template, testTemplate, root)
+}
+
+const function javaModules(
+  _template: JavaModule,
+  _testTemplate: JavaTestModule,
+  _root: String,
+): JavaModules = new {
+  main = (_template) {
+    id = _root.replaceAll("/", "-")
+    root = _root
+  }
+  test = (_testTemplate) {
+    id = "\(_root.replaceAll("/", "-"))-test"
+    root = "\(_root)/test"
+    moduleDeps {
+      main
     }
   }
 }

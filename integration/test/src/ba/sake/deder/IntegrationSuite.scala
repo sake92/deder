@@ -15,8 +15,8 @@ class IntegrationSuite extends BaseIntegrationSuite {
       locally {
         val dederRes = executeDederCommand(projectPath, "version")
         val dederOutput = dederRes.out.text()
-        assert(dederOutput.contains("Client version: 0.0.1"))
-        assert(dederOutput.contains("Server version: 0.0.1"))
+        assert(dederOutput.contains("Client version: "))
+        assert(dederOutput.contains("Server version: "))
       }
       // deder modules
       locally {

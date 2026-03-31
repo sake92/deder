@@ -526,8 +526,8 @@ class DederBspServer(
     ensureRunning()
     val items = withLastGoodState(_ => List.empty) { projectStateData =>
       val testModuleIds = projectStateData.projectConfig.modules.asScala.collect {
-        case m: DederProject.ScalaTestModule =>
-          m.id
+        case m: DederProject.ScalaTestModule => m.id
+        case m: DederProject.JavaTestModule  => m.id
       }
       val serverNotificationsLogger = makeServerNotificationsLogger()
       params.getTargets.asScala.filter(targetId => testModuleIds.contains(targetId.moduleId)).flatMap { targetId =>
@@ -808,7 +808,8 @@ class DederBspServer(
   }
 
   private def isTestModule(module: DederModule): Boolean =
-    val testModuleTypes = Set(ModuleType.SCALA_TEST, ModuleType.SCALA_JS_TEST, ModuleType.SCALA_NATIVE_TEST)
+    val testModuleTypes =
+      Set(ModuleType.JAVA_TEST, ModuleType.SCALA_TEST, ModuleType.SCALA_JS_TEST, ModuleType.SCALA_NATIVE_TEST)
     testModuleTypes.contains(module.`type`)
 
   private def buildTarget(module: DederModule, projectStateData: DederProjectStateData): BuildTarget = {
@@ -829,7 +830,7 @@ class DederBspServer(
       case ModuleType.SCALA | ModuleType.SCALA_TEST | ModuleType.SCALA_JS | ModuleType.SCALA_JS_TEST |
           ModuleType.SCALA_NATIVE | ModuleType.SCALA_NATIVE_TEST =>
         List("scala", "java")
-      case ModuleType.JAVA => List("java")
+      case ModuleType.JAVA | ModuleType.JAVA_TEST => List("java")
     }
     val dependencies = module.moduleDeps.asScala.map(buildTargetId)
     val capabilities = new BuildTargetCapabilities()

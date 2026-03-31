@@ -11,6 +11,7 @@ import ba.sake.deder.testing.OutputCaptureContext
 import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompilersCache}
 import ba.sake.deder.config.DederProject.{
   JavaModule,
+  JavaTestModule,
   ModuleType,
   ScalaJsModule,
   ScalaJsTestModule,
@@ -917,7 +918,12 @@ class CoreTasks() extends StrictLogging {
   val testClassesTask = TaskBuilder
     .make[Seq[DiscoveredFrameworkTests]](
       name = "testClasses",
-      supportedModuleTypes = Set(ModuleType.SCALA_TEST, ModuleType.SCALA_JS_TEST, ModuleType.SCALA_NATIVE_TEST)
+      supportedModuleTypes = Set(
+        ModuleType.JAVA_TEST,
+        ModuleType.SCALA_TEST,
+        ModuleType.SCALA_JS_TEST,
+        ModuleType.SCALA_NATIVE_TEST
+      )
     )
     .dependsOn(classesTask)
     .dependsOn(runClasspathTask)
@@ -926,6 +932,7 @@ class CoreTasks() extends StrictLogging {
       val runtimeClasspath = (Seq(classesDir) ++ runClasspath).reverse.distinct.reverse
       ClassLoaderUtils.withTestsClassLoader(runtimeClasspath) { classLoader =>
         val frameworkClassNames = ctx.module match {
+          case m: JavaTestModule        => m.testFrameworks.asScala.toSeq
           case m: ScalaTestModule       => m.testFrameworks.asScala.toSeq
           case m: ScalaJsTestModule     => m.testFrameworks.asScala.toSeq
           case m: ScalaNativeTestModule => m.testFrameworks.asScala.toSeq
@@ -945,7 +952,7 @@ class CoreTasks() extends StrictLogging {
   val testTask = TaskBuilder
     .make[DederTestResults](
       name = "test",
-      supportedModuleTypes = Set(ModuleType.SCALA_TEST)
+      supportedModuleTypes = Set(ModuleType.JAVA_TEST, ModuleType.SCALA_TEST)
     )
     .dependsOn(runClasspathTask)
     .dependsOn(jvmOptionsTask)
@@ -955,10 +962,13 @@ class CoreTasks() extends StrictLogging {
       execute = { ctx =>
         val (runClasspath, jvmOptions, javaHome, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
-          val testModule = ctx.module.asInstanceOf[ScalaTestModule]
+          val (fork, forkEnv) = ctx.module match {
+            case m: JavaTestModule  => (m.fork, m.forkEnv.asScala.to(Map))
+            case m: ScalaTestModule => (m.fork, m.forkEnv.asScala.to(Map))
+            case _                  => (true, Map.empty)
+          }
           val testOptions = DederTestOptions(ctx.args)
-          if testModule.fork then {
-            val forkEnv = testModule.forkEnv.asScala.to(Map)
+          if fork then {
             ForkedTestOrchestrator.run(
               discoveredTests = discoveredTests,
               runtimeClasspath = runClasspath,
@@ -1016,7 +1026,7 @@ class CoreTasks() extends StrictLogging {
   val assemblyTask = TaskBuilder
     .make[os.Path](
       name = "assembly",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA, ModuleType.SCALA_TEST)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(scalaVersionTask)
     .dependsOn(finalManifestSettingsTask)

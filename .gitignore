@@ -18,6 +18,7 @@ _site/
 .flatmark-cache
 docs/static/**/*.pkl
 
+.deder/
 **/.deder/**
 !**/.deder/server.properties
 
