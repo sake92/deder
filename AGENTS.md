@@ -30,6 +30,8 @@ This project uses [Mill](https://mill-build.org/) (`build.mill`). Key commands:
 ./scripts/run-it-tests.sh ba.sake.deder.bsp.BspIntegrationSuite  # single IT suite
 ```
 
+Check out @README.md @CONTRIBUTING.md @docs/content/reference/server-properties.md @docs/content/reference/cheatsheet.md for more details if needed.
+
 ## Key Patterns
 
 ### Task DAG

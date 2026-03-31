@@ -25,7 +25,7 @@ object ForkedTestMain {
           None
       }
     }
-    
+
     val executorService = Executors.newFixedThreadPool(forkedArgs.workerThreads)
     val logger = new ForkedTestLogger(moduleId = "fork")
 
@@ -44,6 +44,5 @@ object ForkedTestMain {
       executorService.shutdown()
     }
   }
-
 
 }
