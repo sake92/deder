@@ -46,6 +46,8 @@ distributions:
         platform: linux-x86_64
       - path: deder-client-osx-aarch_64
         platform: osx-aarch_64
+      - path: deder-client-windows-x86_64.exe
+        platform: windows-x86_64
     brew:
       formulaName: deder
 
@@ -57,3 +59,11 @@ packagers:
     repository:
       owner: sake92
       name: homebrew-tap
+  winget:
+    active: ALWAYS
+    repository:
+      owner: sake92
+    package:
+      name: deder
+    publisher:
+      name: Sakib Hadžiavdić
