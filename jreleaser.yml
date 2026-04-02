@@ -56,6 +56,7 @@ distributions:
       formulaName: deder
     winget:
       package:
+        identifier: SakibHadziavdic.deder
         name: deder
 
 packagers:
