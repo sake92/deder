@@ -50,6 +50,8 @@ distributions:
     scoop:
       active: ALWAYS
       packageName: deder
+      bin:
+        - deder.exe
   # doesnt work with FLAT_BINARY
    # winget:
    #   active: ALWAYS
