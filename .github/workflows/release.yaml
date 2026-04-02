@@ -93,11 +93,13 @@ jobs:
           ./mill -i client-native.nativeImage
           ls out/client-native/nativeImage.dest/
           cp out/client-native/nativeImage.dest/native-executable${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
-      # if windows: zip the executable, needed for scoop
+      # if windows: rename to deder.exe and zip
       - name: Zip Windows executable
         if: ${{ matrix.os.name == 'windows-x86_64' }}
         shell: pwsh
-        run: Compress-Archive deder-client-${{ matrix.os.name }}${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}.zip
+        run: |
+          Rename-Item deder-client-${{ matrix.os.name }}${{ matrix.os.ext }} deder${{ matrix.os.ext }}
+          Compress-Archive deder${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}.zip
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
