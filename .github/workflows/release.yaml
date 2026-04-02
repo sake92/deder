@@ -93,7 +93,7 @@ jobs:
           ./mill -i client-native.nativeImage
           ls out/client-native/nativeImage.dest/
           cp out/client-native/nativeImage.dest/native-executable${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
-      # if windows zip the executable, needed for scoop
+      # if windows: zip the executable, needed for scoop
       - name: Zip Windows executable
         if: ${{ matrix.os.name == 'windows-x86_64' }}
         shell: pwsh
