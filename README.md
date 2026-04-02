@@ -33,7 +33,7 @@ The [examples](examples) folder has working projects that show you how to use De
 
 ## Installation
 
-### macOS and Linux (Homebrew)
+### MacOS and Linux (Homebrew)
 
 ```shell
 brew tap sake92/tap

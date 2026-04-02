@@ -6,11 +6,18 @@ description: Deder Installation
 
 # Installation
 
-### Homebrew (macOS and Linux)
+### MacOS and Linux (Homebrew)
 
 ```shell
 brew tap sake92/tap
 brew install deder
+```
+
+### Windows 10+
+
+```shell
+scoop bucket add sake92 https://github.com/sake92/scoop-bucket.git
+scoop install deder
 ```
 
 

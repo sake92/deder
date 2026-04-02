@@ -30,7 +30,6 @@ Compared to **sbt**, **Mill**, **Gradle**, and **Maven**:
 | **Init/scaffold command** | Missing | `sbt new`, `mill init`, `gradle init` - create project from template. |
 | **Repository configuration** | Not documented | No way to add custom Maven repositories (private artifactory, etc.) visible in config. |
 | **Multi-JDK testing** | Missing | Gradle toolchains, sbt-javaversions for matrix testing across JDK versions. |
-| **Incremental test execution** | Unclear | Not documented whether only affected tests re-run after changes. |
 
 ---
 
