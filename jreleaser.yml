@@ -29,18 +29,10 @@ distributions:
     type: SINGLE_JAR
     artifacts:
       - path: deder-server.jar
-    brew:
-      active: NEVER
-    winget:
-      active: NEVER
   deder-client-jar:
     type: SINGLE_JAR
     artifacts:
       - path: deder-client.jar
-    brew:
-      active: NEVER
-    winget:
-      active: NEVER
   deder-client-native:
     type: FLAT_BINARY
     executable:
@@ -50,25 +42,36 @@ distributions:
         platform: linux-x86_64
       - path: deder-client-osx-aarch_64
         platform: osx-aarch_64
-      - path: deder-client-windows-x86_64.exe
+      - path: deder-client-windows-x86_64.zip
         platform: windows-x86_64
     brew:
+      active: ALWAYS
       formulaName: deder
-    winget:
-      package:
-        identifier: SakibHadziavdic.deder
-        name: deder
+    scoop:
+      active: ALWAYS
+      packageName: deder
+  # doesnt work with FLAT_BINARY
+   # winget:
+   #   active: ALWAYS
+   #   package:
+   #     identifier: SakibHadziavdic.deder
+   #     name: deder
 
 packagers:
   brew:
-    active: ALWAYS
+    active: NEVER
     # same formula for both macOS and Linux
     multiPlatform: true
     repository:
       owner: sake92
       name: homebrew-tap
+  scoop:
+    active: NEVER
+    repository:
+      owner: sake92
+      name: scoop-bucket
   winget:
-    active: ALWAYS
+    active: NEVER
     repository:
       owner: sake92
       name: winget-app

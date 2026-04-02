@@ -98,11 +98,19 @@ jobs:
           ./mill -i client-native.nativeImage
           ls out/client-native/nativeImage.dest/
           cp out/client-native/nativeImage.dest/native-executable${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
+      # if windows zip the executable, needed for scoop
+      - name: Zip Windows executable
+        if: ${{ matrix.os.name == 'windows-x86_64' }}
+        uses: thedoctor0/zip-release@0.7.5
+        with:
+          type: 'zip'
+          filename: 'deder-client-${{ matrix.os.name }}.zip'
+          path: 'deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}'
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: deder-client-${{ matrix.os.name }}
-          path: deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
+          path: deder-client-${{ matrix.os.name }}*
 
   release:
     needs: [ precheck, build-jars, build-client-native-image ]
