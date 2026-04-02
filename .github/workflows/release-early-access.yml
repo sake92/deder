@@ -23,6 +23,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.repository == 'sake92/deder' && startsWith(github.event.workflow_run.head_commit.message, 'Releasing version') != true }}
     runs-on: ubuntu-latest
     outputs:
+      # always -SNAPSHOT, returned by mill, brew/scoop/winget are skipped
       VERSION: ${{ steps.vars.outputs.VERSION }}
     steps:
       - name: Checkout
@@ -98,11 +99,6 @@ jobs:
           ./mill -i client-native.nativeImage
           ls out/client-native/nativeImage.dest/
           cp out/client-native/nativeImage.dest/native-executable${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
-      # if windows zip the executable, needed for scoop
-      - name: Zip Windows executable
-        if: ${{ matrix.os.name == 'windows-x86_64' }}
-        shell: pwsh
-        run: Compress-Archive deder-client-${{ matrix.os.name }}${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}.zip
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -136,8 +132,6 @@ jobs:
         env:
           JRELEASER_PROJECT_VERSION: ${{ needs.precheck.outputs.VERSION }}
           JRELEASER_GITHUB_TOKEN: ${{ secrets.GH_PAT }}
-          JRELEASER_HOMEBREW_GITHUB_TOKEN: ${{ secrets.JRELEASER_HOMEBREW_GITHUB_TOKEN }}
-          JRELEASER_WINGET_GITHUB_TOKEN: ${{ secrets.JRELEASER_WINGET_GITHUB_TOKEN }}
       - name: JReleaser output
         if: always()
         uses: actions/upload-artifact@v4
