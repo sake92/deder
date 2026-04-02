@@ -5,10 +5,6 @@
 - `--dot` format works well and can be piped to graphviz.
 - **Fix:** Either limit line width with wrapping/truncation, or make the ASCII renderer use a more compact layout (vertical instead of horizontal).
 
-**8. TODO make tests: Empty modules in `java-scala` example**
-- `java-project/src/` and `scala-project/src/` directories exist but are completely empty. The compilation succeeds (no sources to compile) but this is confusing for someone studying the example.
-- **Fix:** Add at least a trivial `Main.java` and `Main.scala` to demonstrate these module types.
-
 **12. Annotation processor warnings in java-scala example**
 - Compiling `java-scala-project` produces: `Could not determine source for class ba.sake.deder.javascalaproject.ImmutableBook$Builder` and `ImmutableBook`. These are generated classes from annotation processing, so the warnings are expected but noisy.
 - **Fix:** Consider suppressing these warnings for annotation-processor-generated classes, or document this as expected behavior.

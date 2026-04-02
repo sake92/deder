@@ -3,8 +3,10 @@
 
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 
+- deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
+
 # CI
-- windows..
+- more package managers?
 
 ## Config
 
@@ -18,31 +20,26 @@
 - fullopt
 - configuration..
 
-## Scalafmt
-- add as a subcommand, `deder format`
-
 ## Scalafix
 - support out of the box? `deder fix`
+- scalafix https://gabro.github.io/scalafix/docs/installation/cli.html
 
 ## Tests
 
-- optionally run as separate JVM process(es), for isolation etc..
+- optimized running:
   - on first run just randomly distribute between workers, record stats per test/suite
   - on next run use stats to figure out how to exec more performantly
   - use H2 db for coordination
-
-- print summary of failed tests at the end, instead of just printing each module's test results, which is noisy and not ideal for CI etc..
 
 ## CLI
 - --mermaid diagrams
     - modules as subgraphs https://mermaid.js.org/syntax/flowchart.html#subgraphs
 
 ## Misc
-
 - temp override of settings, say scalacOptions when running BSP request??? hmmm
 
 ## BSP
-- fix tests
+- more interactive tests
 - java main classes cant be run..??
 
 

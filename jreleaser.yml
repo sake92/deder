@@ -31,11 +31,15 @@ distributions:
       - path: deder-server.jar
     brew:
       active: NEVER
+    winget:
+      active: NEVER
   deder-client-jar:
     type: SINGLE_JAR
     artifacts:
       - path: deder-client.jar
     brew:
+      active: NEVER
+    winget:
       active: NEVER
   deder-client-native:
     type: FLAT_BINARY
@@ -50,6 +54,9 @@ distributions:
         platform: windows-x86_64
     brew:
       formulaName: deder
+    winget:
+      package:
+        name: deder
 
 packagers:
   brew:
@@ -63,6 +70,7 @@ packagers:
     active: ALWAYS
     repository:
       owner: sake92
+      name: winget-app
     package:
       name: deder
     publisher:
