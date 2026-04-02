@@ -19,6 +19,7 @@ Compared to **sbt**, **Mill**, **Gradle**, and **Maven**:
 |---------|----------------|-------|
 | **Dependency tree visualization** | Missing | sbt has `dependencyTree`, Mill has `ivyDepsTree`. Useful for debugging dependency conflicts. |
 | **Dependency updates checker** | Missing | sbt-updates, Mill's dependency updates. Shows available version bumps. |
+| **Dependency exclusions** | Not documented | Not clear if you can exclude transitive dependencies. |
 | **Custom task definition** | Missing | All tasks are predefined. Users can't define custom tasks in the config. sbt/Mill/Gradle all support this. |
 | **Console/REPL** | Missing | sbt has `console`, Mill has `console`. Starts a Scala REPL with project classpath. |
 | **Resource generation** | Partial | `generatedSources` exists but no `generatedResources` task visible. |
@@ -27,7 +28,6 @@ Compared to **sbt**, **Mill**, **Gradle**, and **Maven**:
 | **Benchmarking (JMH)** | Missing | sbt-jmh, Mill JMH module. |
 | **Bill of Materials (BOM) support** | Missing | Maven BOM imports for dependency management. |
 | **Init/scaffold command** | Missing | `sbt new`, `mill init`, `gradle init` - create project from template. |
-| **Dependency exclusions** | Not documented | Not clear if you can exclude transitive dependencies. |
 | **Repository configuration** | Not documented | No way to add custom Maven repositories (private artifactory, etc.) visible in config. |
 | **Multi-JDK testing** | Missing | Gradle toolchains, sbt-javaversions for matrix testing across JDK versions. |
 | **Incremental test execution** | Unclear | Not documented whether only affected tests re-run after changes. |
