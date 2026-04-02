@@ -37,6 +37,7 @@ distributions:
     type: FLAT_BINARY
     executable:
       name: deder
+      windowsExtension: exe
     artifacts:
       - path: deder-client-linux-x86_64
         platform: linux-x86_64
@@ -45,13 +46,11 @@ distributions:
       - path: deder-client-windows-x86_64.zip
         platform: windows-x86_64
     brew:
-      active: ALWAYS
+      active: RELEASE
       formulaName: deder
     scoop:
-      active: ALWAYS
+      active: RELEASE
       packageName: deder
-      bin:
-        - deder.exe
   # doesnt work with FLAT_BINARY
    # winget:
    #   active: ALWAYS
@@ -72,12 +71,12 @@ packagers:
     repository:
       owner: sake92
       name: scoop-bucket
-  winget:
-    active: NEVER
-    repository:
-      owner: sake92
-      name: winget-app
-    package:
-      name: deder
-    publisher:
-      name: Sakib Hadžiavdić
+  #winget:
+  #  active: NEVER
+  #  repository:
+  #    owner: sake92
+  #    name: winget-app
+  #  package:
+  #    name: deder
+  #  publisher:
+  #    name: Sakib Hadžiavdić

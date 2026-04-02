@@ -33,11 +33,18 @@ The [examples](examples) folder has working projects that show you how to use De
 
 ## Installation
 
-### Homebrew (macOS and Linux)
+### macOS and Linux (Homebrew)
 
 ```shell
 brew tap sake92/tap
 brew install deder
+```
+
+### Windows 10+
+
+```shell
+scoop bucket add sake92 https://github.com/sake92/scoop-bucket.git
+scoop install deder
 ```
 
 ### Manual installation
