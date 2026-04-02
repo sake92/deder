@@ -206,7 +206,7 @@ public class Main {
         processBuilder.redirectErrorStream(true);
         var serverProcess = processBuilder.start();
         var exited = serverProcess.waitFor(2, TimeUnit.SECONDS);
-        if (exited) {
+        if (exited && serverProcess.exitValue() != 0) {
             System.err.println("Failed to start Deder server. Please check logs for details: ");
             System.err.println(logFile.toAbsolutePath());
             System.err.println(serverLogFile.toAbsolutePath());
