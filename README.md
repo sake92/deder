@@ -127,12 +127,14 @@ deder exec -t test uber.%
 # execute specific test called "test1" in suite uber.MyTestSuite1
 deder exec -t test uber.MyTestSuite1#test1
 
-################ BSP
-# write BSP config file for current project
-# and then open it in VSCode or IntelliJ (open as a BSP project)
+################ Misc
+# write BSP config file
 deder bsp install
 
-################ Misc
+# fix with scalafix
+deder exec -t fix
+deder exec -t fixCheck
+
 # format with scalafmt
 deder exec -t runMvnApp fmt
 deder exec -t runMvnApp fmtCheck

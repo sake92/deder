@@ -72,6 +72,10 @@ deder exec -t test uber.MyTestSuite1#test1
 # write BSP config file
 deder bsp install
 
+# fix with scalafix
+deder exec -t fix
+deder exec -t fixCheck
+
 # format with scalafmt
 deder exec -t runMvnApp fmt
 deder exec -t runMvnApp fmtCheck
