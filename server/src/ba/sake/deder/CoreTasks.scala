@@ -930,12 +930,13 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(sourcesTask)
     .dependsOn(scalaVersionTask)
+    .dependsOn(scalacOptionsTask)
     .dependsOn(jvmOptionsTask)
     .dependsOn(compileTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(semanticdbDirTask)
     .build { ctx =>
-      val (sources, scalaVersion, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
+      val (sources, scalaVersion, scalacOptions, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
       val scalaVersionRegex = """(\d+)\.(\d+)\.(\d+).*""".r
       val scalafixScalaVersion = scalaVersion match {
         case scalaVersionRegex(major, minor, patch) =>
@@ -957,6 +958,7 @@ class CoreTasks() extends StrictLogging {
 
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val scalafixClasspath = (compileClasspath :+ semanticdbDir).mkString(File.pathSeparator)
+      val scalacOptionsArgs = if scalacOptions.nonEmpty then Seq("--scalac-options", scalacOptions.mkString(",")) else Seq.empty
       val scalafixArgs = Seq(
         "--sourceroot",
         DederGlobals.projectRootDir.toString,
@@ -964,7 +966,7 @@ class CoreTasks() extends StrictLogging {
         scalafixClasspath,
         "--scala-version",
         scalaVersion
-      ) ++ sourcePaths ++ ctx.args
+      ) ++ scalacOptionsArgs ++ sourcePaths ++ ctx.args
 
       val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, "scalafix.cli.Cli") ++ scalafixArgs
       logger.info(s"Running scalafix fix: ${cmd}")
@@ -990,12 +992,13 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(sourcesTask)
     .dependsOn(scalaVersionTask)
+    .dependsOn(scalacOptionsTask)
     .dependsOn(jvmOptionsTask)
     .dependsOn(compileTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(semanticdbDirTask)
     .build { ctx =>
-      val (sources, scalaVersion, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
+      val (sources, scalaVersion, scalacOptions, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
       val scalaVersionRegex = """(\d+)\.(\d+)\.(\d+).*""".r
       val scalafixScalaVersion = scalaVersion match {
         case scalaVersionRegex(major, minor, patch) =>
@@ -1017,6 +1020,7 @@ class CoreTasks() extends StrictLogging {
 
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val scalafixClasspath = (compileClasspath :+ semanticdbDir).mkString(File.pathSeparator)
+      val scalacOptionsArgs = if scalacOptions.nonEmpty then Seq("--scalac-options", scalacOptions.mkString(",")) else Seq.empty
       val scalafixArgs = Seq(
         "--sourceroot",
         DederGlobals.projectRootDir.toString,
@@ -1025,7 +1029,7 @@ class CoreTasks() extends StrictLogging {
         "--scala-version",
         scalaVersion,
         "--test"
-      ) ++ sourcePaths ++ ctx.args
+      ) ++ scalacOptionsArgs ++ sourcePaths ++ ctx.args
 
       val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, "scalafix.cli.Cli") ++ scalafixArgs
       logger.info(s"Running scalafix fixCheck: ${cmd}")
