@@ -117,6 +117,10 @@ deder exec -t test uber.MyTestSuite1#test1
 <span class="hljs-meta prompt_"># </span><span class="language-bash">write BSP config file</span>
 deder bsp install
 <span class="hljs-meta prompt_">
+# </span><span class="language-bash">fix with scalafix</span>
+deder exec -t fix
+deder exec -t fixCheck
+<span class="hljs-meta prompt_">
 # </span><span class="language-bash">format with scalafmt</span>
 deder exec -t runMvnApp fmt
 deder exec -t runMvnApp fmtCheck
