@@ -916,9 +916,8 @@ class CoreTasks() extends StrictLogging {
     }
 
   val fixTask = TaskBuilder
-    .make[Unit](
+    .make[String](
       name = "fix",
-      singleton = true,
       supportedModuleTypes = Set(
         ModuleType.SCALA,
         ModuleType.SCALA_TEST,
@@ -936,12 +935,13 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (sources, scalaVersion, _, compileClasspath, semanticdbDir) = ctx.depResults
 
-      val scalafixDep = "ch.epfl.scala:scalafix-cli_2.13:0.12.1"
+      val scalafixDep = "ch.epfl.scala:scalafix-cli_2.13.18:0.14.6"
       val dependency = Dependency.make(scalafixDep, scalaVersion)
       val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
 
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val args = Array[String](
+        "--no-sys-exit",
         "--sourceroot",
         DederGlobals.projectRootDir.toString,
         "--classpath",
@@ -953,12 +953,12 @@ class CoreTasks() extends StrictLogging {
         val scalafixMain = scalafixClass.getMethod("main", classOf[Array[String]])
         scalafixMain.invoke(null, args)
       }
+      "Scalafix fix completed"
     }
 
   val fixCheckTask = TaskBuilder
-    .make[Unit](
+    .make[String](
       name = "fixCheck",
-      singleton = true,
       supportedModuleTypes = Set(
         ModuleType.SCALA,
         ModuleType.SCALA_TEST,
@@ -982,6 +982,7 @@ class CoreTasks() extends StrictLogging {
 
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val args = Array[String](
+        "--no-sys-exit",
         "--sourceroot",
         DederGlobals.projectRootDir.toString,
         "--classpath",
@@ -994,6 +995,7 @@ class CoreTasks() extends StrictLogging {
         val scalafixMain = scalafixClass.getMethod("main", classOf[Array[String]])
         scalafixMain.invoke(null, args)
       }
+      "Scalafix fixCheck completed"
     }
 
   val testClassesTask = TaskBuilder
