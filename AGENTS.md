@@ -68,6 +68,7 @@ CLI communication uses newline-delimited JSON over Unix sockets. Message types a
 - **OpenTelemetry**: tracing spans wrap BSP/CLI requests (`OTEL.TRACER`, see `OTEL.scala`). Use `traced()` / `javaFuture()` wrappers in BSP server
 - **Test framework**: munit for both unit and integration tests
 - **Examples**: `examples/` contains working sample projects (multi-module, cross-platform, ScalaJS, etc.). Each has a `reset.sh` that copies the server JAR and runs `deder bsp install`
+- **Design docs**: Never commit files in `docs/superpowers/` directory
 
 ## Output Layout
 
