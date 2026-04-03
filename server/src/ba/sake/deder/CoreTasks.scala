@@ -915,6 +915,87 @@ class CoreTasks() extends StrictLogging {
       }
     }
 
+  val fixTask = TaskBuilder
+    .make[Unit](
+      name = "fix",
+      singleton = true,
+      supportedModuleTypes = Set(
+        ModuleType.SCALA,
+        ModuleType.SCALA_TEST,
+        ModuleType.SCALA_JS,
+        ModuleType.SCALA_JS_TEST,
+        ModuleType.SCALA_NATIVE,
+        ModuleType.SCALA_NATIVE_TEST
+      )
+    )
+    .dependsOn(sourcesTask)
+    .dependsOn(scalaVersionTask)
+    .dependsOn(compileTask)
+    .dependsOn(compileClasspathTask)
+    .dependsOn(semanticdbDirTask)
+    .build { ctx =>
+      val (sources, scalaVersion, _, compileClasspath, semanticdbDir) = ctx.depResults
+
+      val scalafixDep = "ch.epfl.scala:scalafix-cli_2.13:0.12.1"
+      val dependency = Dependency.make(scalafixDep, scalaVersion)
+      val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
+
+      val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
+      val args = Array[String](
+        "--sourceroot",
+        DederGlobals.projectRootDir.toString,
+        "--classpath",
+        compileClasspath.mkString(File.pathSeparator)
+      ) ++ sourcePaths ++ ctx.args
+
+      ClassLoaderUtils.withClassLoader(jars, parent = null) { classLoader =>
+        val scalafixClass = classLoader.loadClass("scalafix.cli.Cli")
+        val scalafixMain = scalafixClass.getMethod("main", classOf[Array[String]])
+        scalafixMain.invoke(null, args)
+      }
+    }
+
+  val fixCheckTask = TaskBuilder
+    .make[Unit](
+      name = "fixCheck",
+      singleton = true,
+      supportedModuleTypes = Set(
+        ModuleType.SCALA,
+        ModuleType.SCALA_TEST,
+        ModuleType.SCALA_JS,
+        ModuleType.SCALA_JS_TEST,
+        ModuleType.SCALA_NATIVE,
+        ModuleType.SCALA_NATIVE_TEST
+      )
+    )
+    .dependsOn(sourcesTask)
+    .dependsOn(scalaVersionTask)
+    .dependsOn(compileTask)
+    .dependsOn(compileClasspathTask)
+    .dependsOn(semanticdbDirTask)
+    .build { ctx =>
+      val (sources, scalaVersion, _, compileClasspath, semanticdbDir) = ctx.depResults
+
+      val scalafixDep = "ch.epfl.scala:scalafix-cli_2.13:0.12.1"
+      val dependency = Dependency.make(scalafixDep, scalaVersion)
+      val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
+
+      val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
+      val args = Array[String](
+        "--sourceroot",
+        DederGlobals.projectRootDir.toString,
+        "--classpath",
+        compileClasspath.mkString(File.pathSeparator),
+        "--test"
+      ) ++ sourcePaths ++ ctx.args
+
+      ClassLoaderUtils.withClassLoader(jars, parent = null) { classLoader =>
+        val scalafixClass = classLoader.loadClass("scalafix.cli.Cli")
+        val scalafixMain = scalafixClass.getMethod("main", classOf[Array[String]])
+        scalafixMain.invoke(null, args)
+      }
+    }
+
   val testClassesTask = TaskBuilder
     .make[Seq[DiscoveredFrameworkTests]](
       name = "testClasses",
@@ -1345,6 +1426,8 @@ class CoreTasks() extends StrictLogging {
     runTask,
     runMainTask,
     runMvnAppTask,
+    fixTask,
+    fixCheckTask,
     testClassesTask,
     testTask,
     pomSettingsTask,
