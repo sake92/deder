@@ -917,7 +917,7 @@ class CoreTasks() extends StrictLogging {
     }
 
   val fixTask = TaskBuilder
-    .make[String](
+    .make[Seq[String]](
       name = "fix",
       supportedModuleTypes = Set(
         ModuleType.SCALA,
@@ -930,44 +930,39 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(sourcesTask)
     .dependsOn(scalaVersionTask)
+    .dependsOn(jvmOptionsTask)
     .dependsOn(compileTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(semanticdbDirTask)
     .build { ctx =>
-      val (sources, scalaVersion, _, compileClasspath, semanticdbDir) = ctx.depResults
+      val (sources, scalaVersion, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
 
       val scalafixDep = "ch.epfl.scala:scalafix-cli_2.13.18:0.14.6"
       val dependency = Dependency.make(scalafixDep, scalaVersion)
       val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
+      val cp = jars.map(_.toString).mkString(File.pathSeparator)
 
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val scalafixClasspath = (compileClasspath :+ semanticdbDir).mkString(File.pathSeparator)
-      val args = Array[String](
-        "--no-sys-exit",
+      val scalafixArgs = Seq(
         "--sourceroot",
         DederGlobals.projectRootDir.toString,
         "--classpath",
         scalafixClasspath
       ) ++ sourcePaths ++ ctx.args
 
-      ClassLoaderUtils.withClassLoader(jars, parent = null) { classLoader =>
-        val scalafixClass = classLoader.loadClass("scalafix.cli.Cli")
-        val scalafixMain = scalafixClass.getMethod("main", classOf[Array[String]])
-        try {
-          scalafixMain.invoke(null, args)
-          "Scalafix fix completed"
-        } catch {
-          case e: InvocationTargetException =>
-            ctx.notifications.add(
-              ServerNotification.logError(s"Scalafix fix failed: ${e.getCause().getMessage}", Some(ctx.module.id))
-            )
-            "Scalafix fix failed"
-        }
+      val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, "scalafix.cli.Cli") ++ scalafixArgs
+      logger.info(s"Running scalafix fix: ${cmd}")
+      val forkEnv = ctx.module match {
+        case m: JavaModule => m.forkEnv.asScala.to(Map)
+        case _             => Map.empty
       }
+      ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, ctx.watch))
+      cmd
     }
 
   val fixCheckTask = TaskBuilder
-    .make[String](
+    .make[Seq[String]](
       name = "fixCheck",
       supportedModuleTypes = Set(
         ModuleType.SCALA,
@@ -980,20 +975,21 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(sourcesTask)
     .dependsOn(scalaVersionTask)
+    .dependsOn(jvmOptionsTask)
     .dependsOn(compileTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(semanticdbDirTask)
     .build { ctx =>
-      val (sources, scalaVersion, _, compileClasspath, semanticdbDir) = ctx.depResults
+      val (sources, scalaVersion, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
 
       val scalafixDep = "ch.epfl.scala:scalafix-cli_2.13.18:0.14.6"
       val dependency = Dependency.make(scalafixDep, scalaVersion)
       val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
+      val cp = jars.map(_.toString).mkString(File.pathSeparator)
 
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val scalafixClasspath = (compileClasspath :+ semanticdbDir).mkString(File.pathSeparator)
-      val args = Array[String](
-        "--no-sys-exit",
+      val scalafixArgs = Seq(
         "--sourceroot",
         DederGlobals.projectRootDir.toString,
         "--classpath",
@@ -1001,12 +997,14 @@ class CoreTasks() extends StrictLogging {
         "--test"
       ) ++ sourcePaths ++ ctx.args
 
-      ClassLoaderUtils.withClassLoader(jars, parent = null) { classLoader =>
-        val scalafixClass = classLoader.loadClass("scalafix.cli.Cli")
-        val scalafixMain = scalafixClass.getMethod("main", classOf[Array[String]])
-        scalafixMain.invoke(null, args)
+      val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, "scalafix.cli.Cli") ++ scalafixArgs
+      logger.info(s"Running scalafix fixCheck: ${cmd}")
+      val forkEnv = ctx.module match {
+        case m: JavaModule => m.forkEnv.asScala.to(Map)
+        case _             => Map.empty
       }
-      "Scalafix fixCheck completed"
+      ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, false))
+      cmd
     }
 
   val testClassesTask = TaskBuilder
