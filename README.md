@@ -145,11 +145,11 @@ deder exec -t runMvnApp fmtCheck
 Run `deder bsp install` and just open with VSCode or IntelliJ (open as a BSP project).
 The `reset.sh` script does this for you in examples...
 
-Currently working features:
+Supported features:
 - import of project
 - navigation
 - compilation and diagnostics
-- run main scala classes (Java doesnt.. #todo-fixme )
+- run main classes
 - run tests
 
 If you work on server code, after you build it you can run `./reset.sh` in examples/multi
