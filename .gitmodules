@@ -1,0 +1,3 @@
+[submodule "examples/thirdparty/thealgorithms-java/repo"]
+	path = examples/thirdparty/thealgorithms-java/repo
+	url = https://github.com/TheAlgorithms/Java.git
