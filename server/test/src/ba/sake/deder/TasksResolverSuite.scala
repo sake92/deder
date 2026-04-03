@@ -101,7 +101,9 @@ class TasksResolverSuite extends munit.FunSuite {
       "publishArtifacts",
       "publishLocal",
       "publish",
-      "runMvnApp"
+      "runMvnApp",
+      "fix",
+      "fixCheck"
     )
     val taskInstancesPerModule = tasksResolver.taskInstancesPerModule
     locally {
@@ -260,7 +262,21 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.scalacPlugins", s"${moduleId}.scalaSemanticdbVersion"),
       (s"${moduleId}.scalacPlugins", s"${moduleId}.scalacPluginDeps"),
       (s"${moduleId}.sourcesJar", s"${moduleId}.sources"),
-      (s"${moduleId}.sourcesJar", s"${moduleId}.pomSettings")
+      (s"${moduleId}.sourcesJar", s"${moduleId}.pomSettings"),
+      (s"${moduleId}.fix", s"${moduleId}.sources"),
+      (s"${moduleId}.fix", s"${moduleId}.scalaVersion"),
+      (s"${moduleId}.fix", s"${moduleId}.scalacOptions"),
+      (s"${moduleId}.fix", s"${moduleId}.jvmOptions"),
+      (s"${moduleId}.fix", s"${moduleId}.compile"),
+      (s"${moduleId}.fix", s"${moduleId}.compileClasspath"),
+      (s"${moduleId}.fix", s"${moduleId}.semanticdb"),
+      (s"${moduleId}.fixCheck", s"${moduleId}.sources"),
+      (s"${moduleId}.fixCheck", s"${moduleId}.scalaVersion"),
+      (s"${moduleId}.fixCheck", s"${moduleId}.scalacOptions"),
+      (s"${moduleId}.fixCheck", s"${moduleId}.jvmOptions"),
+      (s"${moduleId}.fixCheck", s"${moduleId}.compile"),
+      (s"${moduleId}.fixCheck", s"${moduleId}.compileClasspath"),
+      (s"${moduleId}.fixCheck", s"${moduleId}.semanticdb")
     )
 
   private def transitiveScalaModuleTaskEdges(moduleId: String, dependencyModuleId: String): Set[(String, String)] =

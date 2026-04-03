@@ -179,7 +179,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/multi") { projectPath =>
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec -m uber-test -t test").err.text()
-       // println(s"Test output:\n$dederOutput")
+        // println(s"Test output:\n$dederOutput")
         // assert(resText.contains("Args = argA, argB, argC"))
       }
     }
@@ -214,14 +214,26 @@ class IntegrationSuite extends BaseIntegrationSuite {
       ) derives JsonRW
       val bspConfig = os.read(bspConfigPath)
       val bspConfigJson = bspConfig.parseJson[BspConfig]
-      assert(bspConfigJson.name == "deder-bsp")
-     // assert(bspConfigJson.version == "0.0.1")
-      assert(bspConfigJson.bspVersion == "2.2.0-M2")
-      assert(bspConfigJson.argv.exists(_.contains("deder")))
-      assert(bspConfigJson.argv.last == "bsp")
+      assert(bspConfigJson.name == "deder-bsp", s"Expected 'name' to be 'deder-bsp', but got: ${bspConfigJson.name}")
+      // assert(bspConfigJson.version == "0.0.1")
+      assert(
+        bspConfigJson.bspVersion == "2.2.0-M2",
+        s"Expected 'bspVersion' to be '2.2.0-M2', but got: ${bspConfigJson.bspVersion}"
+      )
+      assert(
+        bspConfigJson.argv.exists(_.contains("deder")),
+        s"Expected 'argv' to contain 'deder', but got: ${bspConfigJson.argv}"
+      )
+      assert(
+        bspConfigJson.argv.last == "bsp",
+        s"Expected last element of 'argv' to be 'bsp', but got: ${bspConfigJson.argv.last}"
+      )
       val languages = bspConfigJson.languages
-      assert(languages.contains("java"))
-      assert(languages.contains("scala"))
+      assert(languages.contains("java"), s"Expected 'languages' to contain 'java', but got: ${bspConfigJson.languages}")
+      assert(
+        languages.contains("scala"),
+        s"Expected 'languages' to contain 'scala', but got: ${bspConfigJson.languages}"
+      )
     }
   }
 }
