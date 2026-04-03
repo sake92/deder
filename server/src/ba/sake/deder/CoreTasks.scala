@@ -936,8 +936,21 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(semanticdbDirTask)
     .build { ctx =>
       val (sources, scalaVersion, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
+      val scalaVersionRegex = """(\d+)\.(\d+)\.(\d+).*""".r
+      val scalafixScalaVersion = scalaVersion match {
+        case scalaVersionRegex(major, minor, patch) =>
+          if major.toInt == 3 then {
+            if minor.toInt >= 8 then "3.8.2"
+            else if minor.toInt >= 7 then "3.7.4"
+            else if minor.toInt >= 6 then "3.6.4"
+            else if minor.toInt >= 5 then "3.5.2"
+            else "3.3.7"
+          } else if major.toInt == 2 && minor.toInt == 13 then "2.13.18"
+          else "2.12.21"
+        case _ => "2.13.18"
+      }
 
-      val scalafixDep = "ch.epfl.scala:scalafix-cli_2.13.18:0.14.6"
+      val scalafixDep = s"ch.epfl.scala:scalafix-cli_$scalafixScalaVersion:0.14.6"
       val dependency = Dependency.make(scalafixDep, scalaVersion)
       val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
       val cp = jars.map(_.toString).mkString(File.pathSeparator)
@@ -981,8 +994,21 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(semanticdbDirTask)
     .build { ctx =>
       val (sources, scalaVersion, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
+      val scalaVersionRegex = """(\d+)\.(\d+)\.(\d+).*""".r
+      val scalafixScalaVersion = scalaVersion match {
+        case scalaVersionRegex(major, minor, patch) =>
+          if major.toInt == 3 then {
+            if minor.toInt >= 8 then "3.8.2"
+            else if minor.toInt >= 7 then "3.7.4"
+            else if minor.toInt >= 6 then "3.6.4"
+            else if minor.toInt >= 5 then "3.5.2"
+            else "3.3.7"
+          } else if major.toInt == 2 && minor.toInt == 13 then "2.13.18"
+          else "2.12.21"
+        case _ => "2.13.18"
+      }
 
-      val scalafixDep = "ch.epfl.scala:scalafix-cli_2.13.18:0.14.6"
+      val scalafixDep = s"ch.epfl.scala:scalafix-cli_$scalafixScalaVersion:0.14.6"
       val dependency = Dependency.make(scalafixDep, scalaVersion)
       val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
       val cp = jars.map(_.toString).mkString(File.pathSeparator)
