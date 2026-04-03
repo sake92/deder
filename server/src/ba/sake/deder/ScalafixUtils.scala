@@ -37,7 +37,7 @@ object ScalafixUtils {
       sourcePaths: Seq[String],
       extraArgs: Seq[String]
   ): Seq[String] = {
-    val scalafixClasspath = (compileClasspath :+ semanticdbDir).mkString(File.pathSeparator)
+    val scalafixClasspath = (compileClasspath.appended(semanticdbDir)).mkString(File.pathSeparator)
     val scalacOptionsArgs =
       if scalacOptions.nonEmpty then Seq("--scalac-options", scalacOptions.mkString(","))
       else Seq.empty

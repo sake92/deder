@@ -1,0 +1,18 @@
+
+amends "../../config/DederProject.pkl"
+
+//amends "https://sake92.github.io/deder/config/DederProject.pkl"
+
+local const cliModules = new CreateScalaModules {
+  root = "cli"
+  template = new {
+    scalaVersion = "3.7.3"
+    scalacOptions {
+      "-Wall"
+    }
+  }
+}.get
+
+modules {
+  ...cliModules.all
+}

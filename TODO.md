@@ -10,6 +10,9 @@
 
 ## Config
 
+## GraalVM native image
+- add basic support
+
 ## Scala.js
 - run
 - fullopt
