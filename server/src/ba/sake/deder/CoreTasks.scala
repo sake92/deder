@@ -961,7 +961,9 @@ class CoreTasks() extends StrictLogging {
         "--sourceroot",
         DederGlobals.projectRootDir.toString,
         "--classpath",
-        scalafixClasspath
+        scalafixClasspath,
+        "--scala-version",
+        scalaVersion
       ) ++ sourcePaths ++ ctx.args
 
       val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, "scalafix.cli.Cli") ++ scalafixArgs
@@ -1020,6 +1022,8 @@ class CoreTasks() extends StrictLogging {
         DederGlobals.projectRootDir.toString,
         "--classpath",
         scalafixClasspath,
+        "--scala-version",
+        scalaVersion,
         "--test"
       ) ++ sourcePaths ++ ctx.args
 
