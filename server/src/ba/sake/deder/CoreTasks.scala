@@ -937,36 +937,13 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(semanticdbDirTask)
     .build { ctx =>
       val (sources, scalaVersion, scalacOptions, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
-      val scalaVersionRegex = """(\d+)\.(\d+)\.(\d+).*""".r
-      val scalafixScalaVersion = scalaVersion match {
-        case scalaVersionRegex(major, minor, patch) =>
-          if major.toInt == 3 then {
-            if minor.toInt >= 8 then "3.8.2"
-            else if minor.toInt >= 7 then "3.7.4"
-            else if minor.toInt >= 6 then "3.6.4"
-            else if minor.toInt >= 5 then "3.5.2"
-            else "3.3.7"
-          } else if major.toInt == 2 && minor.toInt == 13 then "2.13.18"
-          else "2.12.21"
-        case _ => "2.13.18"
-      }
 
-      val scalafixDep = s"ch.epfl.scala:scalafix-cli_$scalafixScalaVersion:0.14.6"
-      val dependency = Dependency.make(scalafixDep, scalaVersion)
+      val dependency = Dependency.make(ScalafixUtils.scalafixDep(scalaVersion), scalaVersion)
       val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
       val cp = jars.map(_.toString).mkString(File.pathSeparator)
 
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
-      val scalafixClasspath = (compileClasspath :+ semanticdbDir).mkString(File.pathSeparator)
-      val scalacOptionsArgs = if scalacOptions.nonEmpty then Seq("--scalac-options", scalacOptions.mkString(",")) else Seq.empty
-      val scalafixArgs = Seq(
-        "--sourceroot",
-        DederGlobals.projectRootDir.toString,
-        "--classpath",
-        scalafixClasspath,
-        "--scala-version",
-        scalaVersion
-      ) ++ scalacOptionsArgs ++ sourcePaths ++ ctx.args
+      val scalafixArgs = ScalafixUtils.buildArgs(scalaVersion, scalacOptions, compileClasspath, semanticdbDir, sourcePaths, ctx.args)
 
       val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, "scalafix.cli.Cli") ++ scalafixArgs
       logger.info(s"Running scalafix fix: ${cmd}")
@@ -999,37 +976,13 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(semanticdbDirTask)
     .build { ctx =>
       val (sources, scalaVersion, scalacOptions, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
-      val scalaVersionRegex = """(\d+)\.(\d+)\.(\d+).*""".r
-      val scalafixScalaVersion = scalaVersion match {
-        case scalaVersionRegex(major, minor, patch) =>
-          if major.toInt == 3 then {
-            if minor.toInt >= 8 then "3.8.2"
-            else if minor.toInt >= 7 then "3.7.4"
-            else if minor.toInt >= 6 then "3.6.4"
-            else if minor.toInt >= 5 then "3.5.2"
-            else "3.3.7"
-          } else if major.toInt == 2 && minor.toInt == 13 then "2.13.18"
-          else "2.12.21"
-        case _ => "2.13.18"
-      }
 
-      val scalafixDep = s"ch.epfl.scala:scalafix-cli_$scalafixScalaVersion:0.14.6"
-      val dependency = Dependency.make(scalafixDep, scalaVersion)
+      val dependency = Dependency.make(ScalafixUtils.scalafixDep(scalaVersion), scalaVersion)
       val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
       val cp = jars.map(_.toString).mkString(File.pathSeparator)
 
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
-      val scalafixClasspath = (compileClasspath :+ semanticdbDir).mkString(File.pathSeparator)
-      val scalacOptionsArgs = if scalacOptions.nonEmpty then Seq("--scalac-options", scalacOptions.mkString(",")) else Seq.empty
-      val scalafixArgs = Seq(
-        "--sourceroot",
-        DederGlobals.projectRootDir.toString,
-        "--classpath",
-        scalafixClasspath,
-        "--scala-version",
-        scalaVersion,
-        "--test"
-      ) ++ scalacOptionsArgs ++ sourcePaths ++ ctx.args
+      val scalafixArgs = ScalafixUtils.buildArgs(scalaVersion, scalacOptions, compileClasspath, semanticdbDir, sourcePaths, Seq("--test") ++ ctx.args)
 
       val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, "scalafix.cli.Cli") ++ scalafixArgs
       logger.info(s"Running scalafix fixCheck: ${cmd}")
