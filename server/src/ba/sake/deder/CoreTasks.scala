@@ -29,6 +29,7 @@ import ba.sake.deder.publish.{GitSemVer, Hasher, PgpSigner, PomGenerator, PomSet
 import ba.sake.deder.scalajs.{ScalaJsLinker, ScalaJsTestRunner}
 import ba.sake.deder.scalanative.{ScalaNativeLinker, ScalaNativeTestRunner}
 import ba.sake.deder.testing.*
+import java.lang.reflect.InvocationTargetException
 
 class CoreTasks() extends StrictLogging {
 
@@ -940,20 +941,29 @@ class CoreTasks() extends StrictLogging {
       val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
 
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
+      val scalafixClasspath = (compileClasspath :+ semanticdbDir).mkString(File.pathSeparator)
       val args = Array[String](
         "--no-sys-exit",
         "--sourceroot",
         DederGlobals.projectRootDir.toString,
         "--classpath",
-        compileClasspath.mkString(File.pathSeparator)
+        scalafixClasspath
       ) ++ sourcePaths ++ ctx.args
 
       ClassLoaderUtils.withClassLoader(jars, parent = null) { classLoader =>
         val scalafixClass = classLoader.loadClass("scalafix.cli.Cli")
         val scalafixMain = scalafixClass.getMethod("main", classOf[Array[String]])
-        scalafixMain.invoke(null, args)
+        try {
+          scalafixMain.invoke(null, args)
+          "Scalafix fix completed"
+        } catch {
+          case e: InvocationTargetException =>
+            ctx.notifications.add(
+              ServerNotification.logError(s"Scalafix fix failed: ${e.getCause().getMessage}", Some(ctx.module.id))
+            )
+            "Scalafix fix failed"
+        }
       }
-      "Scalafix fix completed"
     }
 
   val fixCheckTask = TaskBuilder
@@ -976,17 +986,18 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (sources, scalaVersion, _, compileClasspath, semanticdbDir) = ctx.depResults
 
-      val scalafixDep = "ch.epfl.scala:scalafix-cli_2.13:0.12.1"
+      val scalafixDep = "ch.epfl.scala:scalafix-cli_2.13.18:0.14.6"
       val dependency = Dependency.make(scalafixDep, scalaVersion)
       val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
 
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
+      val scalafixClasspath = (compileClasspath :+ semanticdbDir).mkString(File.pathSeparator)
       val args = Array[String](
         "--no-sys-exit",
         "--sourceroot",
         DederGlobals.projectRootDir.toString,
         "--classpath",
-        compileClasspath.mkString(File.pathSeparator),
+        scalafixClasspath,
         "--test"
       ) ++ sourcePaths ++ ctx.args
 
