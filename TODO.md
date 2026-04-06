@@ -5,6 +5,9 @@
 
 - deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
 
+# Client
+- when first downloading server, take latest version and fix it in server.properties
+
 # CI
 - more package managers?
 
@@ -28,6 +31,8 @@
 - scalafix https://gabro.github.io/scalafix/docs/installation/cli.html
 
 ## Tests
+
+- print number of suites
 
 - optimized running:
   - on first run just randomly distribute between workers, record stats per test/suite

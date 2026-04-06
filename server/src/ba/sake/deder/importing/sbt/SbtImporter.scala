@@ -35,7 +35,7 @@ class SbtImporter(
          |""".stripMargin
     val exportBuildStructurePluginPath = os.pwd / "project/exportBuildStructure.sbt"
     os.write.over(exportBuildStructurePluginPath, exportBuildStructurePluginSource)
-    val res = os.spawn((sbtCmd, "--client", "exportBuildStructure"), mergeErrIntoOut = true)
+    val res = os.spawn((sbtCmd, "exportBuildStructure"), mergeErrIntoOut = true)
     var line = ""
     while {
       line = res.stdout.readLine()
