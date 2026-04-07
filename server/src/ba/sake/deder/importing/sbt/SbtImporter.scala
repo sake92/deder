@@ -103,18 +103,16 @@ class SbtImporter(
       }
       .map(_.toString)
     val tpe = if isTest then ModuleType.SCALA_TEST else ModuleType.SCALA // TODO
-    val deps = sbtProjectExport.externalDependencies
+    val filteredDeps = sbtProjectExport.externalDependencies
       .filter { d =>
-        if isTest then d.configurations.contains(config) else true
+        if isTest then d.configurations.exists(_.contains(config)) else true
       }
       .filterNot { ed =>
         IgnoredDeps.contains(ed.organization -> ed.name)
       }
-      .map { ed =>
-        if ed.crossVersion == "full" then s"${ed.organization}:::${ed.name}:${ed.revision}"
-        else if ed.crossVersion == "binary" then s"${ed.organization}::${ed.name}:${ed.revision}"
-        else s"${ed.organization}:${ed.name}:${ed.revision}"
-      }
+    val (pluginDeps, regularDeps) = filteredDeps.partition(SbtImporter.isPluginDependency)
+    val deps = regularDeps.map(SbtImporter.formatDependency)
+    val scalacPluginDeps = pluginDeps.map(SbtImporter.formatDependency)
     val dederModuleRoot = if root.toString.isEmpty then "." else root.toString
     val module =
       if isTest then
@@ -141,7 +139,7 @@ class SbtImporter(
           java.util.Map.of(), // commands
           sbtProjectExport.scalaVersion,
           sbtProjectExport.scalacOptions.asJava,
-          List.empty.asJava, // scalacPluginDeps
+          scalacPluginDeps.asJava, // scalacPluginDeps
           "4.13.9", // scalaSemanticdbVersion
           true, // fork
           List.empty.asJava // testFrameworks
@@ -170,7 +168,7 @@ class SbtImporter(
           java.util.Map.of(), // commands
           sbtProjectExport.scalaVersion,
           sbtProjectExport.scalacOptions.asJava,
-          List.empty.asJava, // scalacPluginDeps
+          scalacPluginDeps.asJava, // scalacPluginDeps
           "4.13.9" // scalaSemanticdbVersion
         )
 
@@ -226,7 +224,14 @@ class SbtImporter(
                |${m.scalacOptions.asScala.map(d => s"""  "${d}"""").mkString("\n")}
                |}""".stripMargin.indent(2).stripTrailing
           }
-        val optionals = List(sourcesOpt, resourcesOpt, moduleDepsOpt, depsOpt, scalacOptionsOpt).flatten.mkString("\n")
+        val scalacPluginDeps = m.scalacPluginDeps.asScala.map(d => s""" "$d" """.trim).distinct
+        val scalacPluginDepsOpt = Option
+          .when(scalacPluginDeps.nonEmpty) {
+            s"""scalacPluginDeps {
+               |${scalacPluginDeps.map(d => s"  ${d}").mkString("\n")}
+               |}""".stripMargin.indent(2).stripTrailing
+          }
+        val optionals = List(sourcesOpt, resourcesOpt, moduleDepsOpt, depsOpt, scalacOptionsOpt, scalacPluginDepsOpt).flatten.mkString("\n")
         val moduleType = m match {
           case module: ScalaTestModule => "ScalaTestModule"
           case _                       => "ScalaModule"
@@ -237,7 +242,7 @@ class SbtImporter(
             |  scalaVersion = "${m.scalaVersion}"
             |${optionals}
             |}
-            |""".stripMargin
+             |""".stripMargin
       }
     s"""amends "https://sake92.github.io/deder/config/DederProject.pkl"
        |
@@ -246,5 +251,19 @@ class SbtImporter(
        |${moduleIds.map(id => s"  ${id}").mkString("\n")}
        |}
        |""".stripMargin
+  }
+}
+
+object SbtImporter {
+  /** Checks if a dependency is a compiler plugin based on its configurations field */
+  def isPluginDependency(dep: DependencyExport): Boolean = {
+    dep.configurations.exists(_.contains("plugin"))
+  }
+
+  /** Formats a DependencyExport into a Maven coordinate string */
+  def formatDependency(dep: DependencyExport): String = {
+    if (dep.crossVersion == "full") s"${dep.organization}:::${dep.name}:${dep.revision}"
+    else if (dep.crossVersion == "binary") s"${dep.organization}::${dep.name}:${dep.revision}"
+    else s"${dep.organization}:${dep.name}:${dep.revision}"
   }
 }
