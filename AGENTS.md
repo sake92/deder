@@ -4,6 +4,10 @@
 
 Deder is a **client-server JVM build tool** for Scala/Java projects. Configuration is defined in [Pkl](https://pkl-lang.org/) (`deder.pkl`), the server compiles via Zinc, and communication happens over Unix domain sockets. It implements the [BSP (Build Server Protocol)](https://build-server-protocol.github.io/) for IDE integration.
 
+Prefer to use these tools/skills if available:
+- "scalex" for scala/java definitions, implementations, usages, imports, members, scaladoc, codebase overview, package 
+API surface, files, annotated symbols, file contents etc
+
 ## Architecture
 
 ```

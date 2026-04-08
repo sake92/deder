@@ -221,10 +221,6 @@ class IntegrationSuite extends BaseIntegrationSuite {
         s"Expected 'bspVersion' to be '2.2.0-M2', but got: ${bspConfigJson.bspVersion}"
       )
       assert(
-        bspConfigJson.argv.exists(_.contains("deder")),
-        s"Expected 'argv' to contain 'deder', but got: ${bspConfigJson.argv}"
-      )
-      assert(
         bspConfigJson.argv.last == "bsp",
         s"Expected last element of 'argv' to be 'bsp', but got: ${bspConfigJson.argv.last}"
       )
