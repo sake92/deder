@@ -17,7 +17,6 @@ object ImportingUtils {
     "mainClass",
     "deps",
     "javacAnnotationProcessorDeps",
-    "semanticdbEnabled",
     "javaSemanticdbVersion",
     "scalaVersion",
     "scalacOptions",
