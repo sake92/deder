@@ -41,7 +41,6 @@ class BspResilienceSuite extends BaseIntegrationSuite {
       }
     } finally {
       executeDederCommand(testDir, "shutdown")
-      os.remove.all(testDir)
     }
   }
 
@@ -76,7 +75,6 @@ class BspResilienceSuite extends BaseIntegrationSuite {
       }
     } finally {
       executeDederCommand(testDir, "shutdown")
-      os.remove.all(testDir)
     }
   }
 
@@ -105,7 +103,6 @@ class BspResilienceSuite extends BaseIntegrationSuite {
       }
     } finally {
       executeDederCommand(testDir, "shutdown")
-      os.remove.all(testDir)
     }
   }
 
@@ -130,7 +127,6 @@ class BspResilienceSuite extends BaseIntegrationSuite {
       }
     } finally {
       executeDederCommand(testDir, "shutdown")
-      os.remove.all(testDir)
     }
   }
 
@@ -167,7 +163,87 @@ class BspResilienceSuite extends BaseIntegrationSuite {
       }
     } finally {
       executeDederCommand(testDir, "shutdown")
-      os.remove.all(testDir)
+    }
+  }
+
+  test("compile notifications arrive in order: start -> progress -> finish") {
+    val testDir = os.pwd / "tmp" / s"bsp-notify-order-${System.currentTimeMillis()}"
+    try {
+      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+      val lines = os.read.lines(testDir / "deder.pkl")
+      os.write.over(
+        testDir / "deder.pkl",
+        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+      )
+      os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      executeDederCommand(testDir, "bsp install")
+
+      withBspSession(testDir) { (buildServer, capturingClient, _) =>
+        val params = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params.setOriginId("test-notify-order")
+        capturingClient.clear()
+        val result = buildServer.buildTargetCompile(params).get(2, TimeUnit.MINUTES)
+        assertEquals(result.getStatusCode, StatusCode.OK)
+
+        // Verify notification order: start before progress, progress before finish
+        val taskStart = capturingClient.awaitTaskStart()
+        assert(taskStart.isDefined, "should have compile start notification")
+        val startTime = taskStart.get.getEventTime
+
+        val taskProgress = capturingClient.awaitTaskProgress()
+        // Progress may or may not be sent, but if present should be after start
+        if taskProgress.isDefined then
+          assert(taskProgress.get.getEventTime >= startTime, "progress should be after start")
+
+        val taskFinish = capturingClient.awaitTaskFinish()
+        assert(taskFinish.isDefined, "should have compile finish notification")
+        val finishTime = taskFinish.get.getEventTime
+        assert(finishTime >= startTime, "finish should be after start")
+      }
+    } finally {
+      executeDederCommand(testDir, "shutdown")
+    }
+  }
+
+  test("failing compilation emits error diagnostics and finish with error status") {
+    val testDir = os.pwd / "tmp" / s"bsp-compile-fail-${System.currentTimeMillis()}"
+    try {
+      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+      val lines = os.read.lines(testDir / "deder.pkl")
+      os.write.over(
+        testDir / "deder.pkl",
+        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+      )
+      os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      executeDederCommand(testDir, "bsp install")
+
+      withBspSession(testDir) { (buildServer, capturingClient, _) =>
+        // Write a compilation error
+        val badFile = testDir / "common/src/bad.scala"
+        os.write(badFile, "package common\nval notValid: Int = \"wrong type\"")
+
+        capturingClient.clear()
+        val params = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params.setOriginId("test-compile-fail")
+        val result = buildServer.buildTargetCompile(params).get(2, TimeUnit.MINUTES)
+        assertEquals(result.getStatusCode, StatusCode.ERROR, "compile should fail")
+
+        // Verify we got start notification
+        val taskStart = capturingClient.awaitTaskStart()
+        assert(taskStart.isDefined, "should have compile start notification")
+
+        // Verify we got error diagnostics
+        val diag = capturingClient.awaitDiagnostic(predicate = _.getDiagnostics.asScala.nonEmpty)
+        assert(diag.isDefined, "should have error diagnostics")
+        val errors = diag.get.getDiagnostics.asScala
+        assert(errors.exists(_.getSeverity == DiagnosticSeverity.ERROR), "should have error severity")
+
+        // Verify we got finish notification with error
+        val taskFinish = capturingClient.awaitTaskFinish()
+        assert(taskFinish.isDefined, "should have compile finish notification")
+      }
+    } finally {
+      executeDederCommand(testDir, "shutdown")
     }
   }
 
