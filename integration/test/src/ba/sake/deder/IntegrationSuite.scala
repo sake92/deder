@@ -86,9 +86,9 @@ class IntegrationSuite extends BaseIntegrationSuite {
              |  common.dependencies
              |  common.javacAnnotationProcessors
              |  common.mandatoryDependencies
+             |  common.scalacPlugins
              |Stage #2:
              |  common.allDependencies
-             |  common.scalacPlugins
              |Stage #3:
              |  common.compileClasspath
              |Stage #4:
