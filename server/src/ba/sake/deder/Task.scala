@@ -10,7 +10,7 @@ import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import os.write.over
 
-case class TaskBuilder[T: JsonRW, Deps <: Tuple] private (
+case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     name: String,
     taskDeps: Deps,
     // if it triggers upstream modules task with same name
@@ -42,7 +42,7 @@ case class TaskBuilder[T: JsonRW, Deps <: Tuple] private (
 }
 
 object TaskBuilder {
-  def make[T: JsonRW](
+  def make[T: JsonRW: Hashable](
       name: String,
       // if it triggers upstream modules task with same name
       transitive: Boolean = false,
@@ -132,7 +132,7 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
     isResultSuccessful(result.asInstanceOf[T])
 }
 
-class TaskImpl[T: JsonRW, Deps <: Tuple](
+class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple](
     val name: String,
     val execute: TaskExecContext[T, Deps] => T,
     val taskDeps: Deps = EmptyTuple,
@@ -174,7 +174,7 @@ class TaskImpl[T: JsonRW, Deps <: Tuple](
         outDir
       )
     )
-    val taskResult = TaskResult(res, "", "" /*, transitiveResultsUnsafe*/ )
+    val taskResult = TaskResult(res, "", Hashable[T].hashStr(res))
     serverNotificationsLogger.add(
       ServerNotification.logDebug(s"Computed result for ${name}", Some(module.id))
     )
@@ -274,7 +274,7 @@ class SourceFileTask(
     supportedModuleTypes: Set[ModuleType] = Set.empty,
     execute: TaskExecContext[DederPath, EmptyTuple] => DederPath,
     description: String = ""
-) extends CachedTask[DederPath, EmptyTuple](
+) extends TaskImpl[DederPath, EmptyTuple](
       name,
       execute,
       taskDeps = EmptyTuple,
@@ -291,7 +291,7 @@ class SourceFilesTask(
     execute: TaskExecContext[Seq[DederPath], EmptyTuple] => Seq[DederPath],
     supportedModuleTypes: Set[ModuleType] = Set.empty,
     description: String = ""
-) extends CachedTask[Seq[DederPath], EmptyTuple](
+) extends TaskImpl[Seq[DederPath], EmptyTuple](
       name,
       execute,
       taskDeps = EmptyTuple,
@@ -308,7 +308,7 @@ class ConfigValueTask[T: JsonRW: Hashable](
     execute: TaskExecContext[T, EmptyTuple] => T,
     supportedModuleTypes: Set[ModuleType] = Set.empty,
     description: String = ""
-) extends CachedTask[T, EmptyTuple](
+) extends TaskImpl[T, EmptyTuple](
       name,
       execute,
       taskDeps = EmptyTuple,

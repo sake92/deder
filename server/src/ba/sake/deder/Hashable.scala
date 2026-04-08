@@ -2,6 +2,7 @@ package ba.sake.deder
 
 import java.nio.ByteBuffer
 import scala.util.Using
+import ba.sake.tupson.{JsonRW, toJson, given}
 
 extension [T](value: T)(using hashable: Hashable[T]) {
   def hashStr: String = hashable.hashStr(value)
@@ -11,7 +12,15 @@ trait Hashable[T] {
   def hashStr(value: T): String
 }
 
-object Hashable {
+// Low-priority fallback: derive Hashable[T] from JsonRW[T] by hashing the JSON string.
+// Instances defined directly in object Hashable (and in type companions) take priority.
+private trait HashableLowPriority {
+  given [T](using rw: JsonRW[T]): Hashable[T] with {
+    def hashStr(value: T): String = HashUtils.hashStr(value.toJson)
+  }
+}
+
+object Hashable extends HashableLowPriority {
 
   def apply[T](using h: Hashable[T]): Hashable[T] = h
 
@@ -32,7 +41,8 @@ object Hashable {
   given Hashable[os.Path] with {
     // TODO add file path into hash
     def hashStr(value: os.Path): String = {
-      if os.isFile(value) then
+      if !os.exists(value) then ""
+      else if os.isFile(value) then
         Using.resource(os.read.inputStream(value)) { inputStream =>
           HashUtils.hashStr(inputStream)
         }
@@ -63,9 +73,12 @@ object Hashable {
 
   given [K: Hashable, V: Hashable]: Hashable[Map[K, V]] with {
     def hashStr(value: Map[K, V]): String = {
-      val combinedHash = value.toSeq.sortBy(_._1.hashStr).map { (k, v) =>
-        s"${k.hashStr}=${v.hashStr}"
-      }.mkString("-")
+      val combinedHash = value.toSeq
+        .sortBy(_._1.hashStr)
+        .map { (k, v) =>
+          s"${k.hashStr}=${v.hashStr}"
+        }
+        .mkString("-")
       HashUtils.hashStr(combinedHash)
     }
   }
