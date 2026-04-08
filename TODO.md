@@ -2,11 +2,15 @@
 # Misc
 
 - maybe use https://github.com/encalmo/graphs coz zero deps?
-
 - deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
 
 # Client
 - when first downloading server, take latest version and fix it in server.properties
+
+# Caching
+- harden the abstraction
+- add tests
+- add docs
 
 # CI
 - more package managers?
