@@ -73,15 +73,12 @@ class IntegrationSuite extends BaseIntegrationSuite {
              |  common.deps
              |  common.generatedSources
              |  common.javaHome
-             |  common.javaSemanticdbVersion
              |  common.javaVersion
              |  common.javacAnnotationProcessorDeps
              |  common.javacOptions
              |  common.scalaVersion
              |  common.scalacOptions
              |  common.scalacPluginDeps
-             |  common.semanticdb
-             |  common.semanticdbEnabled
              |  common.sources
              |Stage #1:
              |  common.allClassesDirs
@@ -89,7 +86,6 @@ class IntegrationSuite extends BaseIntegrationSuite {
              |  common.dependencies
              |  common.javacAnnotationProcessors
              |  common.mandatoryDependencies
-             |  common.scalaSemanticdbVersion
              |Stage #2:
              |  common.allDependencies
              |  common.scalacPlugins

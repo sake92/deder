@@ -119,8 +119,6 @@ open class JavaModule extends DederModule {
   /// Dependencies to include when compiling/running the app
   deps: Listing<String> = new Listing {}
   javacAnnotationProcessorDeps: Listing<String> = new Listing {}
-  /// Whether to enable SemanticDB generation. By default, it's disabled in CI to speed up builds (checks the `CI` environment variable).
-  semanticdbEnabled: Boolean = read?("env:CI") != "true"
   javaSemanticdbVersion: String = "0.11.1"
   /// JAR manifest entries. Overrides defaults set by Deder.
   manifest: ManifestSettings = new ManifestSettings {}
