@@ -242,7 +242,7 @@ class SbtImporter(
             |}
              |""".stripMargin
       }
-    s"""amends "https://sake92.github.io/deder/config/DederProject.pkl"
+    s"""amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
        |
        |${moduleDefs.mkString("\n")}
        |modules {

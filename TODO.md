@@ -1,4 +1,8 @@
 
+# Docs
+- run pkldoc on each tag, and publish to ghpages
+https://pkl-lang.org/main/current/pkl-doc/index.html
+
 # Misc
 
 - maybe use https://github.com/encalmo/graphs coz zero deps?

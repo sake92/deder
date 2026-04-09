@@ -15,7 +15,7 @@ Since Deder builds are "just config", you can easily create multiple modules.
 Create a `deder.pkl` file in your project root:
 
 ```ts
-amends "https://sake92.github.io/deder/config/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 local const scalaVersions = List("2.13.18", "3.7.4")
 

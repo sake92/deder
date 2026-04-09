@@ -9,7 +9,7 @@ description: Deder Publishing Tutorial
 Make a minimal `deder.pkl` file in your project root:
 
 ```pkl
-amends "https://sake92.github.io/deder/config/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 local const mylibrary = new ScalaModule {
   scalaVersion = "3.7.1"

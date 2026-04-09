@@ -10,7 +10,7 @@ description: Deder Packaging Tutorial
 Create this `deder.pkl` file:
 
 ```pkl
-amends "https://sake92.github.io/deder/config/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 local const myappModules = new CreateScalaModules {
   root = "myapp"
