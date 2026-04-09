@@ -11,6 +11,7 @@ class TabCompleter(tasksResolver: TasksResolver) {
     "exec",
     "shutdown",
     "import",
+    "bsp",
     "complete",
     "help"
   )
@@ -45,6 +46,7 @@ class TabCompleter(tasksResolver: TasksResolver) {
               .getOrElse(Seq("-m", "--module", "-t", "--task", "--json", "-w", "--watch").filter(_.startsWith(currentWord)))
           case Seq("shutdown", _*) => Seq.empty
           case Seq("import", _*)   => Seq.empty
+          case Seq("bsp", _*)      => Seq("install")
           case Seq("complete", _*) => Seq.empty
           case Seq("help", _*)     => Seq.empty
           case Seq(first, _*)      => allSubcommands.filter(_.startsWith(first))

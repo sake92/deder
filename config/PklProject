@@ -2,7 +2,7 @@ amends "pkl:Project"
 
 package {
   name = "deder"
-  baseUri = "package://pkg.pkl-lang.org/github.com/sake92/deder"
+  baseUri = "package://github.com/sake92/deder"
   version = read("env:VERSION")
 
   packageZipUrl =

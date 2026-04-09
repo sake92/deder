@@ -139,11 +139,11 @@ jobs:
       - name: Make Pkl Config Project
         env:
           VERSION: ${{ needs.precheck.outputs.VERSION }}
-        working-directory: ./config
         run: |
           curl -L https://github.com/apple/pkl/releases/download/0.31.1/pkl-linux-amd64 -o pkl
           chmod +x pkl
-          ./pkl project package .
+          cd config
+          ../pkl project package .
       - name: Release Pkl Config Project
         uses: softprops/action-gh-release@v1
         with:
