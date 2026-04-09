@@ -1,0 +1,68 @@
+module ba.sake.deder.config.DederProject
+
+// TODO write tests https://pkl-lang.org/blog/testing-in-pkl.html#writing-tests
+
+modules: Listing<DederModule>(modulesValidation)
+
+hidden modulesValidation = (value: Listing<DederModule>) ->
+  if (!(value.toList().map((m) -> m.id).distinct.length == value.length))
+    throw("Module ids must be unique.")
+  else
+    true
+
+abstract class DederModule {
+  /// Module id, used in CLI and referring from other modules
+  id: String(idValidation)
+
+  /// Module root directory, relative to project root
+  root: String(rootValidation) = id
+
+  /// Source directories
+  sources: Listing<String> = new Listing { "src" }
+
+  /// Module dependencies
+  moduleDeps: Listing<DederModule>
+
+  type: ModuleType
+
+  hidden idValidation = (value: String) ->
+    if (!value.matches(Regex("^[a-zA-Z0-9_-]+$")))
+      throw("Id must be alphanumeric and can contain '_' and '-'.")
+    else
+      true
+
+  hidden rootValidation = (value: String) ->
+    if (!value.matches(Regex("^[a-zA-Z0-9/_-]+$")))
+      throw("Root must be alphanumeric and can contain '_', '-', and '/' but got: " + value)
+    else
+      true
+}
+
+typealias ModuleType = "java" | "scala" | "scala-test"
+
+class JavaModule extends DederModule {
+  type: ModuleType = "java"
+  resources: Listing<String> = new Listing { "resources" }
+  javacOptions: Listing<String> = new Listing {}
+  mainClass: String? = null
+  deps: Listing<String> = new Listing {}
+}
+
+class ScalaModule extends DederModule {
+  type: ModuleType = "scala"
+  scalaVersion: String
+  resources: Listing<String> = new Listing { "resources" }
+  javacOptions: Listing<String> = new Listing {}
+  scalacOptions: Listing<String> = new Listing {}
+  mainClass: String? = null
+  deps: Listing<String> = new Listing {}
+}
+
+class ScalaTestModule extends DederModule {
+  type: ModuleType = "scala-test"
+  scalaVersion: String
+  resources: Listing<String> = new Listing { "resources" }
+  javacOptions: Listing<String> = new Listing {}
+  scalacOptions: Listing<String> = new Listing {}
+  deps: Listing<String> = new Listing {}
+}

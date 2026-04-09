@@ -1,0 +1,382 @@
+module ba.sake.deder.config.DederProject
+
+// TODO write tests https://pkl-lang.org/blog/testing-in-pkl.html#writing-tests
+
+modules: Listing<DederModule>(modulesValidation)
+
+hidden modulesValidation = (value: Listing<DederModule>) ->
+  if (!(value.toList().map((m) -> m.id).distinct.length == value.length))
+    throw("Module ids must be unique.")
+  else
+    true
+
+abstract class DederModule {
+  /// Module id, used in CLI and referring from other modules
+  id: String(idValidation)
+
+  /// Module root directory, relative to project root
+  root: String(rootValidation) = id
+
+  /// Source directories
+  sources: Listing<String> = new Listing { "src" }
+
+  /// Module dependencies
+  moduleDeps: Listing<DederModule>
+
+  type: ModuleType
+
+  hidden idValidation = (value: String) ->
+    if (!value.matches(Regex("^[.a-zA-Z0-9_-]+$")))
+      throw("Id must be alphanumeric and can contain '_' and '-' but got: " + value)
+    else
+      true
+
+  hidden rootValidation = (value: String) ->
+    if (!value.matches(Regex("^[.a-zA-Z0-9/_-]+$")))
+      throw("Root must be alphanumeric and can contain '_', '-', and '/' but got: " + value)
+    else
+      true
+}
+
+typealias ModuleType =
+  "java"
+    | "scala"
+    | "scala-test"
+    | "scala-js"
+    | "scala-js-test"
+    | "scala-native"
+    | "scala-native-test"
+
+class PomLicense {
+  name: String(!isEmpty)
+  url: String(!isEmpty)
+}
+class PomDeveloper {
+  id: String(!isEmpty)
+  name: String(!isEmpty)
+  email: String(!isEmpty)
+}
+class PomScm {
+  url: String?
+  connection: String?
+  developerConnection: String?
+  tag: String?
+}
+class PomSettings {
+  groupId: String(!isEmpty)
+  artifactId: String(!isEmpty)
+  version: String?
+  name: String(!isEmpty)
+  description: String?
+  url: String?
+  licenses: Listing<PomLicense> = new Listing {}
+  developers: Listing<PomDeveloper> = new Listing {}
+  scm: PomScm?
+}
+
+class ManifestSettings {
+  /// Main JAR manifest attributes, e.g. "Implementation-Version" -> "1.0.0"
+  mainAttributes: Mapping<String, String> = new Mapping {}
+  /// Named manifest entry groups (rarely needed)
+  groups: Mapping<String, Mapping<String, String>> = new Mapping {}
+}
+
+class MvnApp {
+  /// Maven dependency coordinate, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
+  dep: String(!isEmpty)
+  /// Fully qualified main class to run
+  mainClass: String(!isEmpty)
+  args: Listing<String> = new Listing {}
+}
+
+open class JavaModule extends DederModule {
+  type = "java"
+  resources: Listing<String> = new Listing { "resources" }
+  javaHome: String?
+  jvmOptions: Listing<String> = new Listing {}
+  javaVersion: String?
+  javacOptions: Listing<String> = new Listing {}
+  forkEnv: Mapping<String, String> = new Mapping {}
+  mainClass: String?
+  deps: Listing<String> = new Listing {}
+  javacAnnotationProcessorDeps: Listing<String> = new Listing {}
+  semanticdbEnabled: Boolean = read?("env:CI") != "true" // disable in CI by default
+  javaSemanticdbVersion: String = "0.11.1"
+  /// JAR manifest entries. Overrides defaults set by Deder.
+  manifest: ManifestSettings = new ManifestSettings {}
+  publish: Boolean = true
+  pomSettings: PomSettings?
+  /// Named maven apps that can be run via `deder exec -t runMvnApp <name> [args...]`.
+  /// Server auto-provides `fmt`, `fmtCheck` (scalafmt) etc for scala modules.
+  mvnApps: Mapping<String, MvnApp> = new Mapping {}
+}
+
+open class ScalaModule extends JavaModule {
+  type = "scala"
+  scalaVersion: String(!isEmpty)
+  scalacOptions: Listing<String> = new Listing {}
+  scalacPluginDeps: Listing<String> = new Listing {}
+  scalaSemanticdbVersion: String?
+  function asTest(): ScalaTestModule = (this.toDynamic().toTyped(ScalaTestModule)) {
+    type = "scala-test"
+    publish = false
+  }
+  function asJs(): ScalaJsModule = (this.toDynamic().toTyped(ScalaJsModule)) {
+    type = "scala-js"
+  }
+  function asNative(): ScalaNativeModule = (this.toDynamic().toTyped(ScalaNativeModule)) {
+    type = "scala-native"
+  }
+}
+
+class ScalaTestModule extends ScalaModule {
+  type = "scala-test"
+  publish = false
+  fork: Boolean = true
+  testFrameworks: Listing<String> = new Listing {
+    "com.novocode.junit.JUnitFramework"
+    "com.github.sbt.junit.jupiter.api.JupiterFramework"
+    "org.scalatest.tools.Framework"
+    "org.specs2.runner.Specs2Framework"
+    "munit.Framework"
+    "utest.runner.Framework"
+    "zio.test.sbt.ZTestFramework"
+    "weaver.framework.CatsEffect"
+  }
+}
+
+typealias ScalaJsModuleKind = "no-module" | "es-module" | "commonjs-module"
+
+open class ScalaJsModule extends ScalaModule {
+  type = "scala-js"
+  scalaJsVersion: String(!isEmpty)
+  moduleKind: ScalaJsModuleKind = "no-module"
+  function asTest(): ScalaJsTestModule = (this.toDynamic().toTyped(ScalaJsTestModule)) {
+    type = "scala-js-test"
+    publish = false
+  }
+}
+
+class ScalaJsTestModule extends ScalaJsModule {
+  type = "scala-js-test"
+  publish = false
+  testFrameworks: Listing<String> = new Listing {
+    "com.novocode.junit.JUnitFramework"
+    "com.github.sbt.junit.jupiter.api.JupiterFramework"
+    "org.scalatest.tools.Framework"
+    "org.specs2.runner.Specs2Framework"
+    "munit.Framework"
+    "utest.runner.Framework"
+    "zio.test.sbt.ZTestFramework"
+    "weaver.framework.CatsEffect"
+  }
+}
+
+open class ScalaNativeModule extends ScalaModule {
+  type = "scala-native"
+  scalaNativeVersion: String(!isEmpty)
+  function asTest(): ScalaNativeTestModule = (this.toDynamic().toTyped(ScalaNativeTestModule)) {
+    type = "scala-native-test"
+    publish = false
+  }
+}
+
+class ScalaNativeTestModule extends ScalaNativeModule {
+  type = "scala-native-test"
+  publish = false
+  testFrameworks: Listing<String> = new Listing {
+    "com.novocode.junit.JUnitFramework"
+    "com.github.sbt.junit.jupiter.api.JupiterFramework"
+    "org.scalatest.tools.Framework"
+    "org.specs2.runner.Specs2Framework"
+    "munit.Framework"
+    "utest.runner.Framework"
+    "zio.test.sbt.ZTestFramework"
+    "weaver.framework.CatsEffect"
+  }
+}
+
+// helpers
+// https://pkl-lang.org/blog/class-as-a-function.html
+
+class ScalaModules {
+  main: ScalaModule
+  test: ScalaTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateScalaModules {
+  root: String
+  template: ScalaModule
+  testTemplate: ScalaTestModule = template.asTest()
+  fixed get: ScalaModules = scalaModules(template, testTemplate, root)
+}
+
+const function scalaModules(
+  _template: ScalaModule,
+  _testTemplate: ScalaTestModule,
+  _root: String,
+): ScalaModules = new {
+  main = (_template) {
+    id = _root
+    root = _root
+  }
+  test = (_testTemplate) {
+    id = "\(_root)-test"
+    root = "\(_root)/test"
+    moduleDeps {
+      main
+    }
+  }
+}
+
+class ScalaJsModules {
+  main: ScalaJsModule
+  test: ScalaJsTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateScalaJsModules {
+  root: String
+  template: ScalaJsModule
+  testTemplate: ScalaJsTestModule = template.asTest()
+  fixed get: ScalaJsModules = scalaJsModules(template, testTemplate, root)
+}
+
+const function scalaJsModules(
+  _template: ScalaJsModule,
+  _testTemplate: ScalaJsTestModule,
+  _root: String,
+): ScalaJsModules = new {
+  main = (_template) {
+    id = _root
+    root = _root
+  }
+  test = (_testTemplate) {
+    id = "\(_root)-test"
+    root = "\(_root)/test"
+    moduleDeps {
+      main
+    }
+  }
+}
+
+class ScalaNativeModules {
+  main: ScalaNativeModule
+  test: ScalaNativeTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateScalaNativeModules {
+  root: String
+  template: ScalaNativeModule
+  testTemplate: ScalaNativeTestModule = template.asTest()
+  fixed get: ScalaNativeModules = scalaNativeModules(template, testTemplate, root)
+}
+
+const function scalaNativeModules(
+  _template: ScalaNativeModule,
+  _testTemplate: ScalaNativeTestModule,
+  _root: String,
+): ScalaNativeModules = new {
+  main = (_template) {
+    id = _root
+    root = _root
+  }
+  test = (_testTemplate) {
+    id = "\(_root)-test"
+    root = "\(_root)/test"
+    moduleDeps {
+      main
+    }
+  }
+}
+
+class CrossModules {
+  jvm: ScalaModule
+  jvm_test: ScalaTestModule
+  js: ScalaJsModule
+  js_test: ScalaJsTestModule
+  native: ScalaNativeModule
+  native_test: ScalaNativeTestModule
+  all: Listing<DederModule> = new { jvm; jvm_test; js; js_test; native; native_test }
+}
+
+class CreateCrossModules {
+  template: ScalaModule
+  testTemplate: ScalaTestModule = template.asTest()
+  jsTemplate: ScalaJsModule = template.asJs()
+  jsTestTemplate: ScalaJsTestModule = jsTemplate.asTest()
+  nativeTemplate: ScalaNativeModule = template.asNative()
+  nativeTestTemplate: ScalaNativeTestModule = nativeTemplate.asTest()
+  root: String
+  fixed get: CrossModules =
+    crossModules(
+      template,
+      testTemplate,
+      jsTemplate,
+      jsTestTemplate,
+      nativeTemplate,
+      nativeTestTemplate,
+      root,
+    )
+}
+
+const function crossModules(
+  _template: ScalaModule,
+  _testTemplate: ScalaTestModule,
+  _jsTemplate: ScalaJsModule,
+  _jsTestTemplate: ScalaJsTestModule,
+  _nativeTemplate: ScalaNativeModule,
+  _nativeTestTemplate: ScalaNativeTestModule,
+  _root: String,
+): CrossModules = new {
+  jvm = (_template) {
+    id = "\(_root)-jvm-\(_template.scalaVersion)"
+    root = _root
+    sources {
+      "src-jvm"
+    }
+  }
+  jvm_test = (_testTemplate) {
+    id = "\(_root)-jvm-test-\(_template.scalaVersion)"
+    root = "\(_root)/test"
+    sources {
+      "src-jvm"
+    }
+    moduleDeps {
+      jvm
+    }
+  }
+  js = (_jsTemplate) {
+    id = "\(_root)-js-\(_template.scalaVersion)"
+    root = _root
+    sources {
+      "src-js"
+    }
+  }
+  js_test = (_jsTestTemplate) {
+    id = "\(_root)-js-test-\(_template.scalaVersion)"
+    root = "\(_root)/test"
+    sources {
+      "src-js"
+    }
+    moduleDeps {
+      js
+    }
+  }
+  native = (_nativeTemplate) {
+    id = "\(_root)-native-\(_template.scalaVersion)"
+    root = _root
+    sources {
+      "src-native"
+    }
+  }
+  native_test = (_nativeTestTemplate) {
+    id = "\(_root)-native-test-\(_template.scalaVersion)"
+    root = "\(_root)/test"
+    sources {
+      "src-native"
+    }
+    moduleDeps {
+      native
+    }
+  }
+}
