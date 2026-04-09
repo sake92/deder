@@ -1,7 +1,9 @@
 package ba.sake.deder
 
-import java.util.concurrent.ExecutorService
 import java.time.{Duration, Instant}
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
 import scala.util.control.NonFatal
@@ -11,9 +13,7 @@ import com.typesafe.scalalogging.StrictLogging
 import io.opentelemetry.api.trace.StatusCode
 import ba.sake.tupson.toJson
 import ba.sake.deder.config.{ConfigParser, DederProject}
-
-import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
+import ba.sake.deder.cli.TabCompleter
 
 class DederProjectState(
     tasksRegistry: TasksRegistry,

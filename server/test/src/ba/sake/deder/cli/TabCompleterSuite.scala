@@ -1,6 +1,7 @@
-package ba.sake.deder
+package ba.sake.deder.cli
 
 import ba.sake.deder.config.ConfigParser
+import ba.sake.deder.*
 
 class TabCompleterSuite extends munit.FunSuite {
 
@@ -18,7 +19,7 @@ class TabCompleterSuite extends munit.FunSuite {
 
     assertEquals(
       completer.complete("deder ", 6).toSet,
-      Set("version", "clean", "complete", "modules", "tasks", "plan", "exec", "shutdown", "import", "help")
+      Set("version", "clean", "complete", "modules", "tasks", "plan", "exec", "shutdown", "import", "bsp", "help")
     )
 
     assertEquals(completer.complete("deder c", 7).toSet, Set("clean", "complete"))

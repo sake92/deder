@@ -1,4 +1,6 @@
-package ba.sake.deder
+package ba.sake.deder.cli
+
+import ba.sake.deder.TasksResolver
 
 class TabCompleter(tasksResolver: TasksResolver) {
 
