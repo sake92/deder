@@ -76,9 +76,11 @@ object ServerMain extends StrictLogging {
       )
 
     val coreTasks = CoreTasks()
+    val packagingTasks = PackagingTasks(coreTasks)
+    val publishTasks = PublishTasks(packagingTasks)
     val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)
     val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
-    val allTasks = coreTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all
+    val allTasks = coreTasks.all ++ packagingTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
     val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
 
