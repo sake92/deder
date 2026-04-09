@@ -26,6 +26,7 @@ docs/static/**/*.pkl
 pkl-codegen-java
 config/resources
 config/src
+config/.out/
 
 # JS
 node_modules/
@@ -35,3 +36,9 @@ dist/
 
 # other
 tmp/
+
+# AI
+.scalex
+
+
+

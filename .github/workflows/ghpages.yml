@@ -27,7 +27,10 @@ jobs:
             FLATMARK_VERSION=0.0.28
             curl -L https://github.com/sake92/flatmark/releases/download/v${FLATMARK_VERSION}/flatmark-1.0.0.pkg -o flatmark.pkg
             sudo installer -verbose -pkg flatmark.pkg -target /
-            ./scripts/build-docs.sh 
+            # copy latest config files for early-access users
+            mkdir -p docs/static/config
+            cp config/*.pkl docs/static/config/
+            flatmark build -i docs
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
