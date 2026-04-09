@@ -126,7 +126,7 @@ class CoreTasks() extends StrictLogging {
   )
 
   // applied deps, with scala version resolved
-  val dependenciesTask = TaskBuilder
+  val dependenciesTask = CachedTaskBuilder
     .make[Seq[deps.Dependency]](
       name = "dependencies"
     )
@@ -142,7 +142,7 @@ class CoreTasks() extends StrictLogging {
       deps.map(depDecl => Dependency.make(depDecl, scalaVersion, platformSuffix))
     }
 
-  val allDependenciesTask = TaskBuilder
+  val allDependenciesTask = CachedTaskBuilder
     .make[Seq[deps.Dependency]](
       name = "allDependencies",
       transitive = true
@@ -153,7 +153,7 @@ class CoreTasks() extends StrictLogging {
       (deps ++ ctx.transitiveResults.flatten.flatten).distinct
     }
 
-  val mandatoryDependenciesTask = TaskBuilder
+  val mandatoryDependenciesTask = CachedTaskBuilder
     .make[Seq[deps.Dependency]](
       name = "mandatoryDependencies"
     )
@@ -318,7 +318,7 @@ class CoreTasks() extends StrictLogging {
     .build { ctx => ctx.out }
 
   // this is localRunClasspath in mill ??
-  val allClassesDirsTask = TaskBuilder
+  val allClassesDirsTask = CachedTaskBuilder
     .make[Seq[os.Path]](
       name = "allClassesDirs",
       transitive = true
@@ -328,7 +328,7 @@ class CoreTasks() extends StrictLogging {
       Seq(ctx.depResults._1) ++ ctx.transitiveResults.flatten.flatten.reverse.distinct.reverse
     }
 
-  val compileClasspathTask = TaskBuilder
+  val compileClasspathTask = CachedTaskBuilder
     .make[Seq[os.Path]](
       name = "compileClasspath",
       transitive = true
@@ -356,7 +356,7 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
-  val scalaSemanticdbVersionTask = TaskBuilder
+  val scalaSemanticdbVersionTask = CachedTaskBuilder
     .make[String](
       name = "scalaSemanticdbVersion"
     )
@@ -396,7 +396,7 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
-  val javacAnnotationProcessorsTask = TaskBuilder
+  val javacAnnotationProcessorsTask = CachedTaskBuilder
     .make[Seq[os.Path]](
       name = "javacAnnotationProcessors"
     )
@@ -421,7 +421,7 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
-  val scalacPluginsTask = TaskBuilder
+  val scalacPluginsTask = CachedTaskBuilder
     .make[Seq[os.Path]](
       name = "scalacPlugins"
     )
@@ -449,7 +449,7 @@ class CoreTasks() extends StrictLogging {
       pluginJars
     }
 
-  val compilerDepsTask = TaskBuilder
+  val compilerDepsTask = CachedTaskBuilder
     .make[Seq[Dependency]](
       name = "compilerDeps"
     )
@@ -727,7 +727,7 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
-  val runClasspathTask = TaskBuilder
+  val runClasspathTask = CachedTaskBuilder
     .make[Seq[os.Path]](
       name = "runClasspath",
       transitive = true
@@ -741,7 +741,7 @@ class CoreTasks() extends StrictLogging {
       compileClasspath ++ resources
     }
 
-  val mainClassesTask = TaskBuilder
+  val mainClassesTask = CachedTaskBuilder
     .make[Seq[String]](
       name = "mainClasses"
     )
@@ -762,7 +762,7 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
-  val finalMainClassTask = TaskBuilder
+  val finalMainClassTask = CachedTaskBuilder
     .make[Option[String]](
       name = "finalMainClass"
     )
@@ -852,7 +852,7 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
-  val finalManifestSettingsTask = TaskBuilder
+  val finalManifestSettingsTask = CachedTaskBuilder
     .make[ManifestEntries](name = "finalManifest")
     .dependsOn(manifestSettingsTask)
     .dependsOn(finalMainClassTask)
@@ -1090,7 +1090,7 @@ class CoreTasks() extends StrictLogging {
       cmd
     }
 
-  val testClassesTask = TaskBuilder
+  val testClassesTask = CachedTaskBuilder
     .make[Seq[DiscoveredFrameworkTests]](
       name = "testClasses",
       supportedModuleTypes = Set(
@@ -1171,7 +1171,7 @@ class CoreTasks() extends StrictLogging {
       summarize = DederTestResults.summarize
     )
 
-  val jarTask = TaskBuilder
+  val jarTask = CachedTaskBuilder
     .make[os.Path](name = "jar")
     .dependsOn(compileTask)
     .dependsOn(finalManifestSettingsTask)
@@ -1187,7 +1187,7 @@ class CoreTasks() extends StrictLogging {
       resultJarPath
     }
 
-  val allJarsTask = TaskBuilder
+  val allJarsTask = CachedTaskBuilder
     .make[Seq[os.Path]](
       name = "allJars",
       transitive = true
@@ -1198,7 +1198,7 @@ class CoreTasks() extends StrictLogging {
       ctx.transitiveResults.flatten.flatten.prepended(jar).reverse.distinct.reverse
     }
 
-  val assemblyTask = TaskBuilder
+  val assemblyTask = CachedTaskBuilder
     .make[os.Path](
       name = "assembly",
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST)
@@ -1226,7 +1226,7 @@ class CoreTasks() extends StrictLogging {
       resultJarPath
     }
 
-  val moduleDepsPomSettingsTask = TaskBuilder
+  val moduleDepsPomSettingsTask = CachedTaskBuilder
     .make[Seq[Seq[PomSettings]]](
       name = "moduleDepsPomSettings",
       transitive = true
@@ -1237,7 +1237,7 @@ class CoreTasks() extends StrictLogging {
       Seq(pom.toSeq) ++ ctx.transitiveResults.flatten.flatten
     }
 
-  val sourcesJarTask = TaskBuilder
+  val sourcesJarTask = CachedTaskBuilder
     .make[Option[os.Path]](name = "sourcesJar")
     .dependsOn(pomSettingsTask)
     .dependsOn(sourcesTask)
@@ -1252,7 +1252,7 @@ class CoreTasks() extends StrictLogging {
       }
     }
 
-  val javadocJarTask = TaskBuilder
+  val javadocJarTask = CachedTaskBuilder
     .make[Option[os.Path]](name = "javadocJar")
     .dependsOn(scalaVersionTask)
     .dependsOn(pomSettingsTask)
@@ -1354,7 +1354,7 @@ class CoreTasks() extends StrictLogging {
       outDir: os.Path
   ) derives JsonRW
 
-  val publishArtifactsTask = TaskBuilder
+  val publishArtifactsTask = CachedTaskBuilder
     .make[Option[PublishArtifactsRes]](
       name = "publishArtifacts"
     )

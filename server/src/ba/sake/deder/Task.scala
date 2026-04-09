@@ -62,7 +62,7 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
   def dependsOn[T2](t: Task[T2, ?]): CachedTaskBuilder[T, Deps :* Task[T2, ?]] =
     CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes)
 
-  def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
+  def build(execute: TaskExecContext[T, Deps] => T)(using Deps <:< NonEmptyTuple): Task[T, Deps] =
     CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes)
 }
 

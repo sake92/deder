@@ -3,7 +3,7 @@ package ba.sake.deder.scalajs
 import scala.util.Using
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaJsModule, ScalaJsTestModule}
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, OutputCaptureContext}
-import ba.sake.deder.{CoreTasks, DederGlobals, Task, TaskBuilder}
+import ba.sake.deder.*
 
 /*
 TODO
@@ -12,7 +12,7 @@ TODO
  */
 class ScalaJsTasks(coreTasks: CoreTasks) {
 
-  val fastLinkJsTask = TaskBuilder
+  val fastLinkJsTask = CachedTaskBuilder
     .make[String](
       name = "fastLinkJs",
       supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST)

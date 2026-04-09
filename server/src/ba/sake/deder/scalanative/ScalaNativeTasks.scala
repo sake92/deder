@@ -3,7 +3,7 @@ package ba.sake.deder.scalanative
 import scala.util.Using
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaNativeModule, ScalaNativeTestModule}
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, OutputCaptureContext}
-import ba.sake.deder.{CoreTasks, DederException, DederGlobals, Task, TaskBuilder}
+import ba.sake.deder.*
 
 /*
 TODO
@@ -12,7 +12,7 @@ TODO
  */
 class ScalaNativeTasks(coreTasks: CoreTasks) {
 
-  val nativeLinkTask = TaskBuilder
+  val nativeLinkTask = CachedTaskBuilder
     .make[String](
       name = "nativeLink",
       supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST)
