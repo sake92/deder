@@ -49,6 +49,8 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
       - name: Build JARs
+        env:
+          VERSION: ${{ needs.precheck.outputs.VERSION }}
         run: |
           ./scripts/gen-config-bindings.sh
           ./mill server.assembly
@@ -89,6 +91,8 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
       - name: Build Client native image
+        env:
+          VERSION: ${{ needs.precheck.outputs.VERSION }}
         run: |
           ./mill -i client-native.nativeImage
           ls out/client-native/nativeImage.dest/
