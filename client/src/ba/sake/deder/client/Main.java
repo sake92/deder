@@ -8,7 +8,9 @@ import java.net.http.*;
 import java.util.concurrent.TimeUnit;
 import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.Properties;
+import java.util.regex.Pattern;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -128,7 +130,7 @@ public class Main {
         log("Deder server not running, starting it...");
         ensureJavaInstalled();
         // must be exactly tag version e.g. v0.1.0
-        var serverVersion = serverProps.getProperty("version", "early-access");
+        var serverVersion = resolveServerVersion(serverProps);
         var serverLocalPath = serverProps.getProperty("localPath", "");
         var versionCacheFile = Path.of(".deder/server.current.version");
         Path serverJarPath = Path.of(".deder/server.jar");
@@ -222,7 +224,7 @@ public class Main {
         var clientPath = resolveClientPath(processHandle);
         var commandLineArgsJson = "\"" + clientPath + "\", \"bsp\"";
         Files.createDirectories(Path.of(".bsp"));
-        var serverVersion = serverProps.getProperty("version", "early-access");
+        var serverVersion = resolveServerVersion(serverProps);
         var serverLocalPath = serverProps.getProperty("localPath");
         if (serverLocalPath != null && !serverLocalPath.isBlank()) {
             serverVersion = "local";
@@ -259,6 +261,103 @@ public class Main {
         // fall back to the current process path
         return processHandle.info().command().orElseThrow(
                 () -> new IllegalStateException("Cannot determine client executable path"));
+    }
+
+    private static final Pattern DEDER_PKL_VERSION_PATTERN = Pattern.compile(
+            "amends\\s+\"https://sake92\\.github\\.io/deder/config/([^/]+)/DederProject\\.pkl\"");
+
+    /**
+     * Resolves the server version using three sources in priority order:
+     * 1. server.properties "version" key
+     * 2. deder.pkl amends URL version segment
+     * 3. Latest stable release from GitHub (writes a minimal deder.pkl as a side effect)
+     */
+    private String resolveServerVersion(Properties serverProps) {
+        var explicitVersion = serverProps.getProperty("version", "").strip();
+        if (!explicitVersion.isBlank()) {
+            log("Server version from server.properties: " + explicitVersion);
+            return explicitVersion;
+        }
+
+        var pklVersion = parseDederPklVersion();
+        if (pklVersion.isPresent()) {
+            log("Server version from deder.pkl: " + pklVersion.get());
+            return pklVersion.get();
+        }
+
+        var ghVersion = fetchLatestGithubVersion();
+        if (ghVersion.isPresent()) {
+            writeMinimalDederPkl(ghVersion.get());
+            log("Server version from GitHub releases: " + ghVersion.get());
+            return ghVersion.get();
+        }
+
+        log("Could not determine server version; falling back to early-access");
+        return "early-access";
+    }
+
+    private Optional<String> parseDederPklVersion() {
+        var pklFile = Path.of("deder.pkl");
+        if (!Files.exists(pklFile) || !Files.isRegularFile(pklFile)) {
+            return Optional.empty();
+        }
+        try {
+            var content = Files.readString(pklFile, StandardCharsets.UTF_8);
+            var matcher = DEDER_PKL_VERSION_PATTERN.matcher(content);
+            if (matcher.find()) {
+                return Optional.of(matcher.group(1));
+            }
+        } catch (IOException e) {
+            log("Could not read deder.pkl: " + e.getMessage());
+        }
+        return Optional.empty();
+    }
+
+    private Optional<String> fetchLatestGithubVersion() {
+        try (var httpClient = HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(10))
+                .build()) {
+            var request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.github.com/repos/sake92/deder/releases/latest"))
+                    .header("Accept", "application/vnd.github+json")
+                    .GET()
+                    .build();
+            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() == 200) {
+                // Simple extraction of "tag_name" from JSON without pulling in a JSON library
+                var body = response.body();
+                var tagPattern = Pattern.compile("\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
+                var matcher = tagPattern.matcher(body);
+                if (matcher.find()) {
+                    return Optional.of(matcher.group(1));
+                }
+                log("GitHub releases response did not contain tag_name");
+            } else {
+                log("GitHub releases API returned HTTP " + response.statusCode());
+            }
+        } catch (Exception e) {
+            log("Could not fetch latest version from GitHub: " + e.getMessage());
+        }
+        return Optional.empty();
+    }
+
+    private void writeMinimalDederPkl(String version) {
+        var pklFile = Path.of("deder.pkl");
+        if (Files.exists(pklFile)) {
+            return;
+        }
+        try {
+            var content = "amends \"https://sake92.github.io/deder/config/" + version + "/DederProject.pkl\"\n";
+            content += "modules {}\n";
+            Files.writeString(pklFile, content, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            System.err.println("No deder.pkl found — created minimal config with version " + version);
+            log("Created minimal deder.pkl with version " + version);
+        } catch (IOException e) {
+            log("Could not write minimal deder.pkl: " + e.getMessage());
+        }
     }
 
     private void download(String fileUrl, Path destination) throws Exception {
