@@ -10,7 +10,7 @@ trait VersionModule extends Module {
   def version = Task {
     Task.ctx().env.get("VERSION").filter(_.nonEmpty).getOrElse {
       val state = VcsVersion.vcsState()
-      val lt = state.lastTag.getOrElse("0.0.0")
+      val lt = state.lastTag.getOrElse("0.0.0").stripPrefix("v")
       if state.commitsSinceLastTag == 0 && state.dirtyHash.isEmpty then lt
       else lt.split("\\.").toList match {
         case List(major, minor, patch) =>
