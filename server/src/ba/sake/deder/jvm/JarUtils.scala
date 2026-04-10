@@ -1,4 +1,4 @@
-package ba.sake.deder.jar
+package ba.sake.deder.jvm
 
 import java.io.BufferedOutputStream
 import java.io._

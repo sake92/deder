@@ -13,10 +13,11 @@ import mainargs.*
 import org.slf4j.LoggerFactory
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
+import io.opentelemetry.context.Context
 import ba.sake.deder.testing
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
-import io.opentelemetry.context.Context
+import ba.sake.deder.publish.PublishTasks
 
 object ServerMain extends StrictLogging {
 
@@ -76,11 +77,10 @@ object ServerMain extends StrictLogging {
       )
 
     val coreTasks = CoreTasks()
-    val packagingTasks = PackagingTasks(coreTasks)
-    val publishTasks = PublishTasks(packagingTasks)
+    val publishTasks = PublishTasks(coreTasks)
     val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)
     val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
-    val allTasks = coreTasks.all ++ packagingTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all
+    val allTasks = coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
     val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
 

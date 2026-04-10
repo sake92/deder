@@ -3,6 +3,7 @@ package ba.sake.deder
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.ConfigParser
 import ba.sake.deder.config.DederProject.*
+import ba.sake.deder.publish.PublishTasks
 
 class TasksResolverSuite extends munit.FunSuite {
 
@@ -14,9 +15,8 @@ class TasksResolverSuite extends munit.FunSuite {
     assert(parsedConfig.isRight, parsedConfig.left.get)
     val projectConfig = parsedConfig.toOption.get
     val coreTasks = CoreTasks()
-    val packagingTasks = PackagingTasks(coreTasks)
-    val publishTasks = PublishTasks(packagingTasks)
-    val tasksRegistry = TasksRegistry(coreTasks.all ++ packagingTasks.all ++ publishTasks.all)
+    val publishTasks = PublishTasks(coreTasks)
+    val tasksRegistry = TasksRegistry(coreTasks.all ++ publishTasks.all)
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
     val modules = tasksResolver.allModules.map(_.asInstanceOf[ScalaModule])
 
