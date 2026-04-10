@@ -38,6 +38,8 @@ Check out @README.md @CONTRIBUTING.md @docs/content/reference/server-properties.
 
 ## Key Patterns
 
+- prefer running single test and integration test (because they take very long)
+
 ### Task DAG
 The core abstraction is `Task[T, Deps]` (`server/src/ba/sake/deder/Task.scala`). Tasks form a typed DAG:
 - `ConfigValueTask` — reads from Pkl config, cached by value hash

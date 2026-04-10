@@ -9,7 +9,10 @@ trait BaseIntegrationSuite extends munit.FunSuite {
   val dederClientPath: String = System.getenv("DEDER_CLIENT_PATH")
   val dederServerPath: String = System.getenv("DEDER_SERVER_PATH")
 
-  def withTestProject(testProjectPath: os.RelPath)(testCode: os.Path => Unit): Unit = {
+  def withTestProject(
+      testProjectPath: os.RelPath,
+      serverProperties: Map[String, String] = Map.empty
+  )(testCode: os.Path => Unit): Unit = {
     val tempDir = os.pwd / "tmp" / s"${testProjectPath.last}-${System.currentTimeMillis()}"
     try {
       os.copy(testResourceDir / testProjectPath, tempDir, createFolders = true, replaceExisting = true)
@@ -17,7 +20,9 @@ trait BaseIntegrationSuite extends munit.FunSuite {
       val originalLines = os.read.lines(tempDir / "deder.pkl")
       val tweakedLines = Seq(""" amends "../../config/DederProject.pkl" """) ++ originalLines.tail
       os.write.over(tempDir / "deder.pkl", tweakedLines.mkString("\n"), createFolders = true)
-      os.write.over(tempDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      val allServerProperties = serverProperties + ("localPath" -> dederServerPath)
+      val serverPropertiesContent = allServerProperties.map((k, v) => s"$k=$v").mkString("\n") + "\n"
+      os.write.over(tempDir / ".deder/server.properties", serverPropertiesContent, createFolders = true)
       System.setProperty("DEDER_PROJECT_ROOT_DIR", tempDir.toString)
       testCode(tempDir)
     } finally {
