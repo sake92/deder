@@ -1,6 +1,5 @@
 # Deder
 
-
 Config based, concurrent-first, client-server JVM build tool.
 
 :construction: Work in progress, expect rough edges and breaking changes.  
