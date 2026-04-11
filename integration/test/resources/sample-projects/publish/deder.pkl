@@ -33,10 +33,21 @@ local const lib3 = new ScalaModule {
   pomSettings = makePomSettings("lib3")
 }
 
+local const lib4 = new ScalaModule {
+  scalaVersion = "3.7.1"
+  id = "lib4"
+  moduleDeps {
+    lib1
+    lib2
+  }
+  pomSettings = makePomSettings("lib4")
+}
+
 modules {
   lib1
   lib2
   lib3
+  lib4
 }
 
 local const function makePomSettings(_artifactId: String): PomSettings = new {

@@ -166,7 +166,14 @@ class PublishTasks(coreTasks: CoreTasks) {
     .dependsOn(pomSettingsTask)
     .build { ctx =>
       val pom: Option[PomSettings] = ctx.depResults._1
-      Seq(pom.toSeq) ++ ctx.transitiveResults.flatten.flatten
+      // Index 0: this module's own pom settings (0 or 1 item)
+      // Index 1: all direct module deps' pom settings combined (each dep contributes its index-0)
+      val directDepsPoms = ctx.transitiveResults
+        .headOption
+        .getOrElse(Seq.empty)
+        .flatMap(_.headOption)
+        .flatten
+      Seq(pom.toSeq, directDepsPoms)
     }
 
   val sourcesJarTask = CachedTaskBuilder
@@ -320,9 +327,8 @@ class PublishTasks(coreTasks: CoreTasks) {
           case jm: JavaModule => jm.pomSettings
         }
         val allDependencies = mandatoryDependencies ++ dependencies
-        // drop this module's pom settings
-        // then take just the first level, direct module dependencies
-        val moduleDepsPomSettingsClean = moduleDepsPomSettings.take(2).drop(1).flatten
+        // drop index 0 (self), keep index 1 (direct module deps' pom settings)
+        val moduleDepsPomSettingsClean = moduleDepsPomSettings.drop(1).flatten
         val pomXmlContent =
           PomGenerator.generate(
             pom.groupId,

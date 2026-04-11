@@ -44,6 +44,20 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("deder POM should contain all direct module deps when multiple exist") {
+    withTestProject("sample-projects/publish") { projectPath =>
+      executeDederCommand(projectPath, "exec -m lib4 -t publishArtifacts").out.text()
+      val publishArtifactsPath = projectPath / ".deder/out/lib4/publishArtifacts"
+      val pomContent = os.read(publishArtifactsPath / "lib4_3-0.0.1-SNAPSHOT.pom")
+      val reader = new MavenXpp3Reader()
+      val pom = reader.read(new java.io.StringReader(pomContent))
+      val deps = pom.getDependencies.asScala.map(_.getArtifactId).sorted
+      println(s"lib4 POM dependencies: $deps")
+      assert(deps.contains("lib1_3"), s"Expected lib1_3 in deps (direct dep), got: $deps")
+      assert(deps.contains("lib2_3"), s"Expected lib2_3 in deps (direct dep), got: $deps")
+    }
+  }
+
   test("deder jar should contain custom manifest entries") {
     withTestProject("sample-projects/publish") { projectPath =>
       executeDederCommand(projectPath, "exec -t jar -m lib1").out.text()
