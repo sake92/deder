@@ -435,11 +435,19 @@ class CoreTasks() extends StrictLogging {
             case _                    => Seq.empty
           }
       val allDeps = scalacPluginDeps ++ scalaPlatformDeps
-      val pluginJars = DependencyResolver.fetchFiles(
-        allDeps.map(d => Dependency.make(d, scalaVersion)), // .exclude(dependency.Module("*", "*"))),
+      val allJars = DependencyResolver.fetchFiles(
+        allDeps.map(d => Dependency.make(d, scalaVersion)),
         Some(ctx.notifications)
       )
-      pluginJars
+      // Only pass JARs that are actual compiler plugins (contain plugin.properties).
+      // Coursier resolves transitive deps regardless; this filters them out.
+      allJars.filter { jar =>
+        scala.util.Try {
+          val zf = new java.util.zip.ZipFile(jar.toIO)
+          try zf.getEntry("plugin.properties") != null
+          finally zf.close()
+        }.getOrElse(false)
+      }
     }
 
   val compilerDepsTask = CachedTaskBuilder
@@ -472,7 +480,7 @@ class CoreTasks() extends StrictLogging {
     }
 
   // returns classes dir
-  val compileTask = TaskBuilder
+  val compileTask = CachedTaskBuilder
     .make[DederPath](
       name = "compile",
       transitive = true
@@ -486,7 +494,6 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(scalaVersionTask)
     .dependsOn(compilerDepsTask)
     .dependsOn(compileClasspathTask)
-    .dependsOn(classesTask)
     .dependsOn(scalacPluginsTask)
     .dependsOn(javacAnnotationProcessorsTask)
     .build { ctx =>
@@ -500,10 +507,13 @@ class CoreTasks() extends StrictLogging {
         scalaVersion,
         compilerDeps,
         compileClasspath,
-        classesDir,
         scalacPlugins,
         javacAnnotationProcessors
       ) = ctx.depResults
+      // classesTask is NOT a dep here: its outputHash reflects compiled class contents,
+      // which changes after every compilation — making the cache key self-referential.
+      // The path is stable and derived the same way classesTask would compute it.
+      val classesDir = ctx.out / os.up / "classes"
 
       JdkUtils.checkCompat(JdkUtils.getVersion(scala.util.Properties.javaSpecVersion), scalaVersion)
 
@@ -572,7 +582,7 @@ class CoreTasks() extends StrictLogging {
     }
 
   // BSP compile: same as compileTask but always generates SemanticDB for IDE features (go-to-def, scalafix, etc.)
-  val compileBspTask = TaskBuilder
+  val compileBspTask = CachedTaskBuilder
     .make[DederPath](
       name = "compileBsp",
       transitive = true
@@ -586,7 +596,6 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(scalaVersionTask)
     .dependsOn(compilerDepsTask)
     .dependsOn(compileClasspathTask)
-    .dependsOn(classesTask)
     .dependsOn(semanticdbDirTask)
     .dependsOn(scalacPluginsTask)
     .dependsOn(javacAnnotationProcessorsTask)
@@ -603,13 +612,13 @@ class CoreTasks() extends StrictLogging {
         scalaVersion,
         compilerDeps,
         compileClasspath,
-        classesDir,
         semanticdbDir,
         scalacPlugins,
         javacAnnotationProcessors,
         javaSemanticdbVersion,
         scalaSemanticdbVersion
       ) = ctx.depResults
+      val classesDir = ctx.out / os.up / "classes"
 
       JdkUtils.checkCompat(JdkUtils.getVersion(scala.util.Properties.javaSpecVersion), scalaVersion)
 
