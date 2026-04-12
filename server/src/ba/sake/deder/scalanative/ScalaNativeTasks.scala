@@ -1,6 +1,8 @@
 package ba.sake.deder.scalanative
 
+import java.nio.file.Files
 import scala.util.Using
+import scala.util.Properties
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaNativeModule, ScalaNativeTestModule}
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, OutputCaptureContext}
 import ba.sake.deder.*
@@ -52,7 +54,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
         val (_, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
           val testOptions = DederTestOptions(ctx.args)
-          val nativeBinaryPath = findNativeBinary(ctx.out / os.up / "nativeLink")
+          val nativeBinaryPath = ScalaNativeTasks.findNativeBinary(ctx.out / os.up / "nativeLink")
           Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
             executorService =>
               val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
@@ -69,23 +71,30 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
       summarize = DederTestResults.summarize
     )
 
-  private def findNativeBinary(nativeLinkDir: os.Path): os.Path = {
-    // ScalaNative linker outputs the binary in the nativeLink output directory
-    val candidates = os
-      .list(nativeLinkDir)
-      .filter(p =>
-        os.isFile(p) && !p.last.endsWith(".ll") && !p.last.endsWith(".c") && !p.last.endsWith(".o") && !p.last
-          .endsWith(".s")
-      )
-    candidates.headOption.getOrElse(
-      throw DederException(
-        s"No native binary found in $nativeLinkDir. Files: ${os.list(nativeLinkDir).map(_.last).mkString(", ")}"
-      )
-    )
-  }
-
   val all: Seq[Task[?, ?]] = Seq(
     nativeLinkTask,
     testNativeTask
   )
+}
+
+object ScalaNativeTasks {
+
+  private val ignoredFileSuffixes = Seq(".ll", ".c", ".o", ".s", ".json")
+
+  private[deder] def findNativeBinary(nativeLinkDir: os.Path): os.Path = {
+    val files = os.list(nativeLinkDir).filter(os.isFile).sortBy(_.last)
+    val candidates = files.filterNot(path => ignoredFileSuffixes.exists(path.last.endsWith))
+    val executableCandidates = candidates.filter(path => Files.isExecutable(path.toNIO) || (Properties.isWin && path.ext == "exe"))
+
+    executableCandidates.headOption
+      .orElse(candidates match {
+        case Seq(singleCandidate) => Some(singleCandidate)
+        case _                    => None
+      })
+      .getOrElse(
+        throw DederException(
+          s"No native binary found in $nativeLinkDir. Files: ${files.map(_.last).mkString(", ")}"
+        )
+      )
+  }
 }
