@@ -3,6 +3,7 @@ package ba.sake.deder.scalanative
 import java.nio.file.Files
 import scala.util.Using
 import scala.util.Properties
+import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaNativeModule, ScalaNativeTestModule}
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, OutputCaptureContext}
 import ba.sake.deder.*
@@ -32,11 +33,19 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
         case _ => mainClass
       }
       val linker = new ScalaNativeLinker(ctx.notifications, ctx.module.id)
+      val nativeModule = ctx.module.asInstanceOf[ScalaNativeModule]
       linker.link(
         nirPaths = nirPaths,
         outputDir = ctx.out,
         mainClass = effectiveMainClass,
-        nativeLibs = Seq.empty
+        nativeLibs = Seq.empty,
+        gc = nativeModule.gc.toString,
+        mode = nativeModule.mode.toString,
+        multithreading = nativeModule.multithreading,
+        lto = nativeModule.lto.toString,
+        embedResources = nativeModule.embedResources,
+        extraLinkingOptions = nativeModule.nativeLinkingOptions.asScala.toSeq,
+        extraCompileOptions = nativeModule.nativeCompileOptions.asScala.toSeq
       )
       // TODO thread pool..
       ""

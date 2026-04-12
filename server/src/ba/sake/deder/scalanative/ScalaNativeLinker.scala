@@ -12,7 +12,14 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
       nirPaths: Seq[os.Path], // classesDir + all JARs in compileClasspath
       outputDir: os.Path,
       mainClass: Option[String],
-      nativeLibs: Seq[String]
+      nativeLibs: Seq[String],
+      gc: String = "immix",
+      mode: String = "debug",
+      multithreading: Boolean = false,
+      lto: String = "none",
+      embedResources: Boolean = false,
+      extraLinkingOptions: Seq[String] = Seq.empty,
+      extraCompileOptions: Seq[String] = Seq.empty
   ): Unit = Scope { implicit scope =>
     notifications.add(ServerNotification.logInfo("Linking scala-native binary...", Some(moduleId)))
 
@@ -24,13 +31,15 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
     val config = Config.empty
       .withCompilerConfig {
         NativeConfig.empty
-          .withGC(GC.default)
-          .withMode(Mode.default)
-          .withMultithreading(enabled = false)
+          .withGC(GC(gc))
+          .withMode(Mode(mode))
+          .withMultithreading(enabled = multithreading)
+          .withLTO(LTO(lto))
+          .withEmbedResources(embedResources)
           .withClang(clang)
           .withClangPP(clangpp)
-          .withLinkingOptions(linkopts)
-          .withCompileOptions(compopts)
+          .withLinkingOptions(linkopts ++ extraLinkingOptions)
+          .withCompileOptions(compopts ++ extraCompileOptions)
           .withLinkStubs(true)
       }
       .withClassPath(nirPaths.map(_.toNIO))

@@ -206,9 +206,27 @@ class ScalaJsTestModule extends ScalaJsModule {
   }
 }
 
+typealias ScalaNativeGC = "none" | "boehm" | "immix" | "commix"
+typealias ScalaNativeMode = "debug" | "release-fast" | "release-full" | "release-size"
+typealias ScalaNativeLTO = "none" | "thin" | "full"
+
 open class ScalaNativeModule extends ScalaModule {
   type = "scala-native"
   scalaNativeVersion: String(!isEmpty)
+  /// Garbage collector algorithm. `immix` is the default and recommended for most use cases.
+  gc: ScalaNativeGC = "immix"
+  /// Build mode / optimization level. Use `debug` for development and `release-fast` or `release-full` for production.
+  mode: ScalaNativeMode = "debug"
+  /// Enable multithreading support. Requires a multithreading-capable GC (`immix` or `commix`).
+  multithreading: Boolean = false
+  /// Link-Time Optimization level. `thin` is a good balance for release builds.
+  lto: ScalaNativeLTO = "none"
+  /// Embed classpath resources into the native binary.
+  embedResources: Boolean = false
+  /// Extra linker flags, appended to auto-discovered options.
+  nativeLinkingOptions: Listing<String> = new Listing {}
+  /// Extra clang compile flags, appended to auto-discovered options.
+  nativeCompileOptions: Listing<String> = new Listing {}
   function asTest(): ScalaNativeTestModule = (this.toDynamic().toTyped(ScalaNativeTestModule)) {
     type = "scala-native-test"
     publish = false
