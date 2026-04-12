@@ -8,7 +8,7 @@ class ScalaNativeTasksSuite extends munit.FunSuite {
     val tmpDir = os.temp.dir()
     try {
       val metadataFile = tmpDir / "metadata.json"
-      val nativeBinaryName = if Properties.isWin then "cli-test.exe" else "cli-test"
+      val nativeBinaryName = if Properties.isWin then "native-test.exe" else "native-test"
       val nativeBinary = tmpDir / nativeBinaryName
 
       os.write(metadataFile, """{"result":"cached"}""")

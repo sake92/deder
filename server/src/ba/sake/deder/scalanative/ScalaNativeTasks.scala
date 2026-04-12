@@ -90,15 +90,10 @@ object ScalaNativeTasks {
     val candidates = files.filterNot(path => ignoredFileSuffixes.exists(path.last.endsWith))
     val executableCandidates = candidates.filter(isExecutableBinaryCandidate)
 
-    executableCandidates.headOption
-      .orElse(candidates match {
-        case Seq(singleCandidate) => Some(singleCandidate)
-        case _                    => None
-      })
-      .getOrElse(
-        throw DederException(
-          s"No native binary found in $nativeLinkDir. Files: ${files.map(_.last).mkString(", ")}"
-        )
+    executableCandidates.headOption.getOrElse(
+      throw DederException(
+        s"No executable native binary found in $nativeLinkDir. Files: ${files.map(_.last).mkString(", ")}"
       )
+    )
   }
 }
