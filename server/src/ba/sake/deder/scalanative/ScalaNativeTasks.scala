@@ -81,10 +81,13 @@ object ScalaNativeTasks {
 
   private val ignoredFileSuffixes = Seq(".ll", ".c", ".o", ".s", ".json")
 
+  private def isExecutableBinaryCandidate(path: os.Path): Boolean =
+    Files.isExecutable(path.toNIO) || (Properties.isWin && path.ext == "exe")
+
   private[deder] def findNativeBinary(nativeLinkDir: os.Path): os.Path = {
     val files = os.list(nativeLinkDir).filter(os.isFile).sortBy(_.last)
     val candidates = files.filterNot(path => ignoredFileSuffixes.exists(path.last.endsWith))
-    val executableCandidates = candidates.filter(path => Files.isExecutable(path.toNIO) || (Properties.isWin && path.ext == "exe"))
+    val executableCandidates = candidates.filter(isExecutableBinaryCandidate)
 
     executableCandidates.headOption
       .orElse(candidates match {
