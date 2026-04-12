@@ -85,7 +85,7 @@ object ScalaNativeTasks {
     if Properties.isWin then path.ext == "exe"
     else Files.isExecutable(path.toNIO)
 
-  private[deder] def findNativeBinary(nativeLinkDir: os.Path): os.Path = {
+  private[scalanative] def findNativeBinary(nativeLinkDir: os.Path): os.Path = {
     val files = os.list(nativeLinkDir).filter(os.isFile).sortBy(_.last)
     val candidates = files.filterNot(path => ignoredFileSuffixes.exists(path.last.endsWith))
     val executableCandidates = candidates.filter(isExecutableBinaryCandidate)
