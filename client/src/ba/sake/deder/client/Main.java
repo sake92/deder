@@ -55,6 +55,13 @@ public class Main {
         });
 
         var thisProcess = ProcessHandle.current();
+        var parentProcess = thisProcess.parent();
+        var isBspClient = args.length == 1 && args[0].equals("bsp");
+        var logFileName = isBspClient ? "bsp-client" : "cli-client";
+        var timestamp = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS).toString().replaceAll("[^0-9]", "-");
+        logFile = Path.of(".deder/logs/client/" + logFileName + "_" + timestamp + "_" + thisProcess.pid() + ".log");
+        Files.createDirectories(logFile.getParent());
+        Files.createFile(logFile);
 
         var serverProps = new Properties();
         var propFileName = Paths.get(".deder/server.properties");
@@ -68,15 +75,6 @@ public class Main {
             writeBspInstallScript(thisProcess, serverProps);
             return;
         }
-
-        var isBspClient = args.length == 1 && args[0].equals("bsp");
-
-        var parentProcess = thisProcess.parent();
-        var logFileName = isBspClient ? "bsp-client" : "cli-client";
-        var timestamp = LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS).toString().replaceAll("[^0-9]", "-");
-        logFile = Path.of(".deder/logs/client/" + logFileName + "_" + timestamp + "_" + thisProcess.pid() + ".log");
-        Files.createDirectories(logFile.getParent());
-        Files.createFile(logFile);
 
         log("Deder client starting...");
         log("Deder client type: " + (isBspClient ? "BSP" : "CLI"));
