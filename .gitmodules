@@ -1,6 +1,0 @@
-[submodule "examples/thirdparty/thealgorithms-java/repo"]
-	path = examples/thirdparty/thealgorithms-java/repo
-	url = https://github.com/TheAlgorithms/Java.git
-[submodule "examples/thirdparty/thealgorithms-scala/repo"]
-	path = examples/thirdparty/thealgorithms-scala/repo
-	url = https://github.com/TheAlgorithms/Scala.git
