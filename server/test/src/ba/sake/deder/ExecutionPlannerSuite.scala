@@ -60,9 +60,10 @@ class ExecutionPlannerSuite extends munit.FunSuite {
             "common.compilerDeps",
             "common.dependencies",
             "common.javacAnnotationProcessors",
-            "common.scalacPlugins"
+            "common.scalacPlugins",
+            "common.sourceFiles"
           ),
-          Set("common.allDependencies"),
+          Set("common.allDependencies", "common.compilerJars"),
           Set("common.compileClasspath"),
           Set("common.compile")
         ),

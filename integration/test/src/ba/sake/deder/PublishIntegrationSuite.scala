@@ -39,6 +39,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
       assertEquals(pom.getArtifactId, "lib3_3")
       val deps = pom.getDependencies.asScala.map(_.getArtifactId).sorted
       println(s"lib3 POM dependencies: $deps")
+      assertEquals(deps.length, 2) // only lib2_3 + scala3-library, not lib1_3 which is transitive
       assert(deps.contains("lib2_3"), s"Expected lib2_3 in deps, got: $deps")
       assert(!deps.contains("lib1_3"), s"Expected lib1_3 NOT in deps (transitive), got: $deps")
     }
@@ -53,6 +54,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
       val pom = reader.read(new java.io.StringReader(pomContent))
       val deps = pom.getDependencies.asScala.map(_.getArtifactId).sorted
       println(s"lib4 POM dependencies: $deps")
+      assertEquals(deps.length, 3) // 2 libs + scala3-library
       assert(deps.contains("lib1_3"), s"Expected lib1_3 in deps (direct dep), got: $deps")
       assert(deps.contains("lib2_3"), s"Expected lib2_3 in deps (direct dep), got: $deps")
     }

@@ -10,6 +10,9 @@ object ZincCompilersCache {
     Scaffeine()
       .expireAfterAccess(5.minute)
       .maximumSize(10)
+      .removalListener[String, ZincCompiler] { (_, compiler, _) =>
+        if compiler != null then compiler.close()
+      }
       .build()
 
    def get(scalaVersion: String): ZincCompiler =

@@ -83,12 +83,14 @@ class IntegrationSuite extends BaseIntegrationSuite {
              |Stage #1:
              |  common.allClassesDirs
              |  common.compilerDeps
+             |  common.sourceFiles
              |  common.dependencies
              |  common.javacAnnotationProcessors
              |  common.mandatoryDependencies
              |  common.scalacPlugins
              |Stage #2:
              |  common.allDependencies
+             |  common.compilerJars
              |Stage #3:
              |  common.compileClasspath
              |Stage #4:

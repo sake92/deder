@@ -4,6 +4,8 @@ import java.io.File
 import java.net.URLClassLoader
 import java.nio.file.Path
 import java.util.Optional
+import scala.concurrent.duration.*
+import com.github.blemale.scaffeine.*
 import sbt.internal.inc.{MappedFileConverter, ZincUtil}
 import sbt.internal.inc.Locate
 import sbt.internal.inc.consistent.ConsistentFileAnalysisStore
@@ -25,7 +27,7 @@ import xsbti.compile.{
 }
 import com.typesafe.scalalogging.StrictLogging
 import sbt.internal.inc.ScalaInstance
-import ba.sake.deder.{ClassLoaderUtils, DederGlobals, RequestContext, ServerNotification, ServerNotificationsLogger}
+import ba.sake.deder.{DederGlobals, OTEL, RequestContext, ServerNotification, ServerNotificationsLogger}
 
 object ZincCompiler {
   def apply(compilerBridgeJar: os.Path): ZincCompiler =
@@ -35,6 +37,120 @@ object ZincCompiler {
 class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
 
   private val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
+
+  // In-memory cache for Zinc analysis, avoids re-reading inc_compile.zip from disk
+  private val analysisCache: Cache[os.Path, AnalysisContents] =
+    Scaffeine()
+      .expireAfterAccess(5.minute)
+      .maximumSize(50)
+      .build()
+
+  // Cached compiler setup: classloaders, ScalaInstance, and Compilers
+  // are expensive to create (JAR scanning, reflection) and can be reused
+  // across compilations when the same compiler/library JARs are used.
+  private case class CachedCompilerSetup(
+      key: String,
+      zincClassloader: URLClassLoader,
+      libraryClassloader: URLClassLoader,
+      compilerClassloader: URLClassLoader,
+      allJarsClassloader: URLClassLoader,
+      compilers: xsbti.compile.Compilers
+  )
+
+  @volatile private var cachedSetup: Option[CachedCompilerSetup] = None
+
+  def close(): Unit = synchronized {
+    cachedSetup.foreach { s =>
+      try s.allJarsClassloader.close()
+      catch { case _: Exception => }
+      try s.compilerClassloader.close()
+      catch { case _: Exception => }
+      try s.libraryClassloader.close()
+      catch { case _: Exception => }
+      try s.zincClassloader.close()
+      catch { case _: Exception => }
+    }
+    cachedSetup = None
+    analysisCache.invalidateAll()
+  }
+
+  private def compilerSetupKey(
+      compilerJars: Seq[os.Path],
+      scalaLibraryJars: Seq[os.Path],
+      javaHome: Option[Path]
+  ): String =
+    s"${compilerJars.map(_.toString).sorted.hashCode};${scalaLibraryJars.map(_.toString).sorted.hashCode};${javaHome.map(_.toString).getOrElse("")}"
+
+  private def getOrCreateSetup(
+      javaHome: Option[Path],
+      scalaVersion: String,
+      compilerJars: Seq[os.Path],
+      scalaLibraryJars: Seq[os.Path]
+  ): CachedCompilerSetup = synchronized {
+    val key = compilerSetupKey(compilerJars, scalaLibraryJars, javaHome)
+    cachedSetup match {
+      case Some(setup) if setup.key == key => setup
+      case _ =>
+        val span = OTEL.TRACER.spanBuilder("ZincCompiler.createSetup")
+          .setAttribute("scalaVersion", scalaVersion)
+          .startSpan()
+        try {
+          cachedSetup.foreach { s =>
+            try s.allJarsClassloader.close()
+            catch { case _: Exception => }
+            try s.compilerClassloader.close()
+            catch { case _: Exception => }
+            try s.libraryClassloader.close()
+            catch { case _: Exception => }
+            try s.zincClassloader.close()
+            catch { case _: Exception => }
+          }
+
+          // Isolated bridge: only xsbti.* and sbt.internal.inc.* delegate to app classloader
+          val appClassLoader = getClass.getClassLoader
+          val sharedPrefixes = Seq("xsbti.", "sbt.internal.inc.")
+          val bridgeClassLoader = new ClassLoader(ClassLoader.getPlatformClassLoader) {
+            override def loadClass(name: String, resolve: Boolean): Class[?] =
+              if sharedPrefixes.exists(name.startsWith) then
+                val c = appClassLoader.loadClass(name)
+                if resolve then resolveClass(c)
+                c
+              else super.loadClass(name, resolve)
+
+            override def getResource(name: String): java.net.URL =
+              val pathPrefixes = sharedPrefixes.map(_.replace('.', '/'))
+              if pathPrefixes.exists(name.startsWith) then appClassLoader.getResource(name)
+              else super.getResource(name)
+          }
+
+          val zincClassloader = new URLClassLoader(compilerJars.map(_.toURI.toURL).toArray, bridgeClassLoader)
+          val libraryClassloader = new URLClassLoader(scalaLibraryJars.map(_.toURI.toURL).toArray, zincClassloader)
+          val compilerClassloader = new URLClassLoader(compilerJars.map(_.toURI.toURL).toArray, libraryClassloader)
+          val allJarsClassloader =
+            new URLClassLoader((compilerJars ++ scalaLibraryJars).map(_.toURI.toURL).toArray, zincClassloader)
+
+          val scalaInstance = new ScalaInstance(
+            version = scalaVersion,
+            loader = allJarsClassloader,
+            loaderCompilerOnly = compilerClassloader,
+            loaderLibraryOnly = libraryClassloader,
+            libraryJars = scalaLibraryJars.map(_.toIO).toArray,
+            compilerJars = compilerJars.map(_.toIO).toArray,
+            allJars = (compilerJars ++ scalaLibraryJars).map(_.toIO).toArray,
+            explicitActual = Some(scalaVersion)
+          )
+
+          val classpathOptions = ClasspathOptionsUtil.auto()
+          val scalaCompiler = ZincUtil.scalaCompiler(scalaInstance, compilerBridgeJar.toIO, classpathOptions)
+          val compilers = ZincUtil.compilers(scalaInstance, classpathOptions, javaHome, scalac = scalaCompiler)
+
+          val newSetup = CachedCompilerSetup(key, zincClassloader, libraryClassloader, compilerClassloader,
+            allJarsClassloader, compilers)
+          cachedSetup = Some(newSetup)
+          newSetup
+        } finally span.end()
+    }
+  }
 
   def compile(
       javaHome: Option[Path],
@@ -67,55 +183,31 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       p.last.endsWith(".jar")
     }
 
-    // Only include compiler jars in the base classloader, NOT the compile classpath.
-    // The compile classpath is passed separately via CompileOptions (classpathVFs).
-    // Including it here would leak user dependencies into the compiler plugin classloader
-    // hierarchy, causing conflicts when user deps contain classes overlapping with
-    // compiler plugin internals (e.g. scalameta classes from scalafix-core conflicting
-    // with the semanticdb-scalac plugin).
-    ClassLoaderUtils.withIsolatedClassLoader(
-      classPath = compilerJars,
-      sharedPrefixes = Seq("xsbti.", "sbt.internal.inc.")
-    ) { bridgeClassLoader =>
-      ClassLoaderUtils.withClassLoader(compilerJars, parent = bridgeClassLoader) { zincClassloader =>
-        ClassLoaderUtils.withClassLoader(scalaLibraryJars, parent = zincClassloader) { libraryClassloader =>
-          ClassLoaderUtils.withClassLoader(compilerJars, parent = libraryClassloader) { compilerClassloader =>
-            ClassLoaderUtils.withClassLoader(compilerJars ++ scalaLibraryJars, parent = zincClassloader) {
-              allJarsClassloader =>
-                doCompile(
-                  javaHome = javaHome,
-                  scalaVersion = scalaVersion,
-                  compilerJars = compilerJars,
-                  scalaLibraryJars = scalaLibraryJars,
-                  compileClasspath = compileClasspath,
-                  libraryClassloader = libraryClassloader,
-                  compilerClassloader = compilerClassloader,
-                  allJarsClassloader = allJarsClassloader,
-                  zincCacheFile = zincCacheFile,
-                  sources = sources,
-                  classesDir = classesDir,
-                  scalacOptions = scalacOptions,
-                  javacOptions = javacOptions,
-                  zincLogger = zincLogger,
-                  moduleId = moduleId,
-                  notifications = notifications
-                )
-            }
-          }
-        }
-      }
+    val setup = getOrCreateSetup(javaHome, scalaVersion, compilerJars, scalaLibraryJars)
+
+    val oldClassloader = Thread.currentThread().getContextClassLoader
+    Thread.currentThread().setContextClassLoader(setup.allJarsClassloader)
+    try {
+      doCompile(
+        compileClasspath = compileClasspath,
+        compilers = setup.compilers,
+        zincCacheFile = zincCacheFile,
+        sources = sources,
+        classesDir = classesDir,
+        scalacOptions = scalacOptions,
+        javacOptions = javacOptions,
+        zincLogger = zincLogger,
+        moduleId = moduleId,
+        notifications = notifications
+      )
+    } finally {
+      Thread.currentThread().setContextClassLoader(oldClassloader)
     }
   }
 
   private def doCompile(
-      javaHome: Option[Path],
-      scalaVersion: String,
-      compilerJars: Seq[os.Path], // compiler + reflect
-      scalaLibraryJars: Seq[os.Path],
       compileClasspath: Seq[os.Path],
-      libraryClassloader: ClassLoader,
-      compilerClassloader: ClassLoader,
-      allJarsClassloader: ClassLoader,
+      compilers: xsbti.compile.Compilers,
       zincCacheFile: os.Path,
       sources: Seq[os.Path],
       classesDir: os.Path,
@@ -125,22 +217,6 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       moduleId: String,
       notifications: ServerNotificationsLogger
   ): Unit = {
-    val scalaInstance = new ScalaInstance(
-      version = scalaVersion,
-      loader = allJarsClassloader,
-      loaderCompilerOnly = compilerClassloader,
-      loaderLibraryOnly = libraryClassloader,
-      libraryJars = scalaLibraryJars.map(_.toIO).toArray,
-      compilerJars = compilerJars.map(_.toIO).toArray,
-      allJars = (compilerJars ++ scalaLibraryJars).map(_.toIO).toArray,
-      explicitActual = Some(scalaVersion)
-    )
-
-    val classpathOptions = ClasspathOptionsUtil.auto()
-    val scalaCompiler = ZincUtil.scalaCompiler(scalaInstance, compilerBridgeJar.toIO, classpathOptions)
-    val compilers =
-      ZincUtil.compilers(scalaInstance, classpathOptions, javaHome, scalac = scalaCompiler)
-
     val converter = MappedFileConverter.empty
     val sourcesVFs = sources.map(s => converter.toVirtualFile(s.toNIO)).toArray
     val classpathVFs = compileClasspath.map(f => converter.toVirtualFile(f.toNIO)).toArray
@@ -164,11 +240,20 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       parallelism = math.min(Runtime.getRuntime.availableProcessors(), 8)
     )
     val previousResult = locally {
-      val previous = analysisStore.get()
-      PreviousResult.of(
-        previous.map(_.getAnalysis),
-        previous.map(_.getMiniSetup)
-      )
+      val span = OTEL.TRACER.spanBuilder("ZincCompiler.analysisStore.get")
+        .setAttribute("moduleId", moduleId)
+        .startSpan()
+      try {
+        val cached = analysisCache.getIfPresent(zincCacheFile)
+        val previous = cached match {
+          case Some(contents) => Optional.of(contents)
+          case None           => analysisStore.get()
+        }
+        PreviousResult.of(
+          previous.map(_.getAnalysis),
+          previous.map(_.getMiniSetup)
+        )
+      } finally span.end()
     }
 
     val reporter = new DederZincReporter(moduleId, notifications, zincLogger)
@@ -178,8 +263,6 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
     logger.debug(
       s"""Starting compilation
          |  module: $moduleId
-         |  scalaVersion: $scalaVersion
-         |  compilerJars: ${compilerJars.mkString(", ")}
          |  compileClasspath: ${compileClasspath.mkString(", ")}
          |  sources: ${sources.size}
          |  classesDir: $classesDir
@@ -190,8 +273,21 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
 
     try {
       notifications.add(ServerNotification.CompileStarted(moduleId, sources)) // so we can reset BSP diagnostics
-      val newResult = incrementalCompiler.compile(inputs, zincLogger)
-      analysisStore.set(AnalysisContents.create(newResult.analysis(), newResult.setup()))
+      val compileSpan = OTEL.TRACER.spanBuilder("ZincCompiler.incrementalCompile")
+        .setAttribute("moduleId", moduleId)
+        .setAttribute("sources.count", sources.size.toLong)
+        .startSpan()
+      val newResult =
+        try incrementalCompiler.compile(inputs, zincLogger)
+        finally compileSpan.end()
+      val storeSpan = OTEL.TRACER.spanBuilder("ZincCompiler.analysisStore.set")
+        .setAttribute("moduleId", moduleId)
+        .startSpan()
+      try {
+        val contents = AnalysisContents.create(newResult.analysis(), newResult.setup())
+        analysisStore.set(contents)
+        analysisCache.put(zincCacheFile, contents)
+      } finally storeSpan.end()
       // trigger just in case, for BSP
       if !newResult.hasModified then notifications.add(ServerNotification.CompileFinished(moduleId, 0, 0))
     } catch {

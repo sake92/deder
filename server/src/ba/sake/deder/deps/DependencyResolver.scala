@@ -1,15 +1,28 @@
 package ba.sake.deder.deps
 
 import java.util.concurrent.ConcurrentHashMap
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
+import com.github.blemale.scaffeine.*
 import coursierapi.Fetch
 import coursierapi.FetchResult
 import coursierapi.Dependency as CoursierDependency
 import dependency.api.ops.*
-import ba.sake.deder.ServerNotificationsLogger
+import ba.sake.deder.{OTEL, ServerNotificationsLogger}
 import ba.sake.deder.ServerNotification
 
 object DependencyResolver {
+
+  // In-process cache for resolved file paths, keyed by sorted dependency coordinates.
+  // Avoids repeated Coursier resolution calls when deps haven't changed.
+  private val fetchFilesCache: Cache[String, Seq[os.Path]] =
+    Scaffeine()
+      .expireAfterAccess(5.minute)
+      .maximumSize(50)
+      .build()
+
+  private def depsCacheKey(dependencies: Seq[CoursierDependency]): String =
+    dependencies.map(_.toString).sorted.mkString(",")
 
   def doFetch(
       coursierDependencies: Seq[CoursierDependency],
@@ -35,7 +48,19 @@ object DependencyResolver {
     doFetch(coursierDeps, notifications)
 
   def fetchFiles(dependencies: Seq[Dependency], notifications: Option[ServerNotificationsLogger] = None): Seq[os.Path] =
-    fetch(dependencies, notifications).getFiles.asScala.map(f => os.Path(f.toPath)).toSeq
+    if dependencies.isEmpty then return Seq.empty
+    val coursierDeps = dependencies.map(_.applied.toCs)
+    val key = depsCacheKey(coursierDeps)
+    fetchFilesCache.get(
+      key,
+      _ => {
+        val span = OTEL.TRACER.spanBuilder("DependencyResolver.fetchFiles")
+          .setAttribute("deps.count", dependencies.size.toLong)
+          .startSpan()
+        try doFetch(coursierDeps, notifications).getFiles.asScala.map(f => os.Path(f.toPath)).toSeq
+        finally span.end()
+      }
+    )
 
   def fetchFile(dependency: Dependency): os.Path =
     fetchFiles(Seq(dependency)).head
