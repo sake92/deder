@@ -5,9 +5,16 @@ on:
   push:
     branches:
       - main
+  workflow_run:
+    workflows:
+      - Release
+    branches:
+      - main
+    types:
+      - completed
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: true
 
 permissions:
@@ -15,10 +22,17 @@ permissions:
 
 jobs:
   build-and-deploy:
+    if: >-
+      github.repository == 'sake92/deder' &&
+      (
+        (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Releasing version') != true) ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      )
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
       - name: Build
         env: 
