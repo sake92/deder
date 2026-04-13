@@ -48,29 +48,38 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
   // Cached compiler setup: classloaders, ScalaInstance, and Compilers
   // are expensive to create (JAR scanning, reflection) and can be reused
   // across compilations when the same compiler/library JARs are used.
+  // Uses a proper cache (not a single Option) because cross-compilation
+  // produces different compilerJars for the same scalaVersion (JVM vs JS vs Native).
   private case class CachedCompilerSetup(
-      key: String,
       zincClassloader: URLClassLoader,
       libraryClassloader: URLClassLoader,
       compilerClassloader: URLClassLoader,
       allJarsClassloader: URLClassLoader,
       compilers: xsbti.compile.Compilers
-  )
-
-  @volatile private var cachedSetup: Option[CachedCompilerSetup] = None
-
-  def close(): Unit = synchronized {
-    cachedSetup.foreach { s =>
-      try s.allJarsClassloader.close()
+  ) {
+    def closeClassloaders(): Unit = {
+      try allJarsClassloader.close()
       catch { case _: Exception => }
-      try s.compilerClassloader.close()
+      try compilerClassloader.close()
       catch { case _: Exception => }
-      try s.libraryClassloader.close()
+      try libraryClassloader.close()
       catch { case _: Exception => }
-      try s.zincClassloader.close()
+      try zincClassloader.close()
       catch { case _: Exception => }
     }
-    cachedSetup = None
+  }
+
+  private val setupCache: Cache[String, CachedCompilerSetup] =
+    Scaffeine()
+      .expireAfterAccess(5.minute)
+      .maximumSize(20)
+      .removalListener[String, CachedCompilerSetup] { (_, setup, _) =>
+        if setup != null then setup.closeClassloaders()
+      }
+      .build()
+
+  def close(): Unit = {
+    setupCache.invalidateAll()
     analysisCache.invalidateAll()
   }
 
@@ -86,26 +95,15 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       scalaVersion: String,
       compilerJars: Seq[os.Path],
       scalaLibraryJars: Seq[os.Path]
-  ): CachedCompilerSetup = synchronized {
+  ): CachedCompilerSetup = {
     val key = compilerSetupKey(compilerJars, scalaLibraryJars, javaHome)
-    cachedSetup match {
-      case Some(setup) if setup.key == key => setup
-      case _ =>
+    setupCache.get(
+      key,
+      _ => {
         val span = OTEL.TRACER.spanBuilder("ZincCompiler.createSetup")
           .setAttribute("scalaVersion", scalaVersion)
           .startSpan()
         try {
-          cachedSetup.foreach { s =>
-            try s.allJarsClassloader.close()
-            catch { case _: Exception => }
-            try s.compilerClassloader.close()
-            catch { case _: Exception => }
-            try s.libraryClassloader.close()
-            catch { case _: Exception => }
-            try s.zincClassloader.close()
-            catch { case _: Exception => }
-          }
-
           // Isolated bridge: only xsbti.* and sbt.internal.inc.* delegate to app classloader
           val appClassLoader = getClass.getClassLoader
           val sharedPrefixes = Seq("xsbti.", "sbt.internal.inc.")
@@ -144,12 +142,11 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
           val scalaCompiler = ZincUtil.scalaCompiler(scalaInstance, compilerBridgeJar.toIO, classpathOptions)
           val compilers = ZincUtil.compilers(scalaInstance, classpathOptions, javaHome, scalac = scalaCompiler)
 
-          val newSetup = CachedCompilerSetup(key, zincClassloader, libraryClassloader, compilerClassloader,
+          CachedCompilerSetup(zincClassloader, libraryClassloader, compilerClassloader,
             allJarsClassloader, compilers)
-          cachedSetup = Some(newSetup)
-          newSetup
         } finally span.end()
-    }
+      }
+    )
   }
 
   def compile(

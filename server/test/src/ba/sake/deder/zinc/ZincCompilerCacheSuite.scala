@@ -4,30 +4,7 @@ import java.net.URLClassLoader
 
 class ZincCompilerCacheSuite extends munit.FunSuite {
 
-  test("close() closes cached classloaders") {
-    val tmpDir = os.temp.dir()
-    val dummyJar = tmpDir / "dummy.jar"
-    // create a minimal empty JAR
-    val jos = new java.util.jar.JarOutputStream(new java.io.FileOutputStream(dummyJar.toIO))
-    jos.close()
-
-    val compiler = ZincCompiler(dummyJar)
-
-    // Access private cachedSetup via reflection to verify classloader lifecycle
-    val field = compiler.getClass.getDeclaredField("cachedSetup")
-    field.setAccessible(true)
-
-    // Before any compile, cachedSetup should be None
-    assertEquals(field.get(compiler).asInstanceOf[Option[?]], None)
-
-    // Call close on empty — should not throw
-    compiler.close()
-    assertEquals(field.get(compiler).asInstanceOf[Option[?]], None)
-
-    os.remove.all(tmpDir)
-  }
-
-  test("close() clears analysis cache") {
+  test("close() clears setup and analysis caches") {
     val tmpDir = os.temp.dir()
     val dummyJar = tmpDir / "dummy.jar"
     val jos = new java.util.jar.JarOutputStream(new java.io.FileOutputStream(dummyJar.toIO))
@@ -35,15 +12,23 @@ class ZincCompilerCacheSuite extends munit.FunSuite {
 
     val compiler = ZincCompiler(dummyJar)
 
-    // Access private analysisCache via reflection
-    val field = compiler.getClass.getDeclaredField("analysisCache")
-    field.setAccessible(true)
-    val cache = field.get(compiler).asInstanceOf[com.github.blemale.scaffeine.Cache[os.Path, ?]]
+    // Access private caches via reflection
+    val setupField = compiler.getClass.getDeclaredField("setupCache")
+    setupField.setAccessible(true)
+    val setupCache = setupField.get(compiler).asInstanceOf[com.github.blemale.scaffeine.Cache[?, ?]]
 
-    assertEquals(cache.estimatedSize(), 0L)
+    val analysisField = compiler.getClass.getDeclaredField("analysisCache")
+    analysisField.setAccessible(true)
+    val analysisCache = analysisField.get(compiler).asInstanceOf[com.github.blemale.scaffeine.Cache[?, ?]]
 
+    // Both caches start empty
+    assertEquals(setupCache.estimatedSize(), 0L)
+    assertEquals(analysisCache.estimatedSize(), 0L)
+
+    // close() on empty should not throw
     compiler.close()
-    assertEquals(cache.estimatedSize(), 0L)
+    assertEquals(setupCache.estimatedSize(), 0L)
+    assertEquals(analysisCache.estimatedSize(), 0L)
 
     os.remove.all(tmpDir)
   }
