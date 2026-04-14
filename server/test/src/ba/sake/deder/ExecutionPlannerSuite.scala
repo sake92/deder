@@ -52,7 +52,10 @@ class ExecutionPlannerSuite extends munit.FunSuite {
             "common.scalaVersion",
             "common.scalacOptions",
             "common.scalacPluginDeps",
-            "common.sources"
+            "common.sources",
+            "common.javaSemanticdbVersion",
+            "common.semanticdbEnabled",
+            "common.semanticdb"
           ),
           Set(
             "common.allClassesDirs",
@@ -61,7 +64,8 @@ class ExecutionPlannerSuite extends munit.FunSuite {
             "common.dependencies",
             "common.javacAnnotationProcessors",
             "common.scalacPlugins",
-            "common.sourceFiles"
+            "common.sourceFiles",
+            "common.scalaSemanticdbVersion"
           ),
           Set("common.allDependencies", "common.compilerJars"),
           Set("common.compileClasspath"),
@@ -112,6 +116,8 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "common.scalacOptions",
           "common.scalacPluginDeps",
           "common.scalaVersion",
+          "common.javaSemanticdbVersion",
+          "common.semanticdbEnabled",
           "backend.deps",
           "backend.javaHome",
           "backend.javaVersion",
@@ -120,6 +126,8 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "backend.scalacOptions",
           "backend.scalacPluginDeps",
           "backend.scalaVersion",
+          "backend.javaSemanticdbVersion",
+          "backend.semanticdbEnabled",
           "frontend.deps",
           "frontend.javaHome",
           "frontend.javaVersion",
@@ -128,6 +136,8 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "frontend.scalacOptions",
           "frontend.scalacPluginDeps",
           "frontend.scalaVersion",
+          "frontend.javaSemanticdbVersion",
+          "frontend.semanticdbEnabled",
           "uber.deps",
           "uber.javaHome",
           "uber.javaVersion",
@@ -135,7 +145,9 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "uber.javacOptions",
           "uber.scalacOptions",
           "uber.scalacPluginDeps",
-          "uber.scalaVersion"
+          "uber.scalaVersion",
+          "uber.javaSemanticdbVersion",
+          "uber.semanticdbEnabled"
         )
       )
     }

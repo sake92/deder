@@ -120,6 +120,9 @@ open class JavaModule extends DederModule {
   deps: Listing<String> = new Listing {}
   javacAnnotationProcessorDeps: Listing<String> = new Listing {}
   javaSemanticdbVersion: String = "0.11.1"
+  /// Whether to generate SemanticDB during compilation (used by BSP/IDE features and scalafix).
+  /// Defaults to true in local development, false in CI environments.
+  semanticdbEnabled: Boolean = read?("env:CI") == null
   /// JAR manifest entries. Overrides defaults set by Deder.
   manifest: ManifestSettings = new ManifestSettings {}
   publish: Boolean = true

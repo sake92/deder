@@ -111,7 +111,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     assert(options.exists(_.contains("-Xplugin:semanticdb")), "should include semanticdb plugin")
     val classpath = item.getClasspath.asScala
     assert(classpath.nonEmpty, "classpath should not be empty")
-    assert(item.getClassDirectory.nonEmpty, "classDirectory should be set")
+    assert(item.getClassDirectory.contains("/classes"), s"classDirectory should point to classes, got: ${item.getClassDirectory}")
   }
 
   test("buildTargetScalacOptions contains scala3-library and semanticdb flags") {
@@ -125,7 +125,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     assert(classpath.exists(_.contains("scala3-library")), s"scala3-library not in classpath: $classpath")
     val options = item.getOptions.asScala
     assert(options.contains("-Xsemanticdb"), s"missing -Xsemanticdb in options: $options")
-    assert(item.getClassDirectory.nonEmpty, "classDirectory should be set")
+    assert(item.getClassDirectory.contains("/classes"), s"classDirectory should point to classes, got: ${item.getClassDirectory}")
   }
 
   test("buildTargetScalacOptions for module with deps includes dependency classes on classpath") {
@@ -237,6 +237,30 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     val cleanParams = new CleanCacheParams(List(targetId("common")).asJava)
     val result = buildServer.buildTargetCleanCache(cleanParams).get(30, TimeUnit.SECONDS)
     assert(result.getCleaned, "cache should be cleaned for common module")
+  }
+
+  test("buildTargetCompile generates semanticdb files") {
+    val result = buildServer
+      .buildTargetCompile(new CompileParams(List(targetId("common")).asJava))
+      .get(2, TimeUnit.MINUTES)
+    assertEquals(result.getStatusCode, StatusCode.OK)
+    val semanticdbFiles = os.walk(testDir / ".deder/out/common/semanticdb").filter(_.ext == "semanticdb")
+    assert(semanticdbFiles.nonEmpty, s"expected .semanticdb files to be generated under .deder/out/common/semanticdb/")
+  }
+
+  test("buildTargetCompile after cleanCache regenerates semanticdb files") {
+    buildServer
+      .buildTargetCompile(new CompileParams(List(targetId("common")).asJava))
+      .get(2, TimeUnit.MINUTES)
+    buildServer
+      .buildTargetCleanCache(new CleanCacheParams(List(targetId("common")).asJava))
+      .get(30, TimeUnit.SECONDS)
+    val result = buildServer
+      .buildTargetCompile(new CompileParams(List(targetId("common")).asJava))
+      .get(2, TimeUnit.MINUTES)
+    assertEquals(result.getStatusCode, StatusCode.OK)
+    val semanticdbFiles = os.walk(testDir / ".deder/out/common/semanticdb").filter(_.ext == "semanticdb")
+    assert(semanticdbFiles.nonEmpty, s"expected .semanticdb files after clean+recompile under .deder/out/common/semanticdb/")
   }
 
   test("buildTargetInverseSources returns targets containing source file") {

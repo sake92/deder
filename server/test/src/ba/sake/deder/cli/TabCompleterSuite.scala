@@ -59,6 +59,7 @@ class TabCompleterSuite extends munit.FunSuite {
         "javaVersion",
         "test",
         "scalaSemanticdbVersion",
+        "semanticdbEnabled",
         "runClasspath",
         "allClassesDirs",
         "publishArtifacts",
@@ -70,7 +71,6 @@ class TabCompleterSuite extends munit.FunSuite {
         "compilerDeps",
         "compilerJars",
         "compile",
-        "compileBsp",
         "run",
         "assembly",
         "javacOptions",
@@ -93,7 +93,7 @@ class TabCompleterSuite extends munit.FunSuite {
     }
     assertEquals(
       completer.complete("deder plan -m frontend -t compile", 33).toSet,
-      Set("compile", "compileBsp", "compilerDeps", "compilerJars", "compileClasspath")
+      Set("compile", "compilerDeps", "compilerJars", "compileClasspath")
     )
   }
 

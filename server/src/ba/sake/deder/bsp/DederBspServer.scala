@@ -330,7 +330,7 @@ class DederBspServer(
               isCompileTask = true
             )
             val module = projectStateData.tasksResolver.modulesMap(moduleId)
-            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileBspTask, Seq.empty) { _ =>
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty) { _ =>
               allCompileSucceeded = false
             }
           }
