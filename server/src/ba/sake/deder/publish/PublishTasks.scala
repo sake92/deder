@@ -318,11 +318,12 @@ class PublishTasks(coreTasks: CoreTasks) {
       ) = ctx.depResults
       pomOpt.zip(sourcesJarOpt).zip(javadocJarOpt).map { case ((pom, sourcesJar), javadocJar) =>
         val artifactBaseName = s"${pom.artifactId}-${pom.version}"
-        os.remove.all(ctx.out)
-        os.makeDir.all(ctx.out)
-        os.copy.over(jar, ctx.out / s"${artifactBaseName}.jar")
-        os.copy.over(sourcesJar, ctx.out / s"${artifactBaseName}-sources.jar")
-        os.copy.over(javadocJar, ctx.out / s"${artifactBaseName}-javadoc.jar")
+        val artifactsDir = ctx.out / "artifacts"
+        os.remove.all(artifactsDir)
+        os.makeDir.all(artifactsDir)
+        os.copy.over(jar, artifactsDir / s"${artifactBaseName}.jar")
+        os.copy.over(sourcesJar, artifactsDir / s"${artifactBaseName}-sources.jar")
+        os.copy.over(javadocJar, artifactsDir / s"${artifactBaseName}-javadoc.jar")
         val pomSettings = ctx.module match {
           case jm: JavaModule => jm.pomSettings
         }
@@ -338,9 +339,9 @@ class PublishTasks(coreTasks: CoreTasks) {
             pomSettings,
             moduleDepsPomSettingsClean
           )
-        val pomXmlPath = ctx.out / s"${artifactBaseName}.pom"
+        val pomXmlPath = artifactsDir / s"${artifactBaseName}.pom"
         os.write.over(pomXmlPath, pomXmlContent)
-        PublishArtifactsRes(pom, ctx.out)
+        PublishArtifactsRes(pom, artifactsDir)
       }
     }
 
