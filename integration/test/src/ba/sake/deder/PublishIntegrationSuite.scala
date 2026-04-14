@@ -31,7 +31,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
   test("deder POM should only contain direct module deps, not transitive") {
     withTestProject("sample-projects/publish") { projectPath =>
       executeDederCommand(projectPath, "exec -m lib3 -t publishArtifacts").out.text()
-      val publishArtifactsPath = projectPath / ".deder/out/lib3/publishArtifacts"
+      val publishArtifactsPath = projectPath / ".deder/out/lib3/publishArtifacts/artifacts"
       val pomContent = os.read(publishArtifactsPath / "lib3_3-0.0.1-SNAPSHOT.pom")
       val reader = new MavenXpp3Reader()
       val pom = reader.read(new java.io.StringReader(pomContent))
@@ -48,7 +48,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
   test("deder POM should contain all direct module deps when multiple exist") {
     withTestProject("sample-projects/publish") { projectPath =>
       executeDederCommand(projectPath, "exec -m lib4 -t publishArtifacts").out.text()
-      val publishArtifactsPath = projectPath / ".deder/out/lib4/publishArtifacts"
+      val publishArtifactsPath = projectPath / ".deder/out/lib4/publishArtifacts/artifacts"
       val pomContent = os.read(publishArtifactsPath / "lib4_3-0.0.1-SNAPSHOT.pom")
       val reader = new MavenXpp3Reader()
       val pom = reader.read(new java.io.StringReader(pomContent))
