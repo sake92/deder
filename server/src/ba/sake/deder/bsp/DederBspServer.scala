@@ -212,7 +212,7 @@ class DederBspServer(
           )
           List.empty
         case Right(projectStateData) =>
-          projectStateData.projectConfig.modules.asScala.sortBy(_.id)
+          projectStateData.projectConfig.modules.asScala.sortBy(m => (if m.id.contains("-jvm") then 0 else 1, m.id))
             .map(m => buildTarget(m, projectStateData))
             .toList
       }
@@ -267,7 +267,7 @@ class DederBspServer(
             params.getTextDocument.getUri.startsWith(srcDirUri)
           }
         }
-        modules.map(buildTargetId)
+        modules.sortBy(m => if m.id.contains("-jvm") then 0 else 1).map(buildTargetId)
       }
       val result = InverseSourcesResult(targetIds.asJava)
       logger.debug(s"buildTargetInverseSources for params: ${params} return: ${result}")
