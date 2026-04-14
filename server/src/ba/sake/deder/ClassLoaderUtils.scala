@@ -9,6 +9,10 @@ object ClassLoaderUtils {
       classPath: Seq[os.Path],
       parent: ClassLoader = getClass.getClassLoader
   )(f: ClassLoader => T): T = {
+    // Disable jar URL caching so each URLClassLoader gets its own JarFile instances.
+    // Without this, the JVM shares JarFile instances across classloaders via JarURLConnection cache,
+    // and closing one classloader closes JarFiles still in use by concurrent classloaders.
+    java.net.URLConnection.setDefaultUseCaches("jar", false)
     val oldClassloader = Thread.currentThread().getContextClassLoader
     val urls = classPath.map(_.toURI.toURL).toArray
     Using.resource(new URLClassLoader(urls, parent)) { newClassloader =>
