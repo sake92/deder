@@ -15,7 +15,7 @@ import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
-import ba.sake.deder.deps.DependencyResolver
+import ba.sake.deder.deps.{Dependency, DependencyResolver}
 import ba.sake.deder.config.DederProject.ModuleType
 import ba.sake.deder.scalajs.ScalaJsTasks
 import ba.sake.deder.scalanative.ScalaNativeTasks
@@ -576,12 +576,18 @@ class DederBspServer(
                   semanticdbDir.toString
                 )
             else
+              val scalaSemanticdbVersion =
+                executeTask(serverNotificationsLogger, moduleId, coreTasks.scalaSemanticdbVersionTask)
+              val semanticdbScalacJar = DependencyResolver.fetchFiles(
+                Seq(Dependency.make(s"org.scalameta:::semanticdb-scalac:${scalaSemanticdbVersion}", scalaVersion))
+              )
+              val allScalacPlugins = scalacPlugins ++ semanticdbScalacJar
               Seq(
                 "-Yrangepos",
                 s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}",
                 s"-P:semanticdb:targetroot:${semanticdbDir}"
               ) ++
-                scalacPlugins.map(p => s"-Xplugin:${p.toString}")
+                allScalacPlugins.map(p => s"-Xplugin:${p.toString}")
           val finalScalacOptions = scalacOptions ++ semanticdbOptions
           val compileClasspath =
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)(Seq.empty)
