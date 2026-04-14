@@ -43,7 +43,9 @@ class DederBspServer(
       originId: Option[String] = None,
       taskId: Option[TaskId] = None,
       moduleId: Option[String] = None,
-      isCompileTask: Boolean = false
+      isCompileTask: Boolean = false,
+      emitCompileStartFinish: Boolean = true,
+      onCompileResult: (Int, Int) => Unit = (_, _) => ()
   ) = {
     ServerNotificationsLogger { sn =>
       sn match {
@@ -56,13 +58,15 @@ class DederBspServer(
           val targetId = resolveModule(cs.moduleId).map(buildTargetId)
           val isRelevantCompileNotification = isCompileTask && moduleId.contains(cs.moduleId)
           if isRelevantCompileNotification then {
-            val taskStartParams = TaskStartParams(taskId.orNull)
-            taskStartParams.setEventTime(System.currentTimeMillis())
-            taskStartParams.setOriginId(originId.orNull)
-            taskStartParams.setMessage(s"Compiling ${cs.moduleId} ...")
-            taskStartParams.setDataKind(TaskStartDataKind.COMPILE_TASK)
-            taskStartParams.setData(new CompileTask(targetId.orNull))
-            client.onBuildTaskStart(taskStartParams)
+            if emitCompileStartFinish then {
+              val taskStartParams = TaskStartParams(taskId.orNull)
+              taskStartParams.setEventTime(System.currentTimeMillis())
+              taskStartParams.setOriginId(originId.orNull)
+              taskStartParams.setMessage(s"Compiling ${cs.moduleId} ...")
+              taskStartParams.setDataKind(TaskStartDataKind.COMPILE_TASK)
+              taskStartParams.setData(new CompileTask(targetId.orNull))
+              client.onBuildTaskStart(taskStartParams)
+            }
             // reset diagnostics for these files
             cs.files.foreach { file =>
               val fileUri = TextDocumentIdentifier(file.toURI.toString)
@@ -131,26 +135,32 @@ class DederBspServer(
           val targetId = resolveModule(cf.moduleId).map(buildTargetId)
           val isRelevantCompileNotification = isCompileTask && moduleId.contains(cf.moduleId)
           if isRelevantCompileNotification then {
-            val status = if cf.errors == 0 then StatusCode.OK else StatusCode.ERROR
-            val taskFinishParams = TaskFinishParams(taskId.orNull, status)
-            taskFinishParams.setEventTime(System.currentTimeMillis())
-            taskFinishParams.setOriginId(originId.orNull)
-            taskFinishParams.setMessage(s"Finished compiling ${cf.moduleId}")
-            taskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
-            taskFinishParams.setData(new CompileReport(targetId.orNull, cf.errors, cf.warnings))
-            client.onBuildTaskFinish(taskFinishParams)
+            onCompileResult(cf.errors, cf.warnings)
+            if emitCompileStartFinish then {
+              val status = if cf.errors == 0 then StatusCode.OK else StatusCode.ERROR
+              val taskFinishParams = TaskFinishParams(taskId.orNull, status)
+              taskFinishParams.setEventTime(System.currentTimeMillis())
+              taskFinishParams.setOriginId(originId.orNull)
+              taskFinishParams.setMessage(s"Finished compiling ${cf.moduleId}")
+              taskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
+              taskFinishParams.setData(new CompileReport(targetId.orNull, cf.errors, cf.warnings))
+              client.onBuildTaskFinish(taskFinishParams)
+            }
           }
         case cf: ServerNotification.CompileFailed =>
           val targetId = resolveModule(cf.moduleId).map(buildTargetId)
           val isRelevantCompileNotification = isCompileTask && moduleId.contains(cf.moduleId)
           if isRelevantCompileNotification then {
-            val taskFinishParams = TaskFinishParams(taskId.orNull, StatusCode.ERROR)
-            taskFinishParams.setEventTime(System.currentTimeMillis())
-            taskFinishParams.setOriginId(originId.orNull)
-            taskFinishParams.setMessage(s"Finished compiling ${cf.moduleId}")
-            taskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
-            taskFinishParams.setData(new CompileReport(targetId.orNull, cf.errors, cf.warnings))
-            client.onBuildTaskFinish(taskFinishParams)
+            onCompileResult(cf.errors, cf.warnings)
+            if emitCompileStartFinish then {
+              val taskFinishParams = TaskFinishParams(taskId.orNull, StatusCode.ERROR)
+              taskFinishParams.setEventTime(System.currentTimeMillis())
+              taskFinishParams.setOriginId(originId.orNull)
+              taskFinishParams.setMessage(s"Finished compiling ${cf.moduleId}")
+              taskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
+              taskFinishParams.setData(new CompileReport(targetId.orNull, cf.errors, cf.warnings))
+              client.onBuildTaskFinish(taskFinishParams)
+            }
           }
         case n: ServerNotification.RequestFinished => // do nothing
         case n: ServerNotification.Output          => // do nothing
@@ -323,16 +333,46 @@ class DederBspServer(
             val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
             subtaskId.setParents(List(taskId.getId).asJava)
             logger.debug(s"buildTargetCompile subtaskId ${subtaskId}")
+            var moduleErrors = 0
+            var moduleWarnings = 0
+            var moduleSucceeded = true
             val serverNotificationsLogger = makeServerNotificationsLogger(
               originId = Option(params.getOriginId),
               taskId = Some(subtaskId),
               moduleId = Some(moduleId),
-              isCompileTask = true
+              isCompileTask = true,
+              emitCompileStartFinish = false,
+              onCompileResult = (errors, warnings) => {
+                moduleErrors = errors
+                moduleWarnings = warnings
+              }
             )
+
+            // Always emit COMPILE_TASK start
             val module = projectStateData.tasksResolver.modulesMap(moduleId)
+            val modTargetId = buildTargetId(module)
+            val subtaskStartParams = TaskStartParams(subtaskId)
+            subtaskStartParams.setEventTime(System.currentTimeMillis())
+            subtaskStartParams.setOriginId(params.getOriginId)
+            subtaskStartParams.setMessage(s"Compiling ${moduleId} ...")
+            subtaskStartParams.setDataKind(TaskStartDataKind.COMPILE_TASK)
+            subtaskStartParams.setData(new CompileTask(modTargetId))
+            client.onBuildTaskStart(subtaskStartParams)
+
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty) { _ =>
+              moduleSucceeded = false
               allCompileSucceeded = false
             }
+
+            // Always emit COMPILE_REPORT finish
+            val modStatus = if moduleSucceeded then StatusCode.OK else StatusCode.ERROR
+            val subtaskFinishParams = TaskFinishParams(subtaskId, modStatus)
+            subtaskFinishParams.setEventTime(System.currentTimeMillis())
+            subtaskFinishParams.setOriginId(params.getOriginId)
+            subtaskFinishParams.setMessage(s"Finished compiling ${moduleId}")
+            subtaskFinishParams.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
+            subtaskFinishParams.setData(new CompileReport(modTargetId, moduleErrors, moduleWarnings))
+            client.onBuildTaskFinish(subtaskFinishParams)
           }
         }
 
