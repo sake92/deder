@@ -35,6 +35,7 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
+      - uses: coursier/cache-action@v7
       - name: Version
         id: vars
         shell: bash
@@ -56,6 +57,7 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
+      - uses: coursier/cache-action@v7
       - name: Build JARs
         run: |
           ./scripts/gen-config-bindings.sh
@@ -96,6 +98,7 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
+      - uses: coursier/cache-action@v7
       - name: Build Client native image
         run: |
           ./mill -i client-native.nativeImage
@@ -128,6 +131,7 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
+      - uses: coursier/cache-action@v7
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:

@@ -3,6 +3,7 @@ amends "../../../../../config/DederProject.pkl"
 local const baseModule: ScalaModule = new {
   scalaVersion = "3.7.1"
   publish = false
+  semanticdbEnabled = true
 }
 
 local const common = (baseModule) {
