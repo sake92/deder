@@ -13,7 +13,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/publish") { projectPath =>
       executeDederCommand(projectPath, "exec -m lib1 -t publishArtifacts").out.text()
       locally {
-        val publishArtifactsPath = projectPath / ".deder/out/lib1/publishArtifacts"
+        val publishArtifactsPath = projectPath / ".deder/out/lib1/publishArtifacts/artifacts"
         val pomContent = os.read(publishArtifactsPath / "lib1_3-0.0.1-SNAPSHOT.pom")
         val reader = new MavenXpp3Reader()
         val pom = reader.read(new java.io.StringReader(pomContent))

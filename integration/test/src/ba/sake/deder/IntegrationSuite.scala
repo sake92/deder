@@ -86,7 +86,6 @@ class IntegrationSuite extends BaseIntegrationSuite {
              |Stage #1:
              |  common.allClassesDirs
              |  common.compilerDeps
-             |  common.sourceFiles
              |  common.dependencies
              |  common.javacAnnotationProcessors
              |  common.mandatoryDependencies
