@@ -19,8 +19,6 @@ _site/
 docs/static/**/*.pkl
 
 .deder/
-**/.deder/**
-!**/.deder/server.properties
 
 # PKL
 pkl-codegen-java
