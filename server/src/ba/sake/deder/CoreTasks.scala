@@ -525,7 +525,7 @@ class CoreTasks() extends StrictLogging {
     }
 
   // returns classes dir
-  val compileTask = CachedTaskBuilder
+  val compileTask = TaskBuilder
     .make[DederPath](
       name = "compile",
       transitive = true
