@@ -142,6 +142,7 @@ class SbtImporter(
           scalacPluginDeps.asJava, // scalacPluginDeps
           "4.13.9", // scalaSemanticdbVersion
           true, // fork
+          1L, // testParallelism
           List.empty.asJava // testFrameworks
         )
       else

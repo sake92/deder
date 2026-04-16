@@ -141,6 +141,10 @@ class JavaTestModule extends JavaModule {
   publish = false
   /// Whether to run tests in a separate JVM process. By default, it's enabled for better isolation and to avoid classpath issues, but it can be disabled for faster test runs during development (not recommended for CI).
   fork: Boolean = true
+  /// Number of test classes to run in parallel within a single test JVM.
+  /// Default 1 (serial). Increase only if your tests are safe to run concurrently
+  /// (no shared static state, no System.setProperty mutation, no shared temp files, etc.).
+  testParallelism: Int(isBetween(1, 256)) = 1
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
@@ -170,6 +174,10 @@ class ScalaTestModule extends ScalaModule {
   publish = false
   /// Whether to run tests in a separate JVM process. By default, it's enabled for better isolation and to avoid classpath issues, but it can be disabled for faster test runs during development (not recommended for CI).
   fork: Boolean = true
+  /// Number of test classes to run in parallel within a single test JVM.
+  /// Default 1 (serial). Increase only if your tests are safe to run concurrently
+  /// (no shared static state, no System.setProperty mutation, no shared temp files, etc.).
+  testParallelism: Int(isBetween(1, 256)) = 1
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
@@ -197,6 +205,10 @@ open class ScalaJsModule extends ScalaModule {
 class ScalaJsTestModule extends ScalaJsModule {
   type = "scala-js-test"
   publish = false
+  /// Number of test classes to run in parallel within a single test JVM.
+  /// Default 1 (serial). Increase only if your tests are safe to run concurrently
+  /// (no shared static state, no System.setProperty mutation, no shared temp files, etc.).
+  testParallelism: Int(isBetween(1, 256)) = 1
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
@@ -239,6 +251,10 @@ open class ScalaNativeModule extends ScalaModule {
 class ScalaNativeTestModule extends ScalaNativeModule {
   type = "scala-native-test"
   publish = false
+  /// Number of test classes to run in parallel within a single test JVM.
+  /// Default 1 (serial). Increase only if your tests are safe to run concurrently
+  /// (no shared static state, no System.setProperty mutation, no shared temp files, etc.).
+  testParallelism: Int(isBetween(1, 256)) = 1
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
