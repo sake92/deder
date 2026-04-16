@@ -17,6 +17,7 @@ out/
 _site/
 .flatmark-cache
 docs/static/**/*.pkl
+docs/superpowers/
 
 .deder/
 

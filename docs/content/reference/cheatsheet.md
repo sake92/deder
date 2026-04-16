@@ -11,6 +11,13 @@ deder version
 # shutdown server
 deder shutdown
 
+################ clean module output / caches
+# remove .deder/out/<module>/ for one module
+deder clean -m mymodule
+
+# multiple modules
+deder clean -m mod1 -m mod2
+
 deder import --from sbt
 
 ################ install shell completions

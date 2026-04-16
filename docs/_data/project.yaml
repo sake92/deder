@@ -20,6 +20,8 @@ references:
     url: "/reference/cheatsheet.html"
   - label: "Architecture"
     url: "/reference/architecture.html"
+  - label: "Task caching"
+    url: "/reference/caching.html"
   - label: "Files layout"
     url: "/reference/files-layout.html"
   - label: "Server Properties"
