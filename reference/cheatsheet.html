@@ -55,6 +55,13 @@
 <span class="hljs-meta prompt_">
 # </span><span class="language-bash">shutdown server</span>
 deder shutdown
+<span class="hljs-meta prompt_">
+#</span><span class="language-bash"><span class="hljs-comment">############### clean module output / caches</span></span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">remove .deder/out/&lt;module&gt;/ <span class="hljs-keyword">for</span> one module</span>
+deder clean -m mymodule
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">multiple modules</span>
+deder clean -m mod1 -m mod2
 
 deder import --from sbt
 <span class="hljs-meta prompt_">

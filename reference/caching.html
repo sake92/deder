@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Task caching | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#task-caching">Task caching</a>
+         <ul>
+          <li><a href="#how-caching-behaves">How caching behaves</a>
+           <ul>
+            <li><a href="#cached-vs-always-run-tasks">Cached vs always-run tasks</a></li>
+            <li><a href="#where-cached-data-lives">Where cached data lives</a></li>
+            <li><a href="#what-invalidates-a-cached-task">What invalidates a cached task</a></li>
+            <li><a href="#clearing-the-cache">Clearing the cache</a></li>
+           </ul></li>
+          <li><a href="#how-caching-works">How caching works</a>
+           <ul>
+            <li><a href="#two-task-kinds">Two task kinds</a></li>
+            <li><a href="#the-hash-chain">The hash chain</a></li>
+            <li><a href="#hashablet-derivation">Hashable[T] derivation</a></li>
+            <li><a href="#known-limitations">Known limitations</a></li>
+           </ul></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="task-caching">Task caching<a href="#task-caching" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Deder caches task outputs on disk so tasks whose inputs haven't changed don't re-run. This is separate from Scala incremental compilation: the <code>compile</code> task itself always re-invokes Zinc, and Zinc does incremental compilation internally.</p>
+   <h2 id="how-caching-behaves">How caching behaves<a href="#how-caching-behaves" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <h3 id="cached-vs-always-run-tasks">Cached vs always-run tasks<a href="#cached-vs-always-run-tasks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>The lists below are accurate as of deder 0.3.4. To verify against current source, grep <code>server/src</code> for <code>CachedTaskBuilder</code> (cached) and <code>= TaskBuilder</code> (always-run).</p>
+   <p><strong>Cached</strong> (skip when inputs unchanged):</p>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>What it produces</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>sourceFiles</code></td>
+      <td>List of source file paths</td>
+     </tr>
+     <tr>
+      <td><code>dependencies</code></td>
+      <td>Direct module dependencies</td>
+     </tr>
+     <tr>
+      <td><code>allDependencies</code></td>
+      <td>Dependencies including transitive</td>
+     </tr>
+     <tr>
+      <td><code>mandatoryDependencies</code></td>
+      <td>Dependencies that must be present</td>
+     </tr>
+     <tr>
+      <td><code>compileClasspath</code></td>
+      <td>Classpath used for compilation</td>
+     </tr>
+     <tr>
+      <td><code>allClassesDirs</code></td>
+      <td>Class output directories across modules</td>
+     </tr>
+     <tr>
+      <td><code>compilerDeps</code></td>
+      <td>Compiler dependency resolution</td>
+     </tr>
+     <tr>
+      <td><code>compilerJars</code></td>
+      <td>Resolved compiler JARs</td>
+     </tr>
+     <tr>
+      <td><code>scalacPlugins</code></td>
+      <td>Scalac plugin JARs</td>
+     </tr>
+     <tr>
+      <td><code>javacAnnotationProcessors</code></td>
+      <td>Annotation processor JARs</td>
+     </tr>
+     <tr>
+      <td><code>scalaSemanticdbVersion</code></td>
+      <td>Resolved SemanticDB version</td>
+     </tr>
+     <tr>
+      <td><code>runClasspath</code></td>
+      <td>Classpath used at runtime</td>
+     </tr>
+     <tr>
+      <td><code>mainClasses</code></td>
+      <td>Discovered main classes</td>
+     </tr>
+     <tr>
+      <td><code>finalMainClass</code></td>
+      <td>Selected main class</td>
+     </tr>
+     <tr>
+      <td><code>testClasses</code></td>
+      <td>Test class discovery</td>
+     </tr>
+     <tr>
+      <td><code>fastLinkJs</code></td>
+      <td>Scala.js fast link output</td>
+     </tr>
+     <tr>
+      <td><code>nativeLink</code></td>
+      <td>Scala Native link output</td>
+     </tr>
+     <tr>
+      <td><code>jar</code></td>
+      <td>Module JAR</td>
+     </tr>
+     <tr>
+      <td><code>allJars</code></td>
+      <td>Aggregated JARs</td>
+     </tr>
+     <tr>
+      <td><code>sourcesJar</code></td>
+      <td>Sources JAR</td>
+     </tr>
+     <tr>
+      <td><code>javadocJar</code></td>
+      <td>Javadoc JAR</td>
+     </tr>
+     <tr>
+      <td><code>assembly</code></td>
+      <td>Uber JAR</td>
+     </tr>
+     <tr>
+      <td><code>finalManifestSettings</code></td>
+      <td>Resolved JAR manifest settings</td>
+     </tr>
+     <tr>
+      <td><code>moduleDepsPomSettings</code></td>
+      <td>POM dep settings</td>
+     </tr>
+     <tr>
+      <td><code>publishArtifacts</code></td>
+      <td>Artifact set to publish</td>
+     </tr>
+    </tbody>
+   </table>
+   <p><strong>Always runs:</strong></p>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>generatedSources</code></td>
+      <td>Runs source generators</td>
+     </tr>
+     <tr>
+      <td><code>classes</code></td>
+      <td>Resolves module class output directory</td>
+     </tr>
+     <tr>
+      <td><code>semanticdbDir</code></td>
+      <td>Resolves SemanticDB output directory</td>
+     </tr>
+     <tr>
+      <td><code>compile</code></td>
+      <td>Invokes Zinc</td>
+     </tr>
+     <tr>
+      <td><code>run</code></td>
+      <td>Runs the module</td>
+     </tr>
+     <tr>
+      <td><code>runMain</code></td>
+      <td>Runs a specified main class</td>
+     </tr>
+     <tr>
+      <td><code>runMvnApp</code></td>
+      <td>Runs a Maven-application entry point</td>
+     </tr>
+     <tr>
+      <td><code>fix</code></td>
+      <td>Runs Scalafix</td>
+     </tr>
+     <tr>
+      <td><code>fixCheck</code></td>
+      <td>Runs Scalafix in check mode</td>
+     </tr>
+     <tr>
+      <td><code>test</code></td>
+      <td>Runs tests</td>
+     </tr>
+     <tr>
+      <td><code>testJs</code></td>
+      <td>Runs Scala.js tests</td>
+     </tr>
+     <tr>
+      <td><code>testNative</code></td>
+      <td>Runs Scala Native tests</td>
+     </tr>
+     <tr>
+      <td><code>publishLocal</code></td>
+      <td>Publishes to local Ivy repository</td>
+     </tr>
+     <tr>
+      <td><code>publish</code></td>
+      <td>Publishes to remote repository</td>
+     </tr>
+    </tbody>
+   </table>
+   <p><code>compile</code> is "always runs" from deder's perspective, but Zinc skips unchanged sources internally — so unchanged compilations are still cheap even without deder-level caching.</p>
+   <h3 id="where-cached-data-lives">Where cached data lives<a href="#where-cached-data-lives" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>Every cached task writes a <code>metadata.json</code> (plus any task-specific artifacts) under:</p>
+   <pre><code class="language- hljs language-crystal" data-highlighted="yes">.deder/<span class="hljs-keyword">out</span>/&lt;<span class="hljs-class"><span class="hljs-keyword">module</span>-<span class="hljs-title">id</span>&gt;/&lt;<span class="hljs-title">task</span>-<span class="hljs-title">name</span>&gt;/<span class="hljs-title">metadata</span>.<span class="hljs-title">json</span></span>
+</code></pre>
+   <p><code>metadata.json</code> stores the task's stored value, <code>inputsHash</code>, and <code>outputHash</code>.</p>
+   <h3 id="what-invalidates-a-cached-task">What invalidates a cached task<a href="#what-invalidates-a-cached-task" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <ul>
+    <li>Source <strong>file content</strong> change.</li>
+    <li>Source <strong>filename</strong> change within a source directory</li>
+    <li>Config value change in <code>deder.pkl</code> that the task reads.</li>
+    <li>Any dependency task's <code>outputHash</code> changing (propagates up the chain).</li>
+   </ul>
+   <h3 id="clearing-the-cache">Clearing the cache<a href="#clearing-the-cache" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p><code>deder clean -m &lt;module-id&gt;</code> removes <code>.deder/out/&lt;module&gt;/</code> entirely (all cached artifacts and metadata for that module). Multiple <code>-m</code> flags clean multiple modules:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder clean -m mymodule
+deder clean -m mod1 -m mod2
+</code></pre>
+   <p>Clean requires exact module ids. Wildcard patterns that work with <code>exec</code> (e.g. <code>mymodule%</code>) are <strong>not</strong> supported by <code>clean</code>.</p>
+   <p>No CLI command today clears a single task on one module or clears the whole project. Manual fallbacks:</p>
+   <ul>
+    <li>Single task: <code>rm -rf .deder/out/&lt;module&gt;/&lt;task&gt;/</code></li>
+    <li>Whole project: <code>rm -rf .deder/out/</code></li>
+   </ul>
+   <h2 id="how-caching-works">How caching works<a href="#how-caching-works" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <h3 id="two-task-kinds">Two task kinds<a href="#two-task-kinds" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <ul>
+    <li><strong><code>TaskImpl</code></strong> — always executes. Computes <code>outputHash = Hashable[T].hashStr(result)</code> so downstream tasks can detect changes. No <code>inputsHash</code> is stored; <code>changed</code> is always reported as <code>true</code>.</li>
+    <li><strong><code>CachedTask</code></strong> — computes <code>inputsHash = hash(deps' outputHashes joined)</code>. If a <code>metadata.json</code> with the same <code>inputsHash</code> already exists on disk, the stored result is reused; otherwise the task re-executes and writes new metadata. <code>changed = newOutputHash != oldOutputHash</code>. A <code>CachedTask</code> must have at least one dep — enforced at compile time via <code>Deps &lt;:&lt; NonEmptyTuple</code> on <code>CachedTaskBuilder.build</code>.</li>
+   </ul>
+   <h3 id="the-hash-chain">The hash chain<a href="#the-hash-chain" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <pre><code class="language- hljs language-isbl" data-highlighted="yes"><span class="hljs-variable">SourceFileTask</span> (<span class="hljs-variable">CachedTask</span> <span class="hljs-variable">leaf</span>) ──► <span class="hljs-variable">outputHash</span> = <span class="hljs-function"><span class="hljs-title">hash</span>(<span class="hljs-variable">file</span> <span class="hljs-variable">contents</span>)</span>
+         │
+         ▼
+<span class="hljs-variable">compileClasspath</span> (<span class="hljs-variable">CachedTask</span>) ──────► <span class="hljs-variable">inputsHash</span> = <span class="hljs-function"><span class="hljs-title">hash</span>(<span class="hljs-variable">dep</span> <span class="hljs-variable">outputHashes</span>)</span>
+         │                             <span class="hljs-variable">outputHash</span> = <span class="hljs-function"><span class="hljs-title">hash</span>(<span class="hljs-variable"><span class="hljs-class">result</span></span>)</span>
+         ▼
+<span class="hljs-variable">compile</span> (<span class="hljs-variable">TaskImpl</span>) ─────────────────► <span class="hljs-variable">always</span> <span class="hljs-variable">runs</span>
+                                       <span class="hljs-variable">outputHash</span> = <span class="hljs-function"><span class="hljs-title">hash</span>(<span class="hljs-variable">classes</span> <span class="hljs-variable">dir</span>)</span>
+         │
+         ▼
+<span class="hljs-variable">assembly</span> (<span class="hljs-variable">CachedTask</span>) ──────────────► <span class="hljs-variable">skips</span> <span class="hljs-variable"><span class="hljs-keyword">if</span></span> <span class="hljs-variable">compile</span><span class="hljs-string">'s outputHash unchanged
+</span></code></pre>
+   <h3 id="hashablet-derivation"><code>Hashable[T]</code> derivation<a href="#hashablet-derivation" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>Explicit instances live in <code>server/src/ba/sake/deder/Hashable.scala</code>: <code>Int</code>, <code>String</code>, <code>Boolean</code>, <code>os.Path</code>, <code>Option[T]</code>, <code>Seq[T]</code>, <code>Map[K,V]</code>. A low-priority given derives <code>Hashable[T]</code> from <code>JsonRW[T]</code> by hashing the JSON string, so any config type is automatically hashable. Explicit instances take priority — <code>os.Path</code> hashes file/directory contents (recursively, with leaf names bound to child hashes) rather than the path string.</p>
+   <h3 id="known-limitations">Known limitations<a href="#known-limitations" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <ul>
+    <li><strong>Transitive dep hashing is first-level only.</strong> <code>inputsHash</code> folds in <code>depResults ++ transitiveResults.headOption</code> (see <code>Task.scala:217</code>). A change deep in the dep chain that doesn't surface in a first-level output won't invalidate downstream cache.</li>
+    <li><strong>No <code>changed</code>-based short-circuiting.</strong> A <code>CachedTask</code> reporting <code>changed = false</code> doesn't stop downstream tasks from running; the flag is only surfaced in task results for reporting.</li>
+    <li><strong><code>Hashable[os.Path]</code> throws on non-file non-directory existing paths</strong> (e.g. sockets). Missing paths return <code>""</code>.</li>
+   </ul>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/reference/architecture.html">⬅️ Architecture</a> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/files-layout.html">Files layout ➡️</a>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>
