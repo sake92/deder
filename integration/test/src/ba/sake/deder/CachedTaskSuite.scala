@@ -63,6 +63,25 @@ class CachedTaskSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("cached tasks: should recompute after a source file rename that preserves sort order") {
+    withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
+      executeDederCommand(projectPath, "exec -m common -t sourceFiles")
+      val offsetAfterFirstRun = serverLogOffset(projectPath)
+      // Rename common/src/Common.scala -> Commom.scala. It's the only entry in its dir,
+      // so the rename trivially preserves sort order. Content unchanged. Before the Hashable fix
+      // this rename was invisible to the source-dir hash and sourceFiles stayed cached.
+      os.move(projectPath / "common/src/Common.scala", projectPath / "common/src/Commom.scala")
+      // Give the server file watcher a moment to observe the rename.
+      Thread.sleep(500)
+      executeDederCommand(projectPath, "exec -m common -t sourceFiles")
+      val newLines = readNewServerLogLines(projectPath, offsetAfterFirstRun)
+      assert(
+        newLines.exists(_.contains("Computed result for sourceFiles")),
+        "Expected 'Computed result for sourceFiles' after source file rename"
+      )
+    }
+  }
+
   test("cached tasks: should handle corrupted metadata.json gracefully") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
       executeDederCommand(projectPath, "exec -m common -t compileClasspath")

@@ -39,7 +39,6 @@ object Hashable extends HashableLowPriority {
   }
 
   given Hashable[os.Path] with {
-    // TODO add file path into hash
     def hashStr(value: os.Path): String = {
       if !os.exists(value) then ""
       else if os.isFile(value) then
@@ -47,9 +46,12 @@ object Hashable extends HashableLowPriority {
           HashUtils.hashStr(inputStream)
         }
       else if os.isDir(value) then {
-        val childrenHashes = os.list(value, sort = true).map(Hashable[os.Path].hashStr)
-        val combinedHash = childrenHashes.mkString("-")
-        HashUtils.hashStr(combinedHash)
+        // Bind each child's leaf name to its recursive hash so renames that
+        // preserve sibling sort order still change the directory hash.
+        val childrenHashes = os.list(value, sort = true).map { child =>
+          s"${child.last}=${Hashable[os.Path].hashStr(child)}"
+        }
+        HashUtils.hashStr(childrenHashes.mkString("-"))
       } else {
         throw DederException(s"Cannot hash path: ${value}")
       }
