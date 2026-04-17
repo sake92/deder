@@ -145,6 +145,12 @@ class JavaTestModule extends JavaModule {
   /// Default 1 (serial). Increase only if your tests are safe to run concurrently
   /// (no shared static state, no System.setProperty mutation, no shared temp files, etc.).
   testParallelism: Int(isBetween(1, 256)) = 1
+  /// Maximum number of forked JVMs to spawn for running this module's tests.
+  /// Effective fork count is min(maxTestForks, number of discovered test classes).
+  /// Default 1 (single fork). Increase for throughput on large test suites; each fork pays
+  /// JVM startup cost and holds its own heap, so scale with available memory.
+  /// Capped server-wide by the maxConcurrentTestForks server property.
+  maxTestForks: Int(isBetween(1, 64)) = 1
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
@@ -178,6 +184,12 @@ class ScalaTestModule extends ScalaModule {
   /// Default 1 (serial). Increase only if your tests are safe to run concurrently
   /// (no shared static state, no System.setProperty mutation, no shared temp files, etc.).
   testParallelism: Int(isBetween(1, 256)) = 1
+  /// Maximum number of forked JVMs to spawn for running this module's tests.
+  /// Effective fork count is min(maxTestForks, number of discovered test classes).
+  /// Default 1 (single fork). Increase for throughput on large test suites; each fork pays
+  /// JVM startup cost and holds its own heap, so scale with available memory.
+  /// Capped server-wide by the maxConcurrentTestForks server property.
+  maxTestForks: Int(isBetween(1, 64)) = 1
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
