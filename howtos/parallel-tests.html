@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Running tests in parallel | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#running-tests-in-parallel">Running tests in parallel</a>
+         <ul>
+          <li><a href="#when-should-i-increase-it">When should I increase it?</a></li>
+          <li><a href="#when-should-i-leave-it-at-1">When should I leave it at 1?</a></li>
+          <li><a href="#trade-offs-vs-multi-process-parallelism">Trade-offs vs. multi-process parallelism</a></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="running-tests-in-parallel">Running tests in parallel<a href="#running-tests-in-parallel" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>By default, Deder runs test classes <strong>serially</strong> within a single test JVM. This matches sbt (<code>Test / testForkedParallel = false</code>) and Mill (<code>testForked</code>), and avoids flakiness caused by tests that share mutable state (static fields, <code>System.setProperty</code>, security providers, etc.).</p>
+   <p>If your tests are safe to run concurrently within the same JVM, opt in per-module with the <code>testParallelism</code> field:</p>
+   <pre><code class="language-pkl">// deder.pkl — example for a Scala test module
+testTemplate = (template.asTest()) {
+  testParallelism = 8
+  // ...
+}
+</code></pre>
+   <p>Supported on:</p>
+   <ul>
+    <li><code>JavaTestModule</code></li>
+    <li><code>ScalaTestModule</code></li>
+    <li><code>ScalaJsTestModule</code></li>
+    <li><code>ScalaNativeTestModule</code></li>
+   </ul>
+   <p>Default is <code>1</code> (serial). Valid range is <code>1</code> to <code>256</code>.</p>
+   <h2 id="when-should-i-increase-it">When should I increase it?<a href="#when-should-i-increase-it" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Increase <code>testParallelism</code> only if <strong>all</strong> of the following hold for the module:</p>
+   <ul>
+    <li>No tests mutate static fields, system properties, security providers, default locale/timezone, or other JVM-global state.</li>
+    <li>No tests write to shared temp files or shared ports.</li>
+    <li>Test frameworks that do their own intra-class parallelism (JUnit Jupiter <code>@Execution(CONCURRENT)</code>, ZIO Test, weaver, etc.) still work; the <code>testParallelism</code> knob controls <strong>class-level</strong> concurrency only — framework-level parallelism is independent.</li>
+   </ul>
+   <p>If unsure, leave it at <code>1</code>. A single flaky test run is worth more than a few seconds saved.</p>
+   <h2 id="when-should-i-leave-it-at-1">When should I leave it at 1?<a href="#when-should-i-leave-it-at-1" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <ul>
+    <li>Legacy code with static singletons, caches, or process-level shared state.</li>
+    <li>Tests with side effects on shared infrastructure (DB connections, mock servers on fixed ports).</li>
+    <li>CI environments where reproducibility is more important than wall-clock time.</li>
+   </ul>
+   <h2 id="trade-offs-vs-multi-process-parallelism">Trade-offs vs. multi-process parallelism<a href="#trade-offs-vs-multi-process-parallelism" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Intra-JVM parallelism only shares one JVM's warm-up cost. For larger test suites where you want process-level isolation too (like Mill's <code>testParallel</code> workers), that's tracked as future work in Deder.</p>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>
