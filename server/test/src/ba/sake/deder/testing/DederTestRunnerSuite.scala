@@ -3,7 +3,6 @@ package ba.sake.deder.testing
 import java.util.concurrent.{ConcurrentHashMap, CountDownLatch, TimeUnit}
 import scala.collection.mutable
 import sbt.testing.{
-  AnnotatedFingerprint,
   Event,
   EventHandler,
   Fingerprint,
