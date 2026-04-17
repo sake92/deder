@@ -1,7 +1,6 @@
 package ba.sake.deder.scalajs
 
 import java.io.InputStream
-import java.util.concurrent.ExecutorService
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
@@ -22,7 +21,7 @@ class ScalaJsTestRunner(
       linkedJsDir: os.Path,
       moduleKind: ScalaJsModuleKind,
       testOptions: DederTestOptions,
-      executorService: ExecutorService
+      testParallelism: Int
   ): DederTestResults = {
     ensureNodeAvailable()
 
@@ -55,7 +54,7 @@ class ScalaJsTestRunner(
         override def showStackTraces: Boolean = false
       }
 
-      val testRunner = DederTestRunner(executorService, discoveredTests, loadedFrameworks, getClass.getClassLoader, dederLogger)
+      val testRunner = DederTestRunner(testParallelism, discoveredTests, loadedFrameworks, getClass.getClassLoader, dederLogger)
       testRunner.run(testOptions)
     } finally {
       adapter.close()
