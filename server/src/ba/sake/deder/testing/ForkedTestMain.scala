@@ -1,6 +1,5 @@
 package ba.sake.deder.testing
 
-import sbt.testing.{Framework, Fingerprint, SubclassFingerprint, AnnotatedFingerprint}
 import ba.sake.tupson.{*, given}
 
 object ForkedTestMain {
@@ -12,6 +11,11 @@ object ForkedTestMain {
     val argsFilePath = args(0)
     val forkedArgs = os.read(os.Path(argsFilePath)).parseJson[ForkedTestArgs]
 
+    // Install capturing stdout BEFORE any logger captures System.out so logger writes flow through
+    // the per-suite capture path.
+    val (reporter, capture) = ForkedTestReporter.install()
+    reporter.emit(ForkedTestEnvelope.ForkStarted(forkedArgs.forkId))
+
     // forked JVM already has the full classpath on -cp; use the system classloader directly.
     val classLoader = ClassLoader.getSystemClassLoader
 
@@ -22,10 +26,13 @@ object ForkedTestMain {
       discoveredTests = forkedArgs.discoveredTests,
       frameworkOverrides = Map.empty,
       classLoader = classLoader,
-      logger = logger
+      logger = logger,
+      forkHooks = Some(ForkRunnerHooks(capture, reporter))
     )
     val results = testRunner.run(DederTestOptions(forkedArgs.testSelectors))
-    os.write.over(os.Path(forkedArgs.resultsFile), results.toJson, createFolders = true)
+    val payload = ForkedTestResultsPayload(results, testRunner.perClassStats)
+    os.write.over(os.Path(forkedArgs.resultsFile), payload.toJson, createFolders = true)
+    reporter.emit(ForkedTestEnvelope.ForkCompleted(forkedArgs.forkId, results))
     System.exit(if results.success then 0 else 1)
   }
 }

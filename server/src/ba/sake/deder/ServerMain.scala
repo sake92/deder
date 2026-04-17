@@ -53,6 +53,11 @@ object ServerMain extends StrictLogging {
     val maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "600").toInt
     val workerThreads = props.getProperty("workerThreads", "16").toInt
     val bspEnabled = props.getProperty("bspEnabled", "true").toBoolean
+    val maxConcurrentTestForks = Option(props.getProperty("maxConcurrentTestForks"))
+      .filter(_.nonEmpty)
+      .map(_.toInt)
+      .getOrElse(Runtime.getRuntime.availableProcessors())
+    DederGlobals.setTestForkSemaphore(maxConcurrentTestForks)
 
     val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger]
     rootLogger.setLevel(Level.toLevel(logLevel))

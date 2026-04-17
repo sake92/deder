@@ -965,10 +965,12 @@ class CoreTasks() extends StrictLogging {
       execute = { ctx =>
         val (runClasspath, jvmOptions, javaHome, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
-          val (fork, forkEnv, testParallelism) = ctx.module match {
-            case m: JavaTestModule  => (m.fork, m.forkEnv.asScala.to(Map), m.testParallelism.toInt)
-            case m: ScalaTestModule => (m.fork, m.forkEnv.asScala.to(Map), m.testParallelism.toInt)
-            case _                  => (true, Map.empty, 1)
+          val (fork, forkEnv, testParallelism, maxTestForks) = ctx.module match {
+            case m: JavaTestModule =>
+              (m.fork, m.forkEnv.asScala.to(Map), m.testParallelism.toInt, m.maxTestForks.toInt)
+            case m: ScalaTestModule =>
+              (m.fork, m.forkEnv.asScala.to(Map), m.testParallelism.toInt, m.maxTestForks.toInt)
+            case _ => (true, Map.empty, 1, 1)
           }
           val testOptions = DederTestOptions(ctx.args)
           if fork then {
@@ -982,7 +984,8 @@ class CoreTasks() extends StrictLogging {
               notifications = ctx.notifications,
               moduleId = ctx.module.id,
               outDir = ctx.out,
-              testParallelism = testParallelism
+              testParallelism = testParallelism,
+              maxTestForks = maxTestForks
             )
           } else
             ClassLoaderUtils.withTestsClassLoader(runClasspath) { classLoader =>
