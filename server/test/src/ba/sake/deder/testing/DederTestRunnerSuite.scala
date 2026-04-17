@@ -95,10 +95,10 @@ class DederTestRunnerSuite extends munit.FunSuite {
         override def requireNoArgConstructor(): Boolean = false
       }
     )
-    override def runner(args: Array[String], remoteArgs: Array[String], cl: ClassLoader): Runner =
+    override def runner(runnerArgs: Array[String], runnerRemoteArgs: Array[String], cl: ClassLoader): Runner =
       new Runner {
-        override def args(): Array[String] = args
-        override def remoteArgs(): Array[String] = remoteArgs
+        override def args(): Array[String] = runnerArgs
+        override def remoteArgs(): Array[String] = runnerRemoteArgs
         override def done(): String = ""
         override def tasks(taskDefs: Array[TaskDef]): Array[SbtTestTask] =
           taskDefs.map(td => FakeTask(td, onExecute))
