@@ -67,6 +67,7 @@ deder
    <ul>
     <li><code>logLevel</code> - log level used for server log at <code>.deder/logs/server.log</code>, one of <code>ERROR</code>, <code>WARNING</code>, <code>INFO</code>, <code>DEBUG</code>, <code>TRACE</code></li>
     <li><code>workerThreads</code> - number of threads to use for executing tasks</li>
+    <li><code>maxConcurrentTestForks</code> - maximum number of forked test JVMs alive server-wide at any one time. Optional; defaults to the number of available CPU cores. Per-module <code>maxTestForks</code> is capped by this.</li>
     <li><code>maxInactiveSeconds</code> - max number of seconds server is inactive before it shuts down automatically</li>
     <li><code>bspEnabled</code> - specifies if BSP protocol is enabled. If false, the BSP Deder server is never started (useful in CI or to save memory/CPU)</li>
     <li><code>JAVA_OPTS</code> - java options passed to server java process</li>
