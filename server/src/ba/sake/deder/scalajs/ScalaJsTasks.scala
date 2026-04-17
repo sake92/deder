@@ -1,6 +1,5 @@
 package ba.sake.deder.scalajs
 
-import scala.util.Using
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaJsModule, ScalaJsTestModule}
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, OutputCaptureContext}
 import ba.sake.deder.*
@@ -57,17 +56,14 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
           val jsModule = ctx.module.asInstanceOf[ScalaJsTestModule]
           val testOptions = DederTestOptions(ctx.args)
-          Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
-            executorService =>
-              val runner = new ScalaJsTestRunner(ctx.notifications, ctx.module.id)
-              runner.run(
-                discoveredTests = discoveredTests,
-                linkedJsDir = os.Path(linkedJsDir),
-                moduleKind = jsModule.moduleKind,
-                testOptions = testOptions,
-                executorService = executorService
-              )
-          }
+          val runner = new ScalaJsTestRunner(ctx.notifications, ctx.module.id)
+          runner.run(
+            discoveredTests = discoveredTests,
+            linkedJsDir = os.Path(linkedJsDir),
+            moduleKind = jsModule.moduleKind,
+            testOptions = testOptions,
+            testParallelism = jsModule.testParallelism.toInt
+          )
 
         }
       },
