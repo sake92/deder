@@ -1,5 +1,7 @@
 package ba.sake.deder.testing
 
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.{Callable, Executors}
 import scala.util.control.NonFatal
 import ba.sake.deder.*
@@ -8,6 +10,8 @@ import ba.sake.tupson.{*, given}
 object ForkedTestOrchestrator {
 
   private val MaxTestTimeMs = 30L * 60 * 1000
+  private val RunIdFormatter =
+    DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS").withZone(java.time.ZoneId.systemDefault())
 
   def run(
       discoveredTests: Seq[DiscoveredFrameworkTests],
@@ -41,17 +45,23 @@ object ForkedTestOrchestrator {
       return DederTestResults.empty
     }
 
-    os.makeDir.all(outDir)
     val effectiveForks = buckets.size
+    val runId = generateRunId()
+    val runDir = outDir / s"run-$runId"
+    os.makeDir.all(runDir)
     if effectiveForks > 1 then
       notifications.add(
-        ServerNotification.logDebug(s"Spawning $effectiveForks test forks for $moduleId", Some(moduleId))
+        ServerNotification.logDebug(
+          s"Spawning $effectiveForks test forks for $moduleId (run $runId)",
+          Some(moduleId)
+        )
       )
 
     val javaBinary = resolveJavaBinary(javaHome)
     val fullClasspath = buildClasspath(runtimeClasspath)
     val requestId = RequestContext.id.get()
 
+    val showForkTag = effectiveForks > 1
     val forkExecutor = Executors.newFixedThreadPool(effectiveForks)
     try {
       val callables: Seq[Callable[Option[ForkedTestResultsPayload]]] =
@@ -68,7 +78,8 @@ object ForkedTestOrchestrator {
                 envVars = envVars,
                 testOptions = testOptions,
                 testParallelism = testParallelism,
-                outDir = outDir,
+                runDir = runDir,
+                showForkTag = showForkTag,
                 notifications = notifications,
                 moduleId = moduleId
               )
@@ -99,7 +110,8 @@ object ForkedTestOrchestrator {
       envVars: Map[String, String],
       testOptions: DederTestOptions,
       testParallelism: Int,
-      outDir: os.Path,
+      runDir: os.Path,
+      showForkTag: Boolean,
       notifications: ServerNotificationsLogger,
       moduleId: String
   ): Option[ForkedTestResultsPayload] = {
@@ -122,13 +134,20 @@ object ForkedTestOrchestrator {
         envVars = envVars,
         testOptions = testOptions,
         testParallelism = testParallelism,
-        forkDir = outDir / s"fork-$forkId",
+        forkDir = runDir / s"fork-$forkId",
+        showForkTag = showForkTag,
         notifications = notifications,
         moduleId = moduleId
       )
     } finally {
       sem.release()
     }
+  }
+
+  private def generateRunId(): String = {
+    val ts = RunIdFormatter.format(Instant.now())
+    val suffix = java.util.UUID.randomUUID().toString.take(4)
+    s"$ts-$suffix"
   }
 
   private def spawnAndRun(
@@ -141,9 +160,11 @@ object ForkedTestOrchestrator {
       testOptions: DederTestOptions,
       testParallelism: Int,
       forkDir: os.Path,
+      showForkTag: Boolean,
       notifications: ServerNotificationsLogger,
       moduleId: String
   ): Option[ForkedTestResultsPayload] = {
+    val tag = if showForkTag then s"[fork-$forkId] " else ""
     os.makeDir.all(forkDir)
     val argsFilePath = forkDir / "fork-args.json"
     val resultsFilePath = forkDir / s"fork-results-${java.util.UUID.randomUUID()}.json"
@@ -177,14 +198,14 @@ object ForkedTestOrchestrator {
       )
 
     val stdoutThread = new Thread(
-      () => streamStdout(forkId, proc, stdoutLog, notifications, moduleId),
+      () => streamStdout(forkId, proc, stdoutLog, tag, notifications, moduleId),
       s"fork-$forkId-stdout"
     )
     stdoutThread.setDaemon(true)
     stdoutThread.start()
 
     val stderrThread = new Thread(
-      () => streamStderr(forkId, proc, stderrLog, notifications, moduleId),
+      () => streamStderr(proc, stderrLog, tag, notifications, moduleId),
       s"fork-$forkId-stderr"
     )
     stderrThread.setDaemon(true)
@@ -195,7 +216,7 @@ object ForkedTestOrchestrator {
       proc.wrapped.destroyForcibly()
       notifications.add(
         ServerNotification.logError(
-          s"[fork-$forkId] forked test process timed out after ${MaxTestTimeMs / 60000} minutes, killed.",
+          s"${tag}forked test process timed out after ${MaxTestTimeMs / 60000} minutes, killed.",
           Some(moduleId)
         )
       )
@@ -210,7 +231,7 @@ object ForkedTestOrchestrator {
         case NonFatal(e) =>
           notifications.add(
             ServerNotification.logError(
-              s"[fork-$forkId] failed to parse results: ${e.getMessage}",
+              s"${tag}failed to parse results: ${e.getMessage}",
               Some(moduleId)
             )
           )
@@ -219,7 +240,7 @@ object ForkedTestOrchestrator {
     else {
       notifications.add(
         ServerNotification.logError(
-          s"[fork-$forkId] forked test process crashed (exit $exitCode)",
+          s"${tag}forked test process crashed (exit $exitCode)",
           Some(moduleId)
         )
       )
@@ -231,6 +252,7 @@ object ForkedTestOrchestrator {
       forkId: Int,
       proc: os.SubProcess,
       logFile: os.Path,
+      tag: String,
       notifications: ServerNotificationsLogger,
       moduleId: String
   ): Unit = {
@@ -242,15 +264,15 @@ object ForkedTestOrchestrator {
           val json = line.substring(ForkedTestEnvelope.LinePrefix.length)
           try {
             val env = json.parseJson[ForkedTestEnvelope]
-            renderEnvelope(forkId, env, logFile, notifications, moduleId)
+            renderEnvelope(env, logFile, tag, notifications, moduleId)
           } catch {
             case NonFatal(_) =>
               os.write.append(logFile, line + "\n", createFolders = true)
-              notifications.add(ServerNotification.logInfo(s"[fork-$forkId] $line", Some(moduleId)))
+              notifications.add(ServerNotification.logInfo(s"$tag$line", Some(moduleId)))
           }
         } else {
           os.write.append(logFile, line + "\n", createFolders = true)
-          notifications.add(ServerNotification.logInfo(s"[fork-$forkId] $line", Some(moduleId)))
+          notifications.add(ServerNotification.logInfo(s"$tag$line", Some(moduleId)))
         }
         line = reader.readLine()
       }
@@ -258,15 +280,15 @@ object ForkedTestOrchestrator {
       case _: java.io.IOException => ()
       case NonFatal(e) =>
         notifications.add(
-          ServerNotification.logError(s"[fork-$forkId stdout error] ${e.getMessage}", Some(moduleId))
+          ServerNotification.logError(s"${tag}stdout error: ${e.getMessage}", Some(moduleId))
         )
     }
   }
 
   private def streamStderr(
-      forkId: Int,
       proc: os.SubProcess,
       logFile: os.Path,
+      tag: String,
       notifications: ServerNotificationsLogger,
       moduleId: String
   ): Unit = {
@@ -275,45 +297,45 @@ object ForkedTestOrchestrator {
       var line = reader.readLine()
       while (line != null) {
         os.write.append(logFile, line + "\n", createFolders = true)
-        notifications.add(ServerNotification.logError(s"[fork-$forkId] $line", Some(moduleId)))
+        notifications.add(ServerNotification.logError(s"$tag$line", Some(moduleId)))
         line = reader.readLine()
       }
     } catch {
       case _: java.io.IOException => ()
       case NonFatal(e) =>
         notifications.add(
-          ServerNotification.logError(s"[fork-$forkId stderr error] ${e.getMessage}", Some(moduleId))
+          ServerNotification.logError(s"${tag}stderr error: ${e.getMessage}", Some(moduleId))
         )
     }
   }
 
   private def renderEnvelope(
-      forkId: Int,
       env: ForkedTestEnvelope,
       logFile: os.Path,
+      tag: String,
       notifications: ServerNotificationsLogger,
       moduleId: String
   ): Unit = env match {
-    case ForkedTestEnvelope.ForkStarted(id) =>
-      notifications.add(ServerNotification.logDebug(s"[fork-$id] started", Some(moduleId)))
+    case ForkedTestEnvelope.ForkStarted(_) =>
+      notifications.add(ServerNotification.logDebug(s"${tag}started", Some(moduleId)))
     case ForkedTestEnvelope.SuiteStarted(name, _) =>
-      notifications.add(ServerNotification.logDebug(s"[fork-$forkId] suite started: $name", Some(moduleId)))
+      notifications.add(ServerNotification.logDebug(s"${tag}suite started: $name", Some(moduleId)))
     case ForkedTestEnvelope.SuiteCompleted(name, _, output) =>
-      val block = s"=== [fork-$forkId] $name ===\n$output"
-      os.write.append(logFile, block + "\n", createFolders = true)
-      notifications.add(ServerNotification.logInfo(s"=== [fork-$forkId] $name ===", Some(moduleId)))
+      val header = s"=== ${tag}$name ==="
+      os.write.append(logFile, s"$header\n$output\n", createFolders = true)
+      notifications.add(ServerNotification.logInfo(header, Some(moduleId)))
       output.linesIterator.foreach { l =>
         notifications.add(ServerNotification.logInfo(l, Some(moduleId)))
       }
     case ForkedTestEnvelope.UnattributedOutput(text) =>
       os.write.append(logFile, text, createFolders = true)
       text.linesIterator.foreach { l =>
-        if l.nonEmpty then notifications.add(ServerNotification.logInfo(s"[fork-$forkId] $l", Some(moduleId)))
+        if l.nonEmpty then notifications.add(ServerNotification.logInfo(s"$tag$l", Some(moduleId)))
       }
-    case ForkedTestEnvelope.ForkCompleted(id, totals) =>
+    case ForkedTestEnvelope.ForkCompleted(_, totals) =>
       notifications.add(
         ServerNotification.logDebug(
-          s"[fork-$id] completed: ${totals.total} tests, ${totals.passed} passed, ${totals.failed} failed",
+          s"${tag}completed: ${totals.total} tests, ${totals.passed} passed, ${totals.failed} failed",
           Some(moduleId)
         )
       )
