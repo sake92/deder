@@ -143,6 +143,7 @@ class SbtImporter(
           "4.13.9", // scalaSemanticdbVersion
           true, // fork
           1L, // testParallelism
+          1L, // maxTestForks
           List.empty.asJava // testFrameworks
         )
       else

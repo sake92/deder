@@ -10,13 +10,24 @@ import ba.sake.deder.*
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.tupson.JsonRW
 
+case class ForkRunnerHooks(
+    capture: SuiteOutputCapture,
+    reporter: ForkedTestReporter
+)
+
 class DederTestRunner(
     testParallelism: Int,
     discoveredTests: Seq[DiscoveredFrameworkTests],
     frameworkOverrides: Map[String, Framework],
     classLoader: ClassLoader,
-    logger: DederTestLogger
+    logger: DederTestLogger,
+    forkHooks: Option[ForkRunnerHooks] = None
 ) {
+
+  private val _perClassStats = scala.collection.mutable.Map[String, TestClassStats]()
+
+  /** Per-test-class timing aggregated across all frameworks. Populated during [[run]]. */
+  def perClassStats: Map[String, TestClassStats] = _perClassStats.toMap
 
   // TODO run in another thread+outputdir, so we can run tests from multiple terminals/BSP
   // TODO print how to re-run just those
@@ -108,6 +119,8 @@ class DederTestRunner(
     val summary = runner.done()
     logger.info(summary)
 
+    _perClassStats ++= handler.perClassStats
+
     val results = handler.results
     val failedTests = results.filter(r => r.status == Status.Failure || r.status == Status.Error)
     if (failedTests.nonEmpty) {
@@ -128,7 +141,19 @@ class DederTestRunner(
     def runOne(task: SbtTestTask): Unit = {
       val cancelled = currentRequestId != null && DederGlobals.cancellationTokens.get(currentRequestId).get()
       if cancelled then throw CancelledException("Tests execution cancelled")
-      task.execute(handler, Array(logger))
+      val suiteName = task.taskDef().fullyQualifiedName()
+      val threadId = Thread.currentThread().getId
+      forkHooks.foreach { h =>
+        h.capture.startSuite()
+        h.reporter.emit(ForkedTestEnvelope.SuiteStarted(suiteName, threadId))
+      }
+      try task.execute(handler, Array(logger))
+      finally {
+        forkHooks.foreach { h =>
+          val captured = h.capture.finishSuite()
+          h.reporter.emit(ForkedTestEnvelope.SuiteCompleted(suiteName, threadId, captured))
+        }
+      }
     }
 
     if testParallelism <= 1 then {
@@ -172,17 +197,9 @@ case class DederTestOptions(
 
 class DederTestEventHandler(logger: DederTestLogger, frameworkName: String) extends EventHandler {
   private val _results = mutable.ArrayBuffer[DederTestResult]()
+  private val _classStats = mutable.Map[String, TestClassStats]()
 
   def handle(event: Event): Unit = {
-    val status = event.status() match {
-      case Status.Success  => fansi.Color.Green("PASS ✅")
-      case Status.Failure  => fansi.Color.Red("FAIL \uD83D\uDD34")
-      case Status.Error    => fansi.Color.Red("FAIL \uD83D\uDD34")
-      case Status.Skipped  => fansi.Color.LightYellow("SKIP 🚫")
-      case Status.Ignored  => fansi.Color.LightYellow("SKIP 🚫")
-      case Status.Canceled => fansi.Color.LightYellow("SKIP 🚫")
-      case Status.Pending  => fansi.Color.LightYellow("SKIP 🚫")
-    }
     val fqn = event.fullyQualifiedName()
     val testName = event.selector() match {
       case s: TestSelector       => if frameworkName == "Jupiter" then s"${fqn}#${s.testName()}" else s.testName()
@@ -191,15 +208,31 @@ class DederTestEventHandler(logger: DederTestLogger, frameworkName: String) exte
       case _                     => fqn
     }
     val duration = Duration.ofMillis(event.duration())
-    logger.test(s"$status $testName ; took ${duration.toPrettyString}")
     val eventThrowable = Option.when(event.throwable().isDefined)(event.throwable().get())
-    eventThrowable.foreach { t =>
-      logger.error(s"  ${t.getMessage}")
-      if (shouldLogStackTrace(t)) {
-        t.getStackTrace.take(10).foreach { line =>
-          logger.error(s"    at $line")
+    event.status() match {
+      case Status.Success =>
+        // Passing tests rely on the framework's own reporter (ScalaTest, munit, etc. print their own).
+        // Avoid duplicating every test in our output; only non-success results get our uniform line.
+        ()
+      case other =>
+        val status = other match {
+          case Status.Failure  => fansi.Color.Red("FAIL \uD83D\uDD34")
+          case Status.Error    => fansi.Color.Red("FAIL \uD83D\uDD34")
+          case Status.Skipped  => fansi.Color.LightYellow("SKIP 🚫")
+          case Status.Ignored  => fansi.Color.LightYellow("SKIP 🚫")
+          case Status.Canceled => fansi.Color.LightYellow("SKIP 🚫")
+          case Status.Pending  => fansi.Color.LightYellow("SKIP 🚫")
+          case Status.Success  => "" // unreachable
         }
-      }
+        logger.test(s"$status $testName ; took ${duration.toPrettyString}")
+        eventThrowable.foreach { t =>
+          logger.error(s"  ${t.getMessage}")
+          if (shouldLogStackTrace(t)) {
+            t.getStackTrace.take(10).foreach { line =>
+              logger.error(s"    at $line")
+            }
+          }
+        }
     }
     _results += DederTestResult(
       name = testName,
@@ -207,9 +240,24 @@ class DederTestEventHandler(logger: DederTestLogger, frameworkName: String) exte
       duration = event.duration(),
       throwable = eventThrowable
     )
+    val className = fqn.stripSuffix("$")
+    val existing = _classStats.getOrElse(className, TestClassStats(0L, "passed", 0L))
+    val newStatus =
+      if event.status() == Status.Failure || event.status() == Status.Error then "failed"
+      else existing.lastStatus
+    _classStats.update(
+      className,
+      TestClassStats(
+        durationMs = existing.durationMs + event.duration(),
+        lastStatus = newStatus,
+        lastRunEpochMs = System.currentTimeMillis()
+      )
+    )
   }
 
   def results: Seq[DederTestResult] = _results.toSeq
+
+  def perClassStats: Map[String, TestClassStats] = _classStats.toMap
 
   private def shouldLogStackTrace(t: Throwable): Boolean =
     logger.showStackTraces && !isScalaJsMappedFailure(t)
