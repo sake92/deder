@@ -17,7 +17,7 @@ object ForkedTestOrchestrator {
       notifications: ServerNotificationsLogger,
       moduleId: String,
       outDir: os.Path,
-      workerThreads: Int
+      testParallelism: Int
   ): DederTestResults = {
 
     // write args file
@@ -27,7 +27,7 @@ object ForkedTestOrchestrator {
     val args = ForkedTestArgs(
       discoveredTests = discoveredTests,
       testSelectors = testOptions.testSelectors,
-      workerThreads = workerThreads,
+      testParallelism = testParallelism,
       resultsFile = resultsFilePath.toString
     )
     os.write.over(argsFilePath, args.toJson)

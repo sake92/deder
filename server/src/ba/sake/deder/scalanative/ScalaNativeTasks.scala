@@ -1,7 +1,6 @@
 package ba.sake.deder.scalanative
 
 import java.nio.file.Files
-import scala.util.Using
 import scala.util.Properties
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaNativeModule, ScalaNativeTestModule}
@@ -64,16 +63,14 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
           val testOptions = DederTestOptions(ctx.args)
           val nativeBinaryPath = ScalaNativeTasks.findNativeBinary(ctx.out / os.up / "nativeLink")
-          Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
-            executorService =>
-              val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
-              runner.run(
-                discoveredTests = discoveredTests,
-                nativeBinaryPath = nativeBinaryPath,
-                testOptions = testOptions,
-                executorService = executorService
-              )
-          }
+          val nativeModule = ctx.module.asInstanceOf[ScalaNativeTestModule]
+          val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
+          runner.run(
+            discoveredTests = discoveredTests,
+            nativeBinaryPath = nativeBinaryPath,
+            testOptions = testOptions,
+            testParallelism = nativeModule.testParallelism.toInt
+          )
         }
       },
       isResultSuccessful = _.success,

@@ -3,7 +3,7 @@ package ba.sake.deder.testing
 // peek at https://github.com/scala-js/scala-js/blob/main/test-bridge/src/main/scala/org/scalajs/testing/bridge/HTMLRunner.scala
 
 import java.time.Duration
-import java.util.concurrent.ExecutorService
+import java.util.concurrent.{Executors, Future as JFuture}
 import scala.collection.mutable
 import sbt.testing.{Task as SbtTestTask, *}
 import ba.sake.deder.*
@@ -11,7 +11,7 @@ import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.tupson.JsonRW
 
 class DederTestRunner(
-    executorService: ExecutorService,
+    testParallelism: Int,
     discoveredTests: Seq[DiscoveredFrameworkTests],
     frameworkOverrides: Map[String, Framework],
     classLoader: ClassLoader,
@@ -124,31 +124,44 @@ class DederTestRunner(
     val currentRequestId = RequestContext.id.get()
     val capturedNotificationsLogger = OutputCaptureContext.currentNotificationsLogger.get()
     val capturedModuleId = OutputCaptureContext.currentModuleId.get()
-    val futures = {
-      tasks.map { task =>
-        executorService.submit { () =>
-          if (capturedNotificationsLogger != null) {
-            OutputCaptureContext.currentNotificationsLogger.set(capturedNotificationsLogger)
-            OutputCaptureContext.currentModuleId.set(capturedModuleId)
-          }
-          try {
-            val cancelled = currentRequestId != null && DederGlobals.cancellationTokens.get(currentRequestId).get()
-            if cancelled then throw CancelledException("Tests execution cancelled")
-            task.execute(handler, Array(logger))
-          } finally {
-            OutputCaptureContext.currentNotificationsLogger.remove()
-            OutputCaptureContext.currentModuleId.remove()
-          }
-        }
-      }
-      // val nestedTasks = ... TODO
+
+    def runOne(task: SbtTestTask): Unit = {
+      val cancelled = currentRequestId != null && DederGlobals.cancellationTokens.get(currentRequestId).get()
+      if cancelled then throw CancelledException("Tests execution cancelled")
+      task.execute(handler, Array(logger))
     }
-    try futures.map(_.get())
-    catch {
-      case _: CancelledException =>
-        // if one task fails (maybe cancelled..), cancel all other pending tasks
-        logger.warn(s"Cancelling remaining tests...")
-        futures.foreach(_.cancel(true))
+
+    if testParallelism <= 1 then {
+      try tasks.foreach(runOne)
+      catch {
+        case _: CancelledException =>
+          logger.warn("Cancelling remaining tests...")
+      }
+    } else {
+      val executor = Executors.newFixedThreadPool(testParallelism)
+      try {
+        val futures: Seq[JFuture[?]] = tasks.map { task =>
+          executor.submit((() => {
+            if (capturedNotificationsLogger != null) {
+              OutputCaptureContext.currentNotificationsLogger.set(capturedNotificationsLogger)
+              OutputCaptureContext.currentModuleId.set(capturedModuleId)
+            }
+            try runOne(task)
+            finally {
+              OutputCaptureContext.currentNotificationsLogger.remove()
+              OutputCaptureContext.currentModuleId.remove()
+            }
+          }): Runnable)
+        }
+        try futures.foreach(_.get())
+        catch {
+          case _: CancelledException =>
+            logger.warn("Cancelling remaining tests...")
+            futures.foreach(_.cancel(true))
+        }
+      } finally {
+        executor.shutdown()
+      }
     }
   }
 }

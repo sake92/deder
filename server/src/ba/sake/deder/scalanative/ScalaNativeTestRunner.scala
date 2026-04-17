@@ -1,6 +1,5 @@
 package ba.sake.deder.scalanative
 
-import java.util.concurrent.ExecutorService
 import scala.jdk.CollectionConverters.*
 import com.typesafe.scalalogging.StrictLogging
 import scala.scalanative.testinterface.adapter.TestAdapter
@@ -16,7 +15,7 @@ class ScalaNativeTestRunner(
       discoveredTests: Seq[DiscoveredFrameworkTests],
       nativeBinaryPath: os.Path,
       testOptions: DederTestOptions,
-      executorService: ExecutorService
+      testParallelism: Int
   ): DederTestResults = {
     val config = TestAdapter.Config()
       .withBinaryFile(nativeBinaryPath.toIO)
@@ -41,7 +40,7 @@ class ScalaNativeTestRunner(
         override def showStackTraces: Boolean = false
       }
 
-      val testRunner = DederTestRunner(executorService, discoveredTests, loadedFrameworks, getClass.getClassLoader, dederLogger)
+      val testRunner = DederTestRunner(testParallelism, discoveredTests, loadedFrameworks, getClass.getClassLoader, dederLogger)
       testRunner.run(testOptions)
     } finally {
       adapter.close()

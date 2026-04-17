@@ -965,10 +965,10 @@ class CoreTasks() extends StrictLogging {
       execute = { ctx =>
         val (runClasspath, jvmOptions, javaHome, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
-          val (fork, forkEnv) = ctx.module match {
-            case m: JavaTestModule  => (m.fork, m.forkEnv.asScala.to(Map))
-            case m: ScalaTestModule => (m.fork, m.forkEnv.asScala.to(Map))
-            case _                  => (true, Map.empty)
+          val (fork, forkEnv, testParallelism) = ctx.module match {
+            case m: JavaTestModule  => (m.fork, m.forkEnv.asScala.to(Map), m.testParallelism.toInt)
+            case m: ScalaTestModule => (m.fork, m.forkEnv.asScala.to(Map), m.testParallelism.toInt)
+            case _                  => (true, Map.empty, 1)
           }
           val testOptions = DederTestOptions(ctx.args)
           if fork then {
@@ -982,16 +982,13 @@ class CoreTasks() extends StrictLogging {
               notifications = ctx.notifications,
               moduleId = ctx.module.id,
               outDir = ctx.out,
-              workerThreads = DederGlobals.testWorkerThreads
+              testParallelism = testParallelism
             )
           } else
             ClassLoaderUtils.withTestsClassLoader(runClasspath) { classLoader =>
               val logger = DederTestLogger(ctx.notifications, ctx.module.id)
-              Using.resource(java.util.concurrent.Executors.newFixedThreadPool(DederGlobals.testWorkerThreads)) {
-                executorService =>
-                  val testRunner = DederTestRunner(executorService, discoveredTests, Map.empty, classLoader, logger)
-                  testRunner.run(testOptions)
-              }
+              val testRunner = DederTestRunner(testParallelism, discoveredTests, Map.empty, classLoader, logger)
+              testRunner.run(testOptions)
             }
         }
       },

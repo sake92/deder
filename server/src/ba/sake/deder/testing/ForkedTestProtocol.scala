@@ -5,6 +5,6 @@ import ba.sake.tupson.JsonRW
 case class ForkedTestArgs(
     discoveredTests: Seq[DiscoveredFrameworkTests],
     testSelectors: Seq[String],
-    workerThreads: Int,
+    testParallelism: Int,
     resultsFile: String
 ) derives JsonRW
