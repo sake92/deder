@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Testing | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#testing">Testing</a>
+         <ul>
+          <li><a href="#execution-modes">Execution modes</a>
+           <ul>
+            <li><a href="#serial-default">Serial (default)</a></li>
+            <li><a href="#intra-jvm-thread-parallelism-testparallelism">Intra-JVM thread parallelism (testParallelism)</a></li>
+            <li><a href="#multi-fork-parallelism-maxtestforks">Multi-fork parallelism (maxTestForks)</a></li>
+            <li><a href="#server-wide-fork-cap-maxconcurrenttestforks">Server-wide fork cap (maxConcurrentTestForks)</a></li>
+            <li><a href="#summary">Summary</a></li>
+           </ul></li>
+          <li><a href="#stdout-capture">Stdout capture</a>
+           <ul>
+            <li><a href="#in-process-tests-single-fork">In-process tests (single fork)</a></li>
+            <li><a href="#multi-fork-tests">Multi-fork tests</a></li>
+           </ul></li>
+          <li><a href="#test-history">Test history</a>
+           <ul>
+            <li><a href="#location">Location</a></li>
+            <li><a href="#format">Format</a></li>
+            <li><a href="#merge-behaviour">Merge behaviour</a></li>
+           </ul></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="testing">Testing<a href="#testing" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <h2 id="execution-modes">Execution modes<a href="#execution-modes" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Deder supports three independent parallelism knobs that compose together.</p>
+   <h3 id="serial-default">Serial (default)<a href="#serial-default" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>By default, test classes run one at a time inside a single forked JVM — the same behaviour as sbt's <code>Test / testForkedParallel = false</code> and Mill's <code>testForked</code>.</p>
+   <pre><code class="language-pkl">testTemplate = (template.asTest()) {
+  // defaults — no changes needed
+  maxTestForks   = 1
+  testParallelism = 1
+}
+</code></pre>
+   <h3 id="intra-jvm-thread-parallelism-testparallelism">Intra-JVM thread parallelism (<code>testParallelism</code>)<a href="#intra-jvm-thread-parallelism-testparallelism" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p><code>testParallelism</code> controls how many test <strong>classes</strong> run concurrently inside one JVM using a fixed thread pool. Framework-level parallelism (JUnit Jupiter <code>@Execution(CONCURRENT)</code>, ZIO Test, weaver, etc.) is independent and unaffected.</p>
+   <pre><code class="language-pkl">testTemplate = (template.asTest()) {
+  testParallelism = 8   // up to 8 test classes at once in the same JVM
+}
+</code></pre>
+   <p>Safe to increase only when all tests in the module avoid JVM-global mutable state (static fields, <code>System.setProperty</code>, security providers, default locale/timezone, shared ports, shared temp files).</p>
+   <p>Valid range: <code>1</code>–<code>256</code>.</p>
+   <h3 id="multi-fork-parallelism-maxtestforks">Multi-fork parallelism (<code>maxTestForks</code>)<a href="#multi-fork-parallelism-maxtestforks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p><code>maxTestForks</code> spawns multiple forked JVMs for the same module. Test classes are distributed across forks upfront using <strong>LPT (Longest-Processing-Time) bin packing</strong>: the slowest known class is placed first, spreading work as evenly as possible. Effective fork count is <code>min(maxTestForks, discoveredTestClasses)</code> — Deder never spawns an empty fork.</p>
+   <pre><code class="language-pkl">testTemplate = (template.asTest()) {
+  maxTestForks = 4   // up to 4 forked JVMs for this module
+}
+</code></pre>
+   <p>Multi-fork and <code>testParallelism</code> compose: each of the N forks independently runs up to <code>testParallelism</code> classes in parallel.</p>
+   <p>Valid range: <code>1</code>–<code>64</code>.</p>
+   <h3 id="server-wide-fork-cap-maxconcurrenttestforks">Server-wide fork cap (<code>maxConcurrentTestForks</code>)<a href="#server-wide-fork-cap-maxconcurrenttestforks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>The server-wide semaphore in <code>.deder/server.properties</code> caps the total number of live forked JVMs across <strong>all</strong> concurrent test tasks. Per-module <code>maxTestForks</code> is capped by this value.</p>
+   <pre><code class="language-properties hljs" data-highlighted="yes"><span class="hljs-attr">maxConcurrentTestForks</span>=<span class="hljs-string">16   # default: Runtime.availableProcessors()</span>
+</code></pre>
+   <h3 id="summary">Summary<a href="#summary" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <table>
+    <thead>
+     <tr>
+      <th>Setting</th>
+      <th>Scope</th>
+      <th>Default</th>
+      <th>Effect</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>testParallelism</code></td>
+      <td>Per module (Pkl)</td>
+      <td><code>1</code></td>
+      <td>Thread count per forked JVM</td>
+     </tr>
+     <tr>
+      <td><code>maxTestForks</code></td>
+      <td>Per module (Pkl)</td>
+      <td><code>1</code></td>
+      <td>Forked JVMs per module</td>
+     </tr>
+     <tr>
+      <td><code>maxConcurrentTestForks</code></td>
+      <td>Server-wide (<code>.deder/server.properties</code>)</td>
+      <td>CPU cores</td>
+      <td>Hard cap on total live forks</td>
+     </tr>
+    </tbody>
+   </table>
+   <p>Example: <code>maxTestForks=4</code>, <code>testParallelism=8</code>, <code>maxConcurrentTestForks=16</code> — up to 4 JVMs for the module, each running 8 class threads, server allows at most 16 forks total across all modules.</p>
+   <hr>
+   <h2 id="stdout-capture">Stdout capture<a href="#stdout-capture" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <h3 id="in-process-tests-single-fork">In-process tests (single fork)<a href="#in-process-tests-single-fork" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>When <code>maxTestForks=1</code> (the default), Deder installs a <code>TeePrintStream</code> over the JVM's <code>System.out</code> and <code>System.err</code> before any test code runs. Output is line-buffered (max 8 KB per flush). When a test suite is active, output is routed to server notifications tagged with the module ID so it appears in the client in real time.</p>
+   <h3 id="multi-fork-tests">Multi-fork tests<a href="#multi-fork-tests" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>Each forked JVM installs <code>SuiteOutputCapture</code> as a replacement <code>PrintStream</code> on <code>System.out</code> at startup. All output goes through this stream.</p>
+   <p>The capture layer groups output by suite using a <code>ThreadLocal</code> buffer:</p>
+   <ul>
+    <li>When a suite starts, a per-suite buffer is opened on that thread.</li>
+    <li>Any <code>println</code> on that thread is written into the buffer rather than directly to stdout.</li>
+    <li>When the suite finishes, the buffered text is flushed as a single <code>SuiteCompleted</code> envelope.</li>
+    <li>Output that arrives outside any open suite window (JVM startup messages, framework initialisation) is collected in a separate unattributed buffer and emitted line-by-line as <code>UnattributedOutput</code> envelopes.</li>
+   </ul>
+   <p>The orchestrator reads the forked JVM's stdout line-by-line and parses each line that starts with the sentinel prefix <code>@@DEDER-FORK@@ </code> as a JSON envelope. All other lines (including stderr from a separate stream) are forwarded directly to server notifications.</p>
+   <h4 id="envelope-types">Envelope types<a href="#envelope-types" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h4>
+   <table>
+    <thead>
+     <tr>
+      <th>Envelope</th>
+      <th>When emitted</th>
+      <th>Key fields</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>ForkStarted</code></td>
+      <td>JVM has initialised</td>
+      <td><code>forkId</code></td>
+     </tr>
+     <tr>
+      <td><code>SuiteStarted</code></td>
+      <td>Suite execution begins</td>
+      <td><code>suiteName</code>, <code>threadId</code></td>
+     </tr>
+     <tr>
+      <td><code>SuiteCompleted</code></td>
+      <td>Suite execution ends</td>
+      <td><code>suiteName</code>, <code>threadId</code>, <code>capturedOutput</code></td>
+     </tr>
+     <tr>
+      <td><code>UnattributedOutput</code></td>
+      <td>Output outside a suite window</td>
+      <td><code>text</code></td>
+     </tr>
+     <tr>
+      <td><code>ForkCompleted</code></td>
+      <td>All suites finished</td>
+      <td><code>forkId</code>, test totals</td>
+     </tr>
+    </tbody>
+   </table>
+   <p>The orchestrator also reads a results JSON file written by the fork to disk on exit; the stdout protocol is for live streaming only.</p>
+   <hr>
+   <h2 id="test-history">Test history<a href="#test-history" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Deder records per-class timing and status after every test run to enable accurate LPT distribution in subsequent runs.</p>
+   <h3 id="location">Location<a href="#location" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <pre><code class="language- hljs language-x86asm" data-highlighted="yes"><span class="hljs-meta">.deder</span>/<span class="hljs-keyword">out</span>/&lt;module-id&gt;/<span class="hljs-keyword">test</span>-history<span class="hljs-number">.</span>json
+</code></pre>
+   <h3 id="format">Format<a href="#format" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <pre><code class="language-json hljs" data-highlighted="yes"><span class="hljs-punctuation">{</span>
+  <span class="hljs-attr">"stats"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+    <span class="hljs-attr">"com.example.FastTest"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">"durationMs"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">150</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"lastStatus"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"passed"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"lastRunEpochMs"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1713607200000</span>
+    <span class="hljs-punctuation">}</span><span class="hljs-punctuation">,</span>
+    <span class="hljs-attr">"com.example.SlowTest"</span><span class="hljs-punctuation">:</span> <span class="hljs-punctuation">{</span>
+      <span class="hljs-attr">"durationMs"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">5000</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"lastStatus"</span><span class="hljs-punctuation">:</span> <span class="hljs-string">"failed"</span><span class="hljs-punctuation">,</span>
+      <span class="hljs-attr">"lastRunEpochMs"</span><span class="hljs-punctuation">:</span> <span class="hljs-number">1713607200000</span>
+    <span class="hljs-punctuation">}</span>
+  <span class="hljs-punctuation">}</span>
+<span class="hljs-punctuation">}</span>
+</code></pre>
+   <p>Each key is the fully qualified class name. <code>durationMs</code> is the wall-clock time for all tests in that class combined.</p>
+   <h3 id="merge-behaviour">Merge behaviour<a href="#merge-behaviour" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>After each run, results from all forks are merged into the existing history file. Classes that were not executed in the current run retain their previous stats unchanged. Writes are atomic (temp file + rename).</p>
+   <p>History is advisory: load and save failures are silently ignored. Deleting the file is safe — Deder falls back to assigning the median duration of known classes to unknown ones, then distributes them last.</p>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/reference/server-properties.html">⬅️ Server Properties</a> <span></span> <span></span>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>
