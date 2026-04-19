@@ -62,7 +62,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
             linkedJsDir = os.Path(linkedJsDir),
             moduleKind = jsModule.moduleKind,
             testOptions = testOptions,
-            testParallelism = jsModule.testParallelism.toInt
+            testParallelism = { val n = jsModule.testParallelism.toInt; if n == 0 then Runtime.getRuntime.availableProcessors() else n }
           )
 
         }

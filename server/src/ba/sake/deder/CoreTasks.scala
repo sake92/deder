@@ -965,12 +965,14 @@ class CoreTasks() extends StrictLogging {
       execute = { ctx =>
         val (runClasspath, jvmOptions, javaHome, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
+          val cpus = Runtime.getRuntime.availableProcessors()
+          def resolve(n: Int): Int = if n == 0 then cpus else n
           val (fork, forkEnv, testParallelism, maxTestForks) = ctx.module match {
             case m: JavaTestModule =>
-              (m.fork, m.forkEnv.asScala.to(Map), m.testParallelism.toInt, m.maxTestForks.toInt)
+              (m.fork, m.forkEnv.asScala.to(Map), resolve(m.testParallelism.toInt), resolve(m.maxTestForks.toInt))
             case m: ScalaTestModule =>
-              (m.fork, m.forkEnv.asScala.to(Map), m.testParallelism.toInt, m.maxTestForks.toInt)
-            case _ => (true, Map.empty, 1, 1)
+              (m.fork, m.forkEnv.asScala.to(Map), resolve(m.testParallelism.toInt), resolve(m.maxTestForks.toInt))
+            case _ => (true, Map.empty, cpus, cpus)
           }
           val testOptions = DederTestOptions(ctx.args)
           if fork then {

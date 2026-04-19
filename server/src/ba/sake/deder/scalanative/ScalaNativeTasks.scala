@@ -69,7 +69,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
             discoveredTests = discoveredTests,
             nativeBinaryPath = nativeBinaryPath,
             testOptions = testOptions,
-            testParallelism = nativeModule.testParallelism.toInt
+            testParallelism = { val n = nativeModule.testParallelism.toInt; if n == 0 then Runtime.getRuntime.availableProcessors() else n }
           )
         }
       },
