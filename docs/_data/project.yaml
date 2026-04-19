@@ -26,6 +26,8 @@ references:
     url: "/reference/files-layout.html"
   - label: "Server Properties"
     url: "/reference/server-properties.html"
+  - label: "Testing"
+    url: "/reference/testing.html"
 
 howtos:
   - label: "Adding dependencies"
