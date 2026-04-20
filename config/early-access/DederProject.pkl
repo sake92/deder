@@ -142,15 +142,14 @@ class JavaTestModule extends JavaModule {
   /// Whether to run tests in a separate JVM process. By default, it's enabled for better isolation and to avoid classpath issues, but it can be disabled for faster test runs during development (not recommended for CI).
   fork: Boolean = true
   /// Number of test classes to run in parallel within a single test JVM.
-  /// Default 1 (serial). Increase only if your tests are safe to run concurrently
-  /// (no shared static state, no System.setProperty mutation, no shared temp files, etc.).
-  testParallelism: Int(isBetween(1, 256)) = 1
+  /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
+  /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
+  testParallelism: Int(isBetween(0, 256)) = 0
   /// Maximum number of forked JVMs to spawn for running this module's tests.
   /// Effective fork count is min(maxTestForks, number of discovered test classes).
-  /// Default 1 (single fork). Increase for throughput on large test suites; each fork pays
-  /// JVM startup cost and holds its own heap, so scale with available memory.
+  /// 0 (default) = use all available CPU cores. Each fork pays JVM startup cost and holds its own heap.
   /// Capped server-wide by the maxConcurrentTestForks server property.
-  maxTestForks: Int(isBetween(1, 64)) = 1
+  maxTestForks: Int(isBetween(0, 64)) = 0
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
@@ -181,15 +180,14 @@ class ScalaTestModule extends ScalaModule {
   /// Whether to run tests in a separate JVM process. By default, it's enabled for better isolation and to avoid classpath issues, but it can be disabled for faster test runs during development (not recommended for CI).
   fork: Boolean = true
   /// Number of test classes to run in parallel within a single test JVM.
-  /// Default 1 (serial). Increase only if your tests are safe to run concurrently
-  /// (no shared static state, no System.setProperty mutation, no shared temp files, etc.).
-  testParallelism: Int(isBetween(1, 256)) = 1
+  /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
+  /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
+  testParallelism: Int(isBetween(0, 256)) = 0
   /// Maximum number of forked JVMs to spawn for running this module's tests.
   /// Effective fork count is min(maxTestForks, number of discovered test classes).
-  /// Default 1 (single fork). Increase for throughput on large test suites; each fork pays
-  /// JVM startup cost and holds its own heap, so scale with available memory.
+  /// 0 (default) = use all available CPU cores. Each fork pays JVM startup cost and holds its own heap.
   /// Capped server-wide by the maxConcurrentTestForks server property.
-  maxTestForks: Int(isBetween(1, 64)) = 1
+  maxTestForks: Int(isBetween(0, 64)) = 0
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
@@ -218,9 +216,9 @@ class ScalaJsTestModule extends ScalaJsModule {
   type = "scala-js-test"
   publish = false
   /// Number of test classes to run in parallel within a single test JVM.
-  /// Default 1 (serial). Increase only if your tests are safe to run concurrently
-  /// (no shared static state, no System.setProperty mutation, no shared temp files, etc.).
-  testParallelism: Int(isBetween(1, 256)) = 1
+  /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
+  /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
+  testParallelism: Int(isBetween(0, 256)) = 0
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
@@ -264,9 +262,9 @@ class ScalaNativeTestModule extends ScalaNativeModule {
   type = "scala-native-test"
   publish = false
   /// Number of test classes to run in parallel within a single test JVM.
-  /// Default 1 (serial). Increase only if your tests are safe to run concurrently
-  /// (no shared static state, no System.setProperty mutation, no shared temp files, etc.).
-  testParallelism: Int(isBetween(1, 256)) = 1
+  /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
+  /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
+  testParallelism: Int(isBetween(0, 256)) = 0
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
