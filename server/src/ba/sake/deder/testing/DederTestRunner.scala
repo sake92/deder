@@ -9,11 +9,8 @@ import sbt.testing.{Task as SbtTestTask, *}
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.tupson.JsonRW
-
-case class ForkRunnerHooks(
-    capture: SuiteOutputCapture,
-    reporter: ForkedTestReporter
-)
+import ba.sake.deder.testing.forked.{ForkRunnerHooks, ForkedTestEnvelope, TestClassStats}
+import ba.sake.deder.testing.inmemory.OutputCaptureContext
 
 class DederTestRunner(
     testParallelism: Int,

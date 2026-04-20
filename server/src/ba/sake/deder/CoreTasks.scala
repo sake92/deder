@@ -5,7 +5,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import dependency.ScalaVersion
-import ba.sake.deder.testing.OutputCaptureContext
+import ba.sake.deder.testing.inmemory.OutputCaptureContext
 import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompilersCache}
 import ba.sake.deder.config.DederProject.{
   JavaModule,
@@ -23,6 +23,7 @@ import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.testing.*
+import ba.sake.deder.testing.forked.ForkedTestOrchestrator
 
 class CoreTasks() extends StrictLogging {
 

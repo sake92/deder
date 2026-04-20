@@ -1,4 +1,4 @@
-package ba.sake.deder.testing
+package ba.sake.deder.testing.inmemory
 
 import ba.sake.deder.ServerNotificationsLogger
 

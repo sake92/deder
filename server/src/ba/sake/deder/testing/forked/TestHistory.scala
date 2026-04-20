@@ -1,4 +1,4 @@
-package ba.sake.deder.testing
+package ba.sake.deder.testing.forked
 
 import scala.util.control.NonFatal
 import ba.sake.tupson.{*, given}

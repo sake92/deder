@@ -1,6 +1,7 @@
-package ba.sake.deder.testing
+package ba.sake.deder.testing.forked
 
 import ba.sake.tupson.{*, given}
+import ba.sake.deder.testing.*
 
 object ForkedTestMain {
   def main(args: Array[String]): Unit = {
