@@ -1,4 +1,6 @@
-package ba.sake.deder.testing
+package ba.sake.deder.testing.forked
+
+import ba.sake.deder.testing.*
 
 object TestDistribution {
 

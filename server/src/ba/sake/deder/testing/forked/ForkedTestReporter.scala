@@ -1,4 +1,4 @@
-package ba.sake.deder.testing
+package ba.sake.deder.testing.forked
 
 import java.io.{ByteArrayOutputStream, OutputStream, PrintStream}
 import java.nio.charset.StandardCharsets

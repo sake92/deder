@@ -2,6 +2,7 @@ package ba.sake.deder.testing
 
 import scala.collection.mutable
 import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
+import ba.sake.deder.testing.inmemory.OutputCaptureContext
 
 class OutputCaptureContextSuite extends munit.FunSuite {
 

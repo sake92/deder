@@ -1,10 +1,11 @@
-package ba.sake.deder.testing
+package ba.sake.deder.testing.forked
 
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.{Callable, Executors}
 import scala.util.control.NonFatal
 import ba.sake.deder.*
+import ba.sake.deder.testing.*
 import ba.sake.tupson.{*, given}
 
 object ForkedTestOrchestrator {
@@ -185,7 +186,7 @@ object ForkedTestOrchestrator {
     val cmd = Seq(javaBinary) ++ jvmOptions ++ Seq(
       "-cp",
       fullClasspath,
-      "ba.sake.deder.testing.ForkedTestMain",
+      "ba.sake.deder.testing.forked.ForkedTestMain",
       argsFilePath.toString
     )
     val proc = os

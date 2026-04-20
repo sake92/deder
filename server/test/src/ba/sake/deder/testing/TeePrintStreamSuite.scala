@@ -3,6 +3,7 @@ package ba.sake.deder.testing
 import java.io.{ByteArrayOutputStream, PrintStream}
 import scala.collection.mutable
 import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
+import ba.sake.deder.testing.inmemory.{OutputCaptureContext, TeePrintStream}
 
 class TeePrintStreamSuite extends munit.FunSuite {
 

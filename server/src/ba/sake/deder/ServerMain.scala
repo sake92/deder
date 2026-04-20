@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import io.opentelemetry.context.Context
-import ba.sake.deder.testing
+import ba.sake.deder.testing.inmemory.TeePrintStream
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
 import ba.sake.deder.publish.PublishTasks
@@ -37,8 +37,8 @@ object ServerMain extends StrictLogging {
     System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
     // Tee stdout/stderr so test output reaches CLI clients
-    System.setOut(testing.TeePrintStream(System.out, isStdErr = false))
-    System.setErr(testing.TeePrintStream(System.err, isStdErr = true))
+    System.setOut(TeePrintStream(System.out, isStdErr = false))
+    System.setErr(TeePrintStream(System.err, isStdErr = true))
 
     acquireServerLock(projectRoot)
 

@@ -1,6 +1,7 @@
-package ba.sake.deder.testing
+package ba.sake.deder.testing.forked
 
 import ba.sake.tupson.JsonRW
+import ba.sake.deder.testing.*
 
 case class ForkedTestArgs(
     forkId: Int,

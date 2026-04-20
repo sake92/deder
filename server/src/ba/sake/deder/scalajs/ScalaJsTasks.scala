@@ -1,7 +1,8 @@
 package ba.sake.deder.scalajs
 
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaJsModule, ScalaJsTestModule}
-import ba.sake.deder.testing.{DederTestOptions, DederTestResults, OutputCaptureContext}
+import ba.sake.deder.testing.{DederTestOptions, DederTestResults}
+import ba.sake.deder.testing.inmemory.OutputCaptureContext
 import ba.sake.deder.*
 
 /*
