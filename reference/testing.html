@@ -43,6 +43,7 @@
        <ul>
         <li><a href="#testing">Testing</a>
          <ul>
+          <li><a href="#tasks">Tasks</a></li>
           <li><a href="#execution-modes">Execution modes</a>
            <ul>
             <li><a href="#serial-default">Serial (default)</a></li>
@@ -53,8 +54,8 @@
            </ul></li>
           <li><a href="#stdout-capture">Stdout capture</a>
            <ul>
-            <li><a href="#in-process-tests-single-fork">In-process tests (single fork)</a></li>
-            <li><a href="#multi-fork-tests">Multi-fork tests</a></li>
+            <li><a href="#in-process-tests-testinmemory">In-process tests (testInMemory)</a></li>
+            <li><a href="#forked-tests-test">Forked tests (test)</a></li>
            </ul></li>
           <li><a href="#test-history">Test history</a>
            <ul>
@@ -72,8 +73,36 @@
     <div></div>
    </div>
    <h1 id="testing">Testing<a href="#testing" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <h2 id="tasks">Tasks<a href="#tasks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Deder provides two test tasks for JVM modules (<code>java-test</code>, <code>scala-test</code>):</p>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Command</th>
+      <th>Execution</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>test</code></td>
+      <td><code>deder exec -t test</code></td>
+      <td>Forked JVM(s) — isolated, safe for CI</td>
+     </tr>
+     <tr>
+      <td><code>testInMemory</code></td>
+      <td><code>deder exec -t testInMemory</code></td>
+      <td>In-process (same JVM as server) — fast, no startup overhead</td>
+     </tr>
+    </tbody>
+   </table>
+   <p>Use <code>test</code> (forked) for CI and when tests rely on isolation (static state, <code>System.setProperty</code>, shared ports). Use <code>testInMemory</code> during development for a faster feedback loop.</p>
+   <blockquote>
+    <p>ScalaJS and Scala Native only have <code>test</code> — they use their own runners and are unaffected by this split.</p>
+   </blockquote>
+   <hr>
    <h2 id="execution-modes">Execution modes<a href="#execution-modes" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <p>Deder supports three independent parallelism knobs that compose together.</p>
+   <p>Deder supports three independent parallelism knobs that compose together (forked <code>test</code> task only).</p>
    <h3 id="serial-default">Serial (default)<a href="#serial-default" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p>By default, test classes run one at a time inside a single forked JVM — the same behaviour as sbt's <code>Test / testForkedParallel = false</code> and Mill's <code>testForked</code>.</p>
    <pre><code class="language-pkl">testTemplate = (template.asTest()) {
@@ -136,9 +165,9 @@
    <p>Example: <code>maxTestForks=4</code>, <code>testParallelism=8</code>, <code>maxConcurrentTestForks=16</code> — up to 4 JVMs for the module, each running 8 class threads, server allows at most 16 forks total across all modules.</p>
    <hr>
    <h2 id="stdout-capture">Stdout capture<a href="#stdout-capture" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <h3 id="in-process-tests-single-fork">In-process tests (single fork)<a href="#in-process-tests-single-fork" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
-   <p>When <code>maxTestForks=1</code> (the default), Deder installs a <code>TeePrintStream</code> over the JVM's <code>System.out</code> and <code>System.err</code> before any test code runs. Output is line-buffered (max 8 KB per flush). When a test suite is active, output is routed to server notifications tagged with the module ID so it appears in the client in real time.</p>
-   <h3 id="multi-fork-tests">Multi-fork tests<a href="#multi-fork-tests" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <h3 id="in-process-tests-testinmemory">In-process tests (<code>testInMemory</code>)<a href="#in-process-tests-testinmemory" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>The <code>testInMemory</code> task runs tests directly inside the server JVM using <code>InMemoryTestOrchestrator</code>. Deder installs a <code>TeePrintStream</code> over <code>System.out</code> and <code>System.err</code> before any test code runs. Output is line-buffered (max 8 KB per flush). When a test suite is active, output is routed to server notifications tagged with the module ID so it appears in the client in real time.</p>
+   <h3 id="forked-tests-test">Forked tests (<code>test</code>)<a href="#forked-tests-test" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p>Each forked JVM installs <code>SuiteOutputCapture</code> as a replacement <code>PrintStream</code> on <code>System.out</code> at startup. All output goes through this stream.</p>
    <p>The capture layer groups output by suite using a <code>ThreadLocal</code> buffer:</p>
    <ul>

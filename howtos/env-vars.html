@@ -62,9 +62,6 @@
 }
 </code></pre>
    <p>Then you can read this env var when running your app with <code>deder exec -t run</code>, or when you run tests with <code>deder exec -t test</code>.</p>
-   <blockquote>
-    <p>Note that <code>fork</code> must be set to <code>true</code> on test module in order for this to work!</p>
-   </blockquote>
    <h2 id="how-to-pass-jvm-options-to-runtest">How to pass JVM options to run/test<a href="#how-to-pass-jvm-options-to-runtest" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>You need to use the <code>jvmOptions</code> property in module config:</p>
    <pre><code class="language-pkl">jvmOptions {
