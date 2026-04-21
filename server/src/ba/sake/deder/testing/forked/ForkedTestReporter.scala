@@ -39,6 +39,7 @@ object ForkedTestReporter {
     val reporter = new ForkedTestReporter(originalOut)
     val capture = new SuiteOutputCapture(reporter)
     val capturing = new PrintStream(capture, true, StandardCharsets.UTF_8)
+    capture.setCapturingStream(capturing)
     System.setOut(capturing)
     (reporter, capture)
   }
@@ -55,7 +56,15 @@ class SuiteOutputCapture(reporter: ForkedTestReporter) extends OutputStream {
     override def initialValue: ByteArrayOutputStream = new ByteArrayOutputStream()
   }
 
-  def startSuite(): Unit = suiteBuffer.set(new ByteArrayOutputStream())
+  // Stored so startSuite can reset System.out if a prior test forgot to restore it.
+  @volatile private var capturingStream: PrintStream = _
+  def setCapturingStream(ps: PrintStream): Unit = capturingStream = ps
+
+  def startSuite(): Unit = {
+    suiteBuffer.set(new ByteArrayOutputStream())
+    val cs = capturingStream
+    if cs != null && (System.out ne cs) then System.setOut(cs)
+  }
 
   def finishSuite(): String = {
     val buf = suiteBuffer.get()
