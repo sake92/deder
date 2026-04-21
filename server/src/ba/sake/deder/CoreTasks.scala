@@ -23,6 +23,7 @@ import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.testing.*
 import ba.sake.deder.testing.forked.ForkedTestOrchestrator
+import ba.sake.deder.testing.inmemory.InMemoryTestOrchestrator
 
 class CoreTasks() extends StrictLogging {
 
@@ -990,11 +991,14 @@ class CoreTasks() extends StrictLogging {
               maxTestForks = maxTestForks
             )
           } else
-            ClassLoaderUtils.withTestsClassLoader(runClasspath) { classLoader =>
-              val logger = DederTestLogger(ctx.notifications, ctx.module.id)
-              val testRunner = DederTestRunner(testParallelism, discoveredTests, Map.empty, classLoader, logger)
-              testRunner.run(testOptions)
-            }
+            InMemoryTestOrchestrator.run(
+              discoveredTests = discoveredTests,
+              runtimeClasspath = runClasspath,
+              testOptions = testOptions,
+              notifications = ctx.notifications,
+              moduleId = ctx.module.id,
+              testParallelism = testParallelism
+            )
         }
       },
       isResultSuccessful = _.success,
