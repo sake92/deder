@@ -63,6 +63,7 @@ class SuiteOutputCapture(reporter: ForkedTestReporter) extends OutputStream {
   def startSuite(): Unit = {
     suiteBuffer.set(new ByteArrayOutputStream())
     val cs = capturingStream
+    // In case a test (or framework) forgets to restore it, reset it here
     if cs != null && (System.out ne cs) then System.setOut(cs)
   }
 

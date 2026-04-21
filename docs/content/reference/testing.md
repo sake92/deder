@@ -24,14 +24,13 @@ Use `test` (forked) for CI and when tests rely on isolation (static state, `Syst
 
 Deder supports three independent parallelism knobs that compose together (forked `test` task only).
 
-### Serial (default)
+### Serial execution
 
-By default, test classes run one at a time inside a single forked JVM — the same behaviour as sbt's `Test / testForkedParallel = false` and Mill's `testForked`.
+To run test classes one at a time inside a single forked JVM (same behaviour as sbt's `Test / testForkedParallel = false` and Mill's `testForked`), set both to `1`:
 
 ```pkl
 testTemplate = (template.asTest()) {
-  // defaults — no changes needed
-  maxTestForks   = 1
+  maxTestForks    = 1
   testParallelism = 1
 }
 ```
@@ -76,8 +75,8 @@ maxConcurrentTestForks=16   # default: Runtime.availableProcessors()
 
 | Setting | Scope | Default | Effect |
 |---|---|---|---|
-| `testParallelism` | Per module (Pkl) | `1` | Thread count per forked JVM |
-| `maxTestForks` | Per module (Pkl) | `1` | Forked JVMs per module |
+| `testParallelism` | Per module (Pkl) | `0` (all CPUs) | Test classes run concurrently per forked JVM |
+| `maxTestForks` | Per module (Pkl) | `0` (all CPUs) | Forked JVMs per module |
 | `maxConcurrentTestForks` | Server-wide (`.deder/server.properties`) | CPU cores | Hard cap on total live forks |
 
 Example: `maxTestForks=4`, `testParallelism=8`, `maxConcurrentTestForks=16` — up to 4 JVMs for the module, each running 8 class threads, server allows at most 16 forks total across all modules.
