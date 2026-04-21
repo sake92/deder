@@ -57,7 +57,7 @@ class SuiteOutputCapture(reporter: ForkedTestReporter) extends OutputStream {
   }
 
   // Stored so startSuite can reset System.out if a prior test forgot to restore it.
-  @volatile private var capturingStream: PrintStream = _
+  @volatile private var capturingStream: PrintStream = scala.compiletime.uninitialized
   def setCapturingStream(ps: PrintStream): Unit = capturingStream = ps
 
   def startSuite(): Unit = {
