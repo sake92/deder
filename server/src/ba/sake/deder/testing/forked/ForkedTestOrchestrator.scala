@@ -223,8 +223,8 @@ object ForkedTestOrchestrator {
       )
     }
     val exitCode = proc.exitCode()
-    stdoutThread.join(2000)
-    stderrThread.join(2000)
+    //stdoutThread.join(2000)
+    //stderrThread.join(2000)
 
     if os.exists(resultsFilePath) then
       try Some(os.read(resultsFilePath).parseJson[ForkedTestResultsPayload])
