@@ -1,8 +1,7 @@
-package ba.sake.deder.testing.inmemory
+package ba.sake.deder
 
-import ba.sake.deder.ServerNotificationsLogger
-
-/** Context for capturing server stdout/stderr to be sent as server notifications to client. Used by TeePrintStream.
+/** Context for capturing server stdout/stderr to be sent as server notifications to client. Used by TeePrintStream and
+  * inmemory tests.
   *
   * We only want to tee output when we're executing *some* code, e.g in-process test execution, and not when the server
   * is doing other work.

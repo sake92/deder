@@ -5,7 +5,6 @@ import scala.util.Properties
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaNativeModule, ScalaNativeTestModule}
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults}
-import ba.sake.deder.testing.inmemory.OutputCaptureContext
 import ba.sake.deder.*
 
 /*

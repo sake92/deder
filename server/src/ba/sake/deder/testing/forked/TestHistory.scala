@@ -2,12 +2,7 @@ package ba.sake.deder.testing.forked
 
 import scala.util.control.NonFatal
 import ba.sake.tupson.{*, given}
-
-case class TestClassStats(
-    durationMs: Long,
-    lastStatus: String,
-    lastRunEpochMs: Long
-) derives JsonRW
+import ba.sake.deder.testing.TestClassStats
 
 case class TestHistory(
     stats: Map[String, TestClassStats]

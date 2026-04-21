@@ -1,4 +1,4 @@
-package ba.sake.deder.testing.inmemory
+package ba.sake.deder
 
 import java.io.{ByteArrayOutputStream, OutputStream, PrintStream}
 import java.nio.charset.StandardCharsets
@@ -25,7 +25,7 @@ class TeePrintStream(
 object TeePrintStream {
   private val MaxBufferSize = 8192
 
-  private[testing] val byteBuffer: ThreadLocal[ByteArrayOutputStream] =
+  private val byteBuffer: ThreadLocal[ByteArrayOutputStream] =
     ThreadLocal.withInitial(() => new ByteArrayOutputStream())
 
   private def flushLine(

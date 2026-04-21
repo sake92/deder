@@ -9,8 +9,7 @@ import sbt.testing.{Task as SbtTestTask, *}
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.tupson.JsonRW
-import ba.sake.deder.testing.forked.{ForkRunnerHooks, ForkedTestEnvelope, TestClassStats}
-import ba.sake.deder.testing.inmemory.OutputCaptureContext
+import ba.sake.deder.testing.forked.{ForkRunnerHooks, ForkedTestEnvelope}
 
 class DederTestRunner(
     testParallelism: Int,

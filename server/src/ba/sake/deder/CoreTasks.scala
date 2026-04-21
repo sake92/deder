@@ -5,7 +5,6 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import dependency.ScalaVersion
-import ba.sake.deder.testing.inmemory.OutputCaptureContext
 import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompilersCache}
 import ba.sake.deder.config.DederProject.{
   JavaModule,

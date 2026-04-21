@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import io.opentelemetry.context.Context
-import ba.sake.deder.testing.inmemory.TeePrintStream
+import ba.sake.deder.TeePrintStream
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
 import ba.sake.deder.publish.PublishTasks
