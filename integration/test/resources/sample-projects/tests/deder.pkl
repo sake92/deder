@@ -3,14 +3,12 @@ amends "../../../../../config/DederProject.pkl"
 const local function javaTestModule(name: String) = new JavaTestModule {
   id = name
   root = name
-  fork = true
 }
 
 const local function scalaTestModule(name: String) = new ScalaTestModule {
   id = name
   root = name
   scalaVersion = "3.7.1"
-  fork = true
 }
 
 

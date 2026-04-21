@@ -17,8 +17,6 @@ forkEnv {
 Then you can read this env var when running your app with `deder exec -t run`,
 or when you run tests with `deder exec -t test`.
 
-> Note that `fork` must be set to `true` on test module in order for this to work!
-
 
 ## How to pass JVM options to run/test
 

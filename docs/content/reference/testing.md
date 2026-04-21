@@ -5,9 +5,24 @@ title: Testing
 
 # Testing
 
+## Tasks
+
+Deder provides two test tasks for JVM modules (`java-test`, `scala-test`):
+
+| Task | Command | Execution |
+|---|---|---|
+| `test` | `deder exec -t test` | Forked JVM(s) — isolated, safe for CI |
+| `testInMemory` | `deder exec -t testInMemory` | In-process (same JVM as server) — fast, no startup overhead |
+
+Use `test` (forked) for CI and when tests rely on isolation (static state, `System.setProperty`, shared ports). Use `testInMemory` during development for a faster feedback loop.
+
+> ScalaJS and Scala Native only have `test` — they use their own runners and are unaffected by this split.
+
+---
+
 ## Execution modes
 
-Deder supports three independent parallelism knobs that compose together.
+Deder supports three independent parallelism knobs that compose together (forked `test` task only).
 
 ### Serial (default)
 
@@ -71,11 +86,11 @@ Example: `maxTestForks=4`, `testParallelism=8`, `maxConcurrentTestForks=16` — 
 
 ## Stdout capture
 
-### In-process tests (single fork)
+### In-process tests (`testInMemory`)
 
-When `maxTestForks=1` (the default), Deder installs a `TeePrintStream` over the JVM's `System.out` and `System.err` before any test code runs. Output is line-buffered (max 8 KB per flush). When a test suite is active, output is routed to server notifications tagged with the module ID so it appears in the client in real time.
+The `testInMemory` task runs tests directly inside the server JVM using `InMemoryTestOrchestrator`. Deder installs a `TeePrintStream` over `System.out` and `System.err` before any test code runs. Output is line-buffered (max 8 KB per flush). When a test suite is active, output is routed to server notifications tagged with the module ID so it appears in the client in real time.
 
-### Multi-fork tests
+### Forked tests (`test`)
 
 Each forked JVM installs `SuiteOutputCapture` as a replacement `PrintStream` on `System.out` at startup. All output goes through this stream.
 

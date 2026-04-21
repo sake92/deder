@@ -39,7 +39,6 @@ local const uberModules =
       }
     }
     testTemplate = (template.asTest()) {
-      // fork = false
       deps {
         "org.scalameta::munit:1.2.1"
       }

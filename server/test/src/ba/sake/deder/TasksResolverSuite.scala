@@ -119,7 +119,7 @@ class TasksResolverSuite extends munit.FunSuite {
       val uberTestModuleTasks = taskInstancesPerModule(uberTestModule.id)
       assertEquals(
         uberTestModuleTasks.map(_.task.name).toSet,
-        baseTasks ++ Set("testClasses", "test"),
+        baseTasks ++ Set("testClasses", "test", "testInMemory"),
         "uber-test module tasks mismatch"
       )
     }
@@ -189,6 +189,8 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.test", s"${moduleId}.jvmOptions"),
       (s"${moduleId}.test", s"${moduleId}.javaHome"),
       (s"${moduleId}.test", s"${moduleId}.testClasses"),
+      (s"${moduleId}.testInMemory", s"${moduleId}.runClasspath"),
+      (s"${moduleId}.testInMemory", s"${moduleId}.testClasses"),
       (s"${moduleId}.testClasses", s"${moduleId}.classes"),
       (s"${moduleId}.testClasses", s"${moduleId}.runClasspath")
     )

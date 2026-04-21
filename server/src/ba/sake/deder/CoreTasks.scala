@@ -968,37 +968,60 @@ class CoreTasks() extends StrictLogging {
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
           val cpus = Runtime.getRuntime.availableProcessors()
           def resolve(n: Int): Int = if n == 0 then cpus else n
-          val (fork, forkEnv, testParallelism, maxTestForks) = ctx.module match {
+          val (forkEnv, testParallelism, maxTestForks) = ctx.module match {
             case m: JavaTestModule =>
-              (m.fork, m.forkEnv.asScala.to(Map), resolve(m.testParallelism.toInt), resolve(m.maxTestForks.toInt))
+              (m.forkEnv.asScala.to(Map), resolve(m.testParallelism.toInt), resolve(m.maxTestForks.toInt))
             case m: ScalaTestModule =>
-              (m.fork, m.forkEnv.asScala.to(Map), resolve(m.testParallelism.toInt), resolve(m.maxTestForks.toInt))
-            case _ => (true, Map.empty, cpus, cpus)
+              (m.forkEnv.asScala.to(Map), resolve(m.testParallelism.toInt), resolve(m.maxTestForks.toInt))
+            case _ => (Map.empty, cpus, cpus)
           }
           val testOptions = DederTestOptions(ctx.args)
-          if fork then {
-            ForkedTestOrchestrator.run(
-              discoveredTests = discoveredTests,
-              runtimeClasspath = runClasspath,
-              jvmOptions = jvmOptions,
-              envVars = forkEnv,
-              javaHome = javaHome.map(_.toString),
-              testOptions = testOptions,
-              notifications = ctx.notifications,
-              moduleId = ctx.module.id,
-              outDir = ctx.out,
-              testParallelism = testParallelism,
-              maxTestForks = maxTestForks
-            )
-          } else
-            InMemoryTestOrchestrator.run(
-              discoveredTests = discoveredTests,
-              runtimeClasspath = runClasspath,
-              testOptions = testOptions,
-              notifications = ctx.notifications,
-              moduleId = ctx.module.id,
-              testParallelism = testParallelism
-            )
+          ForkedTestOrchestrator.run(
+            discoveredTests = discoveredTests,
+            runtimeClasspath = runClasspath,
+            jvmOptions = jvmOptions,
+            envVars = forkEnv,
+            javaHome = javaHome.map(_.toString),
+            testOptions = testOptions,
+            notifications = ctx.notifications,
+            moduleId = ctx.module.id,
+            outDir = ctx.out,
+            testParallelism = testParallelism,
+            maxTestForks = maxTestForks
+          )
+        }
+      },
+      isResultSuccessful = _.success,
+      summarize = DederTestResults.summarize
+    )
+
+  val testInMemoryTask = TaskBuilder
+    .make[DederTestResults](
+      name = "testInMemory",
+      supportedModuleTypes = Set(ModuleType.JAVA_TEST, ModuleType.SCALA_TEST)
+    )
+    .dependsOn(runClasspathTask)
+    .dependsOn(testClassesTask)
+    .buildWithSummary(
+      execute = { ctx =>
+        val (runClasspath, discoveredTests) = ctx.depResults
+        OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
+          val cpus = Runtime.getRuntime.availableProcessors()
+          def resolve(n: Int): Int = if n == 0 then cpus else n
+          val testParallelism = ctx.module match {
+            case m: JavaTestModule  => resolve(m.testParallelism.toInt)
+            case m: ScalaTestModule => resolve(m.testParallelism.toInt)
+            case _                  => cpus
+          }
+          val testOptions = DederTestOptions(ctx.args)
+          InMemoryTestOrchestrator.run(
+            discoveredTests = discoveredTests,
+            runtimeClasspath = runClasspath,
+            testOptions = testOptions,
+            notifications = ctx.notifications,
+            moduleId = ctx.module.id,
+            testParallelism = testParallelism
+          )
         }
       },
       isResultSuccessful = _.success,
@@ -1045,7 +1068,8 @@ class CoreTasks() extends StrictLogging {
     fixTask,
     fixCheckTask,
     testClassesTask,
-    testTask
+    testTask,
+    testInMemoryTask
   )
 
 }

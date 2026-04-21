@@ -40,6 +40,7 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 
 ## Tests
 
+- split testInMemory
 - print number of suites
 
 - optimized running:

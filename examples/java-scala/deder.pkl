@@ -40,7 +40,6 @@ modules {
   new JavaTestModule {
     id = "java-project-test"
     root = "java-project/test"
-    fork = false
     deps {
       "com.github.sbt.junit:jupiter-interface:0.16.0"
       "org.junit.jupiter:junit-jupiter-api:5.10.1"
