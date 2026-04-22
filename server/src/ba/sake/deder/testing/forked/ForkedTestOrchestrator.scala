@@ -322,7 +322,7 @@ object ForkedTestOrchestrator {
     case ForkedTestEnvelope.SuiteStarted(name, _) =>
       notifications.add(ServerNotification.logDebug(s"${tag}suite started: $name", Some(moduleId)))
     case ForkedTestEnvelope.SuiteCompleted(name, _, output) =>
-      val header = s"=== ${tag}$name ==="
+      val header = s"${tag}${name} completed"
       os.write.append(logFile, s"$header\n$output\n", createFolders = true)
       notifications.add(ServerNotification.logInfo(header, Some(moduleId)))
       output.linesIterator.foreach { l =>

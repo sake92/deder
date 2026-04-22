@@ -1,0 +1,123 @@
+amends "./config/DederProject.pkl"
+
+local const scalaVer = "3.7.4"
+
+local const config = new JavaModule {
+  id = "config"
+  publish = false
+  deps {
+    "org.pkl-lang:pkl-config-java:0.30.2"
+  }
+}
+
+local const function pom(artId: String) = new PomSettings {
+  groupId = "ba.sake"
+  artifactId = artId
+}
+
+local const serverModules =
+  new CreateScalaModules {
+    root = "server"
+    template = new ScalaModule {
+      scalaVersion = scalaVer
+      publish = false
+      moduleDeps { config }
+      mainClass = "ba.sake.deder.ServerMain"
+      scalacOptions {
+        "-Yretain-trees"
+      }
+      manifest {
+        mainAttributes {
+          ["Multi-Release"] = "true"
+          //["Implementation-Version"] = version()
+        }
+      }
+      pomSettings = pom("deder-server")
+      deps {
+        "org.jgrapht:jgrapht-core:1.5.2"
+        "org.jgrapht:jgrapht-io:1.5.2"
+        // withDottyCompat → _2.13 artifact
+        "org.scalameta:ascii-graphs_2.13:0.1.2"
+        "ba.sake::tupson:0.18.0"
+        "com.lihaoyi::os-lib-watch:0.11.6"
+        "commons-codec:commons-codec:1.20.0"
+        "org.scala-sbt:zinc_2.13:1.11.0"
+        "org.scala-sbt:compiler-interface:1.11.0"
+        "io.get-coursier::dependency:0.3.2"
+        "io.get-coursier::dependency-interface:0.3.2"
+        "io.get-coursier:interface:1.0.25"
+        "com.lihaoyi::mainargs:0.7.8"
+        "io.github.classgraph:classgraph:4.8.184"
+        "org.scala-sbt:test-interface:1.0"
+        "ch.epfl.scala:bsp4j:2.2.0-M2"
+        "com.github.blemale::scaffeine:5.3.0"
+        "com.typesafe.scala-logging::scala-logging:3.9.5"
+        "io.opentelemetry:opentelemetry-api:1.58.0"
+        "ch.qos.logback:logback-classic:1.5.23"
+        "com.eed3si9n.jarjarabrams::jarjar-abrams-core:1.16.0"
+        "com.lihaoyi::fansi:0.5.1"
+        // withDottyCompat → _2.13 artifacts
+        "org.scala-js:scalajs-linker_2.13:1.20.2"
+        "org.scala-js:scalajs-sbt-test-adapter_2.13:1.20.2"
+        "org.scala-js:scalajs-env-nodejs_2.13:1.5.0"
+        "org.scala-native::tools:0.5.10"
+        "org.scala-native::test-runner:0.5.10"
+        "org.apache.maven:maven-model:3.9.12"
+        "org.bouncycastle:bcpg-jdk18on:1.78"
+        "org.bouncycastle:bcpkix-jdk18on:1.78"
+        "com.github.mizosoft.methanol:methanol:1.9.0"
+      }
+    }
+    testTemplate = (template.asTest()) {
+      deps {
+        "org.scalameta::munit:1.2.1"
+      }
+    }
+  }.get
+
+local const client = new JavaModule {
+  id = "client"
+  publish = false
+  mainClass = "ba.sake.deder.client.Main"
+  deps {
+    "com.fasterxml.jackson.core:jackson-databind:2.20.1"
+  }
+  graalvm {
+    nativeImageOptions {
+      "-H:+UnlockExperimentalVMOptions"
+      "--no-fallback"
+      "-H:+StaticExecutableWithDynamicLibC"
+    }
+  }
+  /*
+  def manifest = super.manifest().add(
+    "Implementation-Version" -> version()
+  )
+  // TODO generate in CI, or a script..
+  def versionFile = Task {
+    val dest = Task.dest / "ba/sake/deder/client"
+    os.makeDir.all(dest)
+    os.write(dest / "version.properties", s"version=${version()}\n")
+    PathRef(Task.dest)
+  }
+  */
+}
+
+local const integrationTest = new ScalaTestModule {
+  id = "integration-test"
+  root = "integration/test"
+  scalaVersion = scalaVer
+  moduleDeps { serverModules.main }
+  deps {
+    "org.scalameta::munit:1.2.1"
+    "com.lihaoyi::os-lib:0.11.6"
+    "ba.sake::tupson:0.18.0"
+  }
+}
+
+modules {
+  config
+  ...serverModules.all
+  client
+  integrationTest
+}
