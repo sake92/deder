@@ -13,8 +13,10 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 
 # Caching
 - harden the abstraction
-- add tests
-- add docs
+- polish the docs
+
+# Deps
+- custom repos
 
 # CI
 - more package managers?
@@ -22,7 +24,8 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 ## Config
 
 ## GraalVM native image
-- add basic support
+- add reachability metadata for common libs 
+   https://github.com/com-lihaoyi/mill/blob/1.1.5/libs/javalib/src/mill/javalib/NativeImageModule.scala#L365
 
 ## Scala.js
 - run

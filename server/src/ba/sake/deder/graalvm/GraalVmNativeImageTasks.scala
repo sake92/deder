@@ -34,6 +34,26 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
     }
   )
 
+  val nativeIncludedResourcesOptionsTask = CachedTaskBuilder
+    .make[Seq[String]](
+      name = "nativeIncludedResourcesOptions",
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+    )
+    .dependsOn(coreTasks.resourcesTask)
+    .build { ctx =>
+      val resourceDirs = ctx.depResults._1
+      val resourceFiles = resourceDirs
+        .map(_.absPath)
+        .filter(os.isDir(_))
+        .flatMap { dir =>
+          os.walk(dir)
+            .filter(os.isFile(_))
+            .map(_.subRelativeTo(dir).toString)
+        }
+      if resourceFiles.isEmpty then Seq.empty
+      else Seq(s"-H:IncludeResources=${resourceFiles.mkString("|")}")
+    }
+
   val graalvmNativeImageTask = CachedTaskBuilder
     .make[os.Path](
       name = "graalvmNativeImage",
@@ -43,8 +63,9 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(graalvmHomeTask)
     .dependsOn(nativeImageOptionsTask)
+    .dependsOn(nativeIncludedResourcesOptionsTask)
     .build { ctx =>
-      val (runClasspath, finalMainClass, graalvmHome, nativeImageOptions) = ctx.depResults
+      val (runClasspath, finalMainClass, graalvmHome, nativeImageOptions, includedResourcesOptions) = ctx.depResults
 
       ctx.module match {
         case m: JavaModule if m.graalvm == null =>
@@ -79,6 +100,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
       val cp = runClasspath.map(_.toString).mkString(File.pathSeparator)
       val command = Seq(nativeImageTool.toString) ++
         nativeImageOptions ++
+        includedResourcesOptions ++
         Seq("-cp", cp, mainClass, (ctx.out / executableName).toString)
 
       ctx.notifications.add(
@@ -101,6 +123,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
   val all: Seq[Task[?, ?]] = Seq(
     graalvmHomeTask,
     nativeImageOptionsTask,
+    nativeIncludedResourcesOptionsTask,
     graalvmNativeImageTask
   )
 
