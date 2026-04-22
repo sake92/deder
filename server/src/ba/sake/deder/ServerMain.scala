@@ -18,6 +18,7 @@ import ba.sake.deder.TeePrintStream
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
 import ba.sake.deder.publish.PublishTasks
+import ba.sake.deder.graalvm.GraalVmNativeImageTasks
 
 object ServerMain extends StrictLogging {
 
@@ -83,7 +84,8 @@ object ServerMain extends StrictLogging {
     val publishTasks = PublishTasks(coreTasks)
     val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)
     val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
-    val allTasks = coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all
+    val nativeImageTasks = GraalVmNativeImageTasks(coreTasks)
+    val allTasks = coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ nativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
     val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
 
