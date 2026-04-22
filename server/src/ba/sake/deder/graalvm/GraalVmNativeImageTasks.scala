@@ -3,10 +3,11 @@ package ba.sake.deder.graalvm
 import java.io.File
 import scala.util.Properties
 import scala.jdk.CollectionConverters.*
+import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.config.DederProject.{JavaModule, ModuleType}
 import ba.sake.deder.{*, given}
 
-class GraalVmNativeImageTasks(coreTasks: CoreTasks) {
+class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
 
   val graalvmHomeTask = ConfigValueTask[Option[os.Path]](
     name = "graalvmHome",
@@ -33,9 +34,9 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) {
     }
   )
 
-  val nativeImageTask = CachedTaskBuilder
+  val graalvmNativeImageTask = CachedTaskBuilder
     .make[os.Path](
-      name = "nativeImage",
+      name = "graalvmNativeImage",
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
     )
     .dependsOn(coreTasks.runClasspathTask)
@@ -49,7 +50,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) {
         case m: JavaModule if m.graalvm == null =>
           throw DederException(
             s"Module '${ctx.module.id}' does not have a 'graalvm' section in deder.pkl. " +
-              "Add a 'graalvm { }' block to enable the nativeImage task."
+              "Add a 'graalvm { }' block to enable the graalvmNativeImage task."
           )
         case _ =>
       }
@@ -87,6 +88,8 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) {
       val outputHandler = os.ProcessOutput.Readlines { line =>
         ctx.notifications.add(ServerNotification.logInfo(line, Some(ctx.module.id)))
       }
+      os.makeDir.all(ctx.out)
+      logger.info(s"Executing command: ${command.mkString(" ")}")
       os.proc(command).call(cwd = ctx.out, stdout = outputHandler, stderr = outputHandler)
 
       val ext = if Properties.isWin then ".exe" else ""
@@ -98,7 +101,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) {
   val all: Seq[Task[?, ?]] = Seq(
     graalvmHomeTask,
     nativeImageOptionsTask,
-    nativeImageTask
+    graalvmNativeImageTask
   )
 
 }

@@ -4,6 +4,7 @@ amends "../../config/DederProject.pkl"
 
 local const javaProject = new JavaModule {
   id = "java-project"
+  graalvm { }
 }
 
 local const scalaProject = new ScalaModule {
