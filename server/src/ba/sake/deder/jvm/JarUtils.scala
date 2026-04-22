@@ -97,6 +97,7 @@ object JarUtils extends StrictLogging{
           ()
         } else if (name.startsWith("META-INF/services/")) {
           // STRATEGY: CONCATENATE
+          // TODO need to deduplicate entries INSIDE the files as well, e.g. for service providers
           val baos = concatBuffers.getOrElseUpdate(name, new ByteArrayOutputStream())
           jin.transferTo(baos)
           baos.write("\n".getBytes) // Ensure a newline between merges

@@ -34,8 +34,9 @@ class PublishTasks(coreTasks: CoreTasks) {
       ctx.module match {
         case jm: JavaModule =>
           val pom = jm.pomSettings
-          if jm.publish then {
-            if pom == null then throw RuntimeException(s"POM settings are not set for ${jm.id}")
+          if jm.publish && pom == null then
+            throw RuntimeException(s"POM settings are not set for ${jm.id}, but publish is enabled")
+          Option(pom).map { pom =>
             val finalArtifactId = jm match {
               case m: ScalaJsModule =>
                 s"${pom.artifactId}_sjs${ScalaVersion.jsBinary(m.scalaJsVersion).get}_${ScalaVersion.binary(m.scalaVersion)}"
@@ -49,20 +50,11 @@ class PublishTasks(coreTasks: CoreTasks) {
             val resolvedVersion =
               if pom.version != null then pom.version
               else GitSemVer.detectVersion(DederGlobals.projectRootDir)
-            Some(
-              PomSettings(
-                groupId = pom.groupId,
-                artifactId = finalArtifactId,
-                version = resolvedVersion
-              )
+            PomSettings(
+              groupId = pom.groupId,
+              artifactId = finalArtifactId,
+              version = resolvedVersion
             )
-          } else {
-            ctx.notifications.add(
-              ServerNotification.logDebug(
-                s"Skipping POM generation for module ${jm.id} because publish is set to false"
-              )
-            )
-            None
           }
         case other => throw RuntimeException(s"POM settings cannot be applied to $other")
       }
@@ -106,11 +98,12 @@ class PublishTasks(coreTasks: CoreTasks) {
   val jarTask = CachedTaskBuilder
     .make[os.Path](name = "jar")
     .dependsOn(coreTasks.compileTask)
+    .dependsOn(coreTasks.resourcesTask)
     .dependsOn(finalManifestSettingsTask)
     .build { ctx =>
-      val (localClasspath, manifestEntries) = ctx.depResults
+      val (localClasspath, resources, manifestEntries) = ctx.depResults
       val resultJarPath = ctx.out / s"${ctx.module.id}.jar"
-      val jarInputPaths = Seq(localClasspath.absPath)
+      val jarInputPaths = Seq(localClasspath.absPath) ++ resources.map(_.absPath)
       JarUtils.createJar(
         resultJarPath,
         jarInputPaths,
@@ -157,7 +150,7 @@ class PublishTasks(coreTasks: CoreTasks) {
         // skip signature files to avoid "invalid signature file" errors when running the assembly jar
         val lower = name.toLowerCase
         val isSignatureFile = lower.endsWith(".sf") || lower.endsWith(".rsa") || lower.endsWith(".dsa")
-        lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("/manifest.mf"))
+        lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("meta-inf/manifest.mf"))
       }
       JarUtils.mergeJars(mergedJar, allJars, manifestEntries.toJarManifest, skip)
       val resultJarPath = ctx.out / "out.jar"
@@ -175,8 +168,7 @@ class PublishTasks(coreTasks: CoreTasks) {
       val pom: Option[PomSettings] = ctx.depResults._1
       // Index 0: this module's own pom settings (0 or 1 item)
       // Index 1: all direct module deps' pom settings combined (each dep contributes its index-0)
-      val directDepsPoms = ctx.transitiveResults
-        .headOption
+      val directDepsPoms = ctx.transitiveResults.headOption
         .getOrElse(Seq.empty)
         .flatMap(_.headOption)
         .flatten
