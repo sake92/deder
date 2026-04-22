@@ -8,9 +8,10 @@ import java.nio.file.{Files, Path}
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 import scala.collection.mutable
-import com.eed3si9n.jarjarabrams.{ShadeRule, Shader}
+import com.eed3si9n.jarjarabrams.{ShadeRule, Shader, ShadeTarget}
+import com.typesafe.scalalogging.StrictLogging
 
-object JarUtils {
+object JarUtils extends StrictLogging{
 
   // stolen from Mill
   /** Create a JAR file with default inflation level.
@@ -81,10 +82,10 @@ object JarUtils {
     }
   }
 
-  def mergeJars(resultJarPath: os.Path, jarPaths: Seq[os.Path], manifest: JarManifest): Unit = {
+  def mergeJars(resultJarPath: os.Path, jarPaths: Seq[os.Path], manifest: JarManifest, skip: String => Boolean): Unit = {
     val out = new JarOutputStream(Files.newOutputStream(resultJarPath.toNIO), manifest.build)
     val seenEntries = mutable.Set[String]()
-    def skipEntry(name: String) = name.endsWith("MANIFEST.MF")
+    def skipEntry(name: String) = skip(name)
     // map of concatenated files (like services)
     val concatBuffers = mutable.Map[String, ByteArrayOutputStream]()
     for jarPath <- jarPaths do {
@@ -122,6 +123,7 @@ object JarUtils {
   }
 
   def createAssemblyJar(resultJarPath: os.Path, mergedJar: os.Path): Unit = {
+    // TODO expose shade rules OR make it read from standard location lirke resources/META-INF/shade.rules
     val shadeRules = Seq()
     Shader.shadeFile(
       shadeRules,

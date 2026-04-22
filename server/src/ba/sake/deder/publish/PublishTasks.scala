@@ -152,7 +152,14 @@ class PublishTasks(coreTasks: CoreTasks) {
       }
       val allJars = os.list(tmpDir) ++ depsJars
       val mergedJar = ctx.out / "mergedJar.jar"
-      JarUtils.mergeJars(mergedJar, allJars, manifestEntries.toJarManifest)
+      // TODO this should be doable with jarjarabrams, but didnt succeed in making it work yet
+      val skip = (name: String) => {
+        // skip signature files to avoid "invalid signature file" errors when running the assembly jar
+        val lower = name.toLowerCase
+        val isSignatureFile = lower.endsWith(".sf") || lower.endsWith(".rsa") || lower.endsWith(".dsa")
+        lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("/manifest.mf"))
+      }
+      JarUtils.mergeJars(mergedJar, allJars, manifestEntries.toJarManifest, skip)
       val resultJarPath = ctx.out / "out.jar"
       JarUtils.createAssemblyJar(resultJarPath, mergedJar)
       resultJarPath
