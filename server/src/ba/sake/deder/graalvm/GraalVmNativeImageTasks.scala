@@ -1,13 +1,21 @@
 package ba.sake.deder.graalvm
 
 import java.io.File
-import scala.util.Properties
+import java.net.URI
+import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+import java.util.zip.ZipFile
+import scala.util.{Properties, Using}
 import scala.jdk.CollectionConverters.*
 import com.typesafe.scalalogging.StrictLogging
+import ba.sake.tupson.{*, given}
+import org.typelevel.jawn.ast.*
 import ba.sake.deder.config.DederProject.{JavaModule, ModuleType}
+import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.{*, given}
 
-class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
+class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
+
+  private val REACHABILITY_METADATA_VERSION = "0.3.32"
 
   val graalvmHomeTask = ConfigValueTask[Option[os.Path]](
     name = "graalvmHome",
@@ -55,6 +63,96 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
       else Seq(s"-H:IncludeResources=${resourceFiles.mkString("|")}")
     }
 
+  private case class ReachabilityMetadataIndexEntry(
+      module: String,
+      directory: Option[String] = None,
+      requires: Seq[String] = Nil
+  ) derives JsonRW
+
+  val graalvmReachabilityMetadataOptionsTask = CachedTaskBuilder
+    .make[Seq[String]](
+      name = "graalvmReachabilityMetadataOptions",
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+    )
+    .dependsOn(coreTasks.allDependenciesTask)
+    .build { ctx =>
+      val allDeps = ctx.depResults._1
+
+      // Download ZIP from GitHub releases (cached inside ctx.out by CachedTask)
+      val metadataZip = ctx.out / "graalvm-reachability-metadata.zip"
+      if !os.exists(metadataZip) then
+        val url =
+          s"https://github.com/oracle/graalvm-reachability-metadata/releases/download/$REACHABILITY_METADATA_VERSION/graalvm-reachability-metadata-$REACHABILITY_METADATA_VERSION.zip"
+        logger.info(s"Downloading GraalVM reachability metadata from $url")
+        os.makeDir.all(ctx.out)
+        val httpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build()
+        val request = HttpRequest.newBuilder().uri(URI.create(url)).GET().build()
+        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(metadataZip.toNIO))
+        if response.statusCode() != 200 then
+          os.remove(metadataZip)
+          throw DederException(s"Failed to download GraalVM reachability metadata: HTTP ${response.statusCode()}")
+
+      // Root index: array of { "module": "g:a", "directory": "g/a", "requires": [...] }
+      val rootEntries = readStringFromZip(metadataZip, "index.json")
+        .parseJson[Seq[ReachabilityMetadataIndexEntry]]
+      val coordToDirectory: Map[String, String] = rootEntries.flatMap { entry =>
+        entry.directory.map(dir => entry.module -> dir)
+      }.toMap
+      val coordToRequires: Map[String, Seq[String]] =
+        rootEntries.map(e => e.module -> e.requires).toMap
+
+      // Resolve all deps with Coursier to capture transitive coordinates too
+      val resolvedCoords: Seq[(String, String, String)] =
+        if allDeps.isEmpty then Seq.empty
+        else
+          DependencyResolver
+            .fetch(allDeps, Some(ctx.notifications))
+            .getDependencies()
+            .asScala
+            .toSeq
+            .map(d => (d.getModule.getOrganization, d.getModule.getName, d.getVersion))
+
+      // Finds the config dir for a module+version: tries exact version match, falls back to latest.
+      // Required modules (from `requires`) don't have a version, so pass "" to always fall back to latest.
+      def configDirFor(moduleCoord: String, version: String): Option[os.Path] =
+        coordToDirectory.get(moduleCoord).flatMap { directory =>
+          val versionEntries = readStringFromZip(metadataZip, s"$directory/index.json")
+            .parseJson[Seq[Map[String, JValue]]]
+          val matchingEntry = versionEntries
+            .find { entry =>
+              JsonRW[Seq[String]]
+                .parse("tested-versions", entry.getOrElse("tested-versions", JNull))
+                .contains(version)
+            }
+            .orElse(versionEntries.find { entry =>
+              JsonRW[Option[Boolean]]
+                .parse("latest", entry.getOrElse("latest", JNull))
+                .getOrElse(false)
+            })
+          matchingEntry.map { entry =>
+            val metadataVer = JsonRW[String].parse("metadata-version", entry.getOrElse("metadata-version", JNull))
+            val prefix  = s"$directory/$metadataVer/"
+            val destDir = ctx.out / os.RelPath(directory) / os.RelPath(metadataVer)
+            extractDirFromZip(metadataZip, prefix, destDir)
+            destDir
+          }
+        }
+
+      val directDirs = resolvedCoords.flatMap { (org, name, version) =>
+        configDirFor(s"$org:$name", version)
+      }
+
+      // For each matched module, also include metadata for its `requires` (version-less, use latest)
+      val requiredDirs = resolvedCoords.flatMap { (org, name, _) =>
+        coordToRequires.getOrElse(s"$org:$name", Nil).flatMap { reqCoord =>
+          configDirFor(reqCoord, "")
+        }
+      }
+
+      (directDirs ++ requiredDirs).distinct
+        .map(dir => s"-H:ConfigurationFileDirectories=$dir")
+    }
+
   val graalvmNativeImageTask = CachedTaskBuilder
     .make[os.Path](
       name = "graalvmNativeImage",
@@ -65,8 +163,16 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
     .dependsOn(graalvmHomeTask)
     .dependsOn(nativeImageOptionsTask)
     .dependsOn(nativeIncludedResourcesOptionsTask)
+    .dependsOn(graalvmReachabilityMetadataOptionsTask)
     .build { ctx =>
-      val (runClasspath, finalMainClass, graalvmHome, nativeImageOptions, includedResourcesOptions) = ctx.depResults
+      val (
+        runClasspath,
+        finalMainClass,
+        graalvmHome,
+        nativeImageOptions,
+        includedResourcesOptions,
+        reachabilityMetadataOptions
+      ) = ctx.depResults
 
       ctx.module match {
         case m: JavaModule if m.graalvm == null =>
@@ -101,6 +207,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
       val cp = runClasspath.map(_.toString).mkString(File.pathSeparator)
       val command = Seq(nativeImageTool.toString) ++
         nativeImageOptions ++
+        reachabilityMetadataOptions ++
         includedResourcesOptions ++
         Seq("-cp", cp, mainClass, (ctx.out / executableName).toString)
 
@@ -125,7 +232,32 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
     graalvmHomeTask,
     nativeImageOptionsTask,
     nativeIncludedResourcesOptionsTask,
+    graalvmReachabilityMetadataOptionsTask,
     graalvmNativeImageTask
   )
 
+  // Reads a single ZIP/JAR entry as a UTF-8 string.
+  private def readStringFromZip(zipPath: os.Path, entryPath: String): String =
+    Using.resource(new ZipFile(zipPath.toIO)) { zf =>
+      val entry = zf.getEntry(entryPath)
+      if entry == null then throw DederException(s"Entry '$entryPath' not found in $zipPath")
+      new String(zf.getInputStream(entry).readAllBytes(), "UTF-8")
+    }
+
+  // Extracts all files under `prefix` inside the ZIP to `dest`. No-op if `dest` already exists.
+  private def extractDirFromZip(zipPath: os.Path, prefix: String, dest: os.Path): Unit =
+    if os.exists(dest) then return
+    os.makeDir.all(dest)
+    Using.resource(new ZipFile(zipPath.toIO)) { zf =>
+      zf.entries()
+        .asScala
+        .filter(e => !e.isDirectory && e.getName.startsWith(prefix))
+        .foreach { entry =>
+          val relName = entry.getName.stripPrefix(prefix)
+          if relName.nonEmpty then
+            val target = dest / os.SubPath(relName)
+            os.makeDir.all(target / os.up)
+            os.write(target, zf.getInputStream(entry).readAllBytes())
+        }
+    }
 }
