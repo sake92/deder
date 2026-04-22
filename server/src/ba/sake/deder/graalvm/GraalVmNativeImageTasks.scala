@@ -49,6 +49,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks)  extends StrictLogging {
           os.walk(dir)
             .filter(os.isFile(_))
             .map(_.subRelativeTo(dir).toString)
+            .filterNot(_.startsWith("META-INF/native-image"))
         }
       if resourceFiles.isEmpty then Seq.empty
       else Seq(s"-H:IncludeResources=${resourceFiles.mkString("|")}")
