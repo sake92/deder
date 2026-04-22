@@ -139,8 +139,6 @@ open class JavaModule extends DederModule {
 class JavaTestModule extends JavaModule {
   type = "java-test"
   publish = false
-  /// Whether to run tests in a separate JVM process. By default, it's enabled for better isolation and to avoid classpath issues, but it can be disabled for faster test runs during development (not recommended for CI).
-  fork: Boolean = true
   /// Number of test classes to run in parallel within a single test JVM.
   /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
   /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
@@ -177,8 +175,6 @@ open class ScalaModule extends JavaModule {
 class ScalaTestModule extends ScalaModule {
   type = "scala-test"
   publish = false
-  /// Whether to run tests in a separate JVM process. By default, it's enabled for better isolation and to avoid classpath issues, but it can be disabled for faster test runs during development (not recommended for CI).
-  fork: Boolean = true
   /// Number of test classes to run in parallel within a single test JVM.
   /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
   /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
