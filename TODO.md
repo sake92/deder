@@ -5,11 +5,12 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 
 # Misc
 
+- Console/REPL
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
 
 # Client
-- when first downloading server, take latest version and fix it in server.properties
+- pass env vars in request, and merge'm when running subprocesses, e.g. forked tests
 
 # Caching
 - harden the abstraction

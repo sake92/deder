@@ -2,9 +2,18 @@ amends "../../config/DederProject.pkl"
 
 //amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
+repositories {
+  new MavenRepository {
+    url = "https://jitpack.io"
+  }
+}
+
 local const javaProject = new JavaModule {
   id = "java-project"
-  graalvm { }
+  deps {
+    "com.github.sake92:hepek-core:master"
+  }
+  graalvm {}
 }
 
 local const scalaProject = new ScalaModule {
