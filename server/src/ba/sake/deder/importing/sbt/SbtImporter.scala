@@ -73,7 +73,7 @@ class SbtImporter(
       }
       m.withModuleDeps(moduleDependencies.asJava)
     }
-    new DederProject(finalModules.asJava)
+    new DederProject(finalModules.asJava, java.util.Collections.emptyList(), true)
   }
 
   // (projectExport, config, dederModule, dederModuleDeps)

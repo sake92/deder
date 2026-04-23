@@ -19,7 +19,6 @@ import ba.sake.deder.config.DederProject.{
 }
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.deps.Dependency
-import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.given
 import ba.sake.deder.testing.*
 import ba.sake.deder.testing.forked.ForkedTestOrchestrator
@@ -360,7 +359,7 @@ class CoreTasks() extends StrictLogging {
       // we feed even this module's classes dir because of javac annotation processing,
       // it can generate java sources.. and then scala sources can depend on them
       val (scalaVersion, mandatoryDependencies, dependencies, allClassesDirs) = ctx.depResults
-      val depsJars = DependencyResolver
+      val depsJars = ctx.dependencyResolver
         .fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
       (allClassesDirs ++ depsJars).reverse.distinct.reverse
     }
@@ -433,7 +432,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(javacAnnotationProcessorDepsTask)
     .build { ctx =>
       val (scalaVersion, javacAnnotationProcessorDeps) = ctx.depResults
-      val processorJars = DependencyResolver.fetchFiles(
+      val processorJars = ctx.dependencyResolver.fetchFiles(
         javacAnnotationProcessorDeps.map(d => Dependency.make(d, scalaVersion)),
         Some(ctx.notifications)
       )
@@ -471,7 +470,7 @@ class CoreTasks() extends StrictLogging {
             case _                    => Seq.empty
           }
       val allDeps = scalacPluginDeps ++ scalaPlatformDeps
-      val allJars = DependencyResolver.fetchFiles(
+      val allJars = ctx.dependencyResolver.fetchFiles(
         allDeps.map(d => Dependency.make(d, scalaVersion)),
         Some(ctx.notifications)
       )
@@ -522,7 +521,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(compilerDepsTask)
     .build { ctx =>
       val compilerDeps = ctx.depResults._1
-      DependencyResolver.fetchFiles(compilerDeps)
+      ctx.dependencyResolver.fetchFiles(compilerDeps)
     }
 
   // returns classes dir
@@ -580,7 +579,7 @@ class CoreTasks() extends StrictLogging {
       // semanticdb javac annotation processor (when enabled)
       val semanticdbJavacJar =
         if semanticdbEnabled then
-          DependencyResolver.fetchFiles(
+          ctx.dependencyResolver.fetchFiles(
             Seq(Dependency.make(s"com.sourcegraph:semanticdb-javac:${javaSemanticdbVersion}", scalaVersion))
           )
         else Seq.empty
@@ -607,7 +606,7 @@ class CoreTasks() extends StrictLogging {
       // For Scala 2: add semanticdb-scalac plugin (when enabled)
       val semanticdbScalacJar =
         if semanticdbEnabled && !scalaVersion.startsWith("3.") then
-          DependencyResolver.fetchFiles(
+          ctx.dependencyResolver.fetchFiles(
             Seq(Dependency.make(s"org.scalameta:::semanticdb-scalac:${scalaSemanticdbVersion}", scalaVersion))
           )
         else Seq.empty
@@ -638,7 +637,7 @@ class CoreTasks() extends StrictLogging {
           .map(p => s"-Xplugin:${p.toString}") ++ platformSpecificScalacOptions ++ semanticDbScalacOpts
 
       ZincCompilersCache
-        .get(scalaVersion)
+        .get(scalaVersion, ctx.dependencyResolver)
         .compile(
           javaHome = javaHome.map(_.toNIO),
           scalaVersion = scalaVersion,
@@ -820,7 +819,7 @@ class CoreTasks() extends StrictLogging {
       effectiveMap.get(mvnAppName) match {
         case Some((dep, mainClass, args)) =>
           val dependency = Dependency.make(dep, scalaVersion)
-          val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
+          val jars = ctx.dependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
           val cp = jars.map(_.toString).mkString(File.pathSeparator)
           val commandArgs = args ++ ctx.args.tail
           val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, mainClass) ++ commandArgs
@@ -861,7 +860,7 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (sources, scalaVersion, scalacOptions, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
       val dependency = Dependency.make(ScalafixUtils.scalafixDep(scalaVersion), scalaVersion)
-      val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
+      val jars = ctx.dependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
       val cp = jars.map(_.toString).mkString(File.pathSeparator)
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val scalafixArgs =
@@ -898,7 +897,7 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (sources, scalaVersion, scalacOptions, jvmOptions, _, compileClasspath, semanticdbDir) = ctx.depResults
       val dependency = Dependency.make(ScalafixUtils.scalafixDep(scalaVersion), scalaVersion)
-      val jars = DependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
+      val jars = ctx.dependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
       val cp = jars.map(_.toString).mkString(File.pathSeparator)
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val scalafixArgs = ScalafixUtils.buildArgs(

@@ -12,8 +12,10 @@ import org.typelevel.jawn.ast.{CanonicalRenderer, JValue}
 import com.typesafe.scalalogging.StrictLogging
 import io.opentelemetry.api.trace.StatusCode
 import ba.sake.tupson.toJson
+import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
+import ba.sake.deder.deps.DependencyResolver
 
 class DederProjectState(
     tasksRegistry: TasksRegistry,
@@ -74,8 +76,17 @@ class DederProjectState(
             val tasksResolver = TasksResolver(newConfig, tasksRegistry)
             val executionPlanner =
               ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
+            val userRepoUrls = newConfig.repositories.asScala.map(_.url).toSeq
+            val assembledRepos =
+              try DependencyResolver.assembleRepositories(userRepoUrls, newConfig.includeDefaultRepos)
+              catch
+                case e: IllegalArgumentException =>
+                  logger.warn(s"Invalid repository configuration: ${e.getMessage}")
+                  current = Left(e.getMessage)
+                  return
+            val dependencyResolver = new DependencyResolver(assembledRepos)
             val goodProjectStateData =
-              DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner)
+              DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner, dependencyResolver)
             lastGood = Right(goodProjectStateData)
             current = Right(goodProjectStateData)
             triggerConfigWatchedTasks()
@@ -252,7 +263,8 @@ class DederProjectState(
           state.projectConfig,
           state.tasksResolver.modulesGraph,
           state.tasksResolver.taskInstancesGraph,
-          tasksExecutorService
+          tasksExecutorService,
+          state.dependencyResolver
         )
       val allTaskInstances = tasksExecStages.flatten.sortBy(_.id) // essential!!
       try {
@@ -462,7 +474,8 @@ case class DederProjectStateData(
     projectConfig: DederProject,
     tasksRegistry: TasksRegistry,
     tasksResolver: TasksResolver,
-    executionPlanner: ExecutionPlanner
+    executionPlanner: ExecutionPlanner,
+    dependencyResolver: DependencyResolver
 )
 
 case class WatchedTaskData(

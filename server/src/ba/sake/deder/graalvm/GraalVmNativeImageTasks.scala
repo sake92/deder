@@ -10,7 +10,6 @@ import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.{*, given}
 import org.typelevel.jawn.ast.*
 import ba.sake.deder.config.DederProject.{JavaModule, ModuleType}
-import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.{*, given}
 
 class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
@@ -105,7 +104,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
       val resolvedCoords: Seq[(String, String, String)] =
         if allDeps.isEmpty then Seq.empty
         else
-          DependencyResolver
+          ctx.dependencyResolver
             .fetch(allDeps, Some(ctx.notifications))
             .getDependencies()
             .asScala

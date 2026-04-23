@@ -5,7 +5,7 @@ import com.github.blemale.scaffeine.*
 import ba.sake.deder.deps.*
 
 object ZincCompilersCache {
-  
+
   private val zincCache: Cache[String, ZincCompiler] =
     Scaffeine()
       .expireAfterAccess(5.minute)
@@ -15,16 +15,16 @@ object ZincCompilersCache {
       }
       .build()
 
-   def get(scalaVersion: String): ZincCompiler =
-    zincCache.get(scalaVersion, _ => makeZincCompiler(scalaVersion))
+  def get(scalaVersion: String, dependencyResolver: DependencyResolver): ZincCompiler =
+    zincCache.get(scalaVersion, _ => makeZincCompiler(scalaVersion, dependencyResolver))
 
-  private def makeZincCompiler(scalaVersion: String) = {
-      val dep =
-        if scalaVersion.startsWith("3.") then s"org.scala-lang:scala3-sbt-bridge:${scalaVersion}"
-        else "org.scala-sbt::compiler-bridge:1.11.0"
-      val compilerBridgeJar = DependencyResolver.fetchFile(
-        Dependency.make(dep, scalaVersion)
-      )
-      ZincCompiler(compilerBridgeJar)
-    }
+  private def makeZincCompiler(scalaVersion: String, dependencyResolver: DependencyResolver) = {
+    val dep =
+      if scalaVersion.startsWith("3.") then s"org.scala-lang:scala3-sbt-bridge:${scalaVersion}"
+      else "org.scala-sbt::compiler-bridge:1.11.0"
+    val compilerBridgeJar = dependencyResolver.fetchFile(
+      Dependency.make(dep, scalaVersion)
+    )
+    ZincCompiler(compilerBridgeJar)
+  }
 }

@@ -7,7 +7,6 @@ import ba.sake.deder.config.DederProject.*
 import ba.sake.deder.{*, given}
 import ba.sake.deder.jvm.*
 import dependency.ScalaVersion
-import ba.sake.deder.deps.DependencyResolver
 import ba.sake.deder.deps.Dependency
 import java.io.File
 import javax.tools.ToolProvider
@@ -136,7 +135,7 @@ class PublishTasks(coreTasks: CoreTasks) {
     .build { ctx =>
       val (scalaVersion, manifestEntries, mandatoryDependencies, dependencies, allModulesJars) =
         ctx.depResults
-      val depsJars = DependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
+      val depsJars = ctx.dependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
       val tmpDir = ctx.out / "jars"
       os.makeDir.all(tmpDir)
       allModulesJars.zipWithIndex.foreach { case (jar, index) =>
@@ -238,7 +237,7 @@ class PublishTasks(coreTasks: CoreTasks) {
               if tastyFiles.isEmpty then
                 throw RuntimeException(s"No .tasty files found in ${classesDir} for generating scaladoc")
               val deps = Seq(Dependency.make(s"org.scala-lang::scaladoc:${scalaVersion}", scalaVersion))
-              val depsJars = DependencyResolver.fetchFiles(deps, Some(ctx.notifications))
+              val depsJars = ctx.dependencyResolver.fetchFiles(deps, Some(ctx.notifications))
               ClassLoaderUtils.withClassLoader(depsJars, parent = null) { classLoader =>
                 val scaladocClass = classLoader.loadClass("dotty.tools.scaladoc.Main")
                 val scaladocMethod = scaladocClass.getMethod("run", classOf[Array[String]])
@@ -253,7 +252,7 @@ class PublishTasks(coreTasks: CoreTasks) {
                 scaladocMethod.invoke(scaladocObj, args)
               }
             } else {
-              val depsJars = DependencyResolver.fetchFiles(compilerDeps, Some(ctx.notifications))
+              val depsJars = ctx.dependencyResolver.fetchFiles(compilerDeps, Some(ctx.notifications))
               ClassLoaderUtils.withClassLoader(depsJars, parent = null) { classLoader =>
                 val scaladocClass = classLoader.loadClass("scala.tools.nsc.ScalaDoc")
                 val scaladocMethod = scaladocClass.getMethod("process", classOf[Array[String]])

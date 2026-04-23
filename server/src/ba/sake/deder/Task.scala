@@ -2,6 +2,7 @@ package ba.sake.deder
 
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.{DederModule, ModuleType}
+import ba.sake.deder.deps.DependencyResolver
 
 import scala.util.control.Breaks.{break, breakable}
 import scala.Tuple.:*
@@ -97,7 +98,8 @@ case class TaskExecContext[T, Deps <: Tuple](
     args: Seq[String], // external args, like run args
     watch: Boolean,
     notifications: ServerNotificationsLogger,
-    out: os.Path
+    out: os.Path,
+    dependencyResolver: DependencyResolver
 )(using ev: TaskDeps[Deps] =:= true)
 
 sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] =:= true) {
@@ -118,7 +120,8 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
       transitiveResults: Seq[Seq[TaskResult[?]]],
       args: Seq[String],
       watch: Boolean,
-      serverNotificationsLogger: ServerNotificationsLogger
+      serverNotificationsLogger: ServerNotificationsLogger,
+      dependencyResolver: DependencyResolver
   ): (res: TaskResult[T], changed: Boolean)
 
   /** Type-erased summarize for use by the execution engine */
@@ -154,7 +157,8 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple](
       transitiveResults: Seq[Seq[TaskResult[?]]],
       args: Seq[String],
       watch: Boolean,
-      serverNotificationsLogger: ServerNotificationsLogger
+      serverNotificationsLogger: ServerNotificationsLogger,
+      dependencyResolver: DependencyResolver
   ): (res: TaskResult[T], changed: Boolean) = {
     serverNotificationsLogger.add(
       ServerNotification.logDebug(s"Executing ${name}", Some(module.id))
@@ -171,7 +175,8 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple](
         args,
         watch,
         serverNotificationsLogger,
-        outDir
+        outDir,
+        dependencyResolver
       )
     )
     val taskResult = TaskResult(res, "", Hashable[T].hashStr(res))
@@ -206,7 +211,8 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
       transitiveResults: Seq[Seq[TaskResult[?]]],
       args: Seq[String],
       watch: Boolean,
-      serverNotificationsLogger: ServerNotificationsLogger
+      serverNotificationsLogger: ServerNotificationsLogger,
+      dependencyResolver: DependencyResolver
   ): (res: TaskResult[T], changed: Boolean) = {
 
     serverNotificationsLogger.add(ServerNotification.logDebug(s"Executing ${name}", Some(module.id)))
@@ -229,7 +235,8 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
           args,
           watch,
           serverNotificationsLogger,
-          outDir
+          outDir,
+          dependencyResolver
         )
       )
       val outputHash = Hashable[T].hashStr(res)

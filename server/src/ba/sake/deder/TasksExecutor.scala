@@ -8,13 +8,15 @@ import org.jgrapht.graph.{DefaultEdge, SimpleDirectedGraph}
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
+import ba.sake.deder.deps.DependencyResolver
 import io.opentelemetry.api.trace.StatusCode
 
 class TasksExecutor(
     projectConfig: DederProject,
     modulesGraph: SimpleDirectedGraph[DederModule, DefaultEdge],
     tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge],
-    tasksExecutorService: ExecutorService
+    tasksExecutorService: ExecutorService,
+    dependencyResolver: DependencyResolver
 ) extends StrictLogging {
 
   // (taskInstance.id, TaskResult, changed)
@@ -57,7 +59,8 @@ class TasksExecutor(
                       transitiveResults,
                       args,
                       watch,
-                      serverNotificationsLogger
+                      serverNotificationsLogger,
+                      dependencyResolver
                     )
                   (taskInstance.id, taskRes, changed)
                 }

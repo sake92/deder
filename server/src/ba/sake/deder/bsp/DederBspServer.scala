@@ -15,7 +15,7 @@ import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
-import ba.sake.deder.deps.{Dependency, DependencyResolver}
+import ba.sake.deder.deps.Dependency
 import ba.sake.deder.config.DederProject.ModuleType
 import ba.sake.deder.scalajs.ScalaJsTasks
 import ba.sake.deder.scalanative.ScalaNativeTasks
@@ -381,7 +381,7 @@ class DederBspServer(
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
         val dependencies = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)(Seq.empty)
-        val fetchRes = DependencyResolver.fetch(dependencies)
+        val fetchRes = projectStateData.dependencyResolver.fetch(dependencies)
         // assuming that dependencies and artifacts are in the same order, 1:1 mapping
         val depsWithArtifacts = fetchRes.getDependencies.asScala
           .zip(fetchRes.getArtifacts.asScala)
@@ -421,14 +421,14 @@ class DederBspServer(
         val moduleId = targetId.moduleId
         val module = projectStateData.tasksResolver.modulesMap(moduleId)
         val dependencies = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)(Seq.empty)
-        val fetchRes = DependencyResolver.fetch(dependencies)
+        val fetchRes = projectStateData.dependencyResolver.fetch(dependencies)
         val depSources = fetchRes.getDependencies.asScala.map { dep =>
           dep.withClassifier("sources").withType("jar").withConfiguration("sources")
         }
         logger.debug(s"Fetching sources for dependencies: ${depSources.map(_.toString).mkString(", ")}")
         val sourceArtifactFiles =
           try {
-            DependencyResolver
+            projectStateData.dependencyResolver
               .doFetch(depSources.toSeq)
               .getArtifacts
               .asScala
@@ -581,7 +581,7 @@ class DederBspServer(
             else
               val scalaSemanticdbVersion =
                 executeTask(serverNotificationsLogger, moduleId, coreTasks.scalaSemanticdbVersionTask)
-              val semanticdbScalacJar = DependencyResolver.fetchFiles(
+              val semanticdbScalacJar = projectStateData.dependencyResolver.fetchFiles(
                 Seq(Dependency.make(s"org.scalameta:::semanticdb-scalac:${scalaSemanticdbVersion}", scalaVersion))
               )
               val allScalacPlugins = scalacPlugins ++ semanticdbScalacJar
