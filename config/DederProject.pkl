@@ -11,6 +11,22 @@ hidden modulesValidation = (value: Listing<DederModule>) ->
   else
     true
 
+/// Additional Maven repositories for dependency resolution.
+/// Tried in declared order, before default repositories.
+repositories: Listing<MavenRepository> = new Listing {}
+
+/// Include Maven Central and the Ivy2 local cache. Set to false for
+/// air-gapped / internal-only resolution (e.g. via a corporate Nexus).
+/// If false, `repositories` must be non-empty.
+includeDefaultRepos: Boolean = true
+
+class MavenRepository {
+  /// Repository URL. Supports http(s):// and file:// schemes.
+  /// Credentials (if required) come from Coursier's native config:
+  /// ~/.config/coursier/credentials.properties or COURSIER_CREDENTIALS.
+  url: String(!isEmpty)
+}
+
 abstract class DederModule {
   /// Module id, used in CLI and referring from other modules
   id: String(idValidation)
