@@ -3,15 +3,24 @@ rm -rf ./tmp
 
 ./scripts/gen-config-bindings.sh
 
-./mill -i server.assembly
-./mill -i client.assembly       
+#deder exec -m server -t assembly
+#deder exec -m client -t assembly
 
-export DEDER_SERVER_PATH=$(realpath out/server/assembly.dest/out.jar)
-export DEDER_CLIENT_PATH=$(realpath out/client/assembly.dest/out.jar)
+# TODO pass these as file paths instead of env vars
+# coz we need to restart deder server
+# or we can propagate env vars from client to server, but that seems more complex
+export DEDER_SERVER_PATH=$(realpath .deder/out/server/assembly/out.jar)
+export DEDER_CLIENT_PATH=$(realpath .deder/out/client/assembly/out.jar)
+
+deder shutdown
+sleep 1
+deder
+sleep 1
+
 
 if [ $# -eq 0 ]; then
-    ./mill -i integration.test
+    deder exec -m integration-test -t test
 else
-    ./mill -i integration.test.testOnly $1
+    deder exec -m integration-test -t test $1
 fi
 

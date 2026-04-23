@@ -6,8 +6,8 @@ trait BaseIntegrationSuite extends munit.FunSuite {
 
   val testResourceDir: os.Path = os.pwd / "integration/test/resources"
 
-  val dederClientPath: String = System.getenv("DEDER_CLIENT_PATH")
-  val dederServerPath: String = System.getenv("DEDER_SERVER_PATH")
+  val dederClientPath: String = sys.env("DEDER_CLIENT_PATH")
+  val dederServerPath: String = sys.env("DEDER_SERVER_PATH")
 
   def withTestProject(
       testProjectPath: os.RelPath,
@@ -32,8 +32,9 @@ trait BaseIntegrationSuite extends munit.FunSuite {
   }
 
   def executeDederCommand(projectPath: os.Path, command: String): os.CommandResult = {
-    val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
-    val cmd = shell ++ Seq(s"$dederClientPath $command")
+    // val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
+    //val cmd = shell ++ Seq(s"$dederClientPath $command")
+    val cmd = Seq("java", "-jar", dederClientPath, command)
     os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe, check = false)
   }
 }

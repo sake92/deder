@@ -32,6 +32,7 @@ public sealed interface ClientMessage {
     record Plan(String[] args) implements ClientMessage {
     }
 
+    // TODO add env vars
     record Exec(String requestId, String[] args) implements ClientMessage {
     }
 
