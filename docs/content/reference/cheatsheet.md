@@ -88,3 +88,15 @@ deder exec -t runMvnApp fmt
 deder exec -t runMvnApp fmtCheck
 ```
 
+## Custom repositories
+
+Declare extra Maven repositories in `deder.pkl`:
+
+```pkl
+repositories {
+  new MavenRepository { url = "https://nexus.example.com/releases/" }
+}
+# includeDefaultRepos = false  # air-gapped mode
+```
+
+See [Repositories](/reference/repositories.html) for details.
