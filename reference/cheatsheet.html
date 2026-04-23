@@ -41,7 +41,10 @@
       <summary>Table of Contents</summary>
       <div>
        <ul>
-        <li><a href="#cheatsheet">Cheatsheet</a></li>
+        <li><a href="#cheatsheet">Cheatsheet</a>
+         <ul>
+          <li><a href="#custom-repositories">Custom repositories</a></li>
+         </ul></li>
        </ul>
       </div>
      </details>
@@ -132,6 +135,14 @@ deder exec -t fixCheck
 deder exec -t runMvnApp fmt
 deder exec -t runMvnApp fmtCheck
 </code></pre>
+   <h2 id="custom-repositories">Custom repositories<a href="#custom-repositories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Declare extra Maven repositories in <code>deder.pkl</code>:</p>
+   <pre><code class="language-pkl">repositories {
+  new MavenRepository { url = "https://nexus.example.com/releases/" }
+}
+# includeDefaultRepos = false  # air-gapped mode
+</code></pre>
+   <p>See <a href="https://sake92.github.io/deder/reference/repositories.html">Repositories</a> for details.</p>
    <div role="group">
     <span></span> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/architecture.html">Architecture ➡️</a>
    </div>

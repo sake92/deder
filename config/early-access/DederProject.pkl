@@ -92,6 +92,14 @@ class ManifestSettings {
   groups: Mapping<String, Mapping<String, String>> = new Mapping {}
 }
 
+class GraalVmSettings {
+  /// Path to GraalVM home directory (must contain bin/native-image).
+  /// If null, falls back to the GRAALVM_HOME environment variable.
+  graalvmHome: String?
+  /// Extra flags passed to the native-image tool, e.g. "--no-fallback"
+  nativeImageOptions: Listing<String> = new Listing {}
+}
+
 class MvnApp {
   /// Maven dependency coordinate, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
   dep: String(!isEmpty)
@@ -127,6 +135,8 @@ open class JavaModule extends DederModule {
   manifest: ManifestSettings = new ManifestSettings {}
   publish: Boolean = true
   pomSettings: PomSettings?
+  /// GraalVM native image settings. When non-null, the nativeImage task is available for this module.
+  graalvm: GraalVmSettings?
   /// Named maven apps that can be run via `deder exec -t runMvnApp <name> [args...]`.
   /// Server auto-provides `fmt`, `fmtCheck` (scalafmt) etc for scala modules.
   mvnApps: Mapping<String, MvnApp> = new Mapping {}

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Custom Repositories | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#custom-repositories">Custom Repositories</a>
+         <ul>
+          <li><a href="#resolution-order">Resolution order</a></li>
+          <li><a href="#disabling-default-repositories">Disabling default repositories</a></li>
+          <li><a href="#local-directories">Local directories</a></li>
+          <li><a href="#credentials">Credentials</a></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="custom-repositories">Custom Repositories<a href="#custom-repositories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>By default, Deder resolves dependencies from Maven Central plus the local Ivy2 cache. To pull artifacts from an internal Nexus/Artifactory, a public mirror, JitPack, Sonatype snapshots, or an on-disk Maven layout, declare them in your <code>deder.pkl</code>:</p>
+   <pre><code class="language-pkl">repositories {
+  new MavenRepository { url = "https://nexus.mycompany.com/repository/maven-releases/" }
+  new MavenRepository { url = "https://jitpack.io" }
+}
+</code></pre>
+   <h2 id="resolution-order">Resolution order<a href="#resolution-order" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Repositories are tried in this order:</p>
+   <ol>
+    <li>Your declared <code>repositories</code>, in the order they appear in <code>deder.pkl</code>.</li>
+    <li>Maven Central.</li>
+    <li>The local Ivy2 cache (<code>~/.ivy2/local</code>).</li>
+   </ol>
+   <p>"Custom first" means lookups for internal artifacts resolve against your Nexus before Deder hits Maven Central — faster on a LAN, no 404 noise, no leaking internal <code>groupId</code>s to the public repo.</p>
+   <h2 id="disabling-default-repositories">Disabling default repositories<a href="#disabling-default-repositories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>For air-gapped or strict-internal-only setups, turn off the defaults:</p>
+   <pre><code class="language-pkl">repositories {
+  new MavenRepository { url = "https://nexus.mycompany.com/repository/maven-public/" }
+}
+
+includeDefaultRepos = false
+</code></pre>
+   <p>Deder will refuse to load the project if <code>includeDefaultRepos = false</code> and <code>repositories</code> is empty.</p>
+   <h2 id="local-directories">Local directories<a href="#local-directories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Use a <code>file://</code> URL with a Maven-layout directory:</p>
+   <pre><code class="language-pkl">repositories {
+  new MavenRepository { url = "file:///abs/path/to/local-repo" }
+}
+</code></pre>
+   <h2 id="credentials">Credentials<a href="#credentials" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Deder does not store or read credentials. For authenticated repositories, configure Coursier's own credential mechanisms — Deder will pick them up transparently:</p>
+   <ul>
+    <li><code>~/.config/coursier/credentials.properties</code></li>
+    <li>The <code>COURSIER_CREDENTIALS</code> environment variable</li>
+   </ul>
+   <p>See <a href="https://get-coursier.io/docs/other-credentials">Coursier's credentials documentation</a> for syntax.</p>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/reference/server-properties.html">⬅️ Server Properties</a> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/testing.html">Testing ➡️</a>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>
