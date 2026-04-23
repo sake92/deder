@@ -1,0 +1,16 @@
+amends "../../../../../config/DederProject.pkl"
+
+repositories {
+  new MavenRepository { url = "__LOCAL_REPO_URL__" }
+}
+
+modules {
+  new ScalaModule {
+    scalaVersion = "3.7.1"
+    id = "app"
+    mainClass = "ba.sake.deder.customrepo.Main"
+    deps {
+      "com.example:custom-greeter:1.0.0"
+    }
+  }
+}
