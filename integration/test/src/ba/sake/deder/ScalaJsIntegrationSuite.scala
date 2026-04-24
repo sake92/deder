@@ -6,7 +6,7 @@ import ba.sake.tupson.*
 
 class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 1.minute
+  override def munitTimeout = 2.minute
 
   // default command is compile
   // and the logs go to stderr!

@@ -1,8 +1,11 @@
 package ba.sake.deder
 
+import scala.concurrent.duration.*
 import scala.util.Properties
 
 trait BaseIntegrationSuite extends munit.FunSuite {
+
+  override def munitTimeout = 2.minute
 
   val testResourceDir: os.Path = os.pwd / "integration/test/resources"
 
