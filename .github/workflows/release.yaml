@@ -48,6 +48,7 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
+      - uses: coursier/cache-action@v7
       - name: Build JARs
         env:
           VERSION: ${{ needs.precheck.outputs.VERSION }}
@@ -93,6 +94,7 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
+      - uses: coursier/cache-action@v7
       - name: Build Client native image
         env:
           VERSION: ${{ needs.precheck.outputs.VERSION }}
@@ -127,6 +129,7 @@ jobs:
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
+      - uses: coursier/cache-action@v7
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
