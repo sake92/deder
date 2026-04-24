@@ -63,6 +63,8 @@ jobs:
           ./scripts/gen-config-bindings.sh
           ./mill server.assembly
           cp out/server/assembly.dest/out.jar deder-server.jar
+          ./mill test-runner.assembly
+          cp out/test-runner/assembly.dest/out.jar deder-test-runner.jar
           ./mill client.assembly
           cp out/client/assembly.dest/out.jar deder-client.jar
       - name: Upload JARs
@@ -71,6 +73,7 @@ jobs:
           name: deder-jars
           path: |
             deder-server.jar
+            deder-test-runner.jar
             deder-client.jar
 
   build-client-native-image:
