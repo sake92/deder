@@ -993,7 +993,7 @@ class CoreTasks() extends StrictLogging {
         }
       },
       isResultSuccessful = _.success,
-      summarize = DederTestResults.summarize
+      summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
     )
 
   val testInMemoryTask = TaskBuilder
@@ -1026,7 +1026,7 @@ class CoreTasks() extends StrictLogging {
         }
       },
       isResultSuccessful = _.success,
-      summarize = DederTestResults.summarize
+      summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
     )
 
   // order matters for dependency resolution!!

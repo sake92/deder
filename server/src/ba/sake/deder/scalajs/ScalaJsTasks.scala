@@ -1,7 +1,7 @@
 package ba.sake.deder.scalajs
 
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaJsModule, ScalaJsTestModule}
-import ba.sake.deder.testing.{DederTestOptions, DederTestResults}
+import ba.sake.deder.testing.{DederTestOptions, DederTestResults, TestResultsSummary}
 import ba.sake.deder.*
 
 /*
@@ -68,7 +68,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
         }
       },
       isResultSuccessful = _.success,
-      summarize = DederTestResults.summarize
+      summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
     )
 
   val all: Seq[Task[?, ?]] = Seq(
