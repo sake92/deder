@@ -129,6 +129,23 @@ class PublishTasks(coreTasks: CoreTasks) {
     lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("meta-inf/manifest.mf"))
   }
 
+  val depsAssemblyTask = CachedTaskBuilder
+    .make[os.Path](
+      name = "depsAssembly",
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST)
+    )
+    .dependsOn(coreTasks.scalaVersionTask)
+    .dependsOn(coreTasks.mandatoryDependenciesTask)
+    .dependsOn(coreTasks.allDependenciesTask)
+    .build { ctx =>
+      val (_, mandatoryDependencies, dependencies) = ctx.depResults
+      val depsJars = ctx.dependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
+      os.makeDir.all(ctx.out)
+      val depsJarPath = ctx.out / "deps.jar"
+      JarUtils.mergeJars(depsJarPath, depsJars, JarManifest.Default, skipAssemblyEntry)
+      depsJarPath
+    }
+
   val assemblyTask = CachedTaskBuilder
     .make[os.Path](
       name = "assembly",
@@ -428,6 +445,7 @@ class PublishTasks(coreTasks: CoreTasks) {
     finalManifestSettingsTask,
     jarTask,
     allJarsTask,
+    depsAssemblyTask,
     assemblyTask,
     moduleDepsPomSettingsTask,
     sourcesJarTask,
