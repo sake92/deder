@@ -39,8 +39,24 @@ object ForkedTestOrchestrator {
       return DederTestResults(total = 0, passed = 0, failed = 0, errors = 1, skipped = 0, duration = 0)
     }
 
+    val testsToRun =
+      if testOptions.testSelectors.isEmpty then discoveredTests
+      else
+        discoveredTests.flatMap { dft =>
+          val testClassNames = dft.testClasses.map(_.className)
+          val matchedNames = testOptions.testSelectors.flatMap { ts =>
+            val classSelector = ts.split("#") match {
+              case Array(classNameSelector, _) => classNameSelector
+              case _                           => ts
+            }
+            WildcardUtils.getMatches(testClassNames, classSelector)
+          }.toSet
+          val filtered = dft.testClasses.filter(tc => matchedNames.contains(tc.className))
+          Option.when(filtered.nonEmpty)(dft.copy(testClasses = filtered))
+        }
+
     val history = TestHistory.load(outDir)
-    val buckets = TestDistribution.distribute(discoveredTests, history, maxTestForks)
+    val buckets = TestDistribution.distribute(testsToRun, history, maxTestForks)
     if buckets.isEmpty then {
       notifications.add(ServerNotification.logWarning("No tests found on the classpath.", Some(moduleId)))
       return DederTestResults.empty
