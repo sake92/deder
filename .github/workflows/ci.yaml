@@ -19,10 +19,14 @@ jobs:
           distribution: 'zulu'
           java-version: 21
       - uses: coursier/cache-action@v7
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+      - name: Install deder
+        run: brew install sake92/tap/deder
       - name: Unit Test
         run: |
           ./scripts/gen-config-bindings.sh
-          ./mill server.test
+          deder exec -t test -m server-test
 
   integration-tests:
     runs-on: ubuntu-latest
@@ -36,6 +40,10 @@ jobs:
           distribution: 'zulu'
           java-version: 21
       - uses: coursier/cache-action@v7
+       name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+      - name: Install deder
+        run: brew install sake92/tap/deder
       - name: Integration Test Suite
         run: |
           ./scripts/run-it-tests.sh
