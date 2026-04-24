@@ -36,7 +36,6 @@ jobs:
             .deder/logs/server.log
 
   integration-tests:
-    if: false
     runs-on: ubuntu-latest
     continue-on-error: true # allow flaky for now
     steps:
