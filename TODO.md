@@ -41,6 +41,7 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 
 ## Tests
 
+- print test started.. and how long it took again
 - print number of suites
 
 

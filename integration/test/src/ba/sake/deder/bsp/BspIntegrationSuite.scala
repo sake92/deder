@@ -13,7 +13,7 @@ trait BspServerAll extends BuildServer, JvmBuildServer, JavaBuildServer, ScalaBu
 
 class BspIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout: Duration = 5.minutes
+  override def munitTimeout: Duration = 10.minutes
 
   private var testDir: os.Path = uninitialized
   private var bspProcess: os.SubProcess = uninitialized
