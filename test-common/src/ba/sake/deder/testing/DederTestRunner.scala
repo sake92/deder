@@ -7,8 +7,6 @@ import java.util.concurrent.{Executors, Future as JFuture}
 import scala.collection.mutable
 import sbt.testing.{Task as SbtTestTask, *}
 import ba.sake.deder.*
-import ba.sake.deder.config.DederProject.DederModule
-import ba.sake.tupson.JsonRW
 import ba.sake.deder.testing.forked.{ForkRunnerHooks, ForkedTestEnvelope}
 
 class DederTestRunner(
@@ -16,8 +14,9 @@ class DederTestRunner(
     discoveredTests: Seq[DiscoveredFrameworkTests],
     frameworkOverrides: Map[String, Framework],
     classLoader: ClassLoader,
-    logger: DederTestLogger,
-    forkHooks: Option[ForkRunnerHooks] = None
+    logger: TestRunnerLogger,
+    forkHooks: Option[ForkRunnerHooks] = None,
+    isCancelled: () => Boolean = () => false
 ) {
 
   private val _perClassStats = scala.collection.mutable.Map[String, TestClassStats]()
@@ -130,13 +129,11 @@ class DederTestRunner(
   }
 
   private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Unit = {
-    val currentRequestId = RequestContext.id.get()
     val capturedNotificationsLogger = OutputCaptureContext.currentNotificationsLogger.get()
     val capturedModuleId = OutputCaptureContext.currentModuleId.get()
 
     def runOne(task: SbtTestTask): Unit = {
-      val cancelled = currentRequestId != null && DederGlobals.cancellationTokens.get(currentRequestId).get()
-      if cancelled then throw CancelledException("Tests execution cancelled")
+      if isCancelled() then throw CancelledException("Tests execution cancelled")
       val suiteName = task.taskDef().fullyQualifiedName()
       val threadId = Thread.currentThread().getId
       forkHooks.foreach { h =>
@@ -187,11 +184,7 @@ class DederTestRunner(
   }
 }
 
-case class DederTestOptions(
-    testSelectors: Seq[String]
-)
-
-class DederTestEventHandler(logger: DederTestLogger, frameworkName: String) extends EventHandler {
+class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) extends EventHandler {
   private val _results = mutable.ArrayBuffer[DederTestResult]()
   private val _classStats = mutable.Map[String, TestClassStats]()
 
@@ -259,85 +252,6 @@ class DederTestEventHandler(logger: DederTestLogger, frameworkName: String) exte
     t.getStackTrace.exists { line =>
       Option(line.getFileName).exists(_.endsWith("main.js"))
     }
-  }
-}
-
-case class DederTestResult(
-    name: String,
-    status: Status,
-    duration: Long,
-    throwable: Option[Throwable]
-)
-
-// TODO also return DederPath of results folder
-case class DederTestResults(
-    total: Int,
-    passed: Int,
-    failed: Int,
-    errors: Int,
-    skipped: Int,
-    duration: Long,
-    failedTestNames: Seq[String] = Seq.empty
-) derives JsonRW {
-  def success: Boolean = failed == 0 && errors == 0
-}
-
-object DederTestResults {
-  def empty: DederTestResults = DederTestResults(0, 0, 0, 0, 0, 0)
-
-  def summarize(
-      results: Seq[(DederModule, DederTestResults)],
-      notifications: ServerNotificationsLogger
-  ): Unit = {
-    val totalResults = DederTestResults(
-      total = results.map(_._2.total).sum,
-      passed = results.map(_._2.passed).sum,
-      failed = results.map(_._2.failed).sum,
-      errors = results.map(_._2.errors).sum,
-      skipped = results.map(_._2.skipped).sum,
-      duration = results.map(_._2.duration).sum,
-      failedTestNames = results.flatMap(_._2.failedTestNames)
-    )
-    val separator = "═" * 50
-    notifications.add(ServerNotification.logInfo(separator))
-    val statusIcon = if totalResults.success then "PASS ✅" else "FAIL \uD83D\uDD34"
-    notifications.add(
-      ServerNotification.logInfo(
-        s"$statusIcon Test Summary: ${totalResults.total} total, ${totalResults.passed} passed, ${totalResults.failed} failed," +
-          s" ${totalResults.errors} errors, ${totalResults.skipped} skipped"
-      )
-    )
-    results.foreach { case (module, res) =>
-      val icon = if res.success then "  PASS ✅" else "  FAIL \uD83D\uDD34"
-      val detail = Option.when(!res.success) {
-        Seq(
-          Option.when(res.failed > 0)(s"${res.failed} failed"),
-          Option.when(res.errors > 0)(s"${res.errors} errors")
-        ).flatten.mkString(", ")
-      }
-      notifications.add(ServerNotification.logInfo(s"$icon ${module.id}${detail.map(d => s" ($d)").getOrElse("")}"))
-      res.failedTestNames.foreach { testName =>
-        notifications.add(ServerNotification.logInfo(s"       - $testName"))
-      }
-    }
-    notifications.add(ServerNotification.logInfo(separator))
-  }
-
-  def aggregate(results: Seq[DederTestResult]): DederTestResults = {
-    val failedOrError = results.filter(r => r.status == Status.Failure || r.status == Status.Error)
-    DederTestResults(
-      total = results.size,
-      passed = results.count(_.status == Status.Success),
-      failed = results.count(_.status == Status.Failure),
-      errors = results.count(_.status == Status.Error),
-      skipped = results.count(r =>
-        r.status == Status.Skipped ||
-          r.status == Status.Ignored ||
-          r.status == Status.Canceled
-      ),
-      duration = results.map(_.duration).sum,
-      failedTestNames = failedOrError.map(_.name)
-    )
   }
 }
 

@@ -3,7 +3,7 @@ package ba.sake.deder.scalanative
 import scala.jdk.CollectionConverters.*
 import com.typesafe.scalalogging.StrictLogging
 import scala.scalanative.testinterface.adapter.TestAdapter
-import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
+import ba.sake.deder.{DederGlobals, RequestContext, ServerNotification, ServerNotificationsLogger}
 import ba.sake.deder.testing.*
 
 class ScalaNativeTestRunner(
@@ -40,7 +40,14 @@ class ScalaNativeTestRunner(
         override def showStackTraces: Boolean = false
       }
 
-      val testRunner = DederTestRunner(testParallelism, discoveredTests, loadedFrameworks, getClass.getClassLoader, dederLogger)
+      val testRunner = DederTestRunner(testParallelism, discoveredTests, loadedFrameworks, getClass.getClassLoader, dederLogger, isCancelled = {
+        val currentRequestId = RequestContext.id.get()
+        () =>
+          currentRequestId != null && {
+            val tok = DederGlobals.cancellationTokens.get(currentRequestId)
+            tok != null && tok.get()
+          }
+      })
       testRunner.run(testOptions)
     } finally {
       adapter.close()

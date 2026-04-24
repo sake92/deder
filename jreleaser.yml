@@ -29,6 +29,10 @@ distributions:
     type: SINGLE_JAR
     artifacts:
       - path: deder-server.jar
+  deder-test-runner-jar:
+    type: SINGLE_JAR
+    artifacts:
+      - path: deder-test-runner.jar
   deder-client-jar:
     type: SINGLE_JAR
     artifacts:

@@ -7,7 +7,7 @@ import ba.sake.deder.ServerNotification
 class DederTestLogger(
     serverNotificationsLogger: ServerNotificationsLogger,
     moduleId: String
-) extends Logger {
+) extends TestRunnerLogger {
 
   def ansiCodesSupported(): Boolean = true
 

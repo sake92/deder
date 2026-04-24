@@ -7,4 +7,3 @@ case class TestClassStats(
     lastStatus: String,
     lastRunEpochMs: Long
 ) derives JsonRW
-
