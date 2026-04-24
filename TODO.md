@@ -39,19 +39,10 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 - fullopt
 - configuration..
 
-## Scalafix
-- support out of the box? `deder fix`
-- scalafix https://gabro.github.io/scalafix/docs/installation/cli.html
-
 ## Tests
 
-- avoid starting forks if 0 tests..
 - print number of suites
 
-- optimized running:
-  - on first run just randomly distribute between workers, record stats per test/suite
-  - on next run use stats to figure out how to exec more performantly
-  - use H2 db for coordination
 
 ## CLI
 - --mermaid diagrams

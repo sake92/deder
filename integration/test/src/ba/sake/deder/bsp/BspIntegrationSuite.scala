@@ -37,7 +37,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     )
     os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
     executeDederCommand(testDir, "bsp", "install")
-    bspProcess = os.proc(dederClientPath, "bsp").spawn(cwd = testDir)
+    bspProcess = os.proc("java", "-jar", dederClientPath, "bsp").spawn(cwd = testDir)
 
     val launcher = new Launcher.Builder[BuildServer]()
       .setInput(bspProcess.stdout)

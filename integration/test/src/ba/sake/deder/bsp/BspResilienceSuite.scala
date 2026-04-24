@@ -266,7 +266,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
     var buildServer: BspServerAll = null
     val capturingClient = CapturingBuildClient()
     try {
-      bspProcess = os.proc(dederClientPath, "bsp").spawn(cwd = testDir)
+      bspProcess = os.proc("java", "-jar", dederClientPath, "bsp").spawn(cwd = testDir)
 
       val launcher = new Launcher.Builder[BuildServer]()
         .setInput(bspProcess.stdout)
