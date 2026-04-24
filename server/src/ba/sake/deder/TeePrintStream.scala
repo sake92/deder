@@ -13,9 +13,10 @@ class TeePrintStream(
     super.flush()
     val logger = OutputCaptureContext.currentNotificationsLogger.get()
     if (logger != null) {
+      val typedLogger = logger.asInstanceOf[ServerNotificationsLogger]
       val baos = TeePrintStream.byteBuffer.get()
       if (baos.size() > 0) {
-        TeePrintStream.flushLine(logger, baos.toString(StandardCharsets.UTF_8), isStdErr)
+        TeePrintStream.flushLine(typedLogger, baos.toString(StandardCharsets.UTF_8), isStdErr)
         TeePrintStream.byteBuffer.set(new ByteArrayOutputStream())
       }
     }
@@ -59,14 +60,15 @@ object TeePrintStream {
     private def bufferByte(b: Byte): Unit = {
       val logger = OutputCaptureContext.currentNotificationsLogger.get()
       if (logger == null) return
+      val typedLogger = logger.asInstanceOf[ServerNotificationsLogger]
       val baos = byteBuffer.get()
       if (b == '\n') {
-        flushLine(logger, baos.toString(StandardCharsets.UTF_8), isStdErr)
+        flushLine(typedLogger, baos.toString(StandardCharsets.UTF_8), isStdErr)
         byteBuffer.set(new ByteArrayOutputStream())
       } else {
         baos.write(b)
         if (baos.size() > MaxBufferSize) {
-          flushLine(logger, baos.toString(StandardCharsets.UTF_8), isStdErr)
+          flushLine(typedLogger, baos.toString(StandardCharsets.UTF_8), isStdErr)
           byteBuffer.set(new ByteArrayOutputStream())
         }
       }
