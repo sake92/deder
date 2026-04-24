@@ -1,4 +1,6 @@
-amends "https://sake92.github.io/deder/config/v0.4.0/DederProject.pkl"
+//amends "https://sake92.github.io/deder/config/v0.4.0/DederProject.pkl"
+
+amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 local const scalaVer = "3.7.4"
 
@@ -15,13 +17,33 @@ local const function pom(artId: String) = new PomSettings {
   artifactId = artId
 }
 
+local const testCommon = new ScalaModule {
+  id = "test-common"
+  scalaVersion = scalaVer
+  publish = false
+  deps {
+    "ba.sake::tupson:0.18.0"
+    "com.lihaoyi::os-lib:0.11.6"
+    "org.scala-sbt:test-interface:1.0"
+    "com.lihaoyi::fansi:0.5.1"
+  }
+}
+
+local const testRunner = new ScalaModule {
+  id = "test-runner"
+  scalaVersion = scalaVer
+  publish = false
+  moduleDeps { testCommon }
+  mainClass = "ba.sake.deder.testing.forked.ForkedTestMain"
+}
+
 local const serverModules =
   new CreateScalaModules {
     root = "server"
     template = new ScalaModule {
       scalaVersion = scalaVer
       publish = false
-      moduleDeps { config }
+      moduleDeps { config; testCommon }
       mainClass = "ba.sake.deder.ServerMain"
       scalacOptions {
         "-Yretain-trees"
@@ -117,6 +139,8 @@ local const integrationTest = new ScalaTestModule {
 
 modules {
   config
+  testCommon
+  testRunner
   ...serverModules.all
   client
   integrationTest

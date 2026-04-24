@@ -26,7 +26,8 @@ jobs:
       - name: Unit Test
         run: |
           ./scripts/gen-config-bindings.sh
-          deder exec -t test -m server-test
+          ./mill server.test
+          # deder exec -t test -m server-test
       - name: Deder output
         if: failure()
         uses: actions/upload-artifact@v4
