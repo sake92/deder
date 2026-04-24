@@ -29,7 +29,8 @@ class TasksExecutor(
       taskName: String,
       args: Seq[String],
       watch: Boolean,
-      serverNotificationsLogger: ServerNotificationsLogger
+      serverNotificationsLogger: ServerNotificationsLogger,
+      clientParams: CliClientParams
   ): Seq[TaskExecResult] = {
     var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
     val finalTaskResults = Seq.newBuilder[TaskExecResult]
@@ -49,6 +50,7 @@ class TasksExecutor(
             () =>
               val taskSpan = OTEL.TRACER.spanBuilder(taskInstance.id).startSpan()
               RequestContext.id.set(requestId)
+              RequestContext.clientParams.set(clientParams)
               try {
                 Using.resource(taskSpan.makeCurrent()) { scope =>
                   val (taskRes, changed) = taskInstance.task
@@ -72,6 +74,7 @@ class TasksExecutor(
                   throw e
               } finally {
                 RequestContext.id.remove()
+                RequestContext.clientParams.remove()
                 taskSpan.end()
               }
           }

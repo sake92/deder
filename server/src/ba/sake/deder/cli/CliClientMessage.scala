@@ -10,7 +10,7 @@ enum CliClientMessage derives JsonRW {
   case Modules(args: Seq[String])
   case Tasks(args: Seq[String])
   case Plan(args: Seq[String])
-  case Exec(requestId: String, args: Seq[String])
+  case Exec(requestId: String, args: Seq[String], envVars: Map[String, String] = Map.empty)
   case Cancel(requestId: String)
   case Clean(args: Seq[String])
   case Import(args: Seq[String])
@@ -18,7 +18,7 @@ enum CliClientMessage derives JsonRW {
   case Shutdown()
 
   def getRequestId: String = this match {
-    case CliClientMessage.Exec(requestId, _) => requestId
+    case CliClientMessage.Exec(requestId, _, _) => requestId
     case CliClientMessage.Cancel(requestId)  => requestId
     case _                            => UUID.randomUUID.toString
   }

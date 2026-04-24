@@ -109,7 +109,8 @@ class DederProjectState(
       useLastGood: Boolean = false,
       json: Boolean = false,
       startWatch: Boolean = false,
-      exitOnEnd: Boolean = true
+      exitOnEnd: Boolean = true,
+      clientParams: CliClientParams
   ): Unit = try {
     val state = readState(useLastGood) match
       case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
@@ -157,7 +158,8 @@ class DederProjectState(
           args,
           watch = startWatch,
           serverNotificationsLogger,
-          useLastGood = useLastGood
+          useLastGood = useLastGood,
+          clientParams = clientParams
         )
         // summarize across modules (only when >1 module)
         if results.nonEmpty then {
@@ -191,7 +193,8 @@ class DederProjectState(
                   useLastGood,
                   json,
                   affectingSourceFileTasks,
-                  affectingConfigValueTasks
+                  affectingConfigValueTasks,
+                  clientParams
                 )
               )
             }
@@ -247,7 +250,8 @@ class DederProjectState(
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
-      useLastGood: Boolean
+      useLastGood: Boolean,
+      clientParams: CliClientParams = CliClientParams(Map.empty)
   ): Seq[TaskExecResult] =
     try {
       lastRequestStartedAt.set(Instant.now())
@@ -273,7 +277,7 @@ class DederProjectState(
           taskInstance.lock.lock()
         }
         DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
-        tasksExecutor.execute(requestId, tasksExecStages, moduleIds, taskName, args, watch, serverNotificationsLogger)
+        tasksExecutor.execute(requestId, tasksExecStages, moduleIds, taskName, args, watch, serverNotificationsLogger, clientParams)
       } finally {
         allTaskInstances.reverse.foreach { taskInstance =>
           taskInstance.lock.unlock()
@@ -388,7 +392,8 @@ class DederProjectState(
           watchedTask.args,
           true, // tell client we are in watch mode
           watchedTask.serverNotificationsLogger,
-          watchedTask.useLastGood
+          watchedTask.useLastGood,
+          clientParams = watchedTask.clientParams
         )
         watchedTask.serverNotificationsLogger.add(
           ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...", watchedTask.taskInstance.moduleId)
@@ -440,7 +445,8 @@ class DederProjectState(
           watchedTask.useLastGood,
           watchedTask.json,
           startWatch = false,
-          exitOnEnd = false
+          exitOnEnd = false,
+          clientParams = watchedTask.clientParams
         )
         watchedTask.serverNotificationsLogger.add(
           ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...", watchedTask.taskInstance.moduleId)
@@ -486,5 +492,6 @@ case class WatchedTaskData(
     useLastGood: Boolean,
     json: Boolean,
     affectingSourceFileTasks: Set[TaskInstance],
-    affectingConfigValueTasks: Set[TaskInstance]
+    affectingConfigValueTasks: Set[TaskInstance],
+    clientParams: CliClientParams
 )

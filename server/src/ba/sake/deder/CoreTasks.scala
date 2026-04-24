@@ -975,11 +975,13 @@ class CoreTasks() extends StrictLogging {
             case _ => (Map.empty, cpus, cpus)
           }
           val testOptions = DederTestOptions(ctx.args)
+          val clientEnv = Option(RequestContext.clientParams.get()).map(_.envVars).getOrElse(Map.empty)
+          val mergedEnv = clientEnv ++ forkEnv // forkEnv wins on conflict
           ForkedTestOrchestrator.run(
             discoveredTests = discoveredTests,
             runtimeClasspath = runClasspath,
             jvmOptions = jvmOptions,
-            envVars = forkEnv,
+            envVars = mergedEnv,
             javaHome = javaHome.map(_.toString),
             testOptions = testOptions,
             notifications = ctx.notifications,

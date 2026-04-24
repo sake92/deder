@@ -100,6 +100,7 @@ public class Main {
             // start the timer AFTER server process is launched, not before
             var startedConnectingAt = Instant.now();
             var connected = false;
+            // TODO maybe not best idea to poll forever for BSP client..
             while (!connected && (isBspClient
                     || Duration.between(startedConnectingAt, Instant.now()).getSeconds() < maxConnectDurationSeconds)) {
                 try {

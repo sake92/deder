@@ -340,7 +340,8 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                 serverNotificationsLogger,
                 json = cliOptions.json.value,
                 startWatch = cliOptions.watch.value,
-                exitOnEnd = !cliOptions.watch.value
+                exitOnEnd = !cliOptions.watch.value,
+                clientParams = CliClientParams(m.envVars)
               )
           }
       case m: CliClientMessage.Cancel =>
