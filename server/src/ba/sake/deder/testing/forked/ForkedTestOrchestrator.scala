@@ -372,8 +372,8 @@ object ForkedTestOrchestrator {
       )
 
   private def buildClasspath(runtimeClasspath: Seq[os.Path]): String = {
-    val serverClasspath = Seq(DederGlobals.projectRootDir / ".deder/server.jar")
-    (serverClasspath ++ runtimeClasspath).map(_.toString).mkString(java.io.File.pathSeparator)
+    val testRunnerClasspath = Seq(DederGlobals.projectRootDir / ".deder/test-runner.jar")
+    (testRunnerClasspath ++ runtimeClasspath).map(_.toString).mkString(java.io.File.pathSeparator)
   }
 
   private def resolveJavaBinary(javaHome: Option[String]): String =

@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.scalajs.jsenv.{Input, JSComRun, JSEnv, JSRun, RunConfig}
 import org.scalajs.jsenv.nodejs.NodeJSEnv
 import org.scalajs.testing.adapter.TestAdapter
-import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
+import ba.sake.deder.{DederGlobals, RequestContext, ServerNotification, ServerNotificationsLogger}
 import ba.sake.deder.config.DederProject.ScalaJsModuleKind
 import ba.sake.deder.testing.*
 
@@ -54,7 +54,14 @@ class ScalaJsTestRunner(
         override def showStackTraces: Boolean = false
       }
 
-      val testRunner = DederTestRunner(testParallelism, discoveredTests, loadedFrameworks, getClass.getClassLoader, dederLogger)
+      val testRunner = DederTestRunner(testParallelism, discoveredTests, loadedFrameworks, getClass.getClassLoader, dederLogger, isCancelled = {
+        val currentRequestId = RequestContext.id.get()
+        () =>
+          currentRequestId != null && {
+            val tok = DederGlobals.cancellationTokens.get(currentRequestId)
+            tok != null && tok.get()
+          }
+      })
       testRunner.run(testOptions)
     } finally {
       adapter.close()

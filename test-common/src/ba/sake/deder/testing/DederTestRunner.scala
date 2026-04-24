@@ -14,8 +14,9 @@ class DederTestRunner(
     discoveredTests: Seq[DiscoveredFrameworkTests],
     frameworkOverrides: Map[String, Framework],
     classLoader: ClassLoader,
-    logger: DederTestLogger,
-    forkHooks: Option[ForkRunnerHooks] = None
+    logger: TestRunnerLogger,
+    forkHooks: Option[ForkRunnerHooks] = None,
+    isCancelled: () => Boolean = () => false
 ) {
 
   private val _perClassStats = scala.collection.mutable.Map[String, TestClassStats]()
@@ -128,13 +129,11 @@ class DederTestRunner(
   }
 
   private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Unit = {
-    val currentRequestId = RequestContext.id.get()
     val capturedNotificationsLogger = OutputCaptureContext.currentNotificationsLogger.get()
     val capturedModuleId = OutputCaptureContext.currentModuleId.get()
 
     def runOne(task: SbtTestTask): Unit = {
-      val cancelled = currentRequestId != null && DederGlobals.cancellationTokens.get(currentRequestId).get()
-      if cancelled then throw CancelledException("Tests execution cancelled")
+      if isCancelled() then throw CancelledException("Tests execution cancelled")
       val suiteName = task.taskDef().fullyQualifiedName()
       val threadId = Thread.currentThread().getId
       forkHooks.foreach { h =>
@@ -185,7 +184,7 @@ class DederTestRunner(
   }
 }
 
-class DederTestEventHandler(logger: DederTestLogger, frameworkName: String) extends EventHandler {
+class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) extends EventHandler {
   private val _results = mutable.ArrayBuffer[DederTestResult]()
   private val _classStats = mutable.Map[String, TestClassStats]()
 
