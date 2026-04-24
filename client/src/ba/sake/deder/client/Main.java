@@ -131,6 +131,10 @@ public class Main {
         var serverLocalPath = serverProps.getProperty("localPath", "");
         var versionCacheFile = Path.of(".deder/server.current.version");
         Path serverJarPath = Path.of(".deder/server.jar");
+        var cachedVersion = "";
+        if (Files.exists(versionCacheFile) && Files.isRegularFile(versionCacheFile)) {
+            cachedVersion = Files.readString(versionCacheFile, StandardCharsets.UTF_8).strip();
+        }
         if (serverLocalPath != null && !serverLocalPath.isBlank()) {
             // handy for development, use local server build
             log("Using local server build from " + serverLocalPath);
@@ -138,10 +142,6 @@ public class Main {
             Files.writeString(versionCacheFile, "local", StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } else {
-            var cachedVersion = "";
-            if (Files.exists(versionCacheFile) && Files.isRegularFile(versionCacheFile)) {
-                cachedVersion = Files.readString(versionCacheFile, StandardCharsets.UTF_8).strip();
-            }
             if (Files.exists(serverJarPath) && cachedVersion.equals(serverVersion) && !serverVersion.equals("early-access")) {
                 log("Server JAR already up-to-date (version " + serverVersion + "), skipping download.");
             } else {
@@ -149,6 +149,19 @@ public class Main {
                         serverJarPath);
                 Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
                         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            }
+        }
+        Path testRunnerJarPath = Path.of(".deder/test-runner.jar");
+        var testRunnerLocalPath = serverProps.getProperty("testRunnerLocalPath", "");
+        if (testRunnerLocalPath != null && !testRunnerLocalPath.isBlank()) {
+            log("Using local test-runner build from " + testRunnerLocalPath);
+            Files.copy(Path.of(testRunnerLocalPath), testRunnerJarPath, StandardCopyOption.REPLACE_EXISTING);
+        } else {
+            if (Files.exists(testRunnerJarPath) && cachedVersion.equals(serverVersion) && !serverVersion.equals("early-access")) {
+                log("Test-runner JAR already up-to-date (version " + serverVersion + "), skipping download.");
+            } else {
+                download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-test-runner.jar",
+                        testRunnerJarPath);
             }
         }
         startServerProcess(isBspClient, serverProps);
