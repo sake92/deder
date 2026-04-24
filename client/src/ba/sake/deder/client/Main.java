@@ -87,7 +87,7 @@ public class Main {
 
 
         client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(this::log, args);
-        var maxConnectDurationSeconds = 10;
+        var maxConnectDurationSeconds = Integer.parseInt(serverProps.getProperty("maxConnectSeconds", "30"));
         try {
             client.start();
         } catch (Exception e) {
@@ -100,9 +100,7 @@ public class Main {
             // start the timer AFTER server process is launched, not before
             var startedConnectingAt = Instant.now();
             var connected = false;
-            // TODO maybe not best idea to poll forever for BSP client..
-            while (!connected && (isBspClient
-                    || Duration.between(startedConnectingAt, Instant.now()).getSeconds() < maxConnectDurationSeconds)) {
+            while (!connected && Duration.between(startedConnectingAt, Instant.now()).getSeconds() < maxConnectDurationSeconds) {
                 try {
                     var sleepMillis = isBspClient ? 1000 : 100;
                     Thread.sleep(sleepMillis);
