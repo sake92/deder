@@ -205,31 +205,26 @@ class DederTestEventHandler(logger: DederTestLogger, frameworkName: String) exte
     }
     val duration = Duration.ofMillis(event.duration())
     val eventThrowable = Option.when(event.throwable().isDefined)(event.throwable().get())
-    event.status() match {
-      case Status.Success =>
-        // Passing tests rely on the framework's own reporter (ScalaTest, munit, etc. print their own).
-        // Avoid duplicating every test in our output; only non-success results get our uniform line.
-        ()
-      case other =>
-        val status = other match {
-          case Status.Failure  => fansi.Color.Red("FAIL \uD83D\uDD34")
-          case Status.Error    => fansi.Color.Red("FAIL \uD83D\uDD34")
-          case Status.Skipped  => fansi.Color.LightYellow("SKIP 🚫")
-          case Status.Ignored  => fansi.Color.LightYellow("SKIP 🚫")
-          case Status.Canceled => fansi.Color.LightYellow("SKIP 🚫")
-          case Status.Pending  => fansi.Color.LightYellow("SKIP 🚫")
-          case Status.Success  => "" // unreachable
-        }
-        logger.test(s"$status $testName ; took ${duration.toPrettyString}")
-        eventThrowable.foreach { t =>
-          logger.error(s"  ${t.getMessage}")
-          if (shouldLogStackTrace(t)) {
-            t.getStackTrace.take(10).foreach { line =>
-              logger.error(s"    at $line")
-            }
-          }
-        }
+
+    val status = event.status() match {
+      case Status.Failure  => fansi.Color.Red("FAIL \uD83D\uDD34")
+      case Status.Error    => fansi.Color.Red("FAIL \uD83D\uDD34")
+      case Status.Skipped  => fansi.Color.LightYellow("SKIP 🚫")
+      case Status.Ignored  => fansi.Color.LightYellow("SKIP 🚫")
+      case Status.Canceled => fansi.Color.LightYellow("SKIP 🚫")
+      case Status.Pending  => fansi.Color.LightYellow("SKIP 🚫")
+      case Status.Success  => fansi.Color.Green("PASS ✅")
     }
+    logger.test(s"$status $testName ; took ${duration.toPrettyString}")
+    eventThrowable.foreach { t =>
+      logger.error(s"  ${t.getMessage}")
+      if (shouldLogStackTrace(t)) {
+        t.getStackTrace.take(10).foreach { line =>
+          logger.error(s"    at $line")
+        }
+      }
+    }
+
     _results += DederTestResult(
       name = testName,
       status = event.status(),
