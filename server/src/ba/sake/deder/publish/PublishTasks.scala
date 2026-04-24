@@ -122,6 +122,13 @@ class PublishTasks(coreTasks: CoreTasks) {
       ctx.transitiveResults.flatten.flatten.prepended(jar).reverse.distinct.reverse
     }
 
+  private val skipAssemblyEntry: String => Boolean = { name =>
+    // skip signature files to avoid "invalid signature file" errors when running the assembly jar
+    val lower = name.toLowerCase
+    val isSignatureFile = lower.endsWith(".sf") || lower.endsWith(".rsa") || lower.endsWith(".dsa")
+    lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("meta-inf/manifest.mf"))
+  }
+
   val assemblyTask = CachedTaskBuilder
     .make[os.Path](
       name = "assembly",
@@ -145,13 +152,7 @@ class PublishTasks(coreTasks: CoreTasks) {
       val allJars = os.list(tmpDir) ++ depsJars
       val mergedJar = ctx.out / "mergedJar.jar"
       // TODO this should be doable with jarjarabrams, but didnt succeed in making it work yet
-      val skip = (name: String) => {
-        // skip signature files to avoid "invalid signature file" errors when running the assembly jar
-        val lower = name.toLowerCase
-        val isSignatureFile = lower.endsWith(".sf") || lower.endsWith(".rsa") || lower.endsWith(".dsa")
-        lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("meta-inf/manifest.mf"))
-      }
-      JarUtils.mergeJars(mergedJar, allJars, manifestEntries.toJarManifest, skip)
+      JarUtils.mergeJars(mergedJar, allJars, manifestEntries.toJarManifest, skipAssemblyEntry)
       val resultJarPath = ctx.out / "out.jar"
       JarUtils.createAssemblyJar(resultJarPath, mergedJar)
       resultJarPath
