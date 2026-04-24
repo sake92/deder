@@ -21,7 +21,7 @@ trait BaseIntegrationSuite extends munit.FunSuite {
       val tweakedLines = Seq(""" amends "../../config/DederProject.pkl" """) ++ originalLines.tail
       os.write.over(tempDir / "deder.pkl", tweakedLines.mkString("\n"), createFolders = true)
       val allServerProperties = serverProperties + ("localPath" -> dederServerPath)
-      val serverPropertiesContent = allServerProperties.map((k, v) => s"$k=$v").mkString("\n") + "\n"
+      val serverPropertiesContent = allServerProperties.map((k, v) => s"${k}=${v}").mkString("\n") + "\n"
       os.write.over(tempDir / ".deder/server.properties", serverPropertiesContent, createFolders = true)
       System.setProperty("DEDER_PROJECT_ROOT_DIR", tempDir.toString)
       testCode(tempDir)
@@ -31,10 +31,11 @@ trait BaseIntegrationSuite extends munit.FunSuite {
     }
   }
 
-  def executeDederCommand(projectPath: os.Path, command: String): os.CommandResult = {
+  def executeDederCommand(projectPath: os.Path, command: String*): os.CommandResult = {
     // val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
     //val cmd = shell ++ Seq(s"$dederClientPath $command")
-    val cmd = Seq("java", "-jar", dederClientPath, command)
+    val cmd = Seq("java", "-jar", dederClientPath) ++ command
+    println(s"Executing command: ${cmd.mkString(" ")} in $projectPath")
     os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe, check = false)
   }
 }

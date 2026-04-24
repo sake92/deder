@@ -322,7 +322,6 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
               serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
               serverMessages.put(CliServerMessage.Exit(1))
             case Right(cliOptions) =>
-              logger.debug(s"Executing $cliOptions")
               val notificationCallback: ServerNotification => Unit = {
                 case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
                 // skip

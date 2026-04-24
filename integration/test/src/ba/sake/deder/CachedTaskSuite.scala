@@ -8,7 +8,7 @@ class CachedTaskSuite extends BaseIntegrationSuite {
 
   test("cached tasks: first run should compute results") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
-      executeDederCommand(projectPath, "exec -m common -t compileClasspath")
+      val res = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
       val logLines = os.read.lines(projectPath / ".deder/logs/server.log")
       assert(
         logLines.exists(_.contains("Computed result for compileClasspath")),
@@ -23,9 +23,9 @@ class CachedTaskSuite extends BaseIntegrationSuite {
 
   test("cached tasks: second run should use cached results") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
-      executeDederCommand(projectPath, "exec -m common -t compileClasspath")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
       val offsetAfterFirstRun = serverLogOffset(projectPath)
-      executeDederCommand(projectPath, "exec -m common -t compileClasspath")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
       val newLines = readNewServerLogLines(projectPath, offsetAfterFirstRun)
       assert(
         newLines.exists(_.contains("Using cached result for compileClasspath")),
@@ -40,7 +40,7 @@ class CachedTaskSuite extends BaseIntegrationSuite {
 
   test("cached tasks: should recompute after dependency change") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
-      executeDederCommand(projectPath, "exec -m common -t compileClasspath")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
       val offsetAfterFirstRun = serverLogOffset(projectPath)
       // Add jsoup dep to common module — this changes the `deps` task output hash,
       // which invalidates the `compileClasspath` cache entry for common
@@ -54,7 +54,7 @@ class CachedTaskSuite extends BaseIntegrationSuite {
       )
       // Give the server file watcher a moment to pick up the config change
       Thread.sleep(500)
-      executeDederCommand(projectPath, "exec -m common -t compileClasspath")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
       val newLines = readNewServerLogLines(projectPath, offsetAfterFirstRun)
       assert(
         newLines.exists(_.contains("Computed result for compileClasspath")),
@@ -65,7 +65,7 @@ class CachedTaskSuite extends BaseIntegrationSuite {
 
   test("cached tasks: should recompute after a source file rename that preserves sort order") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
-      executeDederCommand(projectPath, "exec -m common -t sourceFiles")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "sourceFiles")
       val offsetAfterFirstRun = serverLogOffset(projectPath)
       // Rename common/src/Common.scala -> Commom.scala. It's the only entry in its dir,
       // so the rename trivially preserves sort order. Content unchanged. Before the Hashable fix
@@ -73,7 +73,7 @@ class CachedTaskSuite extends BaseIntegrationSuite {
       os.move(projectPath / "common/src/Common.scala", projectPath / "common/src/Commom.scala")
       // Give the server file watcher a moment to observe the rename.
       Thread.sleep(500)
-      executeDederCommand(projectPath, "exec -m common -t sourceFiles")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "sourceFiles")
       val newLines = readNewServerLogLines(projectPath, offsetAfterFirstRun)
       assert(
         newLines.exists(_.contains("Computed result for sourceFiles")),
@@ -84,13 +84,13 @@ class CachedTaskSuite extends BaseIntegrationSuite {
 
   test("cached tasks: should handle corrupted metadata.json gracefully") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
-      executeDederCommand(projectPath, "exec -m common -t compileClasspath")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
       os.write.over(
         projectPath / ".deder/out/common/compileClasspath/metadata.json",
         "not valid json {{{"
       )
       val offsetAfterCorrupt = serverLogOffset(projectPath)
-      val result = executeDederCommand(projectPath, "exec -m common -t compileClasspath")
+      val result = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
       assertEquals(result.exitCode, 0, "Expected successful exit after corrupted metadata")
       val newLines = readNewServerLogLines(projectPath, offsetAfterCorrupt)
       assert(
