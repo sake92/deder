@@ -24,7 +24,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
       os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
-      executeDederCommand(testDir, "bsp install")
+      executeDederCommand(testDir, "bsp", "install")
 
       // First session: run a query
       withBspSession(testDir) { (buildServer1, _, _) =>
@@ -54,7 +54,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
       os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
-      executeDederCommand(testDir, "bsp install")
+      executeDederCommand(testDir, "bsp", "install")
 
       // First session
       withBspSession(testDir) { (buildServer1, _, bspProcess1) =>
@@ -88,7 +88,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
       os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
-      executeDederCommand(testDir, "bsp install")
+      executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, _, bspProcess) =>
         val modules = List("common", "frontend", "backend", "uber")
@@ -116,7 +116,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
       os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
-      executeDederCommand(testDir, "bsp install")
+      executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, _, _) =>
         val unknownUri = s"${baseUri(testDir)}#nonexistent"
@@ -140,7 +140,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
       os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
-      executeDederCommand(testDir, "bsp install")
+      executeDederCommand(testDir, "bsp", "install")
 
       // First session: compile common
       withBspSession(testDir) { (buildServer1, capturingClient1, _) =>
@@ -176,7 +176,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
       os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
-      executeDederCommand(testDir, "bsp install")
+      executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, capturingClient, _) =>
         val params = new CompileParams(List(targetId(testDir, "common")).asJava)
@@ -215,7 +215,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
       os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
-      executeDederCommand(testDir, "bsp install")
+      executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, capturingClient, _) =>
         // Write a compilation error

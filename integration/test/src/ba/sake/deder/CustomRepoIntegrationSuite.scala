@@ -13,7 +13,7 @@ class CustomRepoIntegrationSuite extends BaseIntegrationSuite {
       val rewritten = pkl.replace("__LOCAL_REPO_URL__", localRepoUrl)
       os.write.over(projectPath / "deder.pkl", rewritten)
 
-      val res = executeDederCommand(projectPath, "exec -t run -m app")
+      val res = executeDederCommand(projectPath, "exec", "-t", "run", "-m", "app")
       val out = res.out.text()
       assert(res.exitCode == 0, s"exit=${res.exitCode}, stderr=${res.err.text()}\nstdout=$out")
       assert(out.contains("hello, deder"), s"output did not contain greeting: $out")

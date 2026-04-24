@@ -11,7 +11,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
 
   test("deder should make publishArtifacts") {
     withTestProject("sample-projects/publish") { projectPath =>
-      executeDederCommand(projectPath, "exec -m lib1 -t publishArtifacts").out.text()
+      executeDederCommand(projectPath, "exec", "-m", "lib1", "-t", "publishArtifacts").out.text()
       locally {
         val publishArtifactsPath = projectPath / ".deder/out/lib1/publishArtifacts/artifacts"
         val pomContent = os.read(publishArtifactsPath / "lib1_3-0.0.1-SNAPSHOT.pom")
@@ -30,7 +30,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
 
   test("deder POM should only contain direct module deps, not transitive") {
     withTestProject("sample-projects/publish") { projectPath =>
-      executeDederCommand(projectPath, "exec -m lib3 -t publishArtifacts").out.text()
+      executeDederCommand(projectPath, "exec", "-m", "lib3", "-t", "publishArtifacts").out.text()
       val publishArtifactsPath = projectPath / ".deder/out/lib3/publishArtifacts/artifacts"
       val pomContent = os.read(publishArtifactsPath / "lib3_3-0.0.1-SNAPSHOT.pom")
       val reader = new MavenXpp3Reader()
@@ -47,7 +47,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
 
   test("deder POM should contain all direct module deps when multiple exist") {
     withTestProject("sample-projects/publish") { projectPath =>
-      executeDederCommand(projectPath, "exec -m lib4 -t publishArtifacts").out.text()
+      executeDederCommand(projectPath, "exec", "-m", "lib4", "-t", "publishArtifacts").out.text()
       val publishArtifactsPath = projectPath / ".deder/out/lib4/publishArtifacts/artifacts"
       val pomContent = os.read(publishArtifactsPath / "lib4_3-0.0.1-SNAPSHOT.pom")
       val reader = new MavenXpp3Reader()
@@ -62,7 +62,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
 
   test("deder jar should contain custom manifest entries") {
     withTestProject("sample-projects/publish") { projectPath =>
-      executeDederCommand(projectPath, "exec -t jar -m lib1").out.text()
+      executeDederCommand(projectPath, "exec", "-t", "jar", "-m", "lib1").out.text()
       val jarPath = projectPath / ".deder/out/lib1/jar/lib1.jar"
       assert(os.exists(jarPath), s"JAR not found at $jarPath")
       val jarFile = new JarFile(jarPath.toIO)

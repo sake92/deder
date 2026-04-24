@@ -23,7 +23,7 @@ class ScalaNativeIntegrationSuite extends BaseIntegrationSuite {
   test("deder should nativeLink cli project") {
     withTestProject("sample-projects/scalanative") { projectPath =>
       locally {
-        executeDederCommand(projectPath, "exec -m cli -t nativeLink")
+        executeDederCommand(projectPath, "exec", "-m", "cli", "-t", "nativeLink")
         val command = s"./.deder/out/cli/nativeLink/cli"
         val res = os.proc(command).call(cwd = projectPath, stderr = os.Pipe)
         val resText = res.out.text()
@@ -34,7 +34,7 @@ class ScalaNativeIntegrationSuite extends BaseIntegrationSuite {
 
   test("deder should test scalanative project") {
     withTestProject("sample-projects/scalanative") { projectPath =>
-      val res = executeDederCommand(projectPath, "exec -t test")
+      val res = executeDederCommand(projectPath, "exec", "-t", "test")
       val outText = res.err.text()
       assert(
         outText.contains("Test Summary: 3 total, 1 passed, 1 failed, 0 errors, 1 skipped"),

@@ -27,21 +27,21 @@ class IntegrationSuite extends BaseIntegrationSuite {
         }
       }
       locally {
-        val dederRes = executeDederCommand(projectPath, "modules --json")
+        val dederRes = executeDederCommand(projectPath, "modules", "--json")
         val dederOutput = dederRes.out.text()
         List("common", "frontend", "backend", "uber", "uber-test").foreach { moduleId =>
           assert(dederOutput.contains(moduleId), s"Module '$moduleId' not found in 'deder modules --json' output")
         }
       }
       locally {
-        val dederRes = executeDederCommand(projectPath, "modules --ascii")
+        val dederRes = executeDederCommand(projectPath, "modules", "--ascii")
         val dederOutput = dederRes.out.text()
         List("common", "frontend", "backend", "uber", "uber-test").foreach { moduleId =>
           assert(dederOutput.contains(moduleId), s"Module '$moduleId' not found in 'deder modules --ascii' output")
         }
       }
       locally {
-        val dederRes = executeDederCommand(projectPath, "modules --dot")
+        val dederRes = executeDederCommand(projectPath, "modules", "--dot")
         val dederOutput = dederRes.out.text()
         List("common", "frontend", "backend", "uber", "uber-test").foreach { moduleId =>
           assert(dederOutput.contains(moduleId), s"Module '$moduleId' not found in 'deder modules --dot' output")
@@ -49,14 +49,14 @@ class IntegrationSuite extends BaseIntegrationSuite {
       }
       // deder tasks
       locally {
-        val dederRes = executeDederCommand(projectPath, "tasks -m common")
+        val dederRes = executeDederCommand(projectPath, "tasks", "-m", "common")
         val dederOutput = dederRes.out.text()
         List("sources", "compile", "run").foreach { taskName =>
           assert(dederOutput.contains(taskName), s"Task '$taskName' not found in 'deder tasks -m common' output")
         }
       }
       locally {
-        val dederRes = executeDederCommand(projectPath, "tasks -m uber-test")
+        val dederRes = executeDederCommand(projectPath, "tasks", "-m", "uber-test")
         val dederOutput = dederRes.out.text()
         List("sources", "compile", "test").foreach { taskName =>
           assert(dederOutput.contains(taskName), s"Task '$taskName' not found in 'deder tasks -m uber-test' output")
@@ -64,7 +64,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
       }
       // deder plan
       locally {
-        val dederRes = executeDederCommand(projectPath, "plan -m common -t compile")
+        val dederRes = executeDederCommand(projectPath, "plan", "-m", "common", "-t", "compile")
         val dederOutput = dederRes.out.text()
         assertEquals(
           dederOutput,
@@ -110,7 +110,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
   test("deder should compile multimodule project") {
     withTestProject("sample-projects/multi") { projectPath =>
       locally {
-        val dederOutputJson = executeDederCommand(projectPath, "exec -m uber -t compileClasspath --json").out.text()
+        val dederOutputJson = executeDederCommand(projectPath, "exec", "-m", "uber", "-t", "compileClasspath", "--json").out.text()
         val dederOutput = dederOutputJson.parseJson[Map[String, List[String]]]
         val uberCompileClasspath = dederOutput("uber")
         assert(uberCompileClasspath(0).endsWith("/.deder/out/uber/classes"))
@@ -145,7 +145,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
   test("deder should run multimodule project") {
     withTestProject("sample-projects/multi") { projectPath =>
       locally {
-        val dederOutput = executeDederCommand(projectPath, "exec -t run -m uber arg1 arg2 arg3").out.text()
+        val dederOutput = executeDederCommand(projectPath, "exec", "-t", "run", "-m", "uber", "arg1", "arg2", "arg3").out.text()
         assert(dederOutput.contains("Args = arg1, arg2, arg3"))
       }
       locally {
@@ -155,7 +155,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
         val results = new AtomicReference[Map[Int, String]](Map.empty)
         val threads = (1 to totalRuns).map { i =>
           new Thread(() => {
-            val output = executeDederCommand(projectPath, s"exec -t run -m uber arg$i").out.text()
+            val output = executeDederCommand(projectPath, "exec", "-t", "run", "-m", "uber", s"arg$i").out.text()
             results.updateAndGet(_ + (i -> output))
             ()
           })
@@ -180,7 +180,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
   test("deder should run tests in multimodule/uber-test") {
     withTestProject("sample-projects/multi") { projectPath =>
       locally {
-        val dederOutput = executeDederCommand(projectPath, "exec -m uber-test -t test").err.text()
+        val dederOutput = executeDederCommand(projectPath, "exec", "-m", "uber-test", "-t", "test").err.text()
         // println(s"Test output:\n$dederOutput")
         // assert(resText.contains("Args = argA, argB, argC"))
       }
@@ -190,7 +190,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
   test("deder should assembly multimodule/uber and run it") {
     withTestProject("sample-projects/multi") { projectPath =>
       locally {
-        executeDederCommand(projectPath, "exec -m uber -t assembly")
+        executeDederCommand(projectPath, "exec", "-m", "uber", "-t", "assembly")
         val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
         val command = s"java -cp ${projectPath / ".deder/out/uber/assembly/out.jar"} uber.Main argA argB argC"
         val cmd = shell ++ Seq(command)
@@ -205,7 +205,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/multi") { projectPath =>
       val bspConfigPath = projectPath / ".bsp/deder-bsp.json"
       assert(!os.exists(bspConfigPath))
-      executeDederCommand(projectPath, "bsp install")
+      executeDederCommand(projectPath, "bsp", "install")
       assert(os.exists(bspConfigPath))
       case class BspConfig(
           name: String,

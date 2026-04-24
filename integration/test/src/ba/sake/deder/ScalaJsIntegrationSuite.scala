@@ -13,7 +13,7 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
   test("deder should compile scalajs project") {
     withTestProject("sample-projects/scalajs") { projectPath =>
       locally {
-        val dederOutputJson = executeDederCommand(projectPath, "exec -m frontend -t compileClasspath --json").out.text()
+        val dederOutputJson = executeDederCommand(projectPath, "exec", "-m", "frontend", "-t", "compileClasspath", "--json").out.text()
         val dederOutput = dederOutputJson.parseJson[Map[String, List[String]]]
         val frontendCompileClasspath = dederOutput("frontend")
         assert(frontendCompileClasspath(0).endsWith("/.deder/out/frontend/classes"))
@@ -35,7 +35,7 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
   test("deder should fastLinkJs scalajs project") {
     withTestProject("sample-projects/scalajs") { projectPath =>
       locally {
-        executeDederCommand(projectPath, "exec -m frontend -t fastLinkJs")
+        executeDederCommand(projectPath, "exec", "-m", "frontend", "-t", "fastLinkJs")
         val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
         val command = s"node .deder/out/frontend/fastLinkJs/main.js"
         val cmd = shell ++ Seq(command)
@@ -48,7 +48,7 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
 
   test("deder should test scalajs project") {
     withTestProject("sample-projects/scalajs") { projectPath =>
-      val res = executeDederCommand(projectPath, "exec -t test")
+      val res = executeDederCommand(projectPath, "exec", "-t", "test")
       val outText = res.err.text()
       assert(
         outText.contains("Test Summary: 3 total, 1 passed, 1 failed, 0 errors, 1 skipped"),
