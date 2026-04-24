@@ -97,7 +97,7 @@ class TasksResolverSuite extends munit.FunSuite {
       "assembly",
       "run",
       "runMain",
-      "depsAssembly",
+      "assemblyDeps",
       "sourcesJar",
       "javadocJar",
       "pomSettings",

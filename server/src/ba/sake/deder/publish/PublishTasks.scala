@@ -129,9 +129,9 @@ class PublishTasks(coreTasks: CoreTasks) {
     lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("meta-inf/manifest.mf"))
   }
 
-  val depsAssemblyTask = CachedTaskBuilder
+  val assemblyDepsTask = CachedTaskBuilder
     .make[os.Path](
-      name = "depsAssembly",
+      name = "assemblyDeps",
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(coreTasks.scalaVersionTask)
@@ -152,13 +152,13 @@ class PublishTasks(coreTasks: CoreTasks) {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
     .dependsOn(finalManifestSettingsTask)
-    .dependsOn(depsAssemblyTask)
+    .dependsOn(assemblyDepsTask)
     .dependsOn(allJarsTask)
     .build { ctx =>
-      val (manifestEntries, depsAssemblyJar, allModulesJars) = ctx.depResults
+      val (manifestEntries, assemblyDepsJar, allModulesJars) = ctx.depResults
       os.makeDir.all(ctx.out)
       val mergedJar = ctx.out / "mergedJar.jar"
-      JarUtils.mergeJars(mergedJar, allModulesJars ++ Seq(depsAssemblyJar), manifestEntries.toJarManifest, skipAssemblyEntry)
+      JarUtils.mergeJars(mergedJar, allModulesJars ++ Seq(assemblyDepsJar), manifestEntries.toJarManifest, skipAssemblyEntry)
       val resultJarPath = ctx.out / "out.jar"
       JarUtils.createAssemblyJar(resultJarPath, mergedJar)
       resultJarPath
@@ -434,7 +434,7 @@ class PublishTasks(coreTasks: CoreTasks) {
     finalManifestSettingsTask,
     jarTask,
     allJarsTask,
-    depsAssemblyTask,
+    assemblyDepsTask,
     assemblyTask,
     moduleDepsPomSettingsTask,
     sourcesJarTask,
