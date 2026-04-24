@@ -676,7 +676,8 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val (_, compileClasspath, resourceDirs) = ctx.depResults
       val resources = resourceDirs.map(_.absPath)
-      compileClasspath ++ resources
+      val localRunClasspath = compileClasspath ++ resources
+      (localRunClasspath ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
     }
 
   val mainClassesTask = CachedTaskBuilder

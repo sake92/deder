@@ -9,8 +9,7 @@ class TasksResolverSuite extends munit.FunSuite {
 
   private val testProjectsDir = os.pwd / "server/test/resources/sample-projects"
 
-  // TODO reenable after test-runner is used for forked test exec
-  test("TasksResolver builds correct modules and tasks graph".ignore) {
+  test("TasksResolver builds correct modules and tasks graph") {
     val configParser = ConfigParser(writeJson = false)
     val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
     assert(parsedConfig.isRight, parsedConfig.left.get)
@@ -154,9 +153,8 @@ class TasksResolverSuite extends munit.FunSuite {
           transitiveScalaModuleTaskEdges("uber", "backend") ++
           transitiveScalaModuleTaskEdges("uber-test", "uber")
       locally {
-        println(s"Found edges (${taskInstanceEdgeIdsGraph.size}): ${taskInstanceEdgeIdsGraph.filter(_._1.startsWith("uber-test.assembly")).mkString("\n ")}")
         val diff1 = expectedEdges.diff(taskInstanceEdgeIdsGraph)
-       /* assert(
+        assert(
           diff1.isEmpty,
           s"Task instance graph edges mismatch. Nonexisting edges: ${diff1
               .take(10)}${if diff1.size > 10 then "..." else ""}"
@@ -165,8 +163,8 @@ class TasksResolverSuite extends munit.FunSuite {
         assert(
           diff2.isEmpty,
           s"Task instance graph edges mismatch. Missing edges: ${diff2.take(10)}${if diff2.size > 10 then "..." else ""}"
-        )*/
-        // assertEquals(taskInstanceEdgeIdsGraph, expectedEdges)
+        )
+        assertEquals(taskInstanceEdgeIdsGraph, expectedEdges)
       }
     }
   }

@@ -199,6 +199,7 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
     val duration = Duration.ofMillis(event.duration())
     val eventThrowable = Option.when(event.throwable().isDefined)(event.throwable().get())
 
+    // TODO maybe skip PASS here
     val status = event.status() match {
       case Status.Failure  => fansi.Color.Red("FAIL \uD83D\uDD34")
       case Status.Error    => fansi.Color.Red("FAIL \uD83D\uDD34")

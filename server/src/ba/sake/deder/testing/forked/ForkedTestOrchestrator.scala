@@ -7,8 +7,9 @@ import scala.util.control.NonFatal
 import ba.sake.deder.*
 import ba.sake.deder.testing.*
 import ba.sake.tupson.{*, given}
+import com.typesafe.scalalogging.StrictLogging
 
-object ForkedTestOrchestrator {
+object ForkedTestOrchestrator extends StrictLogging {
 
   private val MaxTestTimeMs = 30L * 60 * 1000
   private val RunIdFormatter =
