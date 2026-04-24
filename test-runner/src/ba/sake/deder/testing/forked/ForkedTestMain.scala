@@ -20,7 +20,7 @@ object ForkedTestMain {
     // forked JVM already has the full classpath on -cp; use the system classloader directly.
     val classLoader = ClassLoader.getSystemClassLoader
 
-    val logger = new ForkedTestLogger(moduleId = "fork")
+    val logger = new ForkedTestLogger
 
     val testRunner = new DederTestRunner(
       testParallelism = forkedArgs.testParallelism,
