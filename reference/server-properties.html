@@ -71,6 +71,7 @@ deder
     <li><code>maxInactiveSeconds</code> - max number of seconds server is inactive before it shuts down automatically</li>
     <li><code>bspEnabled</code> - specifies if BSP protocol is enabled. If false, the BSP Deder server is never started (useful in CI or to save memory/CPU)</li>
     <li><code>JAVA_OPTS</code> - java options passed to server java process</li>
+    <li><code>maxConnectSeconds</code> - max number of seconds the client waits for the server to start before giving up. Defaults to <code>30</code>. Increase this on slow machines or CI environments.</li>
     <li><code>localPath</code> - fixed local path to server JAR, useful for developing Deder and debugging</li>
    </ul>
    <div role="group">
