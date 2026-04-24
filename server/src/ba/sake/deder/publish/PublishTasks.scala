@@ -151,25 +151,14 @@ class PublishTasks(coreTasks: CoreTasks) {
       name = "assembly",
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST)
     )
-    .dependsOn(coreTasks.scalaVersionTask)
     .dependsOn(finalManifestSettingsTask)
-    .dependsOn(coreTasks.mandatoryDependenciesTask)
-    .dependsOn(coreTasks.allDependenciesTask)
+    .dependsOn(depsAssemblyTask)
     .dependsOn(allJarsTask)
     .build { ctx =>
-      val (scalaVersion, manifestEntries, mandatoryDependencies, dependencies, allModulesJars) =
-        ctx.depResults
-      val depsJars = ctx.dependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
-      val tmpDir = ctx.out / "jars"
-      os.makeDir.all(tmpDir)
-      allModulesJars.zipWithIndex.foreach { case (jar, index) =>
-        val jarName = s"${index + 1}-${jar.last}"
-        os.copy.over(jar, tmpDir / jarName)
-      }
-      val allJars = os.list(tmpDir) ++ depsJars
+      val (manifestEntries, depsAssemblyJar, allModulesJars) = ctx.depResults
+      os.makeDir.all(ctx.out)
       val mergedJar = ctx.out / "mergedJar.jar"
-      // TODO this should be doable with jarjarabrams, but didnt succeed in making it work yet
-      JarUtils.mergeJars(mergedJar, allJars, manifestEntries.toJarManifest, skipAssemblyEntry)
+      JarUtils.mergeJars(mergedJar, allModulesJars ++ Seq(depsAssemblyJar), manifestEntries.toJarManifest, skipAssemblyEntry)
       val resultJarPath = ctx.out / "out.jar"
       JarUtils.createAssemblyJar(resultJarPath, mergedJar)
       resultJarPath
