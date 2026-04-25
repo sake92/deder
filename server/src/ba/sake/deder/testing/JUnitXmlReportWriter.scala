@@ -38,16 +38,15 @@ object JUnitXmlReportWriter {
 
   private def nextFileName(suiteName: String, usedNames: collection.mutable.Set[String]): String = {
     val base = sanitizeFileName(suiteName)
-    val candidate = s"TEST-$base.xml"
-    if !usedNames.contains(candidate) then {
-      usedNames += candidate
-      candidate
-    } else {
-      val collisionSuffix = java.lang.Long.toHexString(java.lang.Integer.toUnsignedLong(suiteName.hashCode))
-      val hashed = s"TEST-$base-$collisionSuffix.xml"
-      usedNames += hashed
-      hashed
-    }
+    Iterator
+      .single(s"TEST-$base.xml")
+      .concat(LazyList.from(2).map(i => s"TEST-$base-$i.xml"))
+      .find(name => !usedNames.contains(name))
+      .map { name =>
+        usedNames += name
+        name
+      }
+      .get
   }
 
   private def sanitizeFileName(name: String): String = {

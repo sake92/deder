@@ -189,7 +189,7 @@ object ForkedTestOrchestrator extends StrictLogging {
     val resultsFilePath = forkDir / s"fork-results-${java.util.UUID.randomUUID()}.json"
     val stdoutLog = forkDir / "stdout.log"
     val stderrLog = forkDir / "stderr.log"
-    val suiteOutputs = new java.util.concurrent.ConcurrentHashMap[String, StringBuffer]()
+    val suiteOutputs = new java.util.concurrent.ConcurrentHashMap[String, StringBuilder]()
     if os.exists(stdoutLog) then os.remove(stdoutLog)
     if os.exists(stderrLog) then os.remove(stderrLog)
 
@@ -250,7 +250,7 @@ object ForkedTestOrchestrator extends StrictLogging {
         val payload = os.read(resultsFilePath).parseJson[ForkedTestResultsPayload]
         Some(
           payload.copy(
-            results = payload.results.withSuiteStdout(suiteOutputs.asScala.view.mapValues(_.toString).toMap)
+            results = payload.results.withSuiteStdout(suiteOutputs.asScala.view.mapValues(_.result()).toMap)
           )
         )
       }
@@ -282,7 +282,7 @@ object ForkedTestOrchestrator extends StrictLogging {
       tag: String,
       notifications: ServerNotificationsLogger,
       moduleId: String,
-      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, StringBuffer]
+      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, StringBuilder]
   ): Unit = {
     val reader = new java.io.BufferedReader(new java.io.InputStreamReader(proc.stdout.wrapped))
     try {
@@ -343,7 +343,7 @@ object ForkedTestOrchestrator extends StrictLogging {
       tag: String,
       notifications: ServerNotificationsLogger,
       moduleId: String,
-      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, StringBuffer]
+      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, StringBuilder]
   ): Unit = env match {
     case ForkedTestEnvelope.ForkStarted(_) =>
       notifications.add(ServerNotification.logDebug(s"${tag}started", Some(moduleId)))
@@ -353,7 +353,10 @@ object ForkedTestOrchestrator extends StrictLogging {
       val header = s"${tag}${name} completed"
       if output.nonEmpty then {
         val key = DederTestNames.normalizeSuiteName(name)
-        suiteOutputs.computeIfAbsent(key, _ => new StringBuffer()).append(output)
+        val builder = suiteOutputs.computeIfAbsent(key, _ => new StringBuilder())
+        builder.synchronized {
+          builder.append(output)
+        }
       }
       os.write.append(logFile, s"$header\n$output\n", createFolders = true)
       notifications.add(ServerNotification.logInfo(header, Some(moduleId)))
