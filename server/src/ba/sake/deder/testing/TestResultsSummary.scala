@@ -1,5 +1,6 @@
 package ba.sake.deder.testing
 
+import java.time.Duration
 import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
 
 object TestResultsSummary {
@@ -14,30 +15,53 @@ object TestResultsSummary {
       errors = results.map(_._2.errors).sum,
       skipped = results.map(_._2.skipped).sum,
       duration = results.map(_._2.duration).sum,
-      failedTestNames = results.flatMap(_._2.failedTestNames)
+      failedTestNames = results.flatMap(_._2.failedTestNames),
+      suitesTotal = results.map(_._2.suitesTotal).sum,
+      suitesPassed = results.map(_._2.suitesPassed).sum,
+      suitesFailed = results.map(_._2.suitesFailed).sum
     )
     val separator = "═" * 50
+    val statusIcon = if totalResults.success then "✅ PASS" else "🔴 FAIL"
+    val totalFailed = totalResults.failed + totalResults.errors
+    val suitesStr = renderCounts(totalResults.suitesPassed, totalResults.suitesFailed, 0, totalResults.suitesTotal)
+    val testsStr = renderCounts(totalResults.passed, totalFailed, totalResults.skipped, totalResults.total)
+    val timeStr = Duration.ofMillis(totalResults.duration).toPrettyString
     notifications.add(ServerNotification.logInfo(separator))
-    val statusIcon = if totalResults.success then "PASS ✅" else "FAIL \uD83D\uDD34"
     notifications.add(
       ServerNotification.logInfo(
-        s"$statusIcon Test Summary: ${totalResults.total} total, ${totalResults.passed} passed, " +
-          s"${totalResults.failed} failed, ${totalResults.errors} errors, ${totalResults.skipped} skipped"
+        s"$statusIcon  Suites: $suitesStr  │  Tests: $testsStr  │  $timeStr"
       )
     )
-    results.foreach { case (moduleId, res) =>
-      val icon = if res.success then "  PASS ✅" else "  FAIL \uD83D\uDD34"
-      val detail = Option.when(!res.success) {
-        Seq(
-          Option.when(res.failed > 0)(s"${res.failed} failed"),
-          Option.when(res.errors > 0)(s"${res.errors} errors")
-        ).flatten.mkString(", ")
-      }
-      notifications.add(ServerNotification.logInfo(s"$icon $moduleId${detail.map(d => s" ($d)").getOrElse("")}"))
+    val interesting = results.filter { case (_, res) =>
+      val moduleFailed = res.failed + res.errors
+      moduleFailed > 0 || res.skipped > 0
+    }
+    val (skippedOnly, hasFailed) = interesting.partition { case (_, res) =>
+      val moduleFailed = res.failed + res.errors
+      moduleFailed == 0
+    }
+    (skippedOnly ++ hasFailed).foreach { case (moduleId, res) =>
+      val moduleFailed = res.failed + res.errors
+      val icon = if res.success then "  ✅" else "  🔴"
+      val detail = Seq(
+        Option.when(moduleFailed > 0)(s"$moduleFailed failed"),
+        Option.when(res.skipped > 0)(s"${res.skipped} skipped")
+      ).flatten.mkString(", ")
+      notifications.add(ServerNotification.logInfo(s"$icon $moduleId ($detail)"))
       res.failedTestNames.foreach { testName =>
         notifications.add(ServerNotification.logInfo(s"       - $testName"))
       }
     }
     notifications.add(ServerNotification.logInfo(separator))
+  }
+
+  private def renderCounts(passed: Int, failed: Int, skipped: Int, total: Int): String = {
+    val parts = Seq(
+      Option.when(passed > 0)(s"$passed passed"),
+      Option.when(failed > 0)(s"$failed failed"),
+      Option.when(skipped > 0)(s"$skipped skipped")
+    ).flatten
+    if parts.size == 1 && passed == total then parts.head
+    else (parts :+ s"$total total").mkString(", ")
   }
 }

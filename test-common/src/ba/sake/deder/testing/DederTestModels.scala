@@ -9,6 +9,7 @@ case class DederTestOptions(
 
 case class DederTestResult(
     name: String,
+    suiteName: String,
     status: Status,
     duration: Long,
     throwable: Option[Throwable]
@@ -21,7 +22,10 @@ case class DederTestResults(
     errors: Int,
     skipped: Int,
     duration: Long,
-    failedTestNames: Seq[String] = Seq.empty
+    failedTestNames: Seq[String] = Seq.empty,
+    suitesTotal: Int = 0,
+    suitesPassed: Int = 0,
+    suitesFailed: Int = 0
 ) derives JsonRW {
   def success: Boolean = failed == 0 && errors == 0
 }
@@ -31,6 +35,10 @@ object DederTestResults {
 
   def aggregate(results: Seq[DederTestResult]): DederTestResults = {
     val failedOrError = results.filter(r => r.status == Status.Failure || r.status == Status.Error)
+    val suites = results.groupBy(_.suiteName)
+    val suitesFailed = suites.count { case (_, tests) =>
+      tests.exists(t => t.status == Status.Failure || t.status == Status.Error)
+    }
     DederTestResults(
       total = results.size,
       passed = results.count(_.status == Status.Success),
@@ -42,7 +50,10 @@ object DederTestResults {
           r.status == Status.Canceled
       ),
       duration = results.map(_.duration).sum,
-      failedTestNames = failedOrError.map(_.name)
+      failedTestNames = failedOrError.map(_.name),
+      suitesTotal = suites.size,
+      suitesPassed = suites.size - suitesFailed,
+      suitesFailed = suitesFailed
     )
   }
 }

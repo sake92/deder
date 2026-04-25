@@ -337,7 +337,7 @@ object ForkedTestOrchestrator extends StrictLogging {
     case ForkedTestEnvelope.ForkStarted(_) =>
       notifications.add(ServerNotification.logDebug(s"${tag}started", Some(moduleId)))
     case ForkedTestEnvelope.SuiteStarted(name, _) =>
-      notifications.add(ServerNotification.logDebug(s"${tag}suite started: $name", Some(moduleId)))
+      notifications.add(ServerNotification.logInfo(s"${tag}▶ $name", Some(moduleId)))
     case ForkedTestEnvelope.SuiteCompleted(name, _, output) =>
       val header = s"${tag}${name} completed"
       os.write.append(logFile, s"$header\n$output\n", createFolders = true)
@@ -369,7 +369,10 @@ object ForkedTestOrchestrator extends StrictLogging {
         errors = perForkResults.map(_.errors).sum,
         skipped = perForkResults.map(_.skipped).sum,
         duration = perForkResults.map(_.duration).sum,
-        failedTestNames = perForkResults.flatMap(_.failedTestNames)
+        failedTestNames = perForkResults.flatMap(_.failedTestNames),
+        suitesTotal = perForkResults.map(_.suitesTotal).sum,
+        suitesPassed = perForkResults.map(_.suitesPassed).sum,
+        suitesFailed = perForkResults.map(_.suitesFailed).sum
       )
 
   private def buildClasspath(runtimeClasspath: Seq[os.Path]): String = {
