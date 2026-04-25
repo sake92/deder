@@ -4,7 +4,7 @@ import java.nio.file.Files
 import scala.util.Properties
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaNativeModule, ScalaNativeTestModule}
-import ba.sake.deder.testing.{DederTestOptions, DederTestResults, TestResultsSummary}
+import ba.sake.deder.testing.{DederTestOptions, DederTestResults, JUnitXmlReportWriter, TestResultsSummary}
 import ba.sake.deder.*
 
 /*
@@ -65,12 +65,14 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
           val nativeBinaryPath = ScalaNativeTasks.findNativeBinary(ctx.out / os.up / "nativeLink")
           val nativeModule = ctx.module.asInstanceOf[ScalaNativeTestModule]
           val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
-          runner.run(
+          val results = runner.run(
             discoveredTests = discoveredTests,
             nativeBinaryPath = nativeBinaryPath,
             testOptions = testOptions,
             testParallelism = { val n = nativeModule.testParallelism.toInt; if n == 0 then Runtime.getRuntime.availableProcessors() else n }
           )
+          JUnitXmlReportWriter.outputDir(ctx.module, ctx.out).foreach(JUnitXmlReportWriter.writeReports(results, _))
+          results
         }
       },
       isResultSuccessful = _.success,

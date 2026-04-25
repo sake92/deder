@@ -117,11 +117,13 @@ class DederTestRunner(
     _perClassStats ++= handler.perClassStats
 
     val results = handler.results
-    val failedTests = results.filter(r => r.status == Status.Failure || r.status == Status.Error)
+    val failedTests = results.filter(r =>
+      r.status == DederTestStatus.Failure || r.status == DederTestStatus.Error
+    )
     if (failedTests.nonEmpty) {
       logger.info("Failed tests:")
       failedTests.foreach { t =>
-        val msg = t.throwable.flatMap(thr => Option(thr.getMessage)).getOrElse("No error message")
+        val msg = t.failure.flatMap(_.message).getOrElse("No error message")
         logger.info(s"  ${t.name} - ${msg.take(100)}")
       }
     }
@@ -184,20 +186,26 @@ class DederTestRunner(
   }
 }
 
-class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) extends EventHandler {
+  class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) extends EventHandler {
   private val _results = mutable.ArrayBuffer[DederTestResult]()
   private val _classStats = mutable.Map[String, TestClassStats]()
 
   def handle(event: Event): Unit = {
     val fqn = event.fullyQualifiedName()
-    val testName = event.selector() match {
-      case s: TestSelector       => if frameworkName == "Jupiter" then s"${fqn}#${s.testName()}" else s.testName()
-      case s: NestedTestSelector => if frameworkName == "Jupiter" then s"${fqn}#${s.testName()}" else s.testName()
-      case s: SuiteSelector      => fqn
-      case _                     => fqn
+    val suiteName = fqn.stripSuffix("$")
+    val testCaseName = event.selector() match {
+      case s: TestSelector       => s.testName()
+      case s: NestedTestSelector => s.testName()
+      case _: SuiteSelector      => suiteName
+      case _                     => suiteName
     }
+    val testName =
+      if frameworkName == "Jupiter" && testCaseName != suiteName then s"$suiteName#$testCaseName"
+      else testCaseName
     val duration = Duration.ofMillis(event.duration())
     val eventThrowable = Option.when(event.throwable().isDefined)(event.throwable().get())
+    val failure = eventThrowable.map(DederTestFailure.fromThrowable)
+    val testStatus = DederTestStatus.fromSbt(event.status())
 
     // TODO maybe skip PASS here
     val status = event.status() match {
@@ -221,17 +229,18 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
 
     _results += DederTestResult(
       name = testName,
-      status = event.status(),
+      suiteName = suiteName,
+      testCaseName = testCaseName,
+      status = testStatus,
       duration = event.duration(),
-      throwable = eventThrowable
+      failure = failure
     )
-    val className = fqn.stripSuffix("$")
-    val existing = _classStats.getOrElse(className, TestClassStats(0L, "passed", 0L))
+    val existing = _classStats.getOrElse(suiteName, TestClassStats(0L, "passed", 0L))
     val newStatus =
       if event.status() == Status.Failure || event.status() == Status.Error then "failed"
       else existing.lastStatus
     _classStats.update(
-      className,
+      suiteName,
       TestClassStats(
         durationMs = existing.durationMs + event.duration(),
         lastStatus = newStatus,

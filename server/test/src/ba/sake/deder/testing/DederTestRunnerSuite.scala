@@ -56,6 +56,17 @@ class DederTestRunnerSuite extends munit.FunSuite {
     assert(threadIds.size <= 4, s"expected at most 4 threads; got $threadIds")
   }
 
+  test("runner preserves suite data for JUnit XML reporting") {
+    val runner = buildRunner(FakeFramework(taskCount = 2, onExecute = () => ()), testParallelism = 1)
+
+    val results = runner.run(DederTestOptions(testSelectors = Seq.empty))
+
+    assertEquals(results.total, 2)
+    assertEquals(results.suites.map(_.name).sorted, Seq("fake.Task0", "fake.Task1"))
+    assert(results.suites.forall(_.testCases.size == 1))
+    assertEquals(results.suites.head.testCases.head.classname, results.suites.head.name)
+  }
+
   // --- helpers ---
 
   private def buildRunner(framework: Framework, testParallelism: Int): DederTestRunner = {

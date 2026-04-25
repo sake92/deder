@@ -3,6 +3,7 @@ package ba.sake.deder.testing.forked
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.{Callable, Executors}
+import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 import ba.sake.deder.*
 import ba.sake.deder.testing.*
@@ -188,6 +189,7 @@ object ForkedTestOrchestrator extends StrictLogging {
     val resultsFilePath = forkDir / s"fork-results-${java.util.UUID.randomUUID()}.json"
     val stdoutLog = forkDir / "stdout.log"
     val stderrLog = forkDir / "stderr.log"
+    val suiteOutputs = new java.util.concurrent.ConcurrentHashMap[String, String]()
     if os.exists(stdoutLog) then os.remove(stdoutLog)
     if os.exists(stderrLog) then os.remove(stderrLog)
 
@@ -216,7 +218,7 @@ object ForkedTestOrchestrator extends StrictLogging {
       )
 
     val stdoutThread = new Thread(
-      () => streamStdout(forkId, proc, stdoutLog, tag, notifications, moduleId),
+      () => streamStdout(forkId, proc, stdoutLog, tag, notifications, moduleId, suiteOutputs),
       s"fork-$forkId-stdout"
     )
     stdoutThread.setDaemon(true)
@@ -244,7 +246,10 @@ object ForkedTestOrchestrator extends StrictLogging {
     //stderrThread.join(2000)
 
     if os.exists(resultsFilePath) then
-      try Some(os.read(resultsFilePath).parseJson[ForkedTestResultsPayload])
+      try {
+        val payload = os.read(resultsFilePath).parseJson[ForkedTestResultsPayload]
+        Some(payload.copy(results = payload.results.withSuiteOutputs(suiteOutputs.asScala.toMap)))
+      }
       catch {
         case NonFatal(e) =>
           notifications.add(
@@ -272,7 +277,8 @@ object ForkedTestOrchestrator extends StrictLogging {
       logFile: os.Path,
       tag: String,
       notifications: ServerNotificationsLogger,
-      moduleId: String
+      moduleId: String,
+      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, String]
   ): Unit = {
     val reader = new java.io.BufferedReader(new java.io.InputStreamReader(proc.stdout.wrapped))
     try {
@@ -282,7 +288,7 @@ object ForkedTestOrchestrator extends StrictLogging {
           val json = line.substring(ForkedTestEnvelope.LinePrefix.length)
           try {
             val env = json.parseJson[ForkedTestEnvelope]
-            renderEnvelope(env, logFile, tag, notifications, moduleId)
+            renderEnvelope(env, logFile, tag, notifications, moduleId, suiteOutputs)
           } catch {
             case NonFatal(_) =>
               os.write.append(logFile, line + "\n", createFolders = true)
@@ -332,7 +338,8 @@ object ForkedTestOrchestrator extends StrictLogging {
       logFile: os.Path,
       tag: String,
       notifications: ServerNotificationsLogger,
-      moduleId: String
+      moduleId: String,
+      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, String]
   ): Unit = env match {
     case ForkedTestEnvelope.ForkStarted(_) =>
       notifications.add(ServerNotification.logDebug(s"${tag}started", Some(moduleId)))
@@ -340,6 +347,11 @@ object ForkedTestOrchestrator extends StrictLogging {
       notifications.add(ServerNotification.logDebug(s"${tag}suite started: $name", Some(moduleId)))
     case ForkedTestEnvelope.SuiteCompleted(name, _, output) =>
       val header = s"${tag}${name} completed"
+      if output.nonEmpty then {
+        val key = name.stripSuffix("$")
+        val existing = Option(suiteOutputs.get(key)).getOrElse("")
+        suiteOutputs.put(key, existing + output)
+      }
       os.write.append(logFile, s"$header\n$output\n", createFolders = true)
       notifications.add(ServerNotification.logInfo(header, Some(moduleId)))
       output.linesIterator.foreach { l =>
@@ -369,7 +381,8 @@ object ForkedTestOrchestrator extends StrictLogging {
         errors = perForkResults.map(_.errors).sum,
         skipped = perForkResults.map(_.skipped).sum,
         duration = perForkResults.map(_.duration).sum,
-        failedTestNames = perForkResults.flatMap(_.failedTestNames)
+        failedTestNames = perForkResults.flatMap(_.failedTestNames),
+        suites = perForkResults.flatMap(_.suites).sortBy(_.name)
       )
 
   private def buildClasspath(runtimeClasspath: Seq[os.Path]): String = {

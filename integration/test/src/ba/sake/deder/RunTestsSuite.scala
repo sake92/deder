@@ -24,6 +24,14 @@ class RunTestsSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("deder should generate JUnit XML reports for forked tests") {
+    withTestProject("sample-projects/tests") { projectPath =>
+      val res = executeDederCommand(projectPath, "exec", "-m", "junit4", "-t", "test")
+      assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
+      assertReportContains(projectPath, "junit4", "test", "junit4test.JUnit4Test", "tests=\"2\"", "failures=\"0\"")
+    }
+  }
+
   test("deder should run Scalatest tests") {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "scalatest", "-t", "test")
@@ -51,6 +59,14 @@ class RunTestsSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("deder should generate JUnit XML reports for in-memory tests") {
+    withTestProject("sample-projects/tests") { projectPath =>
+      val res = executeDederCommand(projectPath, "exec", "-m", "munit", "-t", "testInMemory")
+      assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
+      assertReportContains(projectPath, "munit", "testInMemory", "munittest.MunitSuite", "tests=\"1\"", "failures=\"0\"")
+    }
+  }
+
   test("deder should run Utest tests") {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "utest", "-t", "test")
@@ -75,6 +91,21 @@ class RunTestsSuite extends BaseIntegrationSuite {
       val outText = res.err.text()
       assert(outText.contains("Passed: 1"), s"Expected test output to contain 'Passed: 1', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
+    }
+  }
+
+  private def assertReportContains(
+      projectPath: os.Path,
+      moduleId: String,
+      taskName: String,
+      suiteName: String,
+      expectedSnippets: String*
+  ): Unit = {
+    val reportPath = projectPath / ".deder" / "out" / moduleId / taskName / "reports" / "junit" / s"TEST-$suiteName.xml"
+    assert(os.exists(reportPath), s"Expected report file at $reportPath")
+    val xml = os.read(reportPath)
+    expectedSnippets.foreach { snippet =>
+      assert(xml.contains(snippet), s"Expected report $reportPath to contain '$snippet', got: $xml")
     }
   }
 
