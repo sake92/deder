@@ -11,10 +11,10 @@ object JUnitXmlReportWriter {
 
   def outputDir(module: DederModule, taskOutDir: os.Path): Option[os.Path] =
     settings(module).filter(_.enabled).map { cfg =>
-      cfg.outputDir match {
-        case null => taskOutDir / "reports" / "junit"
-        case raw if Paths.get(raw).isAbsolute => os.Path(raw)
-        case raw                              => DederPath(s"${module.root}/$raw").absPath
+      Option(cfg.outputDir).filter(_.nonEmpty) match {
+        case None => taskOutDir / "reports" / "junit"
+        case Some(raw) if Paths.get(raw).isAbsolute => os.Path(raw)
+        case Some(raw)                              => DederPath(s"${module.root}/$raw").absPath
       }
     }
 

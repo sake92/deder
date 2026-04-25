@@ -192,7 +192,7 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
 
   def handle(event: Event): Unit = {
     val fqn = event.fullyQualifiedName()
-    val suiteName = fqn.stripSuffix("$")
+    val suiteName = DederTestNames.normalizeSuiteName(fqn)
     val testCaseName = event.selector() match {
       case s: TestSelector       => s.testName()
       case s: NestedTestSelector => s.testName()

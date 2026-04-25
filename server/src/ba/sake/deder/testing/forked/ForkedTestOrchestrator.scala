@@ -352,7 +352,7 @@ object ForkedTestOrchestrator extends StrictLogging {
     case ForkedTestEnvelope.SuiteCompleted(name, _, output) =>
       val header = s"${tag}${name} completed"
       if output.nonEmpty then {
-        val key = name.stripSuffix("$")
+        val key = DederTestNames.normalizeSuiteName(name)
         val builder = suiteOutputs.computeIfAbsent(key, _ => new StringBuilder())
         builder.synchronized {
           builder.append(output)

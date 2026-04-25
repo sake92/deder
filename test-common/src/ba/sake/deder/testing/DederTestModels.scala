@@ -24,6 +24,10 @@ object DederTestStatus {
   }
 }
 
+object DederTestNames {
+  def normalizeSuiteName(name: String): String = name.stripSuffix("$")
+}
+
 case class DederTestFailure(
     message: Option[String],
     stackTrace: Option[String]

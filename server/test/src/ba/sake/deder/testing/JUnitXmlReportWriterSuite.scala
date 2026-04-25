@@ -46,7 +46,14 @@ class JUnitXmlReportWriterSuite extends munit.FunSuite {
       val files = os.list(reportDir).map(_.last).sorted
       assertEquals(files, Seq("TEST-demo.FailingSuite.xml", "TEST-demo.SkippedSuite.xml"))
 
-      val doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse((reportDir / files.head).toIO)
+      val factory = DocumentBuilderFactory.newInstance()
+      factory.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true)
+      factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+      factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
+      factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+      factory.setXIncludeAware(false)
+      factory.setExpandEntityReferences(false)
+      val doc = factory.newDocumentBuilder().parse((reportDir / files.head).toIO)
       val suite = doc.getDocumentElement
       assertEquals(suite.getTagName, "testsuite")
       assertEquals(suite.getAttribute("tests"), "2")
