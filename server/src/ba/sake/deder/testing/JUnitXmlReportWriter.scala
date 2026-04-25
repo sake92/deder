@@ -43,7 +43,8 @@ object JUnitXmlReportWriter {
       usedNames += candidate
       candidate
     } else {
-      val hashed = s"TEST-$base-${Integer.toUnsignedString(suiteName.hashCode, 16)}.xml"
+      val collisionSuffix = java.lang.Long.toHexString(java.lang.Integer.toUnsignedLong(suiteName.hashCode))
+      val hashed = s"TEST-$base-$collisionSuffix.xml"
       usedNames += hashed
       hashed
     }

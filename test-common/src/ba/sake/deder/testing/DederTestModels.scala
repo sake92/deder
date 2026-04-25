@@ -89,7 +89,7 @@ case class DederTestResults(
 ) derives JsonRW {
   def success: Boolean = failed == 0 && errors == 0
 
-  def withSuiteOutputs(outputs: Map[String, String]): DederTestResults =
+  def withSuiteStdout(outputs: Map[String, String]): DederTestResults =
     copy(
       suites = suites.map { suite =>
         suite.copy(systemOut = outputs.get(suite.name).filter(_.nonEmpty).orElse(suite.systemOut))
