@@ -200,7 +200,10 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
       case _                     => suiteName
     }
     val testName =
-      if frameworkName == "Jupiter" && testCaseName != suiteName then s"$suiteName#$testCaseName"
+      if frameworkName == "Jupiter" &&
+          testCaseName != suiteName &&
+          !testCaseName.startsWith(s"$suiteName#")
+      then s"$suiteName#$testCaseName"
       else testCaseName
     val duration = Duration.ofMillis(event.duration())
     val eventThrowable = Option.when(event.throwable().isDefined)(event.throwable().get())

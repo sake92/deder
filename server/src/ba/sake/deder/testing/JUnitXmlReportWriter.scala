@@ -107,7 +107,7 @@ object JUnitXmlReportWriter {
     writer.writeStartElement(elementName)
     failure.flatMap(_.message).foreach(msg => writeAttr(writer, "message", msg))
     writer.writeCData(
-      failure.flatMap(_.stackTrace).orElse(failure.flatMap(_.message)).getOrElse(elementName)
+      failure.flatMap(_.stackTrace).orElse(failure.flatMap(_.message)).getOrElse("No details available")
     )
     writer.writeEndElement()
   }
