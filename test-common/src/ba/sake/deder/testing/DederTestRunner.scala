@@ -186,7 +186,7 @@ class DederTestRunner(
   }
 }
 
-  class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) extends EventHandler {
+class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) extends EventHandler {
   private val _results = mutable.ArrayBuffer[DederTestResult]()
   private val _classStats = mutable.Map[String, TestClassStats]()
 
