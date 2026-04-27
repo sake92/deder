@@ -103,7 +103,7 @@ class RunTestsSuite extends BaseIntegrationSuite {
   ): Unit = {
     val taskOutPath = projectPath / ".deder" / "out" / moduleId / taskName
     val reportPathOpt = os.walk(taskOutPath).find { path =>
-      path.segments.takeRight(3) == Seq("reports", "junit", s"TEST-$suiteName.xml")
+      path.segments.toSeq.takeRight(3) == Seq("reports", "junit", s"TEST-$suiteName.xml")
     }
     assert(reportPathOpt.isDefined, s"Expected a report file under $taskOutPath")
     val reportPath = reportPathOpt.get
