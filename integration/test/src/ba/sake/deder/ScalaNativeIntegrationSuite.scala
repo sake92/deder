@@ -37,8 +37,8 @@ class ScalaNativeIntegrationSuite extends BaseIntegrationSuite {
       val res = executeDederCommand(projectPath, "exec", "-t", "test")
       val outText = res.err.text()
       assert(
-        outText.contains("Test Summary: 3 total, 1 passed, 1 failed, 0 errors, 1 skipped"),
-        s"Expected test summary with 3 total, 1 passed, 1 failed, 0 errors, 1 skipped, got: ${outText}"
+        outText.contains("Tests: 1 passed, 1 failed, 1 skipped, 3 total"),
+        s"Expected test output to contain 'Tests: 1 passed, 1 failed, 1 skipped, 3 total', got: ${outText}"
       )
       assertEquals(res.exitCode, 1, s"Expected exit code 1, got ${res.exitCode}")
     }
