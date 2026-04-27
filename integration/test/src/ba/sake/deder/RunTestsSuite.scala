@@ -101,8 +101,12 @@ class RunTestsSuite extends BaseIntegrationSuite {
       suiteName: String,
       expectedSnippets: String*
   ): Unit = {
-    val reportPath = projectPath / ".deder" / "out" / moduleId / taskName / "reports" / "junit" / s"TEST-$suiteName.xml"
-    assert(os.exists(reportPath), s"Expected report file at $reportPath")
+    val taskOutPath = projectPath / ".deder" / "out" / moduleId / taskName
+    val reportPathOpt = os.walk(taskOutPath).find { path =>
+      path.segments.takeRight(3) == Seq("reports", "junit", s"TEST-$suiteName.xml")
+    }
+    assert(reportPathOpt.isDefined, s"Expected a report file under $taskOutPath")
+    val reportPath = reportPathOpt.get
     val xml = os.read(reportPath)
     expectedSnippets.foreach { snippet =>
       assert(xml.contains(snippet), s"Expected report $reportPath to contain '$snippet', got: $xml")

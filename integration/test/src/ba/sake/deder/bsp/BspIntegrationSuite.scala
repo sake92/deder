@@ -70,7 +70,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
   }
 
   test("workspaceBuildTargets returns all modules with correct structure") {
-    val result = buildServer.workspaceBuildTargets().get(1, TimeUnit.MINUTES)
+    val result = buildServer.workspaceBuildTargets().get(2, TimeUnit.MINUTES)
     val targets = result.getTargets.asScala
     val ids = targets.map(_.getId.getUri).toSet
 

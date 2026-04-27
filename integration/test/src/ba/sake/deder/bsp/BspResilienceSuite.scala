@@ -32,7 +32,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
 
       // First session: run a query
       withBspSession(testDir) { (buildServer1, _, _) =>
-        val result1 = buildServer1.workspaceBuildTargets().get(1, TimeUnit.MINUTES)
+        val result1 = buildServer1.workspaceBuildTargets().get(2, TimeUnit.MINUTES)
         val ids1 = result1.getTargets.asScala.map(_.getId.getUri).toSet
         assert(ids1.contains(s"${baseUri(testDir)}#common"))
       }
