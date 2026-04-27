@@ -109,16 +109,28 @@ class DederTestRunner(
 
     _perClassStats ++= handler.perClassStats
 
-    handler.results
+val results = handler.results
+    val failedTests = results.filter(r =>
+      r.status == DederTestStatus.Failure || r.status == DederTestStatus.Error
+    )
+    if (failedTests.nonEmpty) {
+      logger.info("Failed tests:")
+      failedTests.foreach { t =>
+        val msg = t.failure.flatMap(_.message).getOrElse("No error message")
+        logger.info(s"  ${t.name} - ${msg.take(100)}")
+      }
+    }
+    results
   }
 
-  private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Unit = {
+  private def executeTasks(tasks: Seq[SbtTestTask], handler: DederTestEventHandler): Unit = {
     val capturedNotificationsLogger = OutputCaptureContext.currentNotificationsLogger.get()
     val capturedModuleId = OutputCaptureContext.currentModuleId.get()
 
     def runOne(task: SbtTestTask): Unit = {
       if isCancelled() then throw CancelledException("Tests execution cancelled")
       val suiteName = task.taskDef().fullyQualifiedName()
+      handler.setCurrentSuiteName(suiteName)
       val threadId = Thread.currentThread().getId
       if forkHooks.isEmpty then logger.info(s"  ▶ $suiteName")
       forkHooks.foreach { h =>
@@ -173,16 +185,29 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
   private val _results = mutable.ArrayBuffer[DederTestResult]()
   private val _classStats = mutable.Map[String, TestClassStats]()
 
+  /** Set by the runner before executing each task so the handler knows the correct suite name. */
+  private val _currentSuiteName = new ThreadLocal[String]()
+  def setCurrentSuiteName(name: String): Unit = _currentSuiteName.set(name)
+
   def handle(event: Event): Unit = {
     val fqn = event.fullyQualifiedName()
-    val testName = event.selector() match {
-      case s: TestSelector       => if frameworkName == "Jupiter" then s"${fqn}#${s.testName()}" else s.testName()
-      case s: NestedTestSelector => if frameworkName == "Jupiter" then s"${fqn}#${s.testName()}" else s.testName()
-      case s: SuiteSelector      => fqn
-      case _                     => fqn
+    val suiteName = Option(_currentSuiteName.get()).getOrElse(DederTestNames.normalizeSuiteName(fqn))
+    val testCaseName = event.selector() match {
+      case s: TestSelector       => s.testName()
+      case s: NestedTestSelector => s.testName()
+      case _: SuiteSelector      => suiteName
+      case _                     => suiteName
     }
+    val testName =
+      if frameworkName == "Jupiter" &&
+          testCaseName != suiteName &&
+          !testCaseName.startsWith(s"$suiteName#")
+      then s"$suiteName#$testCaseName"
+      else testCaseName
     val duration = Duration.ofMillis(event.duration())
     val eventThrowable = Option.when(event.throwable().isDefined)(event.throwable().get())
+    val failure = eventThrowable.map(DederTestFailure.fromThrowable)
+    val testStatus = DederTestStatus.fromSbt(event.status())
 
     val statusOpt = event.status() match {
       case Status.Failure  => Some(fansi.Color.Red("FAIL \uD83D\uDD34"))
@@ -207,18 +232,18 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
 
     _results += DederTestResult(
       name = testName,
-      suiteName = fqn.stripSuffix("$"),
-      status = event.status(),
+      suiteName = suiteName,
+      testCaseName = testCaseName,
+      status = testStatus,
       duration = event.duration(),
-      throwable = eventThrowable
+      failure = failure
     )
-    val className = fqn.stripSuffix("$")
-    val existing = _classStats.getOrElse(className, TestClassStats(0L, "passed", 0L))
+    val existing = _classStats.getOrElse(suiteName, TestClassStats(0L, "passed", 0L))
     val newStatus =
       if event.status() == Status.Failure || event.status() == Status.Error then "failed"
       else existing.lastStatus
     _classStats.update(
-      className,
+      suiteName,
       TestClassStats(
         durationMs = existing.durationMs + event.duration(),
         lastStatus = newStatus,

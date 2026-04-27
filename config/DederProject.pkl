@@ -116,6 +116,14 @@ class GraalVmSettings {
   nativeImageOptions: Listing<String> = new Listing {}
 }
 
+class JUnitXmlReportSettings {
+  /// When true, Deder writes one JUnit XML file per executed test suite/class.
+  enabled: Boolean = false
+  /// Optional report output directory. Relative paths resolve from the module root.
+  /// If null, Deder writes to `.deder/out/<module>/<task>/reports/junit/`.
+  outputDir: String?
+}
+
 class MvnApp {
   /// Maven dependency coordinate, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
   dep: String(!isEmpty)
@@ -174,6 +182,7 @@ class JavaTestModule extends JavaModule {
   /// 0 (default) = use all available CPU cores. Each fork pays JVM startup cost and holds its own heap.
   /// Capped server-wide by the maxConcurrentTestForks server property.
   maxTestForks: Int(isBetween(0, 64)) = 0
+  junitXmlReport: JUnitXmlReportSettings?
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
@@ -210,6 +219,7 @@ class ScalaTestModule extends ScalaModule {
   /// 0 (default) = use all available CPU cores. Each fork pays JVM startup cost and holds its own heap.
   /// Capped server-wide by the maxConcurrentTestForks server property.
   maxTestForks: Int(isBetween(0, 64)) = 0
+  junitXmlReport: JUnitXmlReportSettings?
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
@@ -241,6 +251,7 @@ class ScalaJsTestModule extends ScalaJsModule {
   /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
   /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
   testParallelism: Int(isBetween(0, 256)) = 0
+  junitXmlReport: JUnitXmlReportSettings?
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"
@@ -287,6 +298,7 @@ class ScalaNativeTestModule extends ScalaNativeModule {
   /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
   /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
   testParallelism: Int(isBetween(0, 256)) = 0
+  junitXmlReport: JUnitXmlReportSettings?
   testFrameworks: Listing<String> = new Listing {
     "com.novocode.junit.JUnitFramework"
     "com.github.sbt.junit.jupiter.api.JupiterFramework"

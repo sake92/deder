@@ -16,9 +16,7 @@ object TestResultsSummary {
       skipped = results.map(_._2.skipped).sum,
       duration = results.map(_._2.duration).sum,
       failedTestNames = results.flatMap(_._2.failedTestNames),
-      suitesTotal = results.map(_._2.suitesTotal).sum,
-      suitesPassed = results.map(_._2.suitesPassed).sum,
-      suitesFailed = results.map(_._2.suitesFailed).sum
+      suites = results.flatMap(_._2.suites).sortBy(_.name)
     )
     val separator = "═" * 50
     val statusIcon = if totalResults.success then "✅ PASS" else "🔴 FAIL"

@@ -20,6 +20,39 @@ Use `test` (forked) for CI and when tests rely on isolation (static state, `Syst
 
 ---
 
+## JUnit XML reports
+
+Deder can emit standard JUnit XML reports for any test module. Reports are opt-in and use the common CI-friendly layout of **one file per executed suite/class**:
+
+```pkl
+testTemplate = (template.asTest()) {
+  junitXmlReport {
+    enabled = true
+    // outputDir = "build/test-results" // optional, relative to the module root
+  }
+}
+```
+
+If `outputDir` is not set, Deder writes reports under the task output directory:
+
+```text
+.deder/out/<module-id>/<task>/reports/junit/TEST-<suite>.xml
+```
+
+Examples:
+
+- JVM forked tests: `.deder/out/<module-id>/test/reports/junit/`
+- JVM in-memory tests: `.deder/out/<module-id>/testInMemory/reports/junit/`
+- Scala.js / Scala Native tests: `.deder/out/<module-id>/test/reports/junit/`
+
+This matches what CI systems typically expect, so you can upload reports with a glob such as:
+
+```text
+.deder/out/**/reports/junit/TEST-*.xml
+```
+
+---
+
 ## Execution modes
 
 Deder supports three independent parallelism knobs that compose together (forked `test` task only).

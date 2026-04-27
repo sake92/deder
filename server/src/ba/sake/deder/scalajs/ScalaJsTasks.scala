@@ -1,7 +1,7 @@
 package ba.sake.deder.scalajs
 
 import ba.sake.deder.config.DederProject.{ModuleType, ScalaJsModule, ScalaJsTestModule}
-import ba.sake.deder.testing.{DederTestOptions, DederTestResults, TestResultsSummary}
+import ba.sake.deder.testing.{DederTestOptions, DederTestResults, JUnitXmlReportWriter, TestResultsSummary}
 import ba.sake.deder.*
 
 /*
@@ -57,14 +57,15 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
           val jsModule = ctx.module.asInstanceOf[ScalaJsTestModule]
           val testOptions = DederTestOptions(ctx.args)
           val runner = new ScalaJsTestRunner(ctx.notifications, ctx.module.id)
-          runner.run(
+          val results = runner.run(
             discoveredTests = discoveredTests,
             linkedJsDir = os.Path(linkedJsDir),
             moduleKind = jsModule.moduleKind,
             testOptions = testOptions,
             testParallelism = { val n = jsModule.testParallelism.toInt; if n == 0 then Runtime.getRuntime.availableProcessors() else n }
           )
-
+          JUnitXmlReportWriter.outputDir(ctx.module, ctx.out).foreach(JUnitXmlReportWriter.writeReports(results, _))
+          results
         }
       },
       isResultSuccessful = _.success,

@@ -1,14 +1,20 @@
 amends "../../../../../config/DederProject.pkl"
 
+local const junitXml = new JUnitXmlReportSettings {
+  enabled = true
+}
+
 const local function javaTestModule(name: String) = new JavaTestModule {
   id = name
   root = name
+  junitXmlReport = junitXml
 }
 
 const local function scalaTestModule(name: String) = new ScalaTestModule {
   id = name
   root = name
   scalaVersion = "3.7.1"
+  junitXmlReport = junitXml
 }
 
 
