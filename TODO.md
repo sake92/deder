@@ -40,9 +40,8 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 - configuration..
 
 ## Tests
+- stdout not captured when fork
 
-- print test started.. and how long it took again
-- print number of suites
 
 
 ## CLI
