@@ -44,6 +44,7 @@
         <li><a href="#testing">Testing</a>
          <ul>
           <li><a href="#tasks">Tasks</a></li>
+          <li><a href="#junit-xml-reports">JUnit XML reports</a></li>
           <li><a href="#execution-modes">Execution modes</a>
            <ul>
             <li><a href="#serial-execution">Serial execution</a></li>
@@ -100,6 +101,28 @@
    <blockquote>
     <p>ScalaJS and Scala Native only have <code>test</code> — they use their own runners and are unaffected by this split.</p>
    </blockquote>
+   <hr>
+   <h2 id="junit-xml-reports">JUnit XML reports<a href="#junit-xml-reports" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Deder can emit standard JUnit XML reports for any test module. Reports are opt-in and use the common CI-friendly layout of <strong>one file per executed suite/class</strong>:</p>
+   <pre><code class="language-pkl">testTemplate = (template.asTest()) {
+  junitXmlReport {
+    enabled = true
+    // outputDir = "build/test-results" // optional, relative to the module root
+  }
+}
+</code></pre>
+   <p>If <code>outputDir</code> is not set, Deder writes reports under the task output directory:</p>
+   <pre><code class="language-text hljs language-plaintext" data-highlighted="yes">.deder/out/&lt;module-id&gt;/&lt;task&gt;/reports/junit/TEST-&lt;suite&gt;.xml
+</code></pre>
+   <p>Examples:</p>
+   <ul>
+    <li>JVM forked tests: <code>.deder/out/&lt;module-id&gt;/test/reports/junit/</code></li>
+    <li>JVM in-memory tests: <code>.deder/out/&lt;module-id&gt;/testInMemory/reports/junit/</code></li>
+    <li>Scala.js / Scala Native tests: <code>.deder/out/&lt;module-id&gt;/test/reports/junit/</code></li>
+   </ul>
+   <p>This matches what CI systems typically expect, so you can upload reports with a glob such as:</p>
+   <pre><code class="language-text hljs language-plaintext" data-highlighted="yes">.deder/out/**/reports/junit/TEST-*.xml
+</code></pre>
    <hr>
    <h2 id="execution-modes">Execution modes<a href="#execution-modes" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Deder supports three independent parallelism knobs that compose together (forked <code>test</code> task only).</p>
