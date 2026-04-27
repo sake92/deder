@@ -123,13 +123,14 @@ val results = handler.results
     results
   }
 
-  private def executeTasks(tasks: Seq[SbtTestTask], handler: EventHandler): Unit = {
+  private def executeTasks(tasks: Seq[SbtTestTask], handler: DederTestEventHandler): Unit = {
     val capturedNotificationsLogger = OutputCaptureContext.currentNotificationsLogger.get()
     val capturedModuleId = OutputCaptureContext.currentModuleId.get()
 
     def runOne(task: SbtTestTask): Unit = {
       if isCancelled() then throw CancelledException("Tests execution cancelled")
       val suiteName = task.taskDef().fullyQualifiedName()
+      handler.setCurrentSuiteName(suiteName)
       val threadId = Thread.currentThread().getId
       if forkHooks.isEmpty then logger.info(s"  ▶ $suiteName")
       forkHooks.foreach { h =>
@@ -184,9 +185,13 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
   private val _results = mutable.ArrayBuffer[DederTestResult]()
   private val _classStats = mutable.Map[String, TestClassStats]()
 
+  /** Set by the runner before executing each task so the handler knows the correct suite name. */
+  private val _currentSuiteName = new ThreadLocal[String]()
+  def setCurrentSuiteName(name: String): Unit = _currentSuiteName.set(name)
+
   def handle(event: Event): Unit = {
     val fqn = event.fullyQualifiedName()
-    val suiteName = DederTestNames.normalizeSuiteName(fqn)
+    val suiteName = Option(_currentSuiteName.get()).getOrElse(DederTestNames.normalizeSuiteName(fqn))
     val testCaseName = event.selector() match {
       case s: TestSelector       => s.testName()
       case s: NestedTestSelector => s.testName()
