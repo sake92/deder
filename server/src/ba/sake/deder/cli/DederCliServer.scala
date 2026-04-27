@@ -105,7 +105,9 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
             case e: Throwable =>
               span.recordException(e)
               span.setStatus(StatusCode.ERROR)
-              throw e
+              logger.error(s"Unhandled error processing message from client $clientId", e)
+              serverMessages.put(CliServerMessage.Log(s"Internal error: ${e.getMessage}", LogLevel.ERROR))
+              serverMessages.put(CliServerMessage.Exit(1))
           } finally span.end()
         }
       })
@@ -290,26 +292,36 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                   val selectedModuleIds =
                     if cliOptions.modules.isEmpty then state.tasksResolver.allModules.map(_.id)
                     else cliOptions.modules
-                  val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(selectedModuleIds, cliOptions.task)
-                  if cliOptions.json.value then {
-                    val tasksExecStages = state.executionPlanner.getExecStages(selectedModuleIds, cliOptions.task)
-                    serverMessages.put(CliServerMessage.Output(tasksExecStages.map(_.map(_.id)).toJson))
-                  } else if cliOptions.dot.value then {
-                    val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
-                    serverMessages.put(CliServerMessage.Output(dot))
-                  } else if cliOptions.ascii.value then {
-                    val asciiGraph = GraphUtils.generateAscii(tasksExecSubgraph, v => v.id)
-                    serverMessages.put(CliServerMessage.Output(asciiGraph))
-                  } else {
-                    val tasksExecStages = state.executionPlanner.getExecStages(selectedModuleIds, cliOptions.task)
-                    val stagesStr = tasksExecStages.zipWithIndex
-                      .map { case (stage, idx) =>
-                        s"Stage #${idx}:\n" + stage.map(ti => s"  ${ti.id}").mkString("\n")
+                  state.executionPlanner.getTaskInstances(selectedModuleIds, cliOptions.task) match {
+                    case Left(recommendations) =>
+                      val msg =
+                        if recommendations.isEmpty then s"No '${cliOptions.task}' tasks found"
+                        else s"No '${cliOptions.task}' tasks found, did you mean: ${recommendations.mkString(", ")} ?"
+                      serverMessages.put(CliServerMessage.Log(msg, LogLevel.ERROR))
+                      serverMessages.put(CliServerMessage.Exit(1))
+                    case Right(validModuleTasks) =>
+                      val validModuleIds = validModuleTasks.map(_._1)
+                      val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(validModuleIds, cliOptions.task)
+                      if cliOptions.json.value then {
+                        val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
+                        serverMessages.put(CliServerMessage.Output(tasksExecStages.map(_.map(_.id)).toJson))
+                      } else if cliOptions.dot.value then {
+                        val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
+                        serverMessages.put(CliServerMessage.Output(dot))
+                      } else if cliOptions.ascii.value then {
+                        val asciiGraph = GraphUtils.generateAscii(tasksExecSubgraph, v => v.id)
+                        serverMessages.put(CliServerMessage.Output(asciiGraph))
+                      } else {
+                        val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
+                        val stagesStr = tasksExecStages.zipWithIndex
+                          .map { case (stage, idx) =>
+                            s"Stage #${idx}:\n" + stage.map(ti => s"  ${ti.id}").mkString("\n")
+                          }
+                          .mkString("\n")
+                        serverMessages.put(CliServerMessage.Output(stagesStr))
                       }
-                      .mkString("\n")
-                    serverMessages.put(CliServerMessage.Output(stagesStr))
+                      serverMessages.put(CliServerMessage.Exit(0))
                   }
-                  serverMessages.put(CliServerMessage.Exit(0))
               }
           }
       case m: CliClientMessage.Exec =>

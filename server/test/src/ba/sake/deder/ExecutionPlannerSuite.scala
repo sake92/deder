@@ -94,6 +94,27 @@ class ExecutionPlannerSuite extends munit.FunSuite {
     }
   }
 
+  test("getTaskInstances returns Left for non-existent module") {
+    val configParser = ConfigParser(writeJson = false)
+    val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
+    val projectConfig = parsedConfig.toOption.get
+    val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
+    val executionPlanner = ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
+    val result = executionPlanner.getTaskInstances(Seq("nonexistent"), "compile")
+    assert(result.isLeft)
+  }
+
+  test("getTaskInstances returns Left with recommendations for non-existent task on existing module") {
+    val configParser = ConfigParser(writeJson = false)
+    val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
+    val projectConfig = parsedConfig.toOption.get
+    val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
+    val executionPlanner = ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
+    val result = executionPlanner.getTaskInstances(Seq("common"), "nonexistentTask")
+    assert(result.isLeft)
+    assert(result.left.getOrElse(Seq.empty).nonEmpty) // should have recommendations
+  }
+
   test("ExecutionPlanner returns correct tasks for getAffectingConfigValueTasks") {
     val configParser = ConfigParser(writeJson = false)
     val parsedConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")

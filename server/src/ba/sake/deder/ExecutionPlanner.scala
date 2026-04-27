@@ -143,7 +143,7 @@ class ExecutionPlanner(
     val res = moduleIds.flatMap(mId => getTaskInstanceOpt(mId, taskName).map(tId => (mId, tId)))
     if res.isEmpty then
       Left {
-        val allTaskNames = moduleIds.flatMap(tasksPerModule.apply).map(_.task.name).distinct
+        val allTaskNames = moduleIds.flatMap(m => tasksPerModule.getOrElse(m, Seq.empty)).map(_.task.name).distinct
         StringUtils.recommend(taskName, allTaskNames)
       }
     else Right(res)
