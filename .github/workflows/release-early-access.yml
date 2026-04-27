@@ -102,6 +102,8 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
       - uses: coursier/cache-action@v7
+        with:
+          extraFiles: deder.pkl
       - name: Build Client native image
         run: |
           ./mill -i client-native.nativeImage
@@ -135,6 +137,8 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
       - uses: coursier/cache-action@v7
+        with:
+          extraFiles: deder.pkl
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:

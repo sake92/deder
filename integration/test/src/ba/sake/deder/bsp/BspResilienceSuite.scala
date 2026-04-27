@@ -23,7 +23,11 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
       executeDederCommand(testDir, "bsp", "install")
 
       // First session: run a query
@@ -53,7 +57,11 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
       executeDederCommand(testDir, "bsp", "install")
 
       // First session
@@ -87,7 +95,11 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, _, bspProcess) =>
@@ -115,7 +127,11 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, _, _) =>
@@ -139,7 +155,11 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
       executeDederCommand(testDir, "bsp", "install")
 
       // First session: compile common
@@ -175,7 +195,11 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, capturingClient, _) =>
@@ -214,7 +238,11 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, capturingClient, _) =>

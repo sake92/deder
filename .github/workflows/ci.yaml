@@ -47,6 +47,8 @@ jobs:
           distribution: 'zulu'
           java-version: 21
       - uses: coursier/cache-action@v7
+        with:
+          extraFiles: deder.pkl
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder

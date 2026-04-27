@@ -10,7 +10,7 @@ class RunTestsSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "junit4", "-t", "test")
       val outText = res.err.text()
-      assert(outText.contains("Passed: 2"), s"Expected test output to contain 'Passed: 2', got: ${outText}")
+      assert(outText.contains("2 passed"), s"Expected test output to contain '2 passed', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
   }
@@ -19,7 +19,7 @@ class RunTestsSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "junit5", "-t", "test")
       val outText = res.err.text()
-      assert(outText.contains("Passed: 2"), s"Expected test output to contain 'Passed: 2', got: ${outText}")
+      assert(outText.contains("2 passed"), s"Expected test output to contain '2 passed', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
   }
@@ -36,7 +36,7 @@ class RunTestsSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "scalatest", "-t", "test")
       val outText = res.err.text()
-      assert(outText.contains("Passed: 1"), s"Expected test output to contain 'Passed: 1', got: ${outText}")
+      assert(outText.contains("1 passed"), s"Expected test output to contain '1 passed', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
   }
@@ -45,7 +45,7 @@ class RunTestsSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "specs2", "-t", "test")
       val outText = res.err.text()
-      assert(outText.contains("Passed: 2"), s"Expected test output to contain 'Passed: 2', got: ${outText}")
+      assert(outText.contains("2 passed"), s"Expected test output to contain '2 passed', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
   }
@@ -54,7 +54,7 @@ class RunTestsSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "munit", "-t", "test")
       val outText = res.err.text()
-      assert(outText.contains("Passed: 1"), s"Expected test output to contain 'Passed: 1', got: ${outText}")
+      assert(outText.contains("1 passed"), s"Expected test output to contain '1 passed', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
   }
@@ -71,7 +71,7 @@ class RunTestsSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "utest", "-t", "test")
       val outText = res.err.text()
-      assert(outText.contains("Passed: 1"), s"Expected test output to contain 'Passed: 1', got: ${outText}")
+      assert(outText.contains("1 passed"), s"Expected test output to contain '1 passed', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
   }
@@ -80,7 +80,7 @@ class RunTestsSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "weaver", "-t", "test")
       val outText = res.err.text()
-      assert(outText.contains("Passed: 2"), s"Expected test output to contain 'Passed: 2', got: ${outText}")
+      assert(outText.contains("2 passed"), s"Expected test output to contain '2 passed', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
   }
@@ -89,7 +89,7 @@ class RunTestsSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "ztest", "-t", "test")
       val outText = res.err.text()
-      assert(outText.contains("Passed: 1"), s"Expected test output to contain 'Passed: 1', got: ${outText}")
+      assert(outText.contains("1 passed"), s"Expected test output to contain '1 passed', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
   }
