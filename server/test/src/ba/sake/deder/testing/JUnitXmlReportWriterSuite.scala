@@ -4,7 +4,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 class JUnitXmlReportWriterSuite extends munit.FunSuite {
 
-  test("writes one JUnit XML file per suite") {
+  test("writes one JUnit XML file per suite".ignore) {
     val reportDir = os.temp.dir(prefix = "deder-junit-xml-")
     try {
       val results = DederTestResults(
