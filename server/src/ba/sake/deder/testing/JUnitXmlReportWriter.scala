@@ -30,24 +30,15 @@ object JUnitXmlReportWriter {
 
   private def settings(module: DederModule): Option[JUnitXmlReportSettings] = {
     val result = module match {
-      case m: JavaTestModule        => getJUnitXmlReport(m)
-      case m: ScalaTestModule       => getJUnitXmlReport(m)
-      case m: ScalaJsTestModule     => getJUnitXmlReport(m)
-      case m: ScalaNativeTestModule => getJUnitXmlReport(m)
+      case m: JavaTestModule        => Some(m.junitXmlReport)
+      case m: ScalaTestModule       => Some(m.junitXmlReport)
+      case m: ScalaJsTestModule     => Some(m.junitXmlReport)
+      case m: ScalaNativeTestModule => Some(m.junitXmlReport)
       case _                        => None
     }
     result.filter(_.enabled)
   }
 
-  /** Uses reflection so this compiles against old server JARs that don't have `junitXmlReport`. */
-  private def getJUnitXmlReport(module: DederModule): Option[JUnitXmlReportSettings] = {
-    try {
-      val method = module.getClass.getMethod("getJUnitXmlReport")
-      Option(method.invoke(module).asInstanceOf[JUnitXmlReportSettings])
-    } catch {
-      case _: NoSuchMethodException => None
-    }
-  }
 
   private def nextFileName(suiteName: String, usedNames: collection.mutable.Set[String]): String = {
     val base = sanitizeFileName(suiteName)

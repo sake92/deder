@@ -144,6 +144,7 @@ class SbtImporter(
           "4.13.9", // scalaSemanticdbVersion
           0L, // testParallelism (0 = all CPUs)
           0L, // maxTestForks (0 = all CPUs)
+          null, // junitXmlReport
           List.empty.asJava // testFrameworks
         )
       else
@@ -234,7 +235,9 @@ class SbtImporter(
                |${scalacPluginDeps.map(d => s"  ${d}").mkString("\n")}
                |}""".stripMargin.indent(2).stripTrailing
           }
-        val optionals = List(sourcesOpt, resourcesOpt, moduleDepsOpt, depsOpt, scalacOptionsOpt, scalacPluginDepsOpt).flatten.mkString("\n")
+        val optionals =
+          List(sourcesOpt, resourcesOpt, moduleDepsOpt, depsOpt, scalacOptionsOpt, scalacPluginDepsOpt).flatten
+            .mkString("\n")
         val moduleType = m match {
           case module: ScalaTestModule => "ScalaTestModule"
           case _                       => "ScalaModule"
@@ -258,6 +261,7 @@ class SbtImporter(
 }
 
 object SbtImporter {
+
   /** Checks if a dependency is a compiler plugin based on its configurations field */
   def isPluginDependency(dep: DependencyExport): Boolean = {
     dep.configurations.exists(_.contains("plugin"))
