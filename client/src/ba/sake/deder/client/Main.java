@@ -131,18 +131,36 @@ public class Main {
         var serverLocalPath = serverProps.getProperty("localPath", "");
         var versionCacheFile = Path.of(".deder/server.current.version");
         Path serverJarPath = Path.of(".deder/server.jar");
+        Path testRunnerJarPath = Path.of(".deder/test-runner.jar");
         var cachedVersion = "";
         if (Files.exists(versionCacheFile) && Files.isRegularFile(versionCacheFile)) {
             cachedVersion = Files.readString(versionCacheFile, StandardCharsets.UTF_8).strip();
         }
+
+        // Cache instance for global caching
+        ArtifactCache artifactCache = null;
+
+        // Check if we should use cache (not local build, not early-access)
+        boolean useCache = (serverLocalPath == null || serverLocalPath.isBlank()) 
+                && !serverVersion.equals("early-access");
+        if (useCache) {
+            try {
+                artifactCache = new ArtifactCache(this::log);
+            } catch (Exception e) {
+                log("Failed to initialize artifact cache: " + e.getMessage() + ", falling back to direct download");
+                useCache = false;
+            }
+        }
+
         if (serverLocalPath != null && !serverLocalPath.isBlank()) {
             // handy for development, use local server build
             log("Using local server build from " + serverLocalPath);
             Files.copy(Path.of(serverLocalPath), serverJarPath, StandardCopyOption.REPLACE_EXISTING);
             Files.writeString(versionCacheFile, "local", StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        } else {
-            if (Files.exists(serverJarPath) && cachedVersion.equals(serverVersion) && !serverVersion.equals("early-access")) {
+        } else if (serverVersion.equals("early-access")) {
+            // early-access never uses cache - always download directly
+            if (Files.exists(serverJarPath) && cachedVersion.equals(serverVersion)) {
                 log("Server JAR already up-to-date (version " + serverVersion + "), skipping download.");
             } else {
                 download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
@@ -150,20 +168,68 @@ public class Main {
                 Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
                         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             }
+        } else {
+            // Use global cache for stable versions
+            if (Files.exists(serverJarPath) && cachedVersion.equals(serverVersion)) {
+                log("Server JAR already up-to-date (version " + serverVersion + "), skipping download.");
+            } else if (artifactCache != null) {
+                try {
+                    System.err.println("Copying server from global cache (version " + serverVersion + ")...");
+                    Path cachedArtifact = artifactCache.getArtifact(serverVersion, ArtifactCache.ArtifactType.SERVER);
+                    Files.copy(cachedArtifact, serverJarPath, StandardCopyOption.REPLACE_EXISTING);
+                    Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
+                            StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                    log("Copied server JAR from global cache to .deder/");
+                } catch (Exception e) {
+                    log("Cache operation failed: " + e.getMessage() + ", falling back to direct download");
+                    download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
+                            serverJarPath);
+                    Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
+                            StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                }
+            } else {
+                // Fallback to direct download
+                download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
+                        serverJarPath);
+                Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            }
         }
-        Path testRunnerJarPath = Path.of(".deder/test-runner.jar");
+
         var testRunnerLocalPath = serverProps.getProperty("testRunnerLocalPath", "");
         if (testRunnerLocalPath != null && !testRunnerLocalPath.isBlank()) {
             log("Using local test-runner build from " + testRunnerLocalPath);
+            System.err.println("Using local test-runner...");
             Files.copy(Path.of(testRunnerLocalPath), testRunnerJarPath, StandardCopyOption.REPLACE_EXISTING);
-        } else {
-            if (Files.exists(testRunnerJarPath) && cachedVersion.equals(serverVersion) && !serverVersion.equals("early-access")) {
+        } else if (serverVersion.equals("early-access")) {
+            // early-access never uses cache
+            if (Files.exists(testRunnerJarPath) && cachedVersion.equals(serverVersion)) {
                 log("Test-runner JAR already up-to-date (version " + serverVersion + "), skipping download.");
             } else {
                 download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-test-runner.jar",
                         testRunnerJarPath);
             }
-        }
+} else {
+                // Use global cache for test-runner
+                if (Files.exists(testRunnerJarPath) && cachedVersion.equals(serverVersion)) {
+                    log("Test-runner JAR already up-to-date (version " + serverVersion + "), skipping download.");
+                } else if (artifactCache != null) {
+                    try {
+                        System.err.println("Copying test-runner from global cache...");
+                        Path cachedArtifact = artifactCache.getArtifact(serverVersion, ArtifactCache.ArtifactType.TEST_RUNNER);
+                        Files.copy(cachedArtifact, testRunnerJarPath, StandardCopyOption.REPLACE_EXISTING);
+                        log("Copied test-runner JAR from global cache to .deder/");
+                    } catch (Exception e) {
+                        log("Cache operation failed: " + e.getMessage() + ", falling back to direct download");
+                        download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-test-runner.jar",
+                                testRunnerJarPath);
+                    }
+                } else {
+                    // Fallback to direct download
+                    download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-test-runner.jar",
+                            testRunnerJarPath);
+                }
+            }
         startServerProcess(isBspClient, serverProps);
         System.err.println("Deder server started.");
         log("Deder server started.");
@@ -313,9 +379,20 @@ public class Main {
         }
         try {
             var content = Files.readString(pklFile, StandardCharsets.UTF_8);
-            var matcher = DEDER_PKL_VERSION_PATTERN.matcher(content);
-            if (matcher.find()) {
-                return Optional.of(matcher.group(1));
+            
+            // Find the LAST non-commented "amends" line (comments start with //)
+            // Process lines in reverse to find the last active amends
+            var lines = content.split("\\r?\\n");
+            for (int i = lines.length - 1; i >= 0; i--) {
+                var line = lines[i].strip();
+                // Skip empty lines and comments
+                if (line.isEmpty() || line.startsWith("//")) {
+                    continue;
+                }
+                var matcher = DEDER_PKL_VERSION_PATTERN.matcher(line);
+                if (matcher.find()) {
+                    return Optional.of(matcher.group(1));
+                }
             }
         } catch (IOException e) {
             log("Could not read deder.pkl: " + e.getMessage());

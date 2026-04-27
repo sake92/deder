@@ -29,4 +29,5 @@ Availabel properties:
 - `bspEnabled` - specifies if BSP protocol is enabled. If false, the BSP Deder server is never started (useful in CI or to save memory/CPU)
 - `JAVA_OPTS` - java options passed to server java process
 - `maxConnectSeconds` - max number of seconds the client waits for the server to start before giving up. Defaults to `30`. Increase this on slow machines or CI environments.
-- `localPath` - fixed local path to server JAR, useful for developing Deder and debugging
+- `localPath` - fixed local path to server JAR, useful for developing Deder and debugging. **Note:** When using localPath, the global cache is bypassed - the artifact is copied directly without caching. This ensures you're always testing your latest local build.
+- `testRunnerLocalPath` - fixed local path to test-runner JAR, useful for developing Deder and debugging. **Note:** When using testRunnerLocalPath, the global cache is bypassed - the artifact is copied directly without caching.
