@@ -30,7 +30,6 @@ trait BaseIntegrationSuite extends munit.FunSuite {
       )
       val serverPropertiesContent = allServerProperties.map((k, v) => s"${k}=${v}").mkString("\n") + "\n"
       os.write.over(tempDir / ".deder/server.properties", serverPropertiesContent, createFolders = true)
-      System.setProperty("DEDER_PROJECT_ROOT_DIR", tempDir.toString)
       testCode(tempDir)
     } finally {
       executeDederCommand(tempDir, "shutdown")
