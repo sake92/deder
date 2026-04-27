@@ -35,7 +35,11 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
       testDir / "deder.pkl",
       (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
     )
-    os.write.over(testDir / ".deder/server.properties", s"localPath=$dederServerPath\n", createFolders = true)
+    os.write.over(
+      testDir / ".deder/server.properties",
+      s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+      createFolders = true
+    )
     executeDederCommand(testDir, "bsp", "install")
     bspProcess = os.proc("java", "-jar", dederClientPath, "bsp").spawn(cwd = testDir)
 
@@ -111,7 +115,10 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     assert(options.exists(_.contains("-Xplugin:semanticdb")), "should include semanticdb plugin")
     val classpath = item.getClasspath.asScala
     assert(classpath.nonEmpty, "classpath should not be empty")
-    assert(item.getClassDirectory.contains("/classes"), s"classDirectory should point to classes, got: ${item.getClassDirectory}")
+    assert(
+      item.getClassDirectory.contains("/classes"),
+      s"classDirectory should point to classes, got: ${item.getClassDirectory}"
+    )
   }
 
   test("buildTargetScalacOptions contains scala3-library and semanticdb flags") {
@@ -125,7 +132,10 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     assert(classpath.exists(_.contains("scala3-library")), s"scala3-library not in classpath: $classpath")
     val options = item.getOptions.asScala
     assert(options.contains("-Xsemanticdb"), s"missing -Xsemanticdb in options: $options")
-    assert(item.getClassDirectory.contains("/classes"), s"classDirectory should point to classes, got: ${item.getClassDirectory}")
+    assert(
+      item.getClassDirectory.contains("/classes"),
+      s"classDirectory should point to classes, got: ${item.getClassDirectory}"
+    )
   }
 
   test("buildTargetScalacOptions for module with deps includes dependency classes on classpath") {
@@ -260,7 +270,10 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
       .get(2, TimeUnit.MINUTES)
     assertEquals(result.getStatusCode, StatusCode.OK)
     val semanticdbFiles = os.walk(testDir / ".deder/out/common/semanticdb").filter(_.ext == "semanticdb")
-    assert(semanticdbFiles.nonEmpty, s"expected .semanticdb files after clean+recompile under .deder/out/common/semanticdb/")
+    assert(
+      semanticdbFiles.nonEmpty,
+      s"expected .semanticdb files after clean+recompile under .deder/out/common/semanticdb/"
+    )
   }
 
   test("buildTargetInverseSources returns targets containing source file") {
