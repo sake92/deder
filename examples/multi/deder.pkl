@@ -1,6 +1,6 @@
-amends "../../config/DederProject.pkl"
+//amends "../../config/DederProject.pkl"
 
-//amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 local const baseModule: ScalaModule = new {
   scalaVersion = "3.7.4"
@@ -19,16 +19,27 @@ local const frontend = (baseModule) {
   moduleDeps { common }
 }
 
-local const backend = (baseModule) {
-  id = "backend"
-  moduleDeps { common }
-}
+local const backendModules =
+  new CreateScalaModules {
+    root = "backend"
+    template = (baseModule) {
+      moduleDeps { common }
+    }
+    testTemplate = (template.asTest()) {
+      deps {
+        "org.scalameta::munit:1.2.1"
+      }
+    }
+  }.get
 
 local const uberModules =
   new CreateScalaModules {
     root = "uber"
     template = (baseModule) {
-      moduleDeps { frontend; backend }
+      moduleDeps {
+        frontend
+        backendModules.main
+      }
       deps {
         "com.lihaoyi::pprint:0.9.5"
       }
@@ -50,6 +61,6 @@ local const uberModules =
 modules {
   common
   frontend
-  backend
+  ...backendModules.all
   ...uberModules.all
 }

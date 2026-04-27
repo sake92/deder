@@ -348,7 +348,7 @@ object ForkedTestOrchestrator extends StrictLogging {
     case ForkedTestEnvelope.ForkStarted(_) =>
       notifications.add(ServerNotification.logDebug(s"${tag}started", Some(moduleId)))
     case ForkedTestEnvelope.SuiteStarted(name, _) =>
-      notifications.add(ServerNotification.logDebug(s"${tag}suite started: $name", Some(moduleId)))
+      notifications.add(ServerNotification.logInfo(s"${tag}▶ $name", Some(moduleId)))
     case ForkedTestEnvelope.SuiteCompleted(name, _, output) =>
       val header = s"${tag}${name} completed"
       if output.nonEmpty then {

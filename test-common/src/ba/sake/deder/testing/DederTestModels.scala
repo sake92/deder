@@ -89,6 +89,13 @@ case class DederTestResults(
 ) derives JsonRW {
   def success: Boolean = failed == 0 && errors == 0
 
+  /** Total number of test suites executed. */
+  def suitesTotal: Int = suites.size
+  /** Number of suites where no test case failed or errored. */
+  def suitesPassed: Int = suites.count(s => s.failed == 0 && s.errors == 0)
+  /** Number of suites where at least one test case failed or errored. */
+  def suitesFailed: Int = suites.count(s => s.failed > 0 || s.errors > 0)
+
   def withSuiteStdout(outputs: Map[String, String]): DederTestResults =
     copy(
       suites = suites.map { suite =>

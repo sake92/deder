@@ -69,13 +69,6 @@ class DederTestRunner(
       }
       DederTestResults.aggregate(allResults)
     }
-    val endedAt = System.currentTimeMillis()
-    val realDuration = Duration.ofMillis(endedAt - startedAt)
-    val testsDuration = Duration.ofMillis(res.duration)
-    logger.info(
-      s"Test run complete. Passed: ${res.passed}, Failed: ${res.failed}, Errors: ${res.errors}, Skipped: ${res.skipped}; " +
-        s"Executed in ${realDuration.toPrettyString}, Aggregated duration: ${testsDuration.toPrettyString}"
-    )
     res
   }
 
@@ -83,7 +76,7 @@ class DederTestRunner(
       framework: Framework,
       testClasses: Seq[(String, Fingerprint, Selector)]
   ): Seq[DederTestResult] = {
-    logger.info(s"Running tests with ${framework.name()}")
+    logger.debug(s"Running tests with ${framework.name()}")
     if (testClasses.isEmpty) {
       logger.warn(s"No tests found for ${framework.name()}")
       return Seq.empty
@@ -112,11 +105,11 @@ class DederTestRunner(
         logger.warn("Test run was cancelled.")
     }
     val summary = runner.done()
-    logger.info(summary)
+    if summary.nonEmpty then logger.info(summary)
 
     _perClassStats ++= handler.perClassStats
 
-    val results = handler.results
+val results = handler.results
     val failedTests = results.filter(r =>
       r.status == DederTestStatus.Failure || r.status == DederTestStatus.Error
     )
@@ -138,6 +131,7 @@ class DederTestRunner(
       if isCancelled() then throw CancelledException("Tests execution cancelled")
       val suiteName = task.taskDef().fullyQualifiedName()
       val threadId = Thread.currentThread().getId
+      if forkHooks.isEmpty then logger.info(s"  ▶ $suiteName")
       forkHooks.foreach { h =>
         h.capture.startSuite()
         h.reporter.emit(ForkedTestEnvelope.SuiteStarted(suiteName, threadId))
@@ -210,17 +204,18 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
     val failure = eventThrowable.map(DederTestFailure.fromThrowable)
     val testStatus = DederTestStatus.fromSbt(event.status())
 
-    // TODO maybe skip PASS here
-    val status = event.status() match {
-      case Status.Failure  => fansi.Color.Red("FAIL \uD83D\uDD34")
-      case Status.Error    => fansi.Color.Red("FAIL \uD83D\uDD34")
-      case Status.Skipped  => fansi.Color.LightYellow("SKIP 🚫")
-      case Status.Ignored  => fansi.Color.LightYellow("SKIP 🚫")
-      case Status.Canceled => fansi.Color.LightYellow("SKIP 🚫")
-      case Status.Pending  => fansi.Color.LightYellow("SKIP 🚫")
-      case Status.Success  => fansi.Color.Green("PASS ✅")
+    val statusOpt = event.status() match {
+      case Status.Failure  => Some(fansi.Color.Red("FAIL \uD83D\uDD34"))
+      case Status.Error    => Some(fansi.Color.Red("FAIL \uD83D\uDD34"))
+      case Status.Skipped  => Some(fansi.Color.LightYellow("SKIP 🚫"))
+      case Status.Ignored  => Some(fansi.Color.LightYellow("SKIP 🚫"))
+      case Status.Canceled => Some(fansi.Color.LightYellow("SKIP 🚫"))
+      case Status.Pending  => Some(fansi.Color.LightYellow("SKIP 🚫"))
+      case Status.Success  => None // frameworks print their own pass lines
     }
-    logger.test(s"$status $testName ; took ${duration.toPrettyString}")
+    statusOpt.foreach { status =>
+      logger.test(s"$status $testName ; took ${duration.toPrettyString}")
+    }
     eventThrowable.foreach { t =>
       logger.error(s"  ${t.getMessage}")
       if (shouldLogStackTrace(t)) {
