@@ -978,7 +978,7 @@ class CoreTasks() extends StrictLogging {
           val testOptions = DederTestOptions(ctx.args)
           val clientEnv = Option(RequestContext.clientParams.get()).map(_.envVars).getOrElse(Map.empty)
           val mergedEnv = clientEnv ++ forkEnv // forkEnv wins on conflict
-          val results = ForkedTestOrchestrator.run(
+          val forkedRun = ForkedTestOrchestrator.run(
             discoveredTests = discoveredTests,
             runtimeClasspath = runClasspath,
             jvmOptions = jvmOptions,
@@ -991,8 +991,8 @@ class CoreTasks() extends StrictLogging {
             testParallelism = testParallelism,
             maxTestForks = maxTestForks
           )
-          JUnitXmlReportWriter.outputDir(ctx.module, ctx.out).foreach(JUnitXmlReportWriter.writeReports(results, _))
-          results
+          JUnitXmlReportWriter.outputDir(ctx.module, forkedRun.runDir).foreach(JUnitXmlReportWriter.writeReports(forkedRun.results, _))
+          forkedRun.results
         }
       },
       isResultSuccessful = _.success,

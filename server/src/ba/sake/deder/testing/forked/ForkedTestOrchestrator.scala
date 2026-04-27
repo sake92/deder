@@ -10,6 +10,9 @@ import ba.sake.deder.testing.*
 import ba.sake.tupson.{*, given}
 import com.typesafe.scalalogging.StrictLogging
 
+/** Result of a forked test run, including the directory where fork data was written. */
+case class ForkedTestRun(results: DederTestResults, runDir: os.Path)
+
 object ForkedTestOrchestrator extends StrictLogging {
 
   private val MaxTestTimeMs = 30L * 60 * 1000
@@ -28,7 +31,7 @@ object ForkedTestOrchestrator extends StrictLogging {
       outDir: os.Path,
       testParallelism: Int,
       maxTestForks: Int
-  ): DederTestResults = {
+  ): ForkedTestRun = {
 
     if maxTestForks > 1 && jvmOptions.exists(_.contains("-agentlib:jdwp=")) then {
       notifications.add(
@@ -38,7 +41,7 @@ object ForkedTestOrchestrator extends StrictLogging {
           Some(moduleId)
         )
       )
-      return DederTestResults(total = 0, passed = 0, failed = 0, errors = 1, skipped = 0, duration = 0)
+      return ForkedTestRun(DederTestResults(total = 0, passed = 0, failed = 0, errors = 1, skipped = 0, duration = 0), outDir)
     }
 
     val testsToRun =
@@ -61,7 +64,7 @@ object ForkedTestOrchestrator extends StrictLogging {
     val buckets = TestDistribution.distribute(testsToRun, history, maxTestForks)
     if buckets.isEmpty then {
       notifications.add(ServerNotification.logWarning("No tests found on the classpath.", Some(moduleId)))
-      return DederTestResults.empty
+      return ForkedTestRun(DederTestResults.empty, outDir)
     }
 
     val effectiveForks = buckets.size
@@ -113,7 +116,7 @@ object ForkedTestOrchestrator extends StrictLogging {
       val aggregated = aggregate(payloads.map(_.results))
       val perClassStats = payloads.flatMap(_.perClassStats).toMap
       TestHistory.save(outDir, history.merge(perClassStats))
-      aggregated
+      ForkedTestRun(aggregated, runDir)
     } finally {
       forkExecutor.shutdownNow()
     }
