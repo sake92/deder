@@ -21,6 +21,16 @@ cd examples/multi
 ./reset
 ```
 
+For local development, use `localPath` in your project's `.deder/server.properties` to point to your local server build:
+
+```properties
+# .deder/server.properties
+localPath=/path/to/your/deder/out/server/assembly.dest/out.jar
+testRunnerLocalPath=/path/to/your/deder/out/test-runner/assembly.dest/out.jar
+```
+
+**Note:** When using localPath or testRunnerLocalPath, the global artifact cache is bypassed - the artifact is copied directly without caching. This ensures you're always testing your latest local build. The `early-access` version also skips caching to ensure you get the latest pre-release features.
+
 ----
 
 

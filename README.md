@@ -17,6 +17,7 @@ Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 - watch mode with concurrent execution in multiple terminals
 - import from sbt (experimental, feedback needed)
 - OTEL tracing support
+- global artifact cache with checksum verification
 
 ## Adoption and feedback
 Deder is used in some of my OSS projects:
