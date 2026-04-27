@@ -36,7 +36,7 @@ object JUnitXmlReportWriter {
       case m: ScalaNativeTestModule => Some(m.junitXmlReport)
       case _                        => None
     }
-    result.filter(_.enabled)
+    result.flatMap(Option(_)).filter(_.enabled)
   }
 
 
