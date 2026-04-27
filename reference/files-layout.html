@@ -41,7 +41,10 @@
       <summary>Table of Contents</summary>
       <div>
        <ul>
-        <li><a href="#files-layout">Files layout</a></li>
+        <li><a href="#files-layout">Files layout</a>
+         <ul>
+          <li><a href="#global-cache">Global Cache</a></li>
+         </ul></li>
        </ul>
       </div>
      </details>
@@ -56,23 +59,53 @@
     It generally has a flat structure, each module gets its own subdirectory in <code>out</code> folder.</p>
    <pre><code class="language-shell hljs" data-highlighted="yes">.deder/
 ├── logs
-│&nbsp;&nbsp; ├── client
-│&nbsp;&nbsp; │&nbsp;&nbsp; ├── cli-client_2026-02-27-12-54-32_186830.log
-│&nbsp;&nbsp; └── server.log
+│   ├── client
+│   │   ├── cli-client_2026-02-27-12-54-32_186830.log
+│   └── server.log
 ├── out
-│&nbsp;&nbsp; ├── mylibrary     # module name
-│&nbsp;&nbsp; │&nbsp;&nbsp; ├── assembly
-│&nbsp;&nbsp; │&nbsp;&nbsp;  ....         # assembly task files
-│&nbsp;&nbsp; │&nbsp;&nbsp; ├── classes
-│&nbsp;&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; └── ba
-│&nbsp;&nbsp; │&nbsp;&nbsp; │&nbsp;&nbsp; └── ...   # class files etc.
+│   ├── mylibrary     # module name
+│   │   ├── assembly
+│   │    ....         # assembly task files
+│   │   ├── classes
+│   │   │   └── ba
+│   │   │   └── ...   # class files etc.
 ├── server.jar        # the server JAR file
+├── test-runner.jar   # the test-runner JAR file
 ├── server.properties # server config file, can be edited and commited to git
 ├── server.lock       # server lock file, only one is allowed to run at a time
 ├── server-cli.sock   # unix domain socket for CLI clients
-└── server-bsp.sock   # unix domain socket for BSP clients
+├── server-bsp.sock   # unix domain socket for BSP clients
+└── server.current.version  # cached version tag for this project
 
 </code></pre>
+   <h2 id="global-cache">Global Cache<a href="#global-cache" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Deder maintains a global artifact cache to avoid redundant downloads across multiple projects. The cache is stored in your home directory:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">~/.deder/
+└── cache/
+    └── artifacts/
+        ├── v0.5.1/
+        │   ├── deder-server.jar
+        │   ├── deder-server.jar.sha256
+        │   ├── deder-test-runner.jar
+        │   └── deder-test-runner.jar.sha256
+        ├── v0.5.0/
+        │   ├── deder-server.jar
+        │   ├── deder-server.jar.sha256
+        │   ├── deder-test-runner.jar
+        │   └── deder-test-runner.jar.sha256
+        └── cache.lock    # lock file for concurrent access
+</code></pre>
+   <p>Key features:</p>
+   <ul>
+    <li><strong>Shared across all projects</strong> - Multiple projects use the same cached artifacts</li>
+    <li><strong>Checksum verified</strong> - Each download is verified for integrity</li>
+    <li><strong>All versions retained</strong> - Old versions are kept for fast switching</li>
+    <li><strong>Concurrent-safe</strong> - Multiple deder processes can access safely</li>
+   </ul>
+   <p>To clear the global cache:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">rm -rf ~/.deder/cache/artifacts/
+</code></pre>
+   <p>Note: <code>early-access</code> version and local builds (via <code>localPath</code> property) are never cached.</p>
    <div role="group">
     <a role="button" href="https://sake92.github.io/deder/reference/caching.html">⬅️ Task caching</a> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/server-properties.html">Server Properties ➡️</a>
    </div>

@@ -72,7 +72,8 @@ deder
     <li><code>bspEnabled</code> - specifies if BSP protocol is enabled. If false, the BSP Deder server is never started (useful in CI or to save memory/CPU)</li>
     <li><code>JAVA_OPTS</code> - java options passed to server java process</li>
     <li><code>maxConnectSeconds</code> - max number of seconds the client waits for the server to start before giving up. Defaults to <code>30</code>. Increase this on slow machines or CI environments.</li>
-    <li><code>localPath</code> - fixed local path to server JAR, useful for developing Deder and debugging</li>
+    <li><code>localPath</code> - fixed local path to server JAR, useful for developing Deder and debugging. <strong>Note:</strong> When using localPath, the global cache is bypassed - the artifact is copied directly without caching. This ensures you're always testing your latest local build.</li>
+    <li><code>testRunnerLocalPath</code> - fixed local path to test-runner JAR, useful for developing Deder and debugging. <strong>Note:</strong> When using testRunnerLocalPath, the global cache is bypassed - the artifact is copied directly without caching.</li>
    </ul>
    <div role="group">
     <a role="button" href="https://sake92.github.io/deder/reference/files-layout.html">⬅️ Files layout</a> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/repositories.html">Repositories ➡️</a>
