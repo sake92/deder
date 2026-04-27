@@ -3,15 +3,10 @@ package ba.sake.deder.client;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.net.URI;
-import java.net.http.*;
 import java.util.concurrent.TimeUnit;
 import java.util.Arrays;
 import java.util.ArrayList;
-import java.util.Optional;
 import java.util.Properties;
-import java.util.regex.Pattern;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -23,9 +18,9 @@ import ba.sake.deder.client.bsp.DederBspProxyClient;
 /*
  * Main entry point for Deder clients.
  * - never use System.out coz BSP talks to this via stdin/stdout
- * - for BSP client we keep trying to reconnect to server indefinitely,
+ * - for BSP client we keep trying to reconect to server indefinitely,
  * because server might be restarting, or shut down due to inactivity
- * - for CLI client we try to reconnect for max 10 seconds, then give up
+ * - for CLI client we try to reconect for max 10 seconds, then give up
  */
 public class Main {
 
@@ -63,13 +58,7 @@ public class Main {
         Files.createDirectories(logFile.getParent());
         Files.createFile(logFile);
 
-        var serverProps = new Properties();
-        var propFileName = Paths.get(".deder/server.properties");
-        if (Files.exists(propFileName) && Files.isRegularFile(propFileName)) {
-            try (FileInputStream inputStream = new FileInputStream(propFileName.toFile())) {
-                serverProps.load(inputStream);
-            }
-        }
+        var serverProps = loadServerProperties();
 
         if (args.length == 2 && args[0].equals("bsp") && args[1].equals("install")) {
             writeBspInstallScript(thisProcess, serverProps);
@@ -85,9 +74,10 @@ public class Main {
             pp.info().commandLine().ifPresent(cmd -> log("Parent Command: " + cmd));
         }, () -> log("No parent process"));
 
-
         client = isBspClient ? new DederBspProxyClient(logFile) : new DederCliClient(this::log, args);
-        var maxConnectDurationSeconds = Integer.parseInt(serverProps.getProperty("maxConnectSeconds", "30"));
+        var maxConnectDuration = java.time.Duration.ofSeconds(
+                Integer.parseInt(serverProps.getProperty("maxConnectSeconds", "30")));
+
         try {
             client.start();
         } catch (Exception e) {
@@ -100,7 +90,8 @@ public class Main {
             // start the timer AFTER server process is launched, not before
             var startedConnectingAt = Instant.now();
             var connected = false;
-            while (!connected && Duration.between(startedConnectingAt, Instant.now()).getSeconds() < maxConnectDurationSeconds) {
+            while (!connected && java.time.Duration.between(startedConnectingAt, Instant.now()).getSeconds() 
+                    < maxConnectDuration.getSeconds()) {
                 try {
                     var sleepMillis = isBspClient ? 1000 : 100;
                     Thread.sleep(sleepMillis);
@@ -113,7 +104,8 @@ public class Main {
                 }
             }
             if (!connected) {
-                var msg = "Failed to connect to Deder server after " + maxConnectDurationSeconds + " seconds. Please check logs for details:";
+                var msg = "Failed to connect to Deder server after " + maxConnectDuration.getSeconds() 
+                        + " seconds. Please check logs for details:";
                 log(msg);
                 System.err.println(msg);
                 System.err.println(logFile.toAbsolutePath());
@@ -122,114 +114,29 @@ public class Main {
         }
     }
 
+    private Properties loadServerProperties() {
+        var serverProps = new Properties();
+        var propFileName = Paths.get(".deder/server.properties");
+        if (Files.exists(propFileName) && Files.isRegularFile(propFileName)) {
+            try (var inputStream = new FileInputStream(propFileName.toFile())) {
+                serverProps.load(inputStream);
+            } catch (IOException e) {
+                // ignore - use empty properties
+            }
+        }
+        return serverProps;
+    }
+
     private void startServer(boolean isBspClient, Properties serverProps) throws Exception {
         System.err.println("Deder server not running, starting it...");
         log("Deder server not running, starting it...");
         ensureJavaInstalled();
-        // must be exactly tag version e.g. v0.1.0
-        var serverVersion = resolveServerVersion(serverProps);
-        var serverLocalPath = serverProps.getProperty("localPath", "");
-        var versionCacheFile = Path.of(".deder/server.current.version");
-        Path serverJarPath = Path.of(".deder/server.jar");
-        Path testRunnerJarPath = Path.of(".deder/test-runner.jar");
-        var cachedVersion = "";
-        if (Files.exists(versionCacheFile) && Files.isRegularFile(versionCacheFile)) {
-            cachedVersion = Files.readString(versionCacheFile, StandardCharsets.UTF_8).strip();
-        }
 
-        // Cache instance for global caching
-        ArtifactCache artifactCache = null;
+        // Use ArtifactManager for version resolution and artifact handling
+        var artifactManager = new ArtifactManager(this::log);
+        var serverVersion = artifactManager.resolveServerVersion(serverProps);
+        artifactManager.ensureArtifactsAvailable(serverVersion, serverProps);
 
-        // Check if we should use cache (not local build, not early-access)
-        boolean useCache = (serverLocalPath == null || serverLocalPath.isBlank()) 
-                && !serverVersion.equals("early-access");
-        if (useCache) {
-            try {
-                artifactCache = new ArtifactCache(this::log);
-            } catch (Exception e) {
-                log("Failed to initialize artifact cache: " + e.getMessage() + ", falling back to direct download");
-                useCache = false;
-            }
-        }
-
-        if (serverLocalPath != null && !serverLocalPath.isBlank()) {
-            // handy for development, use local server build
-            log("Using local server build from " + serverLocalPath);
-            Files.copy(Path.of(serverLocalPath), serverJarPath, StandardCopyOption.REPLACE_EXISTING);
-            Files.writeString(versionCacheFile, "local", StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-        } else if (serverVersion.equals("early-access")) {
-            // early-access never uses cache - always download directly
-            if (Files.exists(serverJarPath) && cachedVersion.equals(serverVersion)) {
-                log("Server JAR already up-to-date (version " + serverVersion + "), skipping download.");
-            } else {
-                download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
-                        serverJarPath);
-                Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
-                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            }
-        } else {
-            // Use global cache for stable versions
-            if (Files.exists(serverJarPath) && cachedVersion.equals(serverVersion)) {
-                log("Server JAR already up-to-date (version " + serverVersion + "), skipping download.");
-            } else if (artifactCache != null) {
-                try {
-                    System.err.println("Copying server from global cache (version " + serverVersion + ")...");
-                    Path cachedArtifact = artifactCache.getArtifact(serverVersion, ArtifactCache.ArtifactType.SERVER);
-                    Files.copy(cachedArtifact, serverJarPath, StandardCopyOption.REPLACE_EXISTING);
-                    Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
-                            StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                    log("Copied server JAR from global cache to .deder/");
-                } catch (Exception e) {
-                    log("Cache operation failed: " + e.getMessage() + ", falling back to direct download");
-                    download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
-                            serverJarPath);
-                    Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
-                            StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-                }
-            } else {
-                // Fallback to direct download
-                download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-server.jar",
-                        serverJarPath);
-                Files.writeString(versionCacheFile, serverVersion, StandardCharsets.UTF_8,
-                        StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            }
-        }
-
-        var testRunnerLocalPath = serverProps.getProperty("testRunnerLocalPath", "");
-        if (testRunnerLocalPath != null && !testRunnerLocalPath.isBlank()) {
-            log("Using local test-runner build from " + testRunnerLocalPath);
-            System.err.println("Using local test-runner...");
-            Files.copy(Path.of(testRunnerLocalPath), testRunnerJarPath, StandardCopyOption.REPLACE_EXISTING);
-        } else if (serverVersion.equals("early-access")) {
-            // early-access never uses cache
-            if (Files.exists(testRunnerJarPath) && cachedVersion.equals(serverVersion)) {
-                log("Test-runner JAR already up-to-date (version " + serverVersion + "), skipping download.");
-            } else {
-                download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-test-runner.jar",
-                        testRunnerJarPath);
-            }
-} else {
-                // Use global cache for test-runner
-                if (Files.exists(testRunnerJarPath) && cachedVersion.equals(serverVersion)) {
-                    log("Test-runner JAR already up-to-date (version " + serverVersion + "), skipping download.");
-                } else if (artifactCache != null) {
-                    try {
-                        System.err.println("Copying test-runner from global cache...");
-                        Path cachedArtifact = artifactCache.getArtifact(serverVersion, ArtifactCache.ArtifactType.TEST_RUNNER);
-                        Files.copy(cachedArtifact, testRunnerJarPath, StandardCopyOption.REPLACE_EXISTING);
-                        log("Copied test-runner JAR from global cache to .deder/");
-                    } catch (Exception e) {
-                        log("Cache operation failed: " + e.getMessage() + ", falling back to direct download");
-                        download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-test-runner.jar",
-                                testRunnerJarPath);
-                    }
-                } else {
-                    // Fallback to direct download
-                    download("https://github.com/sake92/deder/releases/download/" + serverVersion + "/deder-test-runner.jar",
-                            testRunnerJarPath);
-                }
-            }
         startServerProcess(isBspClient, serverProps);
         System.err.println("Deder server started.");
         log("Deder server started.");
@@ -300,7 +207,9 @@ public class Main {
         var clientPath = resolveClientPath(processHandle);
         var commandLineArgsJson = "\"" + clientPath + "\", \"bsp\"";
         Files.createDirectories(Path.of(".bsp"));
-        var serverVersion = resolveServerVersion(serverProps);
+
+        var artifactManager = new ArtifactManager(this::log);
+        var serverVersion = artifactManager.resolveServerVersion(serverProps);
         var serverLocalPath = serverProps.getProperty("localPath");
         if (serverLocalPath != null && !serverLocalPath.isBlank()) {
             serverVersion = "local";
@@ -320,7 +229,6 @@ public class Main {
         System.err.println("BSP config installed at " + bspConfigPath);
     }
 
-
     private String resolveClientPath(ProcessHandle processHandle) {
         // resolve "deder" via PATH (stable across brew/package-manager upgrades)
         try {
@@ -334,132 +242,8 @@ public class Main {
             }
         } catch (Exception ignored) {
         }
-        // fall back to the current process path
         return processHandle.info().command().orElseThrow(
                 () -> new IllegalStateException("Cannot determine client executable path"));
-    }
-
-    private static final Pattern DEDER_PKL_VERSION_PATTERN = Pattern.compile(
-            "amends\\s+\"https://sake92\\.github\\.io/deder/config/([^/]+)/DederProject\\.pkl\"");
-
-    /**
-     * Resolves the server version using three sources in priority order:
-     * 1. server.properties "version" key
-     * 2. deder.pkl amends URL version segment
-     * 3. Latest stable release from GitHub (writes a minimal deder.pkl as a side effect)
-     */
-    private String resolveServerVersion(Properties serverProps) {
-        var explicitVersion = serverProps.getProperty("version", "").strip();
-        if (!explicitVersion.isBlank()) {
-            log("Server version from server.properties: " + explicitVersion);
-            return explicitVersion;
-        }
-
-        var pklVersion = parseDederPklVersion();
-        if (pklVersion.isPresent()) {
-            log("Server version from deder.pkl: " + pklVersion.get());
-            return pklVersion.get();
-        }
-
-        var ghVersion = fetchLatestGithubVersion();
-        if (ghVersion.isPresent()) {
-            writeMinimalDederPkl(ghVersion.get());
-            log("Server version from GitHub releases: " + ghVersion.get());
-            return ghVersion.get();
-        }
-
-        log("Could not determine server version; falling back to early-access");
-        return "early-access";
-    }
-
-    private Optional<String> parseDederPklVersion() {
-        var pklFile = Path.of("deder.pkl");
-        if (!Files.exists(pklFile) || !Files.isRegularFile(pklFile)) {
-            return Optional.empty();
-        }
-        try {
-            var content = Files.readString(pklFile, StandardCharsets.UTF_8);
-            
-            // Find the LAST non-commented "amends" line (comments start with //)
-            // Process lines in reverse to find the last active amends
-            var lines = content.split("\\r?\\n");
-            for (int i = lines.length - 1; i >= 0; i--) {
-                var line = lines[i].strip();
-                // Skip empty lines and comments
-                if (line.isEmpty() || line.startsWith("//")) {
-                    continue;
-                }
-                var matcher = DEDER_PKL_VERSION_PATTERN.matcher(line);
-                if (matcher.find()) {
-                    return Optional.of(matcher.group(1));
-                }
-            }
-        } catch (IOException e) {
-            log("Could not read deder.pkl: " + e.getMessage());
-        }
-        return Optional.empty();
-    }
-
-    private Optional<String> fetchLatestGithubVersion() {
-        try (var httpClient = HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .connectTimeout(Duration.ofSeconds(10))
-                .build()) {
-            var request = HttpRequest.newBuilder()
-                    .uri(URI.create("https://api.github.com/repos/sake92/deder/releases/latest"))
-                    .header("Accept", "application/vnd.github+json")
-                    .GET()
-                    .build();
-            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() == 200) {
-                // Simple extraction of "tag_name" from JSON without pulling in a JSON library
-                var body = response.body();
-                var tagPattern = Pattern.compile("\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
-                var matcher = tagPattern.matcher(body);
-                if (matcher.find()) {
-                    return Optional.of(matcher.group(1));
-                }
-                log("GitHub releases response did not contain tag_name");
-            } else {
-                log("GitHub releases API returned HTTP " + response.statusCode());
-            }
-        } catch (Exception e) {
-            log("Could not fetch latest version from GitHub: " + e.getMessage());
-        }
-        return Optional.empty();
-    }
-
-    private void writeMinimalDederPkl(String version) {
-        var pklFile = Path.of("deder.pkl");
-        if (Files.exists(pklFile)) {
-            return;
-        }
-        try {
-            var content = "amends \"https://sake92.github.io/deder/config/" + version + "/DederProject.pkl\"\n";
-            content += "modules {}\n";
-            Files.writeString(pklFile, content, StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            System.err.println("No deder.pkl found — created minimal config with version " + version);
-            log("Created minimal deder.pkl with version " + version);
-        } catch (IOException e) {
-            log("Could not write minimal deder.pkl: " + e.getMessage());
-        }
-    }
-
-    private void download(String fileUrl, Path destination) throws Exception {
-        System.err.println("Downloading server from " + fileUrl);
-        try (var client = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
-                .followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build()) {
-            var request = HttpRequest.newBuilder().uri(URI.create(fileUrl)).GET().build();
-            var response = client.send(request,
-                    HttpResponse.BodyHandlers.ofFile(destination, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING));
-            if (response.statusCode() == 200) {
-                System.err.println("File downloaded successfully to: " + response.body());
-            } else {
-                throw new RuntimeException("Failed to download '" + fileUrl + "'. Response: " + response);
-            }
-        }
     }
 
     private void log(String message) {

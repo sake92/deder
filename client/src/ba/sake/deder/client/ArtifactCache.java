@@ -36,6 +36,13 @@ public class ArtifactCache {
 	private static final Map<ArtifactType, String> ARTIFACT_FILE_NAMES = Map.of(ArtifactType.SERVER, "deder-server.jar",
 			ArtifactType.TEST_RUNNER, "deder-test-runner.jar");
 
+	/**
+	 * Gets the artifact file name for a given type
+	 */
+	public static String getArtifactFileName(ArtifactType type) {
+		return ARTIFACT_FILE_NAMES.get(type);
+	}
+
 	// Client singleton
 	private static final HttpClient httpClient = HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1)
 			.followRedirects(HttpClient.Redirect.NORMAL).connectTimeout(Duration.ofSeconds(20)).build();
