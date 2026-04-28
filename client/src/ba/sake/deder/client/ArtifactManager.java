@@ -174,7 +174,7 @@ public class ArtifactManager {
         // Case 4: Stable version - try cache, fallback to direct download
         if (cache != null) {
             try {
-                System.err.println("Copying " + artifactName + " from global cache (version " + version + ")...");
+                System.err.println("Resolving " + artifactName + " from global cache (version " + version + ")...");
                 Path cachedArtifact = cache.getArtifact(version, type);
                 Files.copy(cachedArtifact, targetPath, StandardCopyOption.REPLACE_EXISTING);
                 log("Copied " + artifactName + " JAR from global cache to .deder/");
