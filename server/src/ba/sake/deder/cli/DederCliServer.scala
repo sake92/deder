@@ -129,7 +129,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
           """Deder Build Tool Help:
             |
             |Available commands:
-            |  version                 Show server version
+            |  version                 Show client and server versions
             |  modules [options]       List modules
             |  tasks [options]         List tasks
             |  plan [options]          Show execution plan for a task
