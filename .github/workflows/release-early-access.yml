@@ -113,9 +113,17 @@ jobs:
         with:
           extraFiles: deder.pkl
       - name: Set up Homebrew
+        if: runner.os != 'Windows'
         uses: Homebrew/actions/setup-homebrew@main
-      - name: Install deder
+      - name: Install deder (brew)
+        if: runner.os != 'Windows'
         run: brew install sake92/tap/deder
+      - name: Install deder (scoop)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          scoop bucket add sake92 https://github.com/sake92/scoop-bucket.git
+          scoop install deder
       - name: Build Client native image
         run: |
           deder exec -t graalvmNativeImage -m client
