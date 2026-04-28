@@ -13,6 +13,18 @@ import javax.tools.ToolProvider
 
 class PublishTasks(coreTasks: CoreTasks) {
 
+  val versionTask = TaskBuilder
+    .make[String](name = "version")
+    .build { ctx =>
+      ctx.module match {
+        case jm: JavaModule =>
+          val pom = jm.pomSettings
+          if pom != null && pom.version != null then pom.version
+          else GitSemVer.detectVersion(DederGlobals.projectRootDir)
+        case _ => GitSemVer.detectVersion(DederGlobals.projectRootDir)
+      }
+    }
+
   val manifestSettingsTask = ConfigValueTask[ManifestEntries](
     name = "manifest",
     execute = { ctx =>
@@ -65,7 +77,7 @@ class PublishTasks(coreTasks: CoreTasks) {
     .dependsOn(manifestSettingsTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(pomSettingsTask)
-    .dependsOn(coreTasks.versionTask)
+    .dependsOn(versionTask)
     .build { ctx =>
       val (manifestEntries, mainClass, pomSettings, version) = ctx.depResults
       import java.util.jar.Attributes.Name as JarName
@@ -74,12 +86,9 @@ class PublishTasks(coreTasks: CoreTasks) {
       val pomDefaults = pomSettings match {
         case Some(pom) =>
           Map(
-            JarName.IMPLEMENTATION_TITLE.toString -> pom.artifactId,
-            JarName.IMPLEMENTATION_VERSION.toString -> pom.version,
             JarName.IMPLEMENTATION_VENDOR.toString -> pom.groupId,
-            JarName.SPECIFICATION_TITLE.toString -> pom.artifactId,
-            JarName.SPECIFICATION_VERSION.toString -> pom.version,
-            JarName.SPECIFICATION_VENDOR.toString -> pom.groupId
+            JarName.IMPLEMENTATION_TITLE.toString -> pom.artifactId,
+            JarName.IMPLEMENTATION_VERSION.toString -> version
           )
         case None =>
           Map(
@@ -160,7 +169,12 @@ class PublishTasks(coreTasks: CoreTasks) {
       val (manifestEntries, assemblyDepsJar, allModulesJars) = ctx.depResults
       os.makeDir.all(ctx.out)
       val mergedJar = ctx.out / "mergedJar.jar"
-      JarUtils.mergeJars(mergedJar, allModulesJars ++ Seq(assemblyDepsJar), manifestEntries.toJarManifest, skipAssemblyEntry)
+      JarUtils.mergeJars(
+        mergedJar,
+        allModulesJars ++ Seq(assemblyDepsJar),
+        manifestEntries.toJarManifest,
+        skipAssemblyEntry
+      )
       val resultJarPath = ctx.out / "out.jar"
       JarUtils.createAssemblyJar(resultJarPath, mergedJar)
       resultJarPath
@@ -431,6 +445,7 @@ class PublishTasks(coreTasks: CoreTasks) {
     }
 
   val all: Seq[Task[?, ?]] = Seq(
+    versionTask,
     manifestSettingsTask,
     pomSettingsTask,
     finalManifestSettingsTask,

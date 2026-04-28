@@ -68,7 +68,6 @@ class TasksResolverSuite extends munit.FunSuite {
       "resources",
       "javacOptions",
       "scalacOptions",
-      "version",
       "semanticdb", // directory..
       "javaSemanticdbVersion",
       "scalaSemanticdbVersion",
@@ -101,6 +100,7 @@ class TasksResolverSuite extends munit.FunSuite {
       "assemblyDeps",
       "sourcesJar",
       "javadocJar",
+      "version",
       "pomSettings",
       "moduleDepsPomSettings",
       "publishArtifacts",

@@ -5,8 +5,8 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 
 # Misc
 
+- more resilient autocomplete when project doesnt load..
 - Console/REPL
-- speed up assembly task, steal from mill
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
 

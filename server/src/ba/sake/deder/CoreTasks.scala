@@ -124,12 +124,6 @@ class CoreTasks() extends StrictLogging {
     }
   )
 
-  val versionTask = TaskBuilder
-    .make[String](name = "version")
-    .build { ctx =>
-      GitSemVer.detectVersion(DederGlobals.projectRootDir)
-    }
-
   val scalaVersionTask = ConfigValueTask[String](
     name = "scalaVersion",
     execute = { ctx =>
@@ -1052,7 +1046,6 @@ class CoreTasks() extends StrictLogging {
     resourcesTask,
     javacOptionsTask,
     scalacOptionsTask,
-    versionTask,
     javaSemanticdbVersionTask,
     scalaSemanticdbVersionTask,
     semanticdbEnabledTask,

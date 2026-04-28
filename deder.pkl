@@ -51,7 +51,6 @@ local const serverModules =
       manifest {
         mainAttributes {
           ["Multi-Release"] = "true"
-          //["Implementation-Version"] = version()
         }
       }
       pomSettings = pom("deder-server")
@@ -112,9 +111,6 @@ local const client = new JavaModule {
     }
   }
   /*
-  def manifest = super.manifest().add(
-    "Implementation-Version" -> version()
-  )
   // TODO generate in CI, or a script..
   def versionFile = Task {
     val dest = Task.dest / "ba/sake/deder/client"
