@@ -41,7 +41,10 @@ object ForkedTestOrchestrator extends StrictLogging {
           Some(moduleId)
         )
       )
-      return ForkedTestRun(DederTestResults(total = 0, passed = 0, failed = 0, errors = 1, skipped = 0, duration = 0), outDir)
+      return ForkedTestRun(
+        DederTestResults(total = 0, passed = 0, failed = 0, errors = 1, skipped = 0, duration = 0),
+        outDir
+      )
     }
 
     val testsToRun =
@@ -220,61 +223,26 @@ object ForkedTestOrchestrator extends StrictLogging {
         stderr = os.Pipe
       )
 
-    val stdoutThread = new Thread(
-      () => streamStdout(forkId, proc, stdoutLog, tag, notifications, moduleId, suiteOutputs),
-      s"fork-$forkId-stdout"
-    )
-    stdoutThread.setDaemon(true)
-    stdoutThread.start()
-
-    val stderrThread = new Thread(
-      () => streamStderr(proc, stderrLog, tag, notifications, moduleId),
-      s"fork-$forkId-stderr"
-    )
-    stderrThread.setDaemon(true)
-    stderrThread.start()
-
-    val finished = proc.waitFor(MaxTestTimeMs)
-    if !finished then {
-      proc.wrapped.destroyForcibly()
-      notifications.add(
-        ServerNotification.logError(
-          s"${tag}forked test process timed out after ${MaxTestTimeMs / 60000} minutes, killed.",
-          Some(moduleId)
-        )
+    withProcessCleanup(proc) {
+      val stdoutThread = new Thread(
+        () => streamStdout(forkId, proc, stdoutLog, tag, notifications, moduleId, suiteOutputs),
+        s"fork-$forkId-stdout"
       )
-    }
-    val exitCode = proc.exitCode()
-    //stdoutThread.join(2000)
-    //stderrThread.join(2000)
+      stdoutThread.setDaemon(true)
+      stdoutThread.start()
 
-    if os.exists(resultsFilePath) then
-      try {
-        val payload = os.read(resultsFilePath).parseJson[ForkedTestResultsPayload]
-        Some(
-          payload.copy(
-            results = payload.results.withSuiteStdout(suiteOutputs.asScala.view.mapValues(_.result()).toMap)
-          )
-        )
-      }
-      catch {
-        case NonFatal(e) =>
-          notifications.add(
-            ServerNotification.logError(
-              s"${tag}failed to parse results: ${e.getMessage}",
-              Some(moduleId)
-            )
-          )
-          None
-      }
-    else {
-      notifications.add(
-        ServerNotification.logError(
-          s"${tag}forked test process crashed (exit $exitCode)",
-          Some(moduleId)
-        )
+      val stderrThread = new Thread(
+        () => streamStderr(proc, stderrLog, tag, notifications, moduleId),
+        s"fork-$forkId-stderr"
       )
-      None
+      stderrThread.setDaemon(true)
+      stderrThread.start()
+
+      val finished = waitForForkProcess(proc, tag, moduleId, notifications)
+      stdoutThread.join(300)
+      stderrThread.join(300)
+
+      readForkResults(proc, resultsFilePath, suiteOutputs, tag, notifications, moduleId)
     }
   }
 
@@ -404,4 +372,68 @@ object ForkedTestOrchestrator extends StrictLogging {
       .orElse(Option(System.getenv("JAVA_HOME")).filter(_.nonEmpty))
       .map(home => s"$home/bin/java")
       .getOrElse("java")
+
+  private def withProcessCleanup[T](proc: os.SubProcess)(body: => T): T =
+    try body
+    finally if (proc.wrapped.isAlive()) proc.wrapped.destroyForcibly()
+
+  private def waitForForkProcess(
+      proc: os.SubProcess,
+      tag: String,
+      moduleId: String,
+      notifications: ServerNotificationsLogger
+  ): Boolean = {
+    val finished =
+      try proc.waitFor(MaxTestTimeMs)
+      catch case _: InterruptedException => false
+    if !finished then {
+      proc.wrapped.destroyForcibly()
+      notifications.add(
+        ServerNotification.logError(
+          s"${tag}forked test process timed out after ${MaxTestTimeMs / 60000} minutes, killed.",
+          Some(moduleId)
+        )
+      )
+    }
+    finished
+  }
+
+  private def readForkResults(
+      proc: os.SubProcess,
+      resultsFilePath: os.Path,
+      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, StringBuilder],
+      tag: String,
+      notifications: ServerNotificationsLogger,
+      moduleId: String
+  ): Option[ForkedTestResultsPayload] =
+    if os.exists(resultsFilePath) then
+      try {
+        val payload = os.read(resultsFilePath).parseJson[ForkedTestResultsPayload]
+        Some(
+          payload.copy(
+            results = payload.results.withSuiteStdout(suiteOutputs.asScala.view.mapValues(_.result()).toMap)
+          )
+        )
+      } catch {
+        case NonFatal(e) =>
+          notifications.add(
+            ServerNotification.logError(
+              s"${tag}failed to parse results: ${e.getMessage}",
+              Some(moduleId)
+            )
+          )
+          None
+      }
+    else {
+      val exitCode =
+        try proc.exitCode()
+        catch case _: IllegalThreadStateException => -1
+      notifications.add(
+        ServerNotification.logError(
+          s"${tag}forked test process crashed (exit $exitCode)",
+          Some(moduleId)
+        )
+      )
+      None
+    }
 }
