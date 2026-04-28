@@ -220,7 +220,8 @@ class DederProjectState(
       args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger,
       watch: Boolean = false,
-      useLastGood: Boolean = false
+      useLastGood: Boolean = false,
+      requestId: String = null
   ): (res: T, changed: Boolean) = {
     val span = OTEL.TRACER
       .spanBuilder(s"${moduleId}.${task.name}")
@@ -229,9 +230,9 @@ class DederProjectState(
       .startSpan()
     try {
       Using.resource(span.makeCurrent()) { scope =>
-        val requestId = UUID.randomUUID().toString
+        val reqId = if requestId != null then requestId else UUID.randomUUID().toString
         val res =
-          executeTasks(requestId, Seq(moduleId), task.name, args, watch, serverNotificationsLogger, useLastGood).head
+          executeTasks(reqId, Seq(moduleId), task.name, args, watch, serverNotificationsLogger, useLastGood).head
         (res.res.asInstanceOf[T], res.changed)
       }
     } catch {

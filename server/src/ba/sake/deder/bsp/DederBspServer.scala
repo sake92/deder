@@ -30,6 +30,7 @@ class DederBspServer(
       JvmBuildServer,
       JavaBuildServer,
       ScalaBuildServer,
+      CancelExtension,
       StrictLogging {
 
   var client: BuildClient = compiletime.uninitialized // set by DederBspProxyServer
@@ -37,6 +38,15 @@ class DederBspServer(
   var clientParams: Option[InitializeBuildParams] = None
 
   private val running = AtomicBoolean(true)
+
+  override def cancelRequest(params: CancelRequestParams): Unit = {
+    val originId: String = params.getId match {
+      case e if e.isLeft  => e.getLeft
+      case e if e.isRight => e.getRight.toString
+    }
+    logger.debug(s"BSP cancel request for originId: $originId")
+    projectState.cancelRequest(originId)
+  }
 
   // fresh one for each BSP request!
   private def makeServerNotificationsLogger(
@@ -333,7 +343,7 @@ class DederBspServer(
               isCompileTask = true
             )
 
-            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty) { _ =>
+            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty, originId = params.getOriginId) { _ =>
               allCompileSucceeded = false
             }
           }
@@ -728,7 +738,7 @@ class DederBspServer(
           moduleId = Some(moduleId),
           isCompileTask = true
         )
-        executeTask(serverNotificationsLogger, moduleId, coreTasks.finalMainClassTask) match {
+        executeTask(serverNotificationsLogger, moduleId, coreTasks.finalMainClassTask, originId = params.getOriginId) match {
           case Some(mainClass) =>
             val args = Option(params.getArguments).map(_.asScala.toSeq).getOrElse(Seq.empty)
             val runCmd =
@@ -800,7 +810,7 @@ class DederBspServer(
                 moduleId = Some(moduleId),
                 isCompileTask = true
               )
-            val testRes = executeTask(serverNotificationsLogger, moduleId, testTask)
+            val testRes = executeTask(serverNotificationsLogger, moduleId, testTask, originId = params.getOriginId)
             if !testRes.success then allTestsSucceeded = false
           } catch case e: TaskEvaluationException => allTestsSucceeded = false
         }
@@ -950,18 +960,20 @@ class DederBspServer(
       serverNotificationsLogger: ServerNotificationsLogger,
       moduleId: String,
       task: Task[T, ?],
-      args: Seq[String]
+      args: Seq[String],
+      originId: String
   )(onError: TaskEvaluationException => Unit): Unit =
-    try executeTask(serverNotificationsLogger, moduleId, task, args)
+    try executeTask(serverNotificationsLogger, moduleId, task, args, originId)
     catch case e: TaskEvaluationException => onError(e)
 
   private def executeTask[T](
       serverNotificationsLogger: ServerNotificationsLogger,
       moduleId: String,
       task: Task[T, ?],
-      args: Seq[String] = Seq.empty
+      args: Seq[String] = Seq.empty,
+      originId: String = null
   ): T =
-    projectState.executeTask(moduleId, task, args, serverNotificationsLogger, useLastGood = true).res
+    projectState.executeTask(moduleId, task, args, serverNotificationsLogger, useLastGood = true, requestId = originId).res
 
   private def toBspLogMessage(n: ServerNotification.Log): LogMessageParams = {
     val level = n.level match {
