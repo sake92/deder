@@ -133,6 +133,8 @@ jobs:
           scoop install deder
       - name: Build Client native image
         run: |
+          mkdir -p client/resources/ba/sake/deder/client
+          echo "version=${{ needs.precheck.outputs.VERSION }}" > client/resources/ba/sake/deder/client/version.properties
           deder exec -t graalvmNativeImage -m client
           cp .deder/out/client/graalvmNativeImage/native-executable${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
       # if windows: rename to deder.exe and zip
