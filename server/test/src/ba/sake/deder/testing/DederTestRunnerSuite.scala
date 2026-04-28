@@ -56,8 +56,8 @@ class DederTestRunnerSuite extends munit.FunSuite {
     assert(threadIds.size <= 4, s"expected at most 4 threads; got $threadIds")
   }
 
-  // TODO reenable
-  test("runner preserves suite data for JUnit XML reporting".ignore) {
+  // TODO move to "bootstrapped" tests? build test-runner and then do these tests
+  test("runner preserves suite data for JUnit XML reporting") {
     val runner = buildRunner(FakeFramework(taskCount = 2, onExecute = () => ()), testParallelism = 1)
 
     val results = runner.run(DederTestOptions(testSelectors = Seq.empty))

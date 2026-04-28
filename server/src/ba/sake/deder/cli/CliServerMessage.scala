@@ -3,6 +3,9 @@ package ba.sake.deder.cli
 import ba.sake.deder.{ServerNotification, cli}
 import ba.sake.tupson.JsonRW
 
+enum LogLevel derives JsonRW:
+  case ERROR, WARNING, INFO, DEBUG, TRACE
+
 enum CliServerMessage derives JsonRW {
   case Output(text: String)
   case Log(text: String, level: LogLevel)

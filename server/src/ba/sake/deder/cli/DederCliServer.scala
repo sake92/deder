@@ -58,6 +58,3 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
   }
 
 }
-
-enum LogLevel derives JsonRW:
-  case ERROR, WARNING, INFO, DEBUG, TRACE
