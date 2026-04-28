@@ -65,8 +65,9 @@ class PublishTasks(coreTasks: CoreTasks) {
     .dependsOn(manifestSettingsTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(pomSettingsTask)
+    .dependsOn(coreTasks.versionTask)
     .build { ctx =>
-      val (manifestEntries, mainClass, pomSettings) = ctx.depResults
+      val (manifestEntries, mainClass, pomSettings, version) = ctx.depResults
       import java.util.jar.Attributes.Name as JarName
 
       // defaults from pom settings (when available)
@@ -82,7 +83,8 @@ class PublishTasks(coreTasks: CoreTasks) {
           )
         case None =>
           Map(
-            JarName.IMPLEMENTATION_TITLE.toString -> ctx.module.id
+            JarName.IMPLEMENTATION_TITLE.toString -> ctx.module.id,
+            JarName.IMPLEMENTATION_VERSION.toString -> version
           )
       }
 
