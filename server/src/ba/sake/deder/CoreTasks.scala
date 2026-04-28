@@ -6,6 +6,7 @@ import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import dependency.ScalaVersion
 import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompilersCache}
+import ba.sake.deder.publish.GitSemVer
 import ba.sake.deder.config.DederProject.{
   JavaModule,
   JavaTestModule,
@@ -122,6 +123,12 @@ class CoreTasks() extends StrictLogging {
       }
     }
   )
+
+  val versionTask = TaskBuilder
+    .make[String](name = "version")
+    .build { ctx =>
+      GitSemVer.detectVersion(DederGlobals.projectRootDir)
+    }
 
   val scalaVersionTask = ConfigValueTask[String](
     name = "scalaVersion",
@@ -1045,6 +1052,7 @@ class CoreTasks() extends StrictLogging {
     resourcesTask,
     javacOptionsTask,
     scalacOptionsTask,
+    versionTask,
     javaSemanticdbVersionTask,
     scalaSemanticdbVersionTask,
     semanticdbEnabledTask,
