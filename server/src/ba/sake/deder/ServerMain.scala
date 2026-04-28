@@ -46,8 +46,7 @@ object ServerMain extends StrictLogging {
     val propFile = projectRoot / ".deder/server.properties"
     val props = new ju.Properties()
     if (os.exists(propFile) && os.isFile(propFile)) {
-      val inputStream = os.read.inputStream(propFile)
-      props.load(inputStream)
+      Using.resource(os.read.inputStream(propFile))(props.load)
     }
 
     val logLevel = props.getProperty("logLevel", "INFO").toUpperCase
@@ -85,7 +84,8 @@ object ServerMain extends StrictLogging {
     val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)
     val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
     val graalvmNativeImageTasks = GraalVmNativeImageTasks(coreTasks)
-    val allTasks = coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
+    val allTasks =
+      coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
     val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
 

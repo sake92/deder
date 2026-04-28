@@ -33,6 +33,8 @@ public class DederCliClientReadThread extends Thread {
             // when cancelled with Ctrl+C
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        } finally {
+            running.set(false);
         }
     }
 
