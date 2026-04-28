@@ -1,6 +1,6 @@
-// amends "https://sake92.github.io/deder/config/v0.6.1/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/v0.7.0/DederProject.pkl"
 
-amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+//amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 local const scalaVer = "3.7.4"
 

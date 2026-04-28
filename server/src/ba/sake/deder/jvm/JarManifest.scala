@@ -2,7 +2,6 @@ package ba.sake.deder.jvm
 
 import java.util.jar.{Attributes, Manifest}
 
-// stolen from Mill
 /**
  * Represents a JAR manifest.
  *

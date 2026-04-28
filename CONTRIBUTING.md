@@ -4,16 +4,16 @@
 Build the server and client:
 ```shell
 ./scripts/gen-config-bindings.sh
-./mill server.assembly
+deder exec -t assembly -m server
 
 # client executable JAR
-./mill client.assembly
+deder exec -t assembly -m client
 # or as native client
-./mill client-native.nativeImage
+deder exec -t graalvmNativeImage -m client
 
 # AND PUT CLIENT IN PATH !!! for example:
-cp out/client/assembly.dest/out.jar /usr/local/bin/deder
-cp out/client-native/nativeImage.dest/native-executable /usr/local/bin/deder
+cp .deder/out/client/assembly/out.jar /usr/local/bin/deder
+cp .deder/out/client/graalvmNativeImage/native-executable /usr/local/bin/deder
 
 # then you can run commands:
 cd examples/multi

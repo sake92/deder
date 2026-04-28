@@ -336,7 +336,6 @@ class CoreTasks() extends StrictLogging {
     )
     .build { ctx => ctx.out }
 
-  // this is localRunClasspath in mill ??
   val allClassesDirsTask = CachedTaskBuilder
     .make[Seq[os.Path]](
       name = "allClassesDirs",

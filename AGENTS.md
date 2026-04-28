@@ -23,14 +23,14 @@ client (Java, native-image) --Unix socket--> server (Scala 3)
 
 ## Build System
 
-This project uses [Mill](https://mill-build.org/) (`build.mill`). Key commands:
+This project uses Deder to build itself (`deder.pkl` build file). Key commands:
 
 ```sh
 ./scripts/gen-config-bindings.sh   # regenerate Pkl→Java config bindings (required before first build)
-./mill server.assembly              # build server fat JAR
-./mill client.assembly              # build client fat JAR
-./mill server.test                  # run unit tests (munit)
-./scripts/run-it-tests.sh           # build everything + run integration tests
+deder exec -t assembly -m server   # build server fat JAR
+deder exec -t assembly -m client   # build client fat JAR
+deder exec -t tests -m server-test # run unit tests (munit)
+./scripts/run-it-tests.sh          # build everything + run integration tests
 ./scripts/run-it-tests.sh ba.sake.deder.bsp.BspIntegrationSuite  # single IT suite
 ```
 
