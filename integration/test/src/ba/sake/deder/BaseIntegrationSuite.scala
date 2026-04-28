@@ -41,7 +41,7 @@ trait BaseIntegrationSuite extends munit.FunSuite {
     // val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
     // val cmd = shell ++ Seq(s"$dederClientPath $command")
     val cmd = Seq("java", "-jar", dederClientPath) ++ command
-    println(s"Executing command: ${cmd.mkString(" ")} in $projectPath")
+   // println(s"Executing command: ${cmd.mkString(" ")} in $projectPath")
     os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe, check = false)
   }
 }

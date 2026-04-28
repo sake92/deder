@@ -92,8 +92,9 @@ object ForkedTestOrchestrator extends StrictLogging {
       val callables: Seq[Callable[Option[ForkedTestResultsPayload]]] =
         buckets.zipWithIndex.map { case (slice, forkId) =>
           new Callable[Option[ForkedTestResultsPayload]] {
-            def call(): Option[ForkedTestResultsPayload] =
-              runForkWithPermit(
+            def call(): Option[ForkedTestResultsPayload] = {
+              RequestContext.id.set(requestId)
+              try runForkWithPermit(
                 forkId = forkId,
                 slice = slice,
                 requestId = requestId,
@@ -108,6 +109,8 @@ object ForkedTestOrchestrator extends StrictLogging {
                 notifications = notifications,
                 moduleId = moduleId
               )
+              finally RequestContext.id.remove()
+            }
           }
         }
       val futures = callables.map(forkExecutor.submit)
