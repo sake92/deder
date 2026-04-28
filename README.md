@@ -35,6 +35,8 @@ The [examples](examples) folder has working projects that show you how to use De
 
 ## Installation
 
+Deder needs JDK 21+.
+
 ### MacOS and Linux (Homebrew)
 
 ```shell
