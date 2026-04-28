@@ -23,7 +23,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.repository == 'sake92/deder' && startsWith(github.event.workflow_run.head_commit.message, 'Releasing version') != true }}
     runs-on: ubuntu-latest
     outputs:
-      # always -SNAPSHOT, returned by mill, brew/scoop/winget are skipped
+      # always -SNAPSHOT, brew/scoop/winget are skipped
       VERSION: ${{ steps.vars.outputs.VERSION }}
     steps:
       - name: Checkout
@@ -36,11 +36,15 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
       - uses: coursier/cache-action@v7
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+      - name: Install deder
+        run: brew install sake92/tap/deder
       - name: Version
         id: vars
         shell: bash
         run: |
-          VERSION=$(./mill show server.version | tr -d '"')
+          VERSION=$(deder exec --json -t version -m server | jq -r '.["server"]')
           echo "VERSION=$(echo $VERSION)" >> $GITHUB_OUTPUT
 
   build-jars:
@@ -58,15 +62,19 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
       - uses: coursier/cache-action@v7
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+      - name: Install deder
+        run: brew install sake92/tap/deder
       - name: Build JARs
         run: |
           ./scripts/gen-config-bindings.sh
-          ./mill server.assembly
-          cp out/server/assembly.dest/out.jar deder-server.jar
-          ./mill test-runner.assembly
-          cp out/test-runner/assembly.dest/out.jar deder-test-runner.jar
-          ./mill client.assembly
-          cp out/client/assembly.dest/out.jar deder-client.jar
+          mkdir -p client/resources/ba/sake/deder/client
+          echo "version=${{ needs.precheck.outputs.VERSION }}" > client/resources/ba/sake/deder/client/version.properties
+          deder exec -t assembly -m server -m client -m test-runner
+          cp .deder/out/server/assembly/out.jar deder-server.jar
+          cp .deder/out/client/assembly/out.jar deder-client.jar
+          cp .deder/out/test-runner/assembly/out.jar deder-test-runner.jar
       - name: Upload JARs
         uses: actions/upload-artifact@v4
         with:
@@ -96,19 +104,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Setup Java # for mill itself
-        uses: actions/setup-java@v4
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
         with:
-          java-version: ${{ env.JAVA_VERSION }}
-          distribution: ${{ env.JAVA_DISTRO }}
+          java-version: '25'
+          distribution: 'graalvm-community'
       - uses: coursier/cache-action@v7
         with:
           extraFiles: deder.pkl
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+      - name: Install deder
+        run: brew install sake92/tap/deder
       - name: Build Client native image
         run: |
-          ./mill -i client-native.nativeImage
-          ls out/client-native/nativeImage.dest/
-          cp out/client-native/nativeImage.dest/native-executable${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
+          deder exec -t graalvmNativeImage -m client
+          cp .deder/out/client/graalvmNativeImage/native-executable${{ matrix.os.ext }} deder-client-${{ matrix.os.name }}${{ matrix.os.ext }}
       # if windows: rename to deder.exe and zip
       - name: Zip Windows executable
         if: ${{ matrix.os.name == 'windows-x86_64' }}
