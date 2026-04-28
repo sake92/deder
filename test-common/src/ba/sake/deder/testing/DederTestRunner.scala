@@ -3,7 +3,7 @@ package ba.sake.deder.testing
 // peek at https://github.com/scala-js/scala-js/blob/main/test-bridge/src/main/scala/org/scalajs/testing/bridge/HTMLRunner.scala
 
 import java.time.Duration
-import java.util.concurrent.{Executors, Future as JFuture}
+import java.util.concurrent.{ExecutionException, Executors, Future as JFuture}
 import scala.collection.mutable
 import sbt.testing.{Task as SbtTestTask, *}
 import ba.sake.deder.*
@@ -170,9 +170,14 @@ val results = handler.results
         }
         try futures.foreach(_.get())
         catch {
-          case _: CancelledException =>
-            logger.warn("Cancelling remaining tests...")
-            futures.foreach(_.cancel(true))
+          case e: ExecutionException =>
+            Option(e.getCause) match {
+              case Some(_: CancelledException) =>
+                logger.warn("Cancelling remaining tests...")
+                futures.foreach(_.cancel(true))
+              case Some(cause) => throw cause
+              case None => throw e
+            }
         }
       } finally {
         executor.shutdown()
