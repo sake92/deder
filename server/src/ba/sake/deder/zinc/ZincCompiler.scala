@@ -159,6 +159,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       classesDir: os.Path,
       scalacOptions: Seq[String],
       javacOptions: Seq[String],
+      compileOrder: CompileOrder = CompileOrder.JavaThenScala,
       zincLogger: xsbti.Logger,
       moduleId: String,
       notifications: ServerNotificationsLogger
@@ -193,6 +194,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
         classesDir = classesDir,
         scalacOptions = scalacOptions,
         javacOptions = javacOptions,
+        compileOrder = compileOrder,
         zincLogger = zincLogger,
         moduleId = moduleId,
         notifications = notifications
@@ -210,6 +212,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       classesDir: os.Path,
       scalacOptions: Seq[String],
       javacOptions: Seq[String],
+      compileOrder: CompileOrder,
       zincLogger: xsbti.Logger,
       moduleId: String,
       notifications: ServerNotificationsLogger
@@ -226,7 +229,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       /*_javacOptions =*/ javacOptions.toArray,
       /*_maxErrors =*/ 100,
       /*_sourcePositionMapper =*/ null,
-      /*_order =*/ CompileOrder.JavaThenScala // TODO make configurable
+      /*_order =*/ compileOrder
     )
 
     val analysisStore = ConsistentFileAnalysisStore.binary(

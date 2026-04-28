@@ -161,6 +161,7 @@ val results = handler.results
               OutputCaptureContext.currentNotificationsLogger.set(capturedNotificationsLogger)
               OutputCaptureContext.currentModuleId.set(capturedModuleId)
             }
+            // TODO Request id ?
             try runOne(task)
             finally {
               OutputCaptureContext.currentNotificationsLogger.remove()

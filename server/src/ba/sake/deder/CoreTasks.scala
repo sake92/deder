@@ -6,8 +6,10 @@ import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import dependency.ScalaVersion
 import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompilersCache}
+import xsbti.compile.CompileOrder
 import ba.sake.deder.publish.GitSemVer
 import ba.sake.deder.config.DederProject.{
+  CompileOrder => ConfigCompileOrder,
   JavaModule,
   JavaTestModule,
   ModuleType,
@@ -636,6 +638,14 @@ class CoreTasks() extends StrictLogging {
         scalacOptions ++ allScalacPlugins
           .map(p => s"-Xplugin:${p.toString}") ++ platformSpecificScalacOptions ++ semanticDbScalacOpts
 
+      val compileOrder = (ctx.module: @unchecked) match {
+        case m: JavaModule => m.compileOrder match {
+          case ConfigCompileOrder.JAVA_THEN_SCALA => CompileOrder.JavaThenScala
+          case ConfigCompileOrder.SCALA_THEN_JAVA => CompileOrder.ScalaThenJava
+          case ConfigCompileOrder.MIXED          => CompileOrder.Mixed
+        }
+      }
+
       ZincCompilersCache
         .get(scalaVersion, ctx.dependencyResolver)
         .compile(
@@ -648,6 +658,7 @@ class CoreTasks() extends StrictLogging {
           classesDir = classesDir,
           scalacOptions = finalScalacOptions,
           javacOptions = finalJavacOptions,
+          compileOrder = compileOrder,
           zincLogger = zincLogger,
           moduleId = ctx.module.id,
           notifications = ctx.notifications

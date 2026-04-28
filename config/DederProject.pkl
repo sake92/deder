@@ -65,6 +65,13 @@ typealias ModuleType =
     | "scala-native"
     | "scala-native-test"
 
+/// Zinc compile order: controls the order in which Java and Scala sources are compiled.
+/// `java-then-scala` (default): compile all Java first, then Scala. Standard for most projects.
+/// `scala-then-java`: compile Scala first, then Java. Use when Java sources depend on Scala.
+/// `mixed`: compile Java and Scala together in a single pass. Required when there are circular
+///   dependencies between Java and Scala sources in the same module.
+typealias CompileOrder = "java-then-scala" | "scala-then-java" | "mixed"
+
 class PomLicense {
   /// SPDX identifier or full license name, e.g. "MIT" or "MIT License"
   name: String(!isEmpty)
@@ -143,6 +150,11 @@ open class JavaModule extends DederModule {
   jvmOptions: Listing<String> = new Listing {}
   /// Java version to use for compilation, e.g. "1.8", "11", "17". This is used for setting the `--release` flag during compilation and for selecting the appropriate Java runtime when running the app.
   javaVersion: String?
+  /// Zinc compile order: controls how Java and Scala sources are ordered during compilation.
+  /// `java-then-scala` (default): compile all Java first, then Scala. Standard for most projects.
+  /// `scala-then-java`: compile Scala first, then Java. Use when Java sources depend on Scala types.
+  /// `mixed`: compile Java and Scala together. Required when there are circular dependencies.
+  compileOrder: CompileOrder = "java-then-scala"
   javacOptions: Listing<String> = new Listing {}
   /// Environment variables to set when running/testing the app, e.g. "ENV_VAR" -> "value".
   forkEnv: Mapping<String, String> = new Mapping {}
