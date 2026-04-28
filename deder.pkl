@@ -15,6 +15,7 @@ local const config = new JavaModule {
 local const function pom(artId: String) = new PomSettings {
   groupId = "ba.sake"
   artifactId = artId
+  version = read?("env:VERSION")
 }
 
 local const testCommon = new ScalaModule {
@@ -100,6 +101,7 @@ local const client = new JavaModule {
   id = "client"
   publish = false
   mainClass = "ba.sake.deder.client.Main"
+  pomSettings = pom("deder-client")
   deps {
     "com.fasterxml.jackson.core:jackson-databind:2.20.1"
   }
