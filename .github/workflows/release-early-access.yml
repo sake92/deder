@@ -36,6 +36,8 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
       - uses: coursier/cache-action@v7
+        with:
+          extraFiles: deder.pkl
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder
@@ -62,6 +64,8 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: ${{ env.JAVA_DISTRO }}
       - uses: coursier/cache-action@v7
+        with:
+          extraFiles: deder.pkl
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder
@@ -118,6 +122,9 @@ jobs:
       - name: Install deder (brew)
         if: runner.os != 'Windows'
         run: brew install sake92/tap/deder
+      - name: Set up Scoop
+        if: runner.os == 'Windows'
+        uses: MinoruSekine/setup-scoop@v4.0.2
       - name: Install deder (scoop)
         if: runner.os == 'Windows'
         shell: pwsh
