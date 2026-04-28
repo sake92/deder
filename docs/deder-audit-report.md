@@ -1,10 +1,5 @@
 # Deder Audit Report
 
-**5. TODO `--ascii` plan output is unusably wide**
-- `deder plan -m uber -t compile --ascii` produces output that is hundreds of thousands of characters wide (the truncated output was 391KB+). This makes it unusable in a terminal.
-- `--dot` format works well and can be piped to graphviz.
-- **Fix:** Either limit line width with wrapping/truncation, or make the ASCII renderer use a more compact layout (vertical instead of horizontal).
-
 **12. Annotation processor warnings in java-scala example**
 - Compiling `java-scala-project` produces: `Could not determine source for class ba.sake.deder.javascalaproject.ImmutableBook$Builder` and `ImmutableBook`. These are generated classes from annotation processing, so the warnings are expected but noisy.
 - **Fix:** Consider suppressing these warnings for annotation-processor-generated classes, or document this as expected behavior.

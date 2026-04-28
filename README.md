@@ -11,7 +11,7 @@ Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 ## Current status and features
 - CLI client with shell completions
 - BSP client with support for VSCode and IntelliJ
-- exploring the build with listing modules, tasks, and execution plans (visualized as ASCII or DOT graphs)
+- exploring the build with listing modules, tasks, and execution plans (visualized as DOT graphs)
 - packaging module as JAR, uber JAR, Scala.js bundle, Scala Native executable
 - executing tests
 - watch mode with concurrent execution in multiple terminals
@@ -81,17 +81,17 @@ deder complete -s bash -o > ~/.local/share/bash-completion/completions/deder
 
 ################ explore the build
 # list modules
-# supports flags: --json, --ascii, --dot
+# supports flags: --json, --dot
 deder modules
 
 ################
 # list tasks
-# supports flags: --json, --ascii, --dot
+# supports flags: --json, --dot
 deder tasks
 
 ################
 # print execution plan for a task
-# supports flags: --json, --ascii, --dot
+# supports flags: --json, --dot
 deder plan -m common -t compileClasspath
 
 

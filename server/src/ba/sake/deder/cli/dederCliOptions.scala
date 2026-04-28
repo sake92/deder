@@ -18,8 +18,6 @@ case class DederCliHelpOptions(
 case class DederCliModulesOptions(
     @arg(doc = "Output result as JSON")
     json: Flag,
-    @arg(doc = "Output result as ASCII graph")
-    ascii: Flag,
     @arg(doc = "Output result as DOT graph")
     dot: Flag
 )
@@ -30,8 +28,6 @@ case class DederCliTasksOptions(
     module: Option[String],
     @arg(doc = "Output result as JSON")
     json: Flag,
-    @arg(doc = "Output result as ASCII graph")
-    ascii: Flag,
     @arg(doc = "Output result as DOT graph")
     dot: Flag
     // TODO filtering? by module? but deps must be included..
@@ -47,8 +43,6 @@ case class DederCliPlanOptions(
     task: String,
     @arg(doc = "Output result as JSON")
     json: Flag,
-    @arg(doc = "Output result as ASCII graph")
-    ascii: Flag,
     @arg(doc = "Output result as DOT graph")
     dot: Flag
 )

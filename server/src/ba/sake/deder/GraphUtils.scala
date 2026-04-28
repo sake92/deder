@@ -34,17 +34,4 @@ object GraphUtils {
     exporter.exportGraph(g, writer)
     writer.toString
   }
-
-  def generateAscii[V, E](g: Graph[V, E], vertexLabelProvider: V => String): String = {
-    import org.scalameta.ascii.graph.Graph as AsciiGraph
-    import org.scalameta.ascii.layout.GraphLayout
-    val vertices = g.vertexSet().asScala.toSet.map(vertexLabelProvider)
-    val edges = g
-      .edgeSet()
-      .asScala
-      .toList
-      .map(e => (vertexLabelProvider(g.getEdgeSource(e)), vertexLabelProvider(g.getEdgeTarget(e))))
-    val graph = AsciiGraph(vertices = vertices, edges = edges)
-    GraphLayout.renderGraph(graph)
-  }
 }

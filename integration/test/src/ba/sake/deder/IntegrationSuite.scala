@@ -34,13 +34,6 @@ class IntegrationSuite extends BaseIntegrationSuite {
         }
       }
       locally {
-        val dederRes = executeDederCommand(projectPath, "modules", "--ascii")
-        val dederOutput = dederRes.out.text()
-        List("common", "frontend", "backend", "uber", "uber-test").foreach { moduleId =>
-          assert(dederOutput.contains(moduleId), s"Module '$moduleId' not found in 'deder modules --ascii' output")
-        }
-      }
-      locally {
         val dederRes = executeDederCommand(projectPath, "modules", "--dot")
         val dederOutput = dederRes.out.text()
         List("common", "frontend", "backend", "uber", "uber-test").foreach { moduleId =>

@@ -31,16 +31,16 @@ class TabCompleter(tasksResolver: TasksResolver) {
         rest match {
           case Seq("version", _*) => Seq.empty
           case Seq("clean", _*)   => completeModule(prevWord, currentWord).getOrElse(Seq("-m", "--module"))
-          case Seq("modules", _*) => Seq("--json", "--ascii", "--dot").filter(_.startsWith(currentWord))
+          case Seq("modules", _*) => Seq("--json", "--dot").filter(_.startsWith(currentWord))
           case Seq("tasks", _*) =>
             completeModule(prevWord, currentWord).getOrElse(
-              Seq("-m", "--module", "--json", "--ascii", "--dot").filter(_.startsWith(currentWord))
+              Seq("-m", "--module", "--json", "--dot").filter(_.startsWith(currentWord))
             )
           case Seq("plan", _*) =>
             completeModule(prevWord, currentWord)
               .orElse(completeTask(prevWord, currentWord))
               .getOrElse(
-                Seq("-m", "--module", "-t", "--task", "--json", "--ascii", "--dot").filter(_.startsWith(currentWord))
+                Seq("-m", "--module", "-t", "--task", "--json", "--dot").filter(_.startsWith(currentWord))
               )
           case Seq("exec", _*) =>
             completeModule(prevWord, currentWord)

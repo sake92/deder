@@ -211,9 +211,6 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                     val dot =
                       GraphUtils.generateDOT(state.tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id))
                     serverMessages.put(CliServerMessage.Output(dot))
-                  } else if cliOptions.ascii.value then {
-                    val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.modulesGraph, v => v.id)
-                    serverMessages.put(CliServerMessage.Output(asciiGraph))
                   } else {
                     val allModules = state.tasksResolver.allModules.sortBy(_.id)
                     serverMessages.put(CliServerMessage.Output(allModules.map(_.id).mkString("\n")))
@@ -250,10 +247,6 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                         v => Map("label" -> v.id)
                       )
                     serverMessages.put(CliServerMessage.Output(dot))
-                    serverMessages.put(CliServerMessage.Exit(0))
-                  } else if cliOptions.ascii.value then {
-                    val asciiGraph = GraphUtils.generateAscii(state.tasksResolver.taskInstancesGraph, v => v.id)
-                    serverMessages.put(CliServerMessage.Output(asciiGraph))
                     serverMessages.put(CliServerMessage.Exit(0))
                   } else {
                     val modules = cliOptions.module match {
@@ -308,9 +301,6 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
                       } else if cliOptions.dot.value then {
                         val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
                         serverMessages.put(CliServerMessage.Output(dot))
-                      } else if cliOptions.ascii.value then {
-                        val asciiGraph = GraphUtils.generateAscii(tasksExecSubgraph, v => v.id)
-                        serverMessages.put(CliServerMessage.Output(asciiGraph))
                       } else {
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                         val stagesStr = tasksExecStages.zipWithIndex
