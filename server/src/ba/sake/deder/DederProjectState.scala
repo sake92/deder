@@ -368,7 +368,6 @@ class DederProjectState(
                 logger.error(msg)
                 false
               case Right(taskInstances) =>
-                // log what will be cleaned
                 val shown = taskInstances.take(10)
                 shown.foreach { (moduleId, taskInstance) =>
                   val taskOutDir = DederGlobals.projectRootDir / ".deder/out" / moduleId / taskInstance.task.name
@@ -377,17 +376,15 @@ class DederProjectState(
                 val remaining = taskInstances.size - shown.size
                 if remaining > 0 then logger.info(s"...and ${remaining} more task/module combo(s)")
 
-                // lock and clean
                 val sorted = taskInstances.map(_._2).sortBy(_.id)
                 try {
                   sorted.foreach(_.lock.lock())
-                  taskInstances.foreach { (moduleId, taskInstance) =>
+                  taskInstances.forall { (moduleId, taskInstance) =>
                     DederCleaner.cleanTask(moduleId, taskInstance.task.name)
                   }
                 } finally {
                   sorted.reverse.foreach(_.lock.unlock())
                 }
-                true
             }
         }
     }
