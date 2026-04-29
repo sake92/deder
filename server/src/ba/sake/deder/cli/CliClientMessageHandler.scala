@@ -254,12 +254,11 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
               serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
               serverMessages.put(CliServerMessage.Exit(1))
             case Right(cliOptions) =>
-              val success = cliOptions.task match {
-                case Some(taskName) =>
-                  projectState.cleanTasks(cliOptions.modules, taskName)
-                case None =>
+              val success =
+                if cliOptions.task.nonEmpty then
+                  projectState.cleanTasks(cliOptions.modules, cliOptions.task)
+                else
                   projectState.cleanModules(cliOptions.modules)
-              }
               serverMessages.put(CliServerMessage.Exit(if success then 0 else 1))
           }
       case m: CliClientMessage.Import =>

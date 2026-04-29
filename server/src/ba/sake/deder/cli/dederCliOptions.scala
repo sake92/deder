@@ -49,7 +49,7 @@ case class DederCliCleanOptions(
     @arg(doc = "Module IDs to clean", short = 'm')
     modules: Seq[String], // cant have a default.. :/
     @arg(doc = "The task to clean (if not specified, cleans entire module)", short = 't')
-    task: Option[String] = None
+    task: String = ""
 )
 
 @main("exec command", "Execute a task in module(s)")
