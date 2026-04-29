@@ -117,7 +117,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
         ModuleSplitStyle.SmallestModules
       case ScalaJsModuleSplitStyle.SMALL_MODULES_FOR =>
         val pkgs = cfg.smallModulesFor.asScala.toList
-        ModuleSplitStyle.SmallModulesFor(pkgs.toArray)
+        ModuleSplitStyle.SmallModulesFor(pkgs)
     }
 
     val esVersion = cfg.esVersion match {
