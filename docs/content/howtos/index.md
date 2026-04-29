@@ -15,7 +15,10 @@ pagination:
 
 ## How to clean output artifacts?
 
-You can use `deder clean` to clean all modules outputs.  
+Clean all modules: `deder clean`
 
-Or specify modules(s) to clean explicitly with `deder clean -m mymodule ...`.
-This will delete the whole `.deder/out/mymodule` folder.
+Clean a specific module: `deder clean -m mymodule`
+
+Clean a specific task: `deder clean -t compile`
+
+Both support wildcards: `deder clean -m mod% -t compile%`

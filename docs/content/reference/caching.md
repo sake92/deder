@@ -90,12 +90,15 @@ deder clean -m mymodule
 deder clean -m mod1 -m mod2
 ```
 
-Clean requires exact module ids. Wildcard patterns that work with `exec` (e.g. `mymodule%`) are **not** supported by `clean`.
+`deder clean -t <task-name>` removes `.deder/out/<module>/<task>/` for the specified task across all modules. Combine `-m` and `-t` to target a specific task on specific modules:
 
-No CLI command today clears a single task on one module or clears the whole project. Manual fallbacks:
+```shell
+deder clean -t compile
+deder clean -m mymodule -t test
+deder clean -m mod% -t compile%
+```
 
-- Single task: `rm -rf .deder/out/<module>/<task>/`
-- Whole project: `rm -rf .deder/out/`
+Wildcard patterns (`%`) are supported for both `-m` and `-t` flags.
 
 ## How caching works
 

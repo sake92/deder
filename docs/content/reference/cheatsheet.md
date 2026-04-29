@@ -12,11 +12,13 @@ deder version
 deder shutdown
 
 ################ clean module output / caches
-# remove .deder/out/<module>/ for one module
-deder clean -m mymodule
 
-# multiple modules
-deder clean -m mod1 -m mod2
+deder clean                      # clean all modules
+deder clean -m mymodule          # clean specific module
+deder clean -m mod1 -m mod2      # clean multiple modules
+deder clean -m mod%              # clean modules matching wildcard
+deder clean -t compile           # clean compile task on all modules
+deder clean -m mymodule -t test  # clean test task on specific module
 
 deder import --from sbt
 

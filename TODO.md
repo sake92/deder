@@ -1,22 +1,20 @@
 
-# Docs
-- run pkldoc on each tag, and publish to ghpages
-https://pkl-lang.org/main/current/pkl-doc/index.html
 
 # Misc
-- add forkArgs
-- clean per task
-- revisit server file lock..?? add a proper test
 - support negation tests/modules filter like !mytests%
 - group tasks by category like in gradle, when printing them
 - Console/REPL
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
 
+
+# Docs
+- run pkldoc on each tag, and publish to ghpages
+https://pkl-lang.org/main/current/pkl-doc/index.html
+
 # Client
 
 # Compilers
-- print file where error happened
 - add compileOnly deps
 
 # Caching
