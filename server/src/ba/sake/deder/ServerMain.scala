@@ -3,6 +3,7 @@ package ba.sake.deder
 import java.io.RandomAccessFile
 import java.nio.channels.FileLock
 import java.nio.channels.OverlappingFileLockException
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 import java.util as ju
 import scala.util.control.NonFatal
@@ -22,6 +23,9 @@ import ba.sake.deder.graalvm.GraalVmNativeImageTasks
 
 object ServerMain extends StrictLogging {
 
+  private var serverLockHandle: RandomAccessFile = _
+  private var serverFileLock: FileLock = _
+
   def main(args: Array[String]): Unit = Parser(this).runOrExit(args)
 
   @main def startServer(
@@ -34,7 +38,14 @@ object ServerMain extends StrictLogging {
     // 21 because unix sockets locking bug, i'd have to use bytebuffers for 17 and 18.. meh
     if !Properties.isJavaAtLeast(21) then throw DederException("Must run with Java 21+")
 
-    val projectRoot = os.Path(projectRootDir)
+    val realProjectDir = try {
+      java.nio.file.Path.of(projectRootDir).toRealPath().toString
+    } catch {
+      case e: Exception =>
+        logger.warn(s"Could not resolve canonical path for '$projectRootDir', using as-is: ${e.getMessage}")
+        projectRootDir
+    }
+    val projectRoot = os.Path(realProjectDir)
     System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
     // Tee stdout/stderr so test output reaches CLI clients
@@ -127,22 +138,73 @@ object ServerMain extends StrictLogging {
   private def acquireServerLock(projectRoot: os.Path): Unit = {
     val serverLockFile = projectRoot / ".deder/server.lock"
     os.makeDir.all(serverLockFile / os.up)
-    val lockFileHandle = new RandomAccessFile(serverLockFile.toIO, "rw")
-    val fileLock = lockFileHandle.getChannel.tryLock()
-    if fileLock == null then {
-      logger.error("ERROR: Could not acquire server lock - another server process is already running for this project")
-      lockFileHandle.close()
-      sys.exit(1)
+
+    val attemptLock = () => {
+      val handle = new RandomAccessFile(serverLockFile.toIO, "rw")
+      val lock = handle.getChannel.tryLock()
+      (handle, lock)
     }
+
+    val (handle, lock) = attemptLock()
+    if lock == null then {
+      val existingPidOpt = try {
+        val content = os.read(serverLockFile).trim
+        if content.nonEmpty then Some(content.toLong) else None
+      } catch { case _: Exception => None }
+
+      val isStale = existingPidOpt match {
+        case Some(pid) =>
+          val alive = ProcessHandle.of(pid).isPresent && ProcessHandle.of(pid).get().isAlive
+          !alive
+        case None => true
+      }
+
+      if isStale then {
+        logger.warn(
+          s"Found stale server lock (PID: ${existingPidOpt.getOrElse("unknown")}). Breaking lock and retrying..."
+        )
+        handle.close()
+        os.remove.all(serverLockFile)
+        val (handle2, lock2) = attemptLock()
+        if lock2 == null then {
+          val msg = "ERROR: Could not acquire server lock - another server process is already running for this project"
+          logger.error(msg)
+          System.err.println(msg)
+          handle2.close()
+          sys.exit(1)
+        }
+        serverLockHandle = handle2
+        serverFileLock = lock2
+        writePidToLockFile(handle2)
+      } else {
+        val msg = "ERROR: Could not acquire server lock - another server process is already running for this project"
+        logger.error(msg)
+        System.err.println(msg)
+        handle.close()
+        sys.exit(1)
+      }
+    } else {
+      serverLockHandle = handle
+      serverFileLock = lock
+      writePidToLockFile(handle)
+    }
+
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
       try {
-        fileLock.release()
-        lockFileHandle.close()
+        serverFileLock.release()
+        serverLockHandle.close()
         os.remove.all(serverLockFile)
       } catch {
-        case _: Exception => // Ignore errors during cleanup
+        case _: Exception =>
       }
     }))
+  }
+
+  private def writePidToLockFile(handle: RandomAccessFile): Unit = {
+    val pid = ProcessHandle.current().pid().toString
+    handle.setLength(0)
+    handle.seek(0)
+    handle.write(pid.getBytes(StandardCharsets.UTF_8))
   }
 
   private def isServerConfigFile(p: os.Path): Boolean =
