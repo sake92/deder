@@ -61,8 +61,10 @@
     <li><a href="https://sake92.github.io/deder/howtos/otel.html">OTEL tracing/logging/metrics</a></li>
    </ul>
    <h2 id="how-to-clean-output-artifacts">How to clean output artifacts?<a href="#how-to-clean-output-artifacts" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <p>You can use <code>deder clean</code> to clean all modules outputs.</p>
-   <p>Or specify modules(s) to clean explicitly with <code>deder clean -m mymodule ...</code>. This will delete the whole <code>.deder/out/mymodule</code> folder.</p>
+   <p>Clean all modules: <code>deder clean</code></p>
+   <p>Clean a specific module: <code>deder clean -m mymodule</code></p>
+   <p>Clean a specific task: <code>deder clean -t compile</code></p>
+   <p>Both support wildcards: <code>deder clean -m mod% -t compile%</code></p>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
  </body>

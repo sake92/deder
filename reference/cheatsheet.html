@@ -60,11 +60,13 @@
 deder shutdown
 <span class="hljs-meta prompt_">
 #</span><span class="language-bash"><span class="hljs-comment">############### clean module output / caches</span></span>
-<span class="hljs-meta prompt_"># </span><span class="language-bash">remove .deder/out/&lt;module&gt;/ <span class="hljs-keyword">for</span> one module</span>
-deder clean -m mymodule
-<span class="hljs-meta prompt_">
-# </span><span class="language-bash">multiple modules</span>
-deder clean -m mod1 -m mod2
+
+deder clean                      # clean all modules
+deder clean -m mymodule          # clean specific module
+deder clean -m mod1 -m mod2      # clean multiple modules
+deder clean -m mod%              # clean modules matching wildcard
+deder clean -t compile           # clean compile task on all modules
+deder clean -m mymodule -t test  # clean test task on specific module
 
 deder import --from sbt
 <span class="hljs-meta prompt_">

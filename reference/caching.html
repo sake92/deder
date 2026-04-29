@@ -267,12 +267,12 @@
    <pre><code class="language-shell hljs" data-highlighted="yes">deder clean -m mymodule
 deder clean -m mod1 -m mod2
 </code></pre>
-   <p>Clean requires exact module ids. Wildcard patterns that work with <code>exec</code> (e.g. <code>mymodule%</code>) are <strong>not</strong> supported by <code>clean</code>.</p>
-   <p>No CLI command today clears a single task on one module or clears the whole project. Manual fallbacks:</p>
-   <ul>
-    <li>Single task: <code>rm -rf .deder/out/&lt;module&gt;/&lt;task&gt;/</code></li>
-    <li>Whole project: <code>rm -rf .deder/out/</code></li>
-   </ul>
+   <p><code>deder clean -t &lt;task-name&gt;</code> removes <code>.deder/out/&lt;module&gt;/&lt;task&gt;/</code> for the specified task across all modules. Combine <code>-m</code> and <code>-t</code> to target a specific task on specific modules:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder clean -t compile
+deder clean -m mymodule -t test
+deder clean -m mod% -t compile%
+</code></pre>
+   <p>Wildcard patterns (<code>%</code>) are supported for both <code>-m</code> and <code>-t</code> flags.</p>
    <h2 id="how-caching-works">How caching works<a href="#how-caching-works" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <h3 id="two-task-kinds">Two task kinds<a href="#two-task-kinds" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <ul>
