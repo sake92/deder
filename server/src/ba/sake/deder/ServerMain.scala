@@ -142,6 +142,12 @@ object ServerMain extends StrictLogging {
     val attemptLock = () => {
       val handle = new RandomAccessFile(serverLockFile.toIO, "rw")
       val lock = handle.getChannel.tryLock()
+      if lock != null then {
+        val pid = ProcessHandle.current().pid().toString()
+        handle.setLength(0) // truncate any existing content
+        handle.seek(0)
+        handle.write(pid.getBytes(StandardCharsets.UTF_8))
+      }
       (handle, lock)
     }
 
@@ -174,7 +180,6 @@ object ServerMain extends StrictLogging {
         }
         serverLockHandle = handle2
         serverFileLock = lock2
-        writePidToLockFile(handle2)
       } else {
         val msg = "ERROR: Could not acquire server lock - another server process is already running for this project"
         logger.error(msg)
@@ -184,7 +189,6 @@ object ServerMain extends StrictLogging {
     } else {
       serverLockHandle = handle
       serverFileLock = lock
-      writePidToLockFile(handle)
     }
 
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
@@ -196,13 +200,6 @@ object ServerMain extends StrictLogging {
         case _: Exception =>
       }
     }))
-  }
-
-  private def writePidToLockFile(handle: RandomAccessFile): Unit = {
-    val pid = ProcessHandle.current().pid().toString
-    handle.setLength(0)
-    handle.seek(0)
-    handle.write(pid.getBytes(StandardCharsets.UTF_8))
   }
 
   private def isServerConfigFile(p: os.Path): Boolean =
