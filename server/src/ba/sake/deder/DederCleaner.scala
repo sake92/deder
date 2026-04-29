@@ -8,7 +8,6 @@ object DederCleaner extends StrictLogging {
     moduleIds.forall { moduleId =>
       val moduleOutDir = DederGlobals.projectRootDir / ".deder/out" / moduleId
       try {
-        logger.debug(s"Cleaning module '$moduleId' output directory: $moduleOutDir")
         os.remove.all(moduleOutDir, ignoreErrors = true)
         true
       } catch {
@@ -16,4 +15,15 @@ object DederCleaner extends StrictLogging {
           false
       }
     }
+
+  def cleanTask(moduleId: String, taskName: String): Boolean = {
+    val taskOutDir = DederGlobals.projectRootDir / ".deder/out" / moduleId / taskName
+    try {
+      os.remove.all(taskOutDir, ignoreErrors = true)
+      true
+    } catch {
+      case NonFatal(_) =>
+        false
+    }
+  }
 }
