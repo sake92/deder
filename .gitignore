@@ -36,6 +36,9 @@ dist/
 # other
 tmp/
 
+# git worktrees
+.worktrees/
+
 # AI
 .scalex
 .opencode
