@@ -54,4 +54,47 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
     )
     report
   }
+
+  def linkFull(
+      irContainers: Seq[os.Path],
+      outputDir: os.Path,
+      moduleInitializers: Seq[ModuleInitializer],
+      jsModuleKind: ScalaJsModuleKind
+  ): Report = {
+    notifications.add(ServerNotification.logInfo("Full-linking scalajs module...", Some(moduleId)))
+
+    val moduleKind = jsModuleKind match {
+      case ScalaJsModuleKind.NO_MODULE       => ModuleKind.NoModule
+      case ScalaJsModuleKind.ES_MODULE       => ModuleKind.ESModule
+      case ScalaJsModuleKind.COMMONJS_MODULE => ModuleKind.CommonJSModule
+    }
+    val linkerConfig = StandardConfig()
+      .withModuleKind(moduleKind)
+      .withOptimizer(true)
+      .withMinify(true)
+      .withSourceMap(false)
+
+    val linker = StandardImpl.linker(linkerConfig)
+    val cache = StandardImpl.irFileCache().newCache
+
+    val irFiles = PathIRContainer
+      .fromClasspath(irContainers.map(_.toNIO))
+      .flatMap { case (irContainers, paths) =>
+        cache.cached(irContainers)
+      }
+
+    val output = PathOutputDirectory(outputDir.toNIO)
+    val logger = new DederScalaJsLogger(notifications, moduleId)
+    val res = irFiles
+      .flatMap { files =>
+        linker.link(files, moduleInitializers, output, logger)
+      }
+
+    val report = Await.result(res, Duration.Inf)
+    val publicModulePaths = report.publicModules.map(_.jsFileName).map(outputDir / _)
+    notifications.add(
+      ServerNotification.logInfo("Full-linking succeeded: " + publicModulePaths.mkString(", "), Some(moduleId))
+    )
+    report
+  }
 }

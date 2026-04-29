@@ -46,6 +46,30 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("deder should fullLinkJs scalajs project") {
+    withTestProject("sample-projects/scalajs") { projectPath =>
+      locally {
+        executeDederCommand(projectPath, "exec", "-m", "frontend", "-t", "fullLinkJs")
+        val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
+        val command = s"node .deder/out/frontend/fullLinkJs/main.js"
+        val cmd = shell ++ Seq(command)
+        val res = os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe)
+        val resText = res.out.text()
+        assert(resText.contains("Hello, Scala.js!"))
+      }
+    }
+  }
+
+  test("deder should runJs scalajs project") {
+    withTestProject("sample-projects/scalajs") { projectPath =>
+      locally {
+        val res = executeDederCommand(projectPath, "exec", "-m", "frontend", "-t", "runJs")
+        val outText = res.out.text()
+        assert(outText.contains("Hello, Scala.js!"))
+      }
+    }
+  }
+
   test("deder should test scalajs project") {
     withTestProject("sample-projects/scalajs") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-t", "test")

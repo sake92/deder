@@ -3,6 +3,7 @@ import org.scalajs.dom.Element
 import scala.concurrent.ExecutionContext.Implicits.global
 
 @main def helloScalaJs: Unit = {
+  println("Hello from Scala.js!")
   val fetchFuture = dom.fetch("http://localhost:8181/hello/Scala.js").toFuture
   fetchFuture.foreach { response =>
     if (response.ok) {

@@ -4,11 +4,6 @@ import ba.sake.deder.config.DederProject.{ModuleType, ScalaJsModule, ScalaJsTest
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, JUnitXmlReportWriter, TestResultsSummary}
 import ba.sake.deder.*
 
-/*
-TODO
-- fullLinkJs
-- runJs
- */
 class ScalaJsTasks(coreTasks: CoreTasks) {
 
   val fastLinkJsTask = CachedTaskBuilder
@@ -43,6 +38,58 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
       ctx.out.toString
     }
 
+  val fullLinkJsTask = CachedTaskBuilder
+    .make[String](
+      name = "fullLinkJs",
+      supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST)
+    )
+    .dependsOn(coreTasks.runClasspathTask)
+    .dependsOn(coreTasks.finalMainClassTask)
+    .build { ctx =>
+      val (classpath, mainClass) = ctx.depResults
+      os.makeDir.all(ctx.out)
+      import scala.concurrent.ExecutionContext.Implicits.global
+      val moduleInitializers = ctx.module match {
+        case _: ScalaJsTestModule =>
+          val init = org.scalajs.testing.adapter.TestAdapterInitializer
+          Seq(org.scalajs.linker.interface.ModuleInitializer.mainMethod(init.ModuleClassName, init.MainMethodName))
+        case _ =>
+          mainClass.map { mc =>
+            org.scalajs.linker.interface.ModuleInitializer.mainMethodWithArgs(mc, "main")
+          }.toSeq
+      }
+      val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
+      linker.linkFull(
+        irContainers = classpath,
+        outputDir = ctx.out,
+        moduleInitializers = moduleInitializers,
+        jsModuleKind = ctx.module.asInstanceOf[ScalaJsModule].moduleKind
+      )
+      ctx.out.toString
+    }
+
+  val runJsTask = TaskBuilder
+    .make[Seq[String]](
+      name = "runJs",
+      singleton = true,
+      supportedModuleTypes = Set(ModuleType.SCALA_JS)
+    )
+    .dependsOn(fastLinkJsTask)
+    .dependsOn(coreTasks.finalMainClassTask)
+    .build { ctx =>
+      val (linkedJsDir, finalMainClass) = ctx.depResults
+      finalMainClass match {
+        case Some(mc) =>
+          val linkedJsPath = os.Path(linkedJsDir) / "main.js"
+          val cmd = Seq("node", "--enable-source-maps", linkedJsPath.toString) ++ ctx.args
+          ctx.notifications.add(ServerNotification.RunSubprocess(cmd, Map.empty, ctx.watch))
+          cmd
+        case None =>
+          throw new Exception(s"No main class specified for Scala.js module: ${ctx.module.id}. " +
+            "Please add a 'mainClass' to the module in deder.pkl, or ensure exactly one @main method is defined.")
+      }
+    }
+
   val testJsTask = TaskBuilder
     .make[DederTestResults](
       name = "test",
@@ -74,6 +121,8 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
 
   val all: Seq[Task[?, ?]] = Seq(
     fastLinkJsTask,
+    fullLinkJsTask,
+    runJsTask,
     testJsTask
   )
 }

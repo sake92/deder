@@ -5,12 +5,16 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 
 # Misc
 
-- more resilient autocomplete when project doesnt load..
+- support negation tests/modules filter like !mytests%
+- group tasks by category like in gradle, when printing them
 - Console/REPL
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
 
 # Client
+
+# Compilers
+- print file where error happened
 
 # Caching
 - harden the abstraction
