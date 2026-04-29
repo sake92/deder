@@ -1,0 +1,42 @@
+amends "pkl:test"
+
+import "DederProject.pkl"
+
+facts {
+  // Test version prefix extraction indirectly via scalaModules
+  ["scalaModules default layout with 3-part version"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
+    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "default")
+    result.main.sources.toList() == List("src", "src-3", "src-3.7", "src-3.7.4")
+  }
+
+  ["scalaModules default layout with 2-part version"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "2.13"; id = "x" }
+    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "default")
+    result.main.sources.toList() == List("src", "src-2", "src-2.13")
+  }
+
+  ["scalaModules default layout with 1-part version"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "21"; id = "x" }
+    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "default")
+    result.main.sources.toList() == List("src", "src-21")
+  }
+
+  ["scalaModules - Coursier suffix stripped"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "2.13.18+3"; id = "x" }
+    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "default")
+    result.main.sources.toList() == List("src", "src-2", "src-2.13", "src-2.13.18")
+  }
+
+  ["scalaModules maven layout with 3-part version"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
+    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "maven")
+    result.main.sources.toList() == List("src/main/scala", "src/main/scala-3", "src/main/scala-3.7", "src/main/scala-3.7.4")
+  }
+
+  ["scalaModules maven layout - test root shared"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
+    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "maven")
+    result.test.root == "mylib"
+  }
+}
