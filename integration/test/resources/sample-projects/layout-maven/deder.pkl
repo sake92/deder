@@ -1,0 +1,16 @@
+amends "../../../../../config/DederProject.pkl"
+
+local const backendModules = new CreateScalaModules {
+  root = "backend"
+  layout = "maven"
+  template = new {
+    scalaVersion = "3.7.4"
+    deps {
+      "org.scalameta::munit::1.1.1"
+    }
+  }
+}.get
+
+modules {
+  ...backendModules.all
+}
