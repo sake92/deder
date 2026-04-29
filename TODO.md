@@ -4,6 +4,8 @@
 https://pkl-lang.org/main/current/pkl-doc/index.html
 
 # Misc
+- add forkArgs
+- clean per task
 - revisit server file lock..?? add a proper test
 - support negation tests/modules filter like !mytests%
 - group tasks by category like in gradle, when printing them
@@ -15,6 +17,7 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 
 # Compilers
 - print file where error happened
+- add compileOnly deps
 
 # Caching
 - harden the abstraction
