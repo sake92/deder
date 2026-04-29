@@ -140,6 +140,31 @@ class MvnApp {
   args: Listing<String> = new Listing {}
 }
 
+/// Extracts version prefixes from a scalaVersion string using Mill-style prefix matching.
+/// Example: "3.7.4" → ["3", "3.7", "3.7.4"], "2.13" → ["2", "2.13"]
+/// Coursier suffixes (e.g. "2.13.18+3") are stripped: only leading digits and dots are kept.
+const function versionPrefixes(scalaVersion: String): List<String> =
+  let (cleanVersion = scalaVersion.replaceAll(Regex("\\+.*$"), ""))
+  let (parts = cleanVersion.split(".").toList())
+  let (len = parts.length)
+  let (major = "\(parts[0])")
+  let (minor = if (len >= 2) "\(parts[0]).\(parts[1])" else null)
+  let (patch = if (len >= 3) "\(parts[0]).\(parts[1]).\(parts[2])" else null)
+  new Listing {
+    major
+    when (minor != null) { minor }
+    when (patch != null) { patch }
+  }.toList()
+
+/// Returns version-specific source directories for a given base directory and scalaVersion.
+/// Example: versionSourceDirs("3.7.4", "src/main/scala") → ["src/main/scala-3", "src/main/scala-3.7", "src/main/scala-3.7.4"]
+const function versionSourceDirs(scalaVersion: String, baseDir: String): Listing<String> =
+  new Listing {
+    for (prefix in versionPrefixes(scalaVersion)) {
+      "\(baseDir)-\(prefix)"
+    }
+  }
+
 open class JavaModule extends DederModule {
   type = "java"
   /// Resource directories, relative to module root. Defaults to `resources/`.
