@@ -146,7 +146,7 @@ open class JavaModule extends DederModule {
   resources: Listing<String> = new Listing { "resources" }
   /// Java path to use for compilation and running. Can be a JDK path or a JDK version if using toolchains. If not provided, Deder will use the Java version running Deder server itself.
   javaHome: String?
-  /// JVM options to use for running and testing
+  /// JVM options to use for running and testing, e.g. "-DXmx2g". These are not used for compilation, which uses `javacOptions` instead.
   jvmOptions: Listing<String> = new Listing {}
   /// Java version to use for compilation, e.g. "1.8", "11", "17". This is used for setting the `--release` flag during compilation and for selecting the appropriate Java runtime when running the app.
   javaVersion: String?

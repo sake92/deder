@@ -17,6 +17,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
       val (classpath, mainClass) = ctx.depResults
       val irContainers = classpath
       os.makeDir.all(ctx.out)
+      // TODO thread pool.. ?
       import scala.concurrent.ExecutionContext.Implicits.global
       val moduleInitializers = ctx.module match {
         case _: ScalaJsTestModule =>
@@ -36,7 +37,6 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
         jsModuleKind = jsModule.moduleKind,
         linkerConfig = jsModule.linkerConfig
       )
-      // TODO thread pool..
       ctx.out.toString
     }
 

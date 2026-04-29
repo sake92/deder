@@ -25,6 +25,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
       val (classpath, mainClass) = ctx.depResults
       val nirPaths = classpath
       os.makeDir.all(ctx.out)
+      // TODO thread pool.. ?
       import scala.concurrent.ExecutionContext.Implicits.global
       val effectiveMainClass = ctx.module match {
         case _: ScalaNativeTestModule =>
@@ -46,7 +47,6 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
         extraLinkingOptions = nativeModule.nativeLinkingOptions.asScala.toSeq,
         extraCompileOptions = nativeModule.nativeCompileOptions.asScala.toSeq
       )
-      // TODO thread pool..
       ""
     }
 
