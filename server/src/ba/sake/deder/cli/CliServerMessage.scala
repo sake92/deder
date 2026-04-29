@@ -1,6 +1,6 @@
 package ba.sake.deder.cli
 
-import ba.sake.deder.{ServerNotification, cli}
+import ba.sake.deder.{ServerNotification, cli, DederGlobals}
 import ba.sake.tupson.JsonRW
 
 enum LogLevel derives JsonRW:
@@ -40,7 +40,11 @@ object CliServerMessage {
     case cs: ServerNotification.CompileStarted =>
       None
     case cd: ServerNotification.CompileDiagnostic =>
-      None
+      val sev = cd.problem.severity() match
+        case xsbti.Severity.Error => LogLevel.ERROR
+        case xsbti.Severity.Warn  => LogLevel.WARNING
+        case _                     => LogLevel.INFO
+      Some(CliServerMessage.Log(formatDiagnostic(cd.problem), sev))
     case cs: ServerNotification.CompileFinished =>
       None
     case cf: ServerNotification.CompileFailed =>
@@ -50,4 +54,20 @@ object CliServerMessage {
     case ServerNotification.RequestFinished(success) =>
       Some(CliServerMessage.Exit(if success then 0 else 1))
   }
+
+  private def formatDiagnostic(problem: xsbti.Problem): String =
+    val pos = problem.position()
+    val src = pos.sourceFile().map[String] { f =>
+      val abs = os.Path(f.toPath)
+      if abs.startsWith(DederGlobals.projectRootDir) then
+        abs.relativeTo(DederGlobals.projectRootDir).toString()
+      else abs.toString()
+    }.orElse("?")
+    val line = pos.startLine().orElse(0)
+    val col = pos.startColumn().orElse(0)
+    val sev = problem.severity() match
+      case xsbti.Severity.Error => "error"
+      case xsbti.Severity.Warn  => "warn"
+      case _                     => "info"
+    s"$src:$line:$col: $sev: ${problem.message()}"
 }
