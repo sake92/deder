@@ -246,10 +246,76 @@ class ScalaTestModule extends ScalaModule {
 
 typealias ScalaJsModuleKind = "no-module" | "es-module" | "commonjs-module"
 
+typealias ScalaJsModuleSplitStyle = "fewest-modules" | "smallest-modules" | "small-modules-for"
+
+typealias ScalaJsESVersion = "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021"
+
+class ScalaJsLinkerConfig {
+  /// How to split output into multiple JS modules.
+  /// `fewest-modules` (default): bundles aggressively, fewer larger files.
+  /// `smallest-modules`: splits ~1 class per file, better for caching/incremental downstream tooling.
+  /// `small-modules-for`: splits only listed packages (see `smallModulesFor`).
+  moduleSplitStyle: ScalaJsModuleSplitStyle = "fewest-modules"
+
+  /// Packages to split when `moduleSplitStyle = "small-modules-for"`. Must be non-empty.
+  smallModulesFor: Listing<String> = new Listing {}
+
+  /// ECMAScript version assumed available at runtime. Enables polyfill dead-code-elimination.
+  /// Use `es2018`+ for modern Node.js/browsers.
+  esVersion: ScalaJsESVersion = "es2015"
+
+  /// Emit source maps for debugging generated JS. Turn off to reduce file count.
+  sourceMap: Boolean = true
+
+  /// Enable Scala.js optimizer (dead-code elimination, method inlining). Disable for faster dev linking.
+  optimizer: Boolean = true
+
+  /// Apply Scala.js minification (identifier shortening). Does NOT affect runtime performance.
+  minify: Boolean = false
+
+  /// Production mode semantics: removes debug assertions, enables aggressive optimizations.
+  productionMode: Boolean = false
+
+  /// JS comment prepended to every generated `.js` file. Must end with `\n`.
+  jsHeader: String = ""
+
+  /// Pretty-print generated JavaScript. Useful for debugging linker output.
+  prettyPrint: Boolean = false
+
+  /// Java Formatter pattern for JS output filenames, e.g. "%s.mjs" for Node.js ES modules.
+  jsOutputPattern: String = "%s.js"
+
+  /// Avoid JS `class` syntax in favor of `function`/`prototype` when semantics are identical.
+  avoidClasses: Boolean = true
+
+  /// Avoid `let`/`const` in favor of `var` when semantics are identical.
+  avoidLetsAndConsts: Boolean = true
+
+  /// Perform expensive IR validity checks during linking. For debugging linker/compiler bugs.
+  checkIR: Boolean = false
+
+  /// Base URI to relativize source map paths against. Useful for deployable source maps.
+  relativizeSourceMapBase: String?
+
+  /// Discard intermediate linker state for one-shot builds (CI). Default false for watch mode.
+  batchMode: Boolean = false
+
+  /// Maximum concurrent file writes during linking. Tune lower for slow/network filesystems.
+  maxConcurrentWrites: Int(isBetween(1, 256)) = 50
+
+  /// EXPERIMENTAL: Compile `scala.Long` as JavaScript `bigint` instead of runtime-emulated 64-bit integers.
+  allowBigIntsForLongs: Boolean = false
+
+  /// EXPERIMENTAL: Use the WebAssembly backend instead of JavaScript. Requires `moduleKind = "es-module"` and `esVersion >= es2015`.
+  experimentalUseWebAssembly: Boolean = false
+}
+
 open class ScalaJsModule extends ScalaModule {
   type = "scala-js"
   scalaJsVersion: String(!isEmpty)
   moduleKind: ScalaJsModuleKind = "no-module"
+  /// Scala.js linker configuration. Fine-grained control over linking behavior.
+  linkerConfig: ScalaJsLinkerConfig = new ScalaJsLinkerConfig {}
   function asTest(): ScalaJsTestModule = (this.toDynamic().toTyped(ScalaJsTestModule)) {
     type = "scala-js-test"
     publish = false
