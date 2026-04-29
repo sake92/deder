@@ -27,12 +27,14 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
             org.scalajs.linker.interface.ModuleInitializer.mainMethodWithArgs(mc, "main")
           }.toSeq
       }
+      val jsModule = ctx.module.asInstanceOf[ScalaJsModule]
       val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
-      linker.link(
+      linker.linkFast(
         irContainers = irContainers,
         outputDir = ctx.out,
         moduleInitializers = moduleInitializers,
-        jsModuleKind = ctx.module.asInstanceOf[ScalaJsModule].moduleKind
+        jsModuleKind = jsModule.moduleKind,
+        linkerConfig = jsModule.linkerConfig
       )
       // TODO thread pool..
       ctx.out.toString
@@ -58,12 +60,47 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
             org.scalajs.linker.interface.ModuleInitializer.mainMethodWithArgs(mc, "main")
           }.toSeq
       }
+      val jsModule = ctx.module.asInstanceOf[ScalaJsModule]
       val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
       linker.linkFull(
         irContainers = classpath,
         outputDir = ctx.out,
         moduleInitializers = moduleInitializers,
-        jsModuleKind = ctx.module.asInstanceOf[ScalaJsModule].moduleKind
+        jsModuleKind = jsModule.moduleKind,
+        linkerConfig = jsModule.linkerConfig
+      )
+      ctx.out.toString
+    }
+
+  val linkJsTask = CachedTaskBuilder
+    .make[String](
+      name = "linkJs",
+      supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST)
+    )
+    .dependsOn(coreTasks.runClasspathTask)
+    .dependsOn(coreTasks.finalMainClassTask)
+    .build { ctx =>
+      val (classpath, mainClass) = ctx.depResults
+      val irContainers = classpath
+      os.makeDir.all(ctx.out)
+      import scala.concurrent.ExecutionContext.Implicits.global
+      val jsModule = ctx.module.asInstanceOf[ScalaJsModule]
+      val moduleInitializers = ctx.module match {
+        case _: ScalaJsTestModule =>
+          val init = org.scalajs.testing.adapter.TestAdapterInitializer
+          Seq(org.scalajs.linker.interface.ModuleInitializer.mainMethod(init.ModuleClassName, init.MainMethodName))
+        case _ =>
+          mainClass.map { mc =>
+            org.scalajs.linker.interface.ModuleInitializer.mainMethodWithArgs(mc, "main")
+          }.toSeq
+      }
+      val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
+      linker.link(
+        irContainers = irContainers,
+        outputDir = ctx.out,
+        moduleInitializers = moduleInitializers,
+        jsModuleKind = jsModule.moduleKind,
+        linkerConfig = jsModule.linkerConfig
       )
       ctx.out.toString
     }
@@ -122,6 +159,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
   val all: Seq[Task[?, ?]] = Seq(
     fastLinkJsTask,
     fullLinkJsTask,
+    linkJsTask,
     runJsTask,
     testJsTask
   )
