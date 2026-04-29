@@ -1,19 +1,17 @@
 package ba.sake.deder.scalajs
 
+import scala.concurrent.duration.Duration
+import scala.jdk.CollectionConverters.*
+import scala.concurrent.{Await, ExecutionContext, Future}
+import org.scalajs.linker.*
+import org.scalajs.linker.interface.*
+import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
 import ba.sake.deder.config.DederProject.{
   ScalaJsLinkerConfig,
   ScalaJsModuleKind,
   ScalaJsModuleSplitStyle,
   ScalaJsESVersion
 }
-
-import scala.concurrent.{Await, ExecutionContext, Future}
-import org.scalajs.linker.*
-import org.scalajs.linker.interface.*
-import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
-
-import scala.concurrent.duration.Duration
-import scala.jdk.CollectionConverters.*
 
 class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(using ExecutionContext) {
 

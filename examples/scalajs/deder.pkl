@@ -8,15 +8,14 @@ local const frontendModules = new CreateScalaJsModules {
     scalaVersion = "3.7.1"
     scalaJsVersion = "1.20.2"
     moduleKind = "es-module"
-    // Customize linker behavior (all fields have sensible defaults):
-    // linkerConfig = new {
+    //linkerConfig {
     //   moduleSplitStyle = "smallest-modules"
     //   esVersion = "es2018"
     //   sourceMap = false
     //   optimizer = true
     //   minify = true
     //   productionMode = true
-    // }
+    //}
     deps {
       "org.scala-js::scalajs-dom::2.2.0"
     }

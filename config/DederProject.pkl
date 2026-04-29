@@ -392,6 +392,36 @@ class ScalaNativeTestModule extends ScalaNativeModule {
 // helpers
 // https://pkl-lang.org/blog/class-as-a-function.html
 
+class JavaModules {
+  main: JavaModule
+  test: JavaTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateJavaModules {
+  root: String
+  template: JavaModule
+  testTemplate: JavaTestModule = template.asTest()
+  fixed get: JavaModules = javaModules(template, testTemplate, root)
+}
+
+const function javaModules(
+  _template: JavaModule,
+  _testTemplate: JavaTestModule,
+  _root: String,
+): JavaModules = new {
+  main = (_template) {
+    id = _root.replaceAll("/", "-")
+    root = _root
+  }
+  test = (_testTemplate) {
+    id = "\(_root.replaceAll("/", "-"))-test"
+    root = "\(_root)/test"
+    moduleDeps {
+      main
+    }
+  }
+}
+
 class ScalaModules {
   main: ScalaModule
   test: ScalaTestModule
@@ -574,32 +604,4 @@ const function crossModules(
   }
 }
 
-class JavaModules {
-  main: JavaModule
-  test: JavaTestModule
-  all: Listing<DederModule> = new { main; test }
-}
-class CreateJavaModules {
-  root: String
-  template: JavaModule
-  testTemplate: JavaTestModule = template.asTest()
-  fixed get: JavaModules = javaModules(template, testTemplate, root)
-}
 
-const function javaModules(
-  _template: JavaModule,
-  _testTemplate: JavaTestModule,
-  _root: String,
-): JavaModules = new {
-  main = (_template) {
-    id = _root.replaceAll("/", "-")
-    root = _root
-  }
-  test = (_testTemplate) {
-    id = "\(_root.replaceAll("/", "-"))-test"
-    root = "\(_root)/test"
-    moduleDeps {
-      main
-    }
-  }
-}
