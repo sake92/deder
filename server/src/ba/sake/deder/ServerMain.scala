@@ -175,6 +175,7 @@ object ServerMain extends StrictLogging {
         if lock2 == null then {
           val msg = "ERROR: Could not acquire server lock - another server process is already running for this project"
           logger.error(msg)
+          System.err.println(msg)
           handle2.close()
           sys.exit(1)
         }
@@ -183,6 +184,7 @@ object ServerMain extends StrictLogging {
       } else {
         val msg = "ERROR: Could not acquire server lock - another server process is already running for this project"
         logger.error(msg)
+        System.err.println(msg)
         handle.close()
         sys.exit(1)
       }
