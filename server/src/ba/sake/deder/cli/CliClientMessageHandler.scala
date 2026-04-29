@@ -254,17 +254,13 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
               serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
               serverMessages.put(CliServerMessage.Exit(1))
             case Right(cliOptions) =>
-              projectState.readState(useLastGood = true) match {
-                case Left(error) =>
-                  serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-                  serverMessages.put(CliServerMessage.Exit(1))
-                case Right(state) =>
-                  val moduleIds =
-                    if cliOptions.modules.nonEmpty then cliOptions.modules
-                    else state.tasksResolver.allModules.map(_.id)
-                  projectState.cleanModules(moduleIds)
-                  serverMessages.put(CliServerMessage.Exit(0))
+              val success = cliOptions.task match {
+                case Some(taskName) =>
+                  projectState.cleanTasks(cliOptions.modules, taskName)
+                case None =>
+                  projectState.cleanModules(cliOptions.modules)
               }
+              serverMessages.put(CliServerMessage.Exit(if success then 0 else 1))
           }
       case m: CliClientMessage.Import =>
         if m.args == Seq("--help") || m.args == Seq("-h") then
