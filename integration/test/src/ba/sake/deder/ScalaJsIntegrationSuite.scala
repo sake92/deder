@@ -60,6 +60,30 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("deder should linkJs scalajs project with custom config") {
+    withTestProject("sample-projects/scalajs") { projectPath =>
+      locally {
+        executeDederCommand(projectPath, "exec", "-m", "frontend", "-t", "linkJs")
+        val shell = if Properties.isWin then Seq("cmd.exe", "/C") else Seq("bash", "-c")
+        val command = s"node .deder/out/frontend/linkJs/main.js"
+        val cmd = shell ++ Seq(command)
+        val res = os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe)
+        val resText = res.out.text()
+        assert(resText.contains("Hello, Scala.js!"))
+        // Verify the custom JS header was included
+        val mainJsPath = projectPath / ".deder" / "out" / "frontend" / "linkJs" / "main.js"
+        val mainJsContent = os.read(mainJsPath)
+        assert(
+          mainJsContent.contains("// My custom header"),
+          s"Expected custom JS header in output, got: ${mainJsContent.take(200)}"
+        )
+        // Verify source maps are NOT emitted (we set sourceMap = false in linkerConfig)
+        val sourceMapPath = projectPath / ".deder" / "out" / "frontend" / "linkJs" / "main.js.map"
+        assert(!os.exists(sourceMapPath), "Expected no source map file since sourceMap=false in linkerConfig")
+      }
+    }
+  }
+
   test("deder should runJs scalajs project") {
     withTestProject("sample-projects/scalajs") { projectPath =>
       locally {
