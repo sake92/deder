@@ -85,6 +85,8 @@ All build artifacts go under `.deder/out/<moduleId>/<taskName>/`. Cache metadata
 
 Check @CONTRIBUTING.md for technical details, how to test server, client, test-runner changes locally.  
 
+You can use one of @examples/ scenarios to test changes, just make sure to revert when you finish testing.
+
 Keep integration test classes rather small, because then it is easier to run them one by one.  
 Run minimal affected integration tests, rarely all of them.
 

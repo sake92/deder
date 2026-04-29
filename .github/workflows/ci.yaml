@@ -27,6 +27,7 @@ jobs:
         run: |
           ./scripts/gen-config-bindings.sh
           deder exec -t test -m server-test
+          deder exec -t testInMemory -m test-common-test
       - name: Deder output
         if: failure()
         uses: actions/upload-artifact@v4

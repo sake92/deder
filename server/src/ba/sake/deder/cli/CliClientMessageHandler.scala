@@ -178,7 +178,16 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                 case Right(state) =>
                   val selectedModuleIds =
                     if cliOptions.modules.isEmpty then state.tasksResolver.allModules.map(_.id)
-                    else cliOptions.modules
+                    else WildcardUtils.getMatchesOrRecommendations(state.tasksResolver.allModules.map(_.id), cliOptions.modules) match {
+                      case Left(recommendations) =>
+                        val msg =
+                          if recommendations.isEmpty then s"No modules found for selectors: ${cliOptions.modules.mkString(", ")}"
+                          else s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
+                        serverMessages.put(CliServerMessage.Log(msg, LogLevel.ERROR))
+                        serverMessages.put(CliServerMessage.Exit(1))
+                        return
+                      case Right(ids) => ids
+                    }
                   state.executionPlanner.getTaskInstances(selectedModuleIds, cliOptions.task) match {
                     case Left(recommendations) =>
                       val msg =

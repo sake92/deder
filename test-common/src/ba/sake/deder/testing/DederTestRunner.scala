@@ -41,25 +41,28 @@ class DederTestRunner(
           if options.testSelectors.isEmpty then
             t.testClasses.map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
           else {
-            options.testSelectors.flatMap { ts =>
+            // Separate class-only selectors (no #) to handle negation via multi-matcher
+            val (classOnlySelectors, methodSelectors) = options.testSelectors.partition(!_.contains("#"))
+
+            // Class-only selectors: use multi-matcher with negation support
+            val matchedClassNames = WildcardUtils.getMatches(testClassNames, classOnlySelectors).toSet
+            val resultsFromClassOnly = matchedClassNames.toSeq
+              .flatMap { n => t.testClasses.find(_.className == n) }
+              .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
+
+            // #method selectors: processed individually (negation not supported for #method)
+            val resultsFromMethod = methodSelectors.flatMap { ts =>
               ts.split("#") match {
                 case Array(classNameSelector, testSelector) =>
-                  val matchedClassNames = WildcardUtils.getMatches(testClassNames, classNameSelector)
-                  matchedClassNames
-                    .flatMap { n =>
-                      t.testClasses.find(_.className == n)
-                    }
+                  val mcn = WildcardUtils.getMatches(testClassNames, classNameSelector)
+                  mcn
+                    .flatMap { n => t.testClasses.find(_.className == n) }
                     .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new TestSelector(testSelector)))
-                // TODO add TestWildcardSelector? hmm just a substring
-                case _ =>
-                  val matchedClassNames = WildcardUtils.getMatches(testClassNames, ts)
-                  matchedClassNames
-                    .flatMap { n =>
-                      t.testClasses.find(_.className == n)
-                    }
-                    .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
+                case _ => Seq.empty
               }
             }
+
+            resultsFromClassOnly ++ resultsFromMethod
           }
         val framework = frameworkOverrides.getOrElse(
           t.frameworkClassName,

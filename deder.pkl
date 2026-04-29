@@ -30,6 +30,16 @@ local const testCommon = new ScalaModule {
   }
 }
 
+local const testCommonTest = new ScalaTestModule {
+  id = "test-common-test"
+  root = "test-common/test"
+  scalaVersion = scalaVer
+  moduleDeps { testCommon }
+  deps {
+    "org.scalameta::munit:1.2.1"
+  }
+}
+
 local const testRunner = new ScalaModule {
   id = "test-runner"
   scalaVersion = scalaVer
@@ -136,6 +146,7 @@ local const integrationTest = new ScalaTestModule {
 modules {
   config
   testCommon
+  testCommonTest
   testRunner
   ...serverModules.all
   client

@@ -153,7 +153,7 @@ class ExecutionPlanner(
   // supports wildcard task pattern matching
   def getTaskInstancesMatching(moduleIds: Seq[String], taskPattern: String): Either[Seq[String], Seq[(String, TaskInstance)]] = {
     val allTaskNamesInModules = moduleIds.flatMap(m => tasksPerModule.getOrElse(m, Seq.empty)).map(_.task.name).distinct
-    val matchedTaskNames = WildcardUtils.getMatches(allTaskNamesInModules, taskPattern)
+    val matchedTaskNames = WildcardUtils.getMatches(allTaskNamesInModules, Seq(taskPattern))
     val res = moduleIds.flatMap { mId =>
       tasksPerModule.getOrElse(mId, Seq.empty)
         .filter(ti => matchedTaskNames.contains(ti.task.name))

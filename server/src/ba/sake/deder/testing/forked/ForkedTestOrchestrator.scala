@@ -52,13 +52,13 @@ object ForkedTestOrchestrator extends StrictLogging {
       else
         discoveredTests.flatMap { dft =>
           val testClassNames = dft.testClasses.map(_.className)
-          val matchedNames = testOptions.testSelectors.flatMap { ts =>
-            val classSelector = ts.split("#") match {
+          val classSelectors = testOptions.testSelectors.map { ts =>
+            ts.split("#") match {
               case Array(classNameSelector, _) => classNameSelector
               case _                           => ts
             }
-            WildcardUtils.getMatches(testClassNames, classSelector)
-          }.toSet
+          }
+          val matchedNames = WildcardUtils.getMatches(testClassNames, classSelectors).toSet
           val filtered = dft.testClasses.filter(tc => matchedNames.contains(tc.className))
           Option.when(filtered.nonEmpty)(dft.copy(testClasses = filtered))
         }
