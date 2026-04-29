@@ -30,7 +30,10 @@ class TabCompleter(tasksResolver: TasksResolver) {
       case Seq("deder", rest*) =>
         rest match {
           case Seq("version", _*) => Seq.empty
-          case Seq("clean", _*)   => completeModule(prevWord, currentWord).getOrElse(Seq("-m", "--module"))
+          case Seq("clean", _*) =>
+            completeModule(prevWord, currentWord)
+              .orElse(completeTask(prevWord, currentWord))
+              .getOrElse(Seq("-m", "--module", "-t", "--task").filter(_.startsWith(currentWord)))
           case Seq("modules", _*) => Seq("--json", "--dot").filter(_.startsWith(currentWord))
           case Seq("tasks", _*) =>
             completeModule(prevWord, currentWord).getOrElse(
