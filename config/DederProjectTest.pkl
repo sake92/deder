@@ -39,4 +39,44 @@ facts {
     local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "maven")
     result.test.root == "mylib"
   }
+
+  // Layout: javaModules (no version auto-detection)
+  ["javaModules maven layout"] {
+    local javaMod = new DederProject.JavaModule { id = "x" }
+    local result = DederProject.javaModules(javaMod, javaMod.asTest(), "mylib", "maven")
+    result.main.sources.toList() == List("src/main/java")
+    result.main.resources.toList() == List("src/main/resources")
+    result.test.root == "mylib"
+    result.test.sources.toList() == List("src/test/java")
+  }
+
+  ["javaModules default layout"] {
+    local javaMod = new DederProject.JavaModule { id = "x" }
+    local result = DederProject.javaModules(javaMod, javaMod.asTest(), "mylib", "default")
+    result.main.sources.toList() == List("src")
+    result.main.resources.toList() == List("resources")
+    result.test.root == "mylib/test"
+  }
+
+  // Layout: crossModules (version dirs + platform dirs)
+  ["crossModules default layout"] {
+    local scalaMod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
+    local jsMod = (scalaMod.asJs()) { scalaJsVersion = "1.18.2" }
+    local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
+    local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), "mylib", "default")
+    result.jvm.sources.toList() == List("src", "src-jvm", "src-3", "src-3.7", "src-3.7.4")
+    result.jvm.root == "mylib"
+    result.jvm_test.root == "mylib/test"
+  }
+
+  ["crossModules maven layout"] {
+    local scalaMod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
+    local jsMod = (scalaMod.asJs()) { scalaJsVersion = "1.18.2" }
+    local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
+    local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), "mylib", "maven")
+    result.jvm.sources.toList() == List("src/main/scala", "src/main/scala-jvm", "src/main/scala-3", "src/main/scala-3.7", "src/main/scala-3.7.4")
+    result.jvm.resources.toList() == List("src/main/resources")
+    result.jvm.root == "mylib"
+    result.jvm_test.root == "mylib"
+  }
 }
