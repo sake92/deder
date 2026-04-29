@@ -29,7 +29,7 @@ This project uses Deder to build itself (`deder.pkl` build file). Key commands:
 ./scripts/gen-config-bindings.sh   # regenerate Pkl→Java config bindings (required before first build)
 deder exec -t assembly -m server   # build server fat JAR
 deder exec -t assembly -m client   # build client fat JAR
-deder exec -t tests -m server-test # run unit tests (munit)
+deder exec -t test -m server-test  # run unit tests (munit)
 ./scripts/run-it-tests.sh          # build everything + run integration tests
 ./scripts/run-it-tests.sh ba.sake.deder.bsp.BspIntegrationSuite  # single IT suite
 ```
@@ -80,4 +80,11 @@ CLI communication uses newline-delimited JSON over Unix sockets. Message types a
 ## Output Layout
 
 All build artifacts go under `.deder/out/<moduleId>/<taskName>/`. Cache metadata is in `metadata.json` per task. Server logs go to `.deder/logs/`.
+
+## Testing
+
+Check @CONTRIBUTING.md for technical details, how to test server, client, test-runner changes locally.  
+
+Keep integration test classes rather small, because then it is easier to run them one by one.  
+Run minimal affected integration tests, rarely all of them.
 
