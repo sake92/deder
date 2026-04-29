@@ -4,7 +4,7 @@
 https://pkl-lang.org/main/current/pkl-doc/index.html
 
 # Misc
-
+- revisit server file lock..?? add a proper test
 - support negation tests/modules filter like !mytests%
 - group tasks by category like in gradle, when printing them
 - Console/REPL

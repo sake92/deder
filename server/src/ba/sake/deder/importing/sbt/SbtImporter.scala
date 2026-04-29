@@ -126,6 +126,7 @@ class SbtImporter(
           null, // javaHome
           List.empty.asJava, // jvmOptions
           null, // javaVersion
+          DederProject.CompileOrder.JAVA_THEN_SCALA,
           sbtProjectExport.javacOptions.asJava,
           null, // forkEnv
           null, // mainClass
@@ -158,6 +159,7 @@ class SbtImporter(
           null, // javaHome
           List.empty.asJava, // jvmOptions
           null, // javaVersion
+          DederProject.CompileOrder.JAVA_THEN_SCALA,
           sbtProjectExport.javacOptions.asJava,
           null, // forkEnv
           null, // mainClass
