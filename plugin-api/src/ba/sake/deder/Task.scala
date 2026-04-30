@@ -20,8 +20,8 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     supportedModuleTypes: Set[ModuleType],
     category: String
 )(using ev: TaskDeps[Deps] =:= true) {
-  def dependsOn[T2](t: Task[T2, ?]): TaskBuilder[T, Deps :* Task[T2, ?]] =
-    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category)
+  def dependsOn[T2](t: AbstractTask[T2]): TaskBuilder[T, Deps :* AbstractTask[T2]] =
+    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
     TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category)
@@ -64,8 +64,8 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     supportedModuleTypes: Set[ModuleType],
     category: String
 )(using ev: TaskDeps[Deps] =:= true) {
-  def dependsOn[T2](t: Task[T2, ?]): CachedTaskBuilder[T, Deps :* Task[T2, ?]] =
-    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category)
+  def dependsOn[T2](t: AbstractTask[T2]): CachedTaskBuilder[T, Deps :* AbstractTask[T2]] =
+    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes)
 
   def build(execute: TaskExecContext[T, Deps] => T)(using Deps <:< NonEmptyTuple): Task[T, Deps] =
     CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category)
@@ -82,16 +82,16 @@ object CachedTaskBuilder {
   ): CachedTaskBuilder[T, EmptyTuple] = CachedTaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category)
 }
 
-// this is to make sure that Deps are Task-s and not arbitrary types
+// this is to make sure that Deps are AbstractTask-s and not arbitrary types
 type TaskDeps[T <: Tuple] <: Boolean = T match {
-  case EmptyTuple      => true
-  case t :* Task[?, ?] => TaskDeps[t]
-  case _               => false
+  case EmptyTuple           => true
+  case t :* AbstractTask[?] => TaskDeps[t]
+  case _                    => false
 }
 
 type TaskDepResults[T <: Tuple] <: Tuple = T match {
-  case EmptyTuple         => EmptyTuple
-  case Task[t, ?] *: rest => t *: TaskDepResults[rest]
+  case EmptyTuple                => EmptyTuple
+  case AbstractTask[t] *: rest   => t *: TaskDepResults[rest]
 }
 
 // needs a T because of transitive results
