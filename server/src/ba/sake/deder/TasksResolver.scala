@@ -42,7 +42,7 @@ class TasksResolver(
       val tasksMap = taskInstances.map(t => t.id -> t).toMap
       taskInstances.foreach { taskInstance =>
         graph.addVertex(taskInstance)
-        taskInstance.task.taskDeps.toList.asInstanceOf[List[Task[?, ?]]].foreach { taskDep =>
+        taskInstance.task.taskDeps.toList.asInstanceOf[List[AbstractTask[?]]].foreach { taskDep =>
           val taskDepId = s"${module.id}.${taskDep.name}"
           val taskDepInstance = tasksMap.getOrElse(
             taskDepId,
