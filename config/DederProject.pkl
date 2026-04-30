@@ -768,7 +768,7 @@ const function crossModules(
   let (testNativeSuffix = "\(cfg.testScalaSrcBase)-native")
     new {
       jvm = (_template) {
-        id = baseId
+        id = "\(baseId)-jvm-\(_template.scalaVersion)"
         root = _root
         sources = new Listing {
           cfg.mainScalaSrcBase
@@ -784,7 +784,7 @@ const function crossModules(
         resources = cfg.mainResources
       }
       jvm_test = (_testTemplate) {
-        id = "\(baseId)-test"
+        id = "\(baseId)-jvm-test-\(_template.scalaVersion)"
         root = "\(_root)\(cfg.testRootSuffix)"
         sources = new Listing {
           cfg.testScalaSrcBase
@@ -803,7 +803,7 @@ const function crossModules(
         }
       }
       js = (_jsTemplate) {
-        id = "\(baseId)-js"
+        id = "\(baseId)-js-\(_template.scalaVersion)"
         root = _root
         sources = new Listing {
           cfg.mainScalaSrcBase
@@ -819,7 +819,7 @@ const function crossModules(
         resources = cfg.mainResources
       }
       js_test = (_jsTestTemplate) {
-        id = "\(baseId)-js-test"
+        id = "\(baseId)-js-test-\(_template.scalaVersion)"
         root = "\(_root)\(cfg.testRootSuffix)"
         sources = new Listing {
           cfg.testScalaSrcBase
@@ -838,7 +838,7 @@ const function crossModules(
         }
       }
       native = (_nativeTemplate) {
-        id = "\(baseId)-native"
+        id = "\(baseId)-native-\(_template.scalaVersion)"
         root = _root
         sources = new Listing {
           cfg.mainScalaSrcBase
@@ -854,7 +854,7 @@ const function crossModules(
         resources = cfg.mainResources
       }
       native_test = (_nativeTestTemplate) {
-        id = "\(baseId)-native-test"
+        id = "\(baseId)-native-test-\(_template.scalaVersion)"
         root = "\(_root)\(cfg.testRootSuffix)"
         sources = new Listing {
           cfg.testScalaSrcBase
