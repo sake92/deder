@@ -1045,6 +1045,78 @@ class CoreTasks() extends StrictLogging {
       summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
     )
 
+  val replDepsTask = CachedTaskBuilder
+    .make[Seq[Dependency]](
+      name = "replDeps"
+    )
+    .dependsOn(scalaVersionTask)
+    .build { ctx =>
+      val scalaVersion = ctx.depResults._1
+      ctx.module match {
+        case _: ScalaModule =>
+          if scalaVersion.startsWith("3.") then
+            Seq(Dependency.make(s"org.scala-lang::scala3-repl:${scalaVersion}", scalaVersion))
+          else
+            Seq(
+              Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
+              Dependency.make(s"org.scala-lang:scala-reflect:${scalaVersion}", scalaVersion)
+            )
+        case _ => Seq.empty
+      }
+    }
+
+  val replJarsTask = CachedTaskBuilder
+    .make[Seq[os.Path]](
+      name = "replJars"
+    )
+    .dependsOn(replDepsTask)
+    .build { ctx =>
+      val replDeps = ctx.depResults._1
+      if replDeps.isEmpty then Seq.empty
+      else ctx.dependencyResolver.fetchFiles(replDeps)
+    }
+
+  val replTask = TaskBuilder
+    .make[Seq[String]](
+      name = "repl",
+      singleton = true,
+      supportedModuleTypes = Set(
+        ModuleType.JAVA,
+        ModuleType.JAVA_TEST,
+        ModuleType.SCALA,
+        ModuleType.SCALA_TEST
+      )
+    )
+    .dependsOn(runClasspathTask)
+    .dependsOn(scalaVersionTask)
+    .dependsOn(jvmOptionsTask)
+    .dependsOn(javaHomeTask)
+    .dependsOn(replJarsTask)
+    .build { ctx =>
+      val (runClasspath, scalaVersion, jvmOptions, javaHome, replJars) = ctx.depResults
+      val forkEnv = ctx.module match {
+        case m: JavaModule => m.forkEnv.asScala.to(Map)
+        case _             => Map.empty
+      }
+      val cmd = ctx.module match {
+        case _: ScalaModule =>
+          val allJars = (replJars ++ runClasspath).map(_.toString)
+          val cp = allJars.mkString(File.pathSeparator)
+          val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)
+          val mainClass =
+            if scalaVersion.startsWith("3.") then "dotty.tools.repl.Main"
+            else "scala.tools.nsc.MainGenericRunner"
+          Seq("java") ++ jvmOptions ++ Seq("-cp", cp, mainClass, "-classpath", userClasspath) ++ ctx.args
+        case _ =>
+          val jshellBin = javaHome.map(h => (h / "bin" / "jshell").toString).getOrElse("jshell")
+          val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)
+          Seq(jshellBin, "--class-path", userClasspath) ++ ctx.args
+      }
+      logger.debug(s"Client should run command: ${cmd}")
+      ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, false))
+      cmd
+    }
+
   // order matters for dependency resolution!!
   val all: Seq[Task[?, ?]] = Seq(
     sourcesTask,
@@ -1086,7 +1158,10 @@ class CoreTasks() extends StrictLogging {
     fixCheckTask,
     testClassesTask,
     testTask,
-    testInMemoryTask
+    testInMemoryTask,
+    replDepsTask,
+    replJarsTask,
+    replTask
   )
 
 }
