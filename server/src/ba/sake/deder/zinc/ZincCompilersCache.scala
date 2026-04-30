@@ -15,10 +15,10 @@ object ZincCompilersCache {
       }
       .build()
 
-  def get(scalaVersion: String, dependencyResolver: DependencyResolver): ZincCompiler =
+  def get(scalaVersion: String, dependencyResolver: DependencyResolverApi): ZincCompiler =
     zincCache.get(scalaVersion, _ => makeZincCompiler(scalaVersion, dependencyResolver))
 
-  private def makeZincCompiler(scalaVersion: String, dependencyResolver: DependencyResolver) = {
+  private def makeZincCompiler(scalaVersion: String, dependencyResolver: DependencyResolverApi) = {
     val dep =
       if scalaVersion.startsWith("3.") then s"org.scala-lang:scala3-sbt-bridge:${scalaVersion}"
       else "org.scala-sbt::compiler-bridge:1.11.0"
