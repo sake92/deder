@@ -33,6 +33,20 @@ class TabCompleterSuite extends munit.FunSuite {
     )
     assertEquals(completer.complete("deder exec --", 13).toSet, Set("--module", "--task", "--json", "--watch"))
 
+    // --mermaid flag is available for modules, tasks, and plan subcommands
+    assertEquals(
+      completer.complete("deder modules --", 16).toSet,
+      Set("--json", "--dot", "--mermaid")
+    )
+    assertEquals(
+      completer.complete("deder tasks --", 14).toSet,
+      Set("--module", "--json", "--dot", "--mermaid")
+    )
+    assertEquals(
+      completer.complete("deder plan --", 13).toSet,
+      Set("--module", "--task", "--json", "--dot", "--mermaid")
+    )
+
     assertEquals(
       completer.complete("deder clean -m ", 15).toSet,
       Set("common", "frontend", "backend", "uber", "uber-test")

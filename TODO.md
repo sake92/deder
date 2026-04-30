@@ -47,8 +47,6 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 
 
 ## CLI
-- --mermaid diagrams
-    - modules as subgraphs https://mermaid.js.org/syntax/flowchart.html#subgraphs
 
 ## Misc
 - temp override of settings, say scalacOptions when running BSP request??? hmmm

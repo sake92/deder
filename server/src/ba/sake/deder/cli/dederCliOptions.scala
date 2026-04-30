@@ -19,7 +19,9 @@ case class DederCliModulesOptions(
     @arg(doc = "Output result as JSON")
     json: Flag,
     @arg(doc = "Output result as DOT graph")
-    dot: Flag
+    dot: Flag,
+    @arg(doc = "Output result as Mermaid graph")
+    mermaid: Flag
 )
 
 @main("tasks command", "List tasks per module")
@@ -29,7 +31,9 @@ case class DederCliTasksOptions(
     @arg(doc = "Output result as JSON")
     json: Flag,
     @arg(doc = "Output result as DOT graph")
-    dot: Flag
+    dot: Flag,
+    @arg(doc = "Output result as Mermaid graph")
+    mermaid: Flag
 )
 
 @main("plan command", "Plan for task execution in a module")
@@ -41,7 +45,9 @@ case class DederCliPlanOptions(
     @arg(doc = "Output result as JSON")
     json: Flag,
     @arg(doc = "Output result as DOT graph")
-    dot: Flag
+    dot: Flag,
+    @arg(doc = "Output result as Mermaid graph")
+    mermaid: Flag
 )
 
 @main("clean command", "Clean build artifacts for module(s)")
