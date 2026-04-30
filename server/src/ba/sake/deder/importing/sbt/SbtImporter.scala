@@ -5,9 +5,7 @@ import ba.sake.tupson.parseJson
 import ba.sake.deder.ServerNotification
 import ba.sake.deder.ServerNotificationsLogger
 import ba.sake.deder.config.DederProject
-import ba.sake.deder.config.DederProject.{DederModule, JavaModule, ModuleType, ScalaModule, ScalaTestModule}
 import ba.sake.deder.importing.ImportingUtils
-import org.pkl.core.{EvaluatorBuilder, ModuleSource, ValueConverter, ValueRenderer, ValueRenderers}
 
 class SbtImporter(
     serverNotificationsLogger: ServerNotificationsLogger
@@ -18,10 +16,12 @@ class SbtImporter(
     "org.scala-lang" -> "scala-library"
   )
 
+  private var _builderDefs: Seq[String] = Seq.empty
+  private var _builderNames: Seq[String] = Seq.empty
+
   def doImport() = {
     dumpSbtBuild()
-    val dederProject = parseSbtBuild()
-    val dederBuild = generateDederBuild(dederProject)
+    val dederBuild = parseAndGenerateBuild()
     os.write.over(os.pwd / "deder.pkl", dederBuild)
   }
 
@@ -47,249 +47,136 @@ class SbtImporter(
     os.remove(exportBuildStructurePluginPath)
   }
 
-  private def parseSbtBuild(): DederProject = {
+  private def parseAndGenerateBuild(): String = {
     val exportedSbtModuleFiles = os.list(os.pwd / "target/build-export").filter(_.ext == "json")
-    var exportedSbtModules = exportedSbtModuleFiles
-      .map { mf =>
-        os.read(mf).parseJson[ProjectExport]
-      }
-    // skip root aggregating project.. TODO better heuristic
-    if exportedSbtModules.length > 1 then exportedSbtModules = exportedSbtModules.filterNot(_.base == os.pwd.toString)
-    val modules = exportedSbtModules
-      .flatMap { sbtProjectExport =>
-        Seq(
-          getModule(sbtProjectExport, "compile"),
-          getModule(sbtProjectExport, "test")
-        )
-      }
-      .filterNot(_._3.sources.isEmpty)
-      .filterNot(_._1.externalDependencies.exists(_.organization == "org.scala-js")) // ScalaJS unsupported for now
-    serverNotificationsLogger.add(ServerNotification.logInfo(s"Discovered ${modules.length} modules"))
-    val finalModules = modules.map { case (spe, config, m, moduleDeps) =>
-      val moduleDependencies = moduleDeps.flatMap { moduleDepId =>
-        modules
-          .find(_._3.id == moduleDepId)
-          .map(_._3)
-      }
-      m.withModuleDeps(moduleDependencies.asJava)
-    }
-    new DederProject(finalModules.asJava, java.util.Collections.emptyList(), true)
-  }
+    val allModules = exportedSbtModuleFiles
+      .map(mf => os.read(mf).parseJson[ProjectExport])
+    // skip root aggregating project
+    val exportedSbtModules = if (allModules.length > 1) allModules.filterNot(_.base == os.pwd.toString) else allModules
 
-  // (projectExport, config, dederModule, dederModuleDeps)
-  private def getModule(
-      sbtProjectExport: ProjectExport,
-      config: String
-  ): (ProjectExport, String, JavaModule, Seq[String]) = {
-    val isTest = config == "test"
-    val originalId = if isTest then s"${sbtProjectExport.id}Test" else sbtProjectExport.id
-    val id = ImportingUtils.sanitizeId(originalId)
-    var rootAbsPath = os.Path(sbtProjectExport.base)
-    val isCrossProject = Set("jvm", "js", "native").contains(rootAbsPath.last)
-    if isCrossProject then rootAbsPath = rootAbsPath / os.up // dirty hack to have proper subpaths
-    val root = rootAbsPath.relativeTo(os.pwd)
-    val sourceDirs = if isTest then sbtProjectExport.testSourceDirs else sbtProjectExport.sourceDirs
-    val sources = sourceDirs
-      .flatMap { d =>
-        val sourceDirPath = os.Path(d)
-        Option.when(os.exists(sourceDirPath))(sourceDirPath.relativeTo(rootAbsPath))
-      }
-      .map(_.toString)
-    val resourceDirs = if isTest then sbtProjectExport.testResourceDirs else sbtProjectExport.resourceDirs
-    val resources = resourceDirs
-      .flatMap { d =>
-        val resourceDirPath = os.Path(d)
-        Option.when(os.exists(resourceDirPath))(resourceDirPath.relativeTo(rootAbsPath))
-      }
-      .map(_.toString)
-    val tpe = if isTest then ModuleType.SCALA_TEST else ModuleType.SCALA // TODO
-    val filteredDeps = sbtProjectExport.externalDependencies
-      .filter { d =>
-        if isTest then d.configurations.exists(_.contains(config)) else true
-      }
-      .filterNot { ed =>
-        IgnoredDeps.contains(ed.organization -> ed.name)
-      }
-    val (pluginDeps, regularDeps) = filteredDeps.partition(SbtImporter.isPluginDependency)
-    val deps = regularDeps.map(SbtImporter.formatDependency)
-    val scalacPluginDeps = pluginDeps.map(SbtImporter.formatDependency)
-    val dederModuleRoot = if root.toString.isEmpty then "." else root.toString
-    val module =
-      if isTest then
-        new ScalaTestModule(
-          id,
-          dederModuleRoot,
-          sources.asJava,
-          List.empty.asJava, // moduleDeps, filled in next pass..
-          tpe,
-          resources.asJava,
-          null, // javaHome
-          List.empty.asJava, // jvmOptions
-          null, // javaVersion
-          DederProject.CompileOrder.JAVA_THEN_SCALA,
-          sbtProjectExport.javacOptions.asJava,
-          null, // forkEnv
-          null, // mainClass
-          deps.asJava,
-          List.empty.asJava, // javacAnnotationProcessorDeps
-          "0.11.1", // javaSemanticdbVersion
-          true, // semanticdbEnabled
-          new DederProject.ManifestSettings(java.util.Map.of(), java.util.Map.of()), // manifest
-          false, // publish
-          null, // pomSettings
-          null, // publishTo
-          null, // publishLocalTo
-          null, // graalvm
-          java.util.Map.of(), // mvnApps
-          sbtProjectExport.scalaVersion,
-          sbtProjectExport.scalacOptions.asJava,
-          scalacPluginDeps.asJava, // scalacPluginDeps
-          "4.13.9", // scalaSemanticdbVersion
-          0L, // testParallelism (0 = all CPUs)
-          0L, // maxTestForks (0 = all CPUs)
-          null, // junitXmlReport
-          List.empty.asJava // testFrameworks
-        )
-      else
-        new ScalaModule(
-          id,
-          dederModuleRoot,
-          sources.asJava,
-          List.empty.asJava, // moduleDeps, filled in next pass..
-          tpe,
-          resources.asJava,
-          null, // javaHome
-          List.empty.asJava, // jvmOptions
-          null, // javaVersion
-          DederProject.CompileOrder.JAVA_THEN_SCALA,
-          sbtProjectExport.javacOptions.asJava,
-          null, // forkEnv
-          null, // mainClass
-          deps.asJava,
-          List.empty.asJava, // javacAnnotationProcessorDeps
-          "0.11.1", // javaSemanticdbVersion
-          true, // semanticdbEnabled
-          new DederProject.ManifestSettings(java.util.Map.of(), java.util.Map.of()), // manifest
-          false, // publish
-          null, // pomSettings
-          null, // publishTo
-          null, // publishLocalTo
-          null, // graalvm
-          java.util.Map.of(), // mvnApps
-          sbtProjectExport.scalaVersion,
-          sbtProjectExport.scalacOptions.asJava,
-          scalacPluginDeps.asJava, // scalacPluginDeps
-          "4.13.9" // scalaSemanticdbVersion
-        )
-
-    val originalModuleDeps = sbtProjectExport.interProjectDependencies.map { ipde =>
-      if ipde.configuration == "test" then s"${ipde.project}Test" else ipde.project
-    } ++ Option.when(isTest)(sbtProjectExport.id)
-    val moduleDeps = originalModuleDeps.map(ImportingUtils.sanitizeId)
-    (sbtProjectExport, config, module, moduleDeps)
-  }
-
-  // there is no nice way to serialize DederProject back to Pkl..
-  private def generateDederBuild(dederProject: DederProject): String = {
-    val allModules = dederProject.modules.asScala
-    val mainModules = allModules.collect { case m: ScalaModule if !m.isInstanceOf[ScalaTestModule] => m }
-    val testModules = allModules.collect { case m: ScalaTestModule => m }
-
-    // Map: main module ID → test module
-    val mainToTest: Map[String, ScalaTestModule] = testModules.flatMap { tm =>
-      tm.moduleDeps.asScala
-        .collectFirst { case dep if mainModules.exists(_.id == dep.id) => dep.id }
-        .map(mainId => mainId -> tm)
-    }.toMap
-
-    // Build old-ID → Pkl variable reference mapping for moduleDeps substitution
-    val idToRef: Map[String, String] =
-      mainModules.map(m => m.id -> s"${m.id}.main").toMap ++
-        testModules.flatMap { tm =>
-          tm.moduleDeps.asScala
-            .collectFirst { case dep if mainModules.exists(_.id == dep.id) => dep.id }
-            .map(mainId => tm.id -> s"${mainId}.test")
-        }.toMap
-
-    def renderStringListing(name: String, items: Seq[String]): Option[String] =
-      Option.when(items.nonEmpty) {
-        val lines = items.map(d => s"""  "$d"""").mkString("\n")
-        s"$name {\n$lines\n}"
-      }
-
-    def renderRefListing(name: String, refs: Seq[String]): Option[String] =
-      Option.when(refs.nonEmpty) {
-        val lines = refs.map(d => s"  $d").mkString("\n")
-        s"$name {\n$lines\n}"
-      }
-
-    def renderModuleBody(
-        m: ScalaModule,
-        excludeDeps: Set[String] = Set.empty,
-        excludeModuleDeps: Set[String] = Set.empty,
-        excludeScalacOpts: Set[String] = Set.empty,
-        excludePluginDeps: Set[String] = Set.empty
-    ): Seq[String] = {
-      val deps = m.deps.asScala.distinct.filterNot(excludeDeps.contains)
-      val moduleDepsRefs = m.moduleDeps.asScala
-        .map(_.id)
-        .filterNot(excludeModuleDeps.contains)
-        .map(id => idToRef.getOrElse(id, id))
-      val javacOpts = m.javacOptions.asScala.toSeq
-      val scalacOpts = m.scalacOptions.asScala.distinct.filterNot(excludeScalacOpts.contains)
-      val pluginDeps = m.scalacPluginDeps.asScala.distinct.filterNot(excludePluginDeps.contains)
-      List(
-        renderStringListing("deps", deps.toSeq),
-        renderRefListing("moduleDeps", moduleDepsRefs.toSeq),
-        Option.when(javacOpts.nonEmpty)(s"javacOptions {\n${javacOpts.map(d => s"  $d").mkString("\n")}\n}"),
-        renderStringListing("scalacOptions", scalacOpts.toSeq),
-        renderStringListing("scalacPluginDeps", pluginDeps.toSeq)
-      ).flatten
+    // Group modules by their cross-project root.
+    // For sbt-crossproject, jvm/js/native modules share the same parent directory.
+    val grouped = exportedSbtModules.groupBy { pe =>
+      val absPath = os.Path(pe.base)
+      val last = absPath.last
+      if (Set("jvm", "js", "native").contains(last)) absPath / os.up
+      else absPath
     }
 
-    val moduleDefs = mainModules.map { mainMod =>
-      val testModOpt = mainToTest.get(mainMod.id)
+    serverNotificationsLogger.add(ServerNotification.logInfo(s"Discovered ${exportedSbtModules.length} modules in ${grouped.size} groups"))
 
-      val templateLines = s"""scalaVersion = "${mainMod.scalaVersion}"""" +:
-        renderModuleBody(mainMod)
-      val templateBody = templateLines.mkString("\n").indent(4).stripTrailing
+    var counter = 0
+    val builderDefs = grouped.flatMap { case (rootPath, modules) =>
+      counter += 1
+      generateModuleGroup(rootPath, modules.toSeq, counter)
+    }.toSeq
 
-      val testTemplatePart = testModOpt.map { testMod =>
-        val mainAndDepIds = mainMod.moduleDeps.asScala.map(_.id).toSet + mainMod.id
-        val testLines = renderModuleBody(
-          testMod,
-          excludeDeps = mainMod.deps.asScala.toSet,
-          excludeModuleDeps = mainAndDepIds,
-          excludeScalacOpts = mainMod.scalacOptions.asScala.toSet,
-          excludePluginDeps = mainMod.scalacPluginDeps.asScala.toSet
-        )
-        if testLines.isEmpty then ""
-        else {
-          val body = testLines.mkString("\n").indent(4).stripTrailing
-          s"""
-             |  testTemplate = (template.asTest()) {
-             |$body
-             |  }""".stripMargin
-        }
-      }.getOrElse("")
+    _builderDefs = builderDefs
+    _builderNames = (1 to counter).map(i => s"mod$i").toSeq
 
-      s"""local const ${mainMod.id} = new CreateScalaModules {
-         |  root = "${mainMod.root}"
-         |  layout = "maven"
-         |  template = new {
-         |$templateBody
-         |  }$testTemplatePart
-         |}.get
-         |""".stripMargin
-    }
-
-    s"""amends "https://sake92.github.io/deder/config/v0.7.2/DederProject.pkl"
+    s"""amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
        |
-       |${moduleDefs.mkString("\n")}
+       |${_builderDefs.mkString("\n")}
+       |
        |modules {
-       |${mainModules.map(m => s"  ...${m.id}.all").mkString("\n")}
+       |${_builderNames.map(n => s"  ...${n}.all").mkString("\n")}
        |}
        |""".stripMargin
+  }
+
+  private def generateModuleGroup(
+      rootPath: os.Path,
+      modules: Seq[ProjectExport],
+      index: Int
+  ): Option[String] = {
+    val root = rootPath.relativeTo(os.pwd).toString match {
+      case "" => "."
+      case r => r
+    }
+
+    // Find the main module (not test, not JS, not Native)
+    val mainModule = modules.find(pe =>
+      !pe.id.endsWith("Test") && !pe.id.contains("JS") && !pe.id.contains("Native")
+    ).getOrElse(modules.head)
+
+    val plugins = mainModule.plugins
+    val layout = SbtImporter.detectLayout(plugins, rootPath.toString)
+    val layoutStr = layout.toString.toLowerCase.replace("_", "-")
+
+    val isCross = layout == DederProject.DirLayout.SBT_CROSS_FULL ||
+      layout == DederProject.DirLayout.SBT_CROSS_PURE ||
+      layout == DederProject.DirLayout.SBT_CROSS_DUMMY
+
+    val hasScalaJs = plugins.exists(_.contains("sbt-scalajs"))
+    val hasScalaNative = plugins.exists(_.contains("sbt-scala-native"))
+
+    val deps = mainModule.externalDependencies
+      .filterNot(d => IgnoredDeps.contains(d.organization -> d.name))
+      .filterNot(d => d.configurations.exists(_.contains("plugin")))
+      .map(SbtImporter.formatDependency)
+      .distinct
+
+    val pluginDeps = mainModule.externalDependencies
+      .filter(SbtImporter.isPluginDependency)
+      .map(SbtImporter.formatDependency)
+      .distinct
+
+    val depsStr = if (deps.nonEmpty)
+      s"""deps {\n${deps.map(d => s"""      "$d"""").mkString("\n")}\n    }"""
+    else ""
+
+    val pluginDepsStr = if (pluginDeps.nonEmpty)
+      s"""scalacPluginDeps {\n${pluginDeps.map(d => s"""      "$d"""").mkString("\n")}\n    }"""
+    else ""
+
+    val idOverride = if (root == ".") "\n  id = \"project\"" else ""
+
+    val body =
+      s"""  template = new ScalaModule {
+         |    scalaVersion = "${mainModule.scalaVersion}"
+         |${if (depsStr.nonEmpty) s"    $depsStr\n" else ""}${if (pluginDepsStr.nonEmpty) s"    $pluginDepsStr\n" else ""}  }""".stripMargin
+
+    val defStr = if (isCross) {
+      s"""new CreateCrossModules {
+         |  root = "$root"$idOverride
+         |  layout = "$layoutStr"
+         |$body
+         |  jsTemplate = (template.asJs()) { scalaJsVersion = "1.18.2" }
+         |  nativeTemplate = (template.asNative()) { scalaNativeVersion = "0.5.10" }
+         |  testTemplate = (template.asTest()) {
+         |    deps { "org.scalameta::munit:1.2.1" }
+         |  }
+         |}.get""".stripMargin
+    } else if (hasScalaJs) {
+      s"""new CreateScalaJsModules {
+         |  root = "$root"$idOverride
+         |  layout = "$layoutStr"
+         |$body
+         |  testTemplate = (template.asTest()) {
+         |    deps { "org.scalameta::munit:1.2.1" }
+         |  }
+         |}.get""".stripMargin
+    } else if (hasScalaNative) {
+      s"""new CreateScalaNativeModules {
+         |  root = "$root"$idOverride
+         |  layout = "$layoutStr"
+         |$body
+         |  testTemplate = (template.asTest()) {
+         |    deps { "org.scalameta::munit:1.2.1" }
+         |  }
+         |}.get""".stripMargin
+    } else {
+      s"""new CreateScalaModules {
+         |  root = "$root"$idOverride
+         |  layout = "$layoutStr"
+         |$body
+         |  testTemplate = (template.asTest()) {
+         |    deps { "org.scalameta::munit:1.2.1" }
+         |  }
+         |}.get""".stripMargin
+    }
+
+    Some(s"local const mod$index = $defStr")
   }
 }
 
@@ -305,5 +192,24 @@ object SbtImporter {
     if (dep.crossVersion == "full") s"${dep.organization}:::${dep.name}:${dep.revision}"
     else if (dep.crossVersion == "binary") s"${dep.organization}::${dep.name}:${dep.revision}"
     else s"${dep.organization}:${dep.name}:${dep.revision}"
+  }
+
+  /** Detects which Deder DirLayout to use based on sbt plugins and directory structure. */
+  def detectLayout(plugins: Seq[String], projectBaseDir: String): DederProject.DirLayout = {
+    val hasCrossProject = plugins.exists(_.contains("sbt-crossproject"))
+    
+    if (hasCrossProject) {
+      val basePath = os.Path(projectBaseDir)
+      val hasSharedDir = os.exists(basePath / "shared")
+      val hasDotDirs = os.exists(basePath / ".jvm") || os.exists(basePath / ".js") || os.exists(basePath / ".native")
+      val hasTopLevelPlatformDirs = os.exists(basePath / "jvm") && os.exists(basePath / "js")
+      
+      if (hasSharedDir) DederProject.DirLayout.SBT_CROSS_FULL
+      else if (hasDotDirs) DederProject.DirLayout.SBT_CROSS_PURE
+      else if (hasTopLevelPlatformDirs) DederProject.DirLayout.SBT_CROSS_DUMMY
+      else DederProject.DirLayout.SBT
+    } else {
+      DederProject.DirLayout.SBT
+    }
   }
 }
