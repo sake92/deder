@@ -28,14 +28,14 @@ class SbtImporter(
   // writes in target/build-export/ , a json file for each "module"
   private def dumpSbtBuild() = {
     val sbtCmd = if (scala.util.Properties.isWin) "sbt.bat" else "sbt"
-    val exportBuildStructurePluginVersion = "0.0.2"
+    val exportBuildStructurePluginVersion = "0.0.3"
     val exportBuildStructurePluginSource =
       s"""addSbtPlugin("ba.sake" % "sbt-build-extract" % "$exportBuildStructurePluginVersion")
          |libraryDependencies += "ba.sake" %% "sbt-build-extract-core" % "$exportBuildStructurePluginVersion"
          |""".stripMargin
     val exportBuildStructurePluginPath = os.pwd / "project/exportBuildStructure.sbt"
     os.write.over(exportBuildStructurePluginPath, exportBuildStructurePluginSource)
-    val res = os.spawn((sbtCmd, "exportBuildStructure"), mergeErrIntoOut = true)
+    val res = os.spawn((sbtCmd, "exportAllBuildStructures"), mergeErrIntoOut = true)
     var line = ""
     while {
       line = res.stdout.readLine()
@@ -107,8 +107,8 @@ class SbtImporter(
       layout == DederProject.DirLayout.SBT_CROSS_PURE ||
       layout == DederProject.DirLayout.SBT_CROSS_DUMMY
 
-    val hasScalaJs = plugins.exists(_.contains("sbt-scalajs"))
-    val hasScalaNative = plugins.exists(_.contains("sbt-scala-native"))
+    val hasScalaJs = plugins.exists(p => p.contains("ScalaJSPlugin") || p.contains("scalajs"))
+    val hasScalaNative = plugins.exists(p => p.contains("ScalaNativePlugin") || p.contains("scalanative"))
 
     val deps = mainModule.externalDependencies
       .filterNot(d => IgnoredDeps.contains(d.organization -> d.name))
@@ -196,7 +196,7 @@ object SbtImporter {
 
   /** Detects which Deder DirLayout to use based on sbt plugins and directory structure. */
   def detectLayout(plugins: Seq[String], projectBaseDir: String): DederProject.DirLayout = {
-    val hasCrossProject = plugins.exists(_.contains("sbt-crossproject"))
+    val hasCrossProject = plugins.exists(p => p.contains("CrossPlugin") || p.contains("crossproject"))
     
     if (hasCrossProject) {
       val basePath = os.Path(projectBaseDir)

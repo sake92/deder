@@ -52,7 +52,7 @@ const function sbtVersionPrefixes(scalaVersion: String): List<String> =
     for (p in exactPrefixes) { p }
     currentPlus
     for (p in crossPlus) { p }
-  }.toList().distinct()
+  }.toList().distinct
 
 /// Returns sbt-style version-specific source directories for a given base directory and scalaVersion.
 /// Example: sbtVersionSourceDirs("2.13.18", "src/main/scala") → ["src/main/scala-2", "src/main/scala-2.13", "src/main/scala-2.13.18", "src/main/scala-2.13+"]

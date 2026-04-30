@@ -444,7 +444,7 @@ class ScalaNativeTestModule extends ScalaNativeModule {
 
 const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig =
   let (style = if (layout.startsWith("sbt")) "sbt" else "deder")
-  let (crossType = 
+  let (ct = 
     if (layout == "sbt-cross-full") "full"
     else if (layout == "sbt-cross-pure") "pure"
     else if (layout == "sbt-cross-dummy") "dummy"
@@ -461,7 +461,7 @@ const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig =
         testResources { "src/test/resources" }
         testRootSuffix = ""
         versionStyle = style
-        crossType = crossType
+        crossType = ct
       }
     else // "java"
       new I.LayoutConfig {
@@ -473,7 +473,7 @@ const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig =
         testResources { "src/test/resources" }
         testRootSuffix = ""
         versionStyle = style
-        crossType = crossType
+        crossType = ct
       }
   else // "default"
     new I.LayoutConfig {
@@ -485,7 +485,7 @@ const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig =
       testResources { "resources" }
       testRootSuffix = "/test"
       versionStyle = style
-      crossType = crossType
+      crossType = ct
     }
 
 class JavaModules {
