@@ -4,6 +4,7 @@ import java.io.IOException
 import java.nio.channels.*
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.BlockingQueue
+import scala.jdk.CollectionConverters.*
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.toJson
 import ba.sake.deder.*
@@ -105,6 +106,10 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                     val dot =
                       GraphUtils.generateDOT(state.tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id))
                     serverMessages.put(CliServerMessage.Output(dot))
+                  } else if cliOptions.mermaid.value then {
+                    val mermaid =
+                      GraphUtils.generateMermaid(state.tasksResolver.modulesGraph, v => v.id, v => v.id)
+                    serverMessages.put(CliServerMessage.Output(mermaid))
                   } else {
                     val allModules = state.tasksResolver.allModules.sortBy(_.id)
                     serverMessages.put(CliServerMessage.Output(allModules.map(_.id).mkString("\n")))
@@ -141,6 +146,16 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                         v => Map("label" -> v.id)
                       )
                     serverMessages.put(CliServerMessage.Output(dot))
+                    serverMessages.put(CliServerMessage.Exit(0))
+                  } else if cliOptions.mermaid.value then {
+                    val mermaid =
+                      GraphUtils.generateMermaidWithSubgraphs(
+                        state.tasksResolver.taskInstancesGraph,
+                        state.tasksResolver.taskInstancesPerModule,
+                        v => v.id,
+                        v => v.task.name
+                      )
+                    serverMessages.put(CliServerMessage.Output(mermaid))
                     serverMessages.put(CliServerMessage.Exit(0))
                   } else {
                     val modules = cliOptions.module match {
@@ -204,6 +219,16 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                       } else if cliOptions.dot.value then {
                         val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
                         serverMessages.put(CliServerMessage.Output(dot))
+                      } else if cliOptions.mermaid.value then {
+                        val groups = tasksExecSubgraph.vertexSet().asScala.toSeq.groupBy(_.moduleId)
+                        val mermaid =
+                          GraphUtils.generateMermaidWithSubgraphs(
+                            tasksExecSubgraph,
+                            groups,
+                            v => v.id,
+                            v => v.task.name
+                          )
+                        serverMessages.put(CliServerMessage.Output(mermaid))
                       } else {
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                         val stagesStr = tasksExecStages.zipWithIndex
