@@ -13,7 +13,7 @@ import dependency.api.ops.*
 import ba.sake.deder.{OTEL, ServerNotificationsLogger}
 import ba.sake.deder.ServerNotification
 
-class DependencyResolver(val repositories: Seq[CsRepository]) {
+class DependencyResolver(val repositories: Seq[CsRepository]) extends DependencyResolverApi {
 
   // In-process cache for resolved file paths, keyed by sorted dependency
   // coordinates. Scoped to this resolver instance, so repos implicitly key

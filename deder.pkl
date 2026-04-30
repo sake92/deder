@@ -48,13 +48,31 @@ local const testRunner = new ScalaModule {
   mainClass = "ba.sake.deder.testing.forked.ForkedTestMain"
 }
 
+local const pluginApi = new ScalaModule {
+  id = "plugin-api"
+  root = "plugin-api"
+  scalaVersion = scalaVer
+  publish = false
+  moduleDeps { config }
+  pomSettings = pom("deder-plugin-api")
+  deps {
+    "ba.sake::tupson:0.18.0"
+    "com.lihaoyi::os-lib:0.11.6"
+    "commons-codec:commons-codec:1.20.0"
+    "org.scala-sbt:compiler-interface:1.11.0"
+    "com.typesafe.scala-logging::scala-logging:3.9.5"
+    "io.get-coursier::dependency:0.3.2"
+    "io.get-coursier::dependency-interface:0.3.2"
+  }
+}
+
 local const serverModules =
   new CreateScalaModules {
     root = "server"
     template = new ScalaModule {
       scalaVersion = scalaVer
       publish = false
-      moduleDeps { config; testCommon }
+      moduleDeps { config; testCommon; pluginApi }
       mainClass = "ba.sake.deder.ServerMain"
       scalacOptions {
         "-Yretain-trees"
@@ -145,6 +163,7 @@ local const integrationTest = new ScalaTestModule {
 
 modules {
   config
+  pluginApi
   testCommon
   testCommonTest
   testRunner

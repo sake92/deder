@@ -27,7 +27,7 @@ import ba.sake.deder.testing.*
 import ba.sake.deder.testing.forked.ForkedTestOrchestrator
 import ba.sake.deder.testing.inmemory.InMemoryTestOrchestrator
 
-class CoreTasks() extends StrictLogging {
+class CoreTasks() extends CoreTasksApi with StrictLogging {
 
   /** source folders */
   val sourcesTask = SourceFilesTask(
