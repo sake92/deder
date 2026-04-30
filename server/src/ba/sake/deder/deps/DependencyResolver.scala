@@ -72,6 +72,19 @@ class DependencyResolver(val repositories: Seq[CsRepository]) extends Dependency
 
   def fetchFile(dependency: Dependency): os.Path =
     fetchFiles(Seq(dependency)).head
+
+  def resolveTransitiveCoordinates(
+      dependencies: Seq[Dependency],
+      notifications: Option[ServerNotificationsLogger] = None
+  ): Seq[(String, String, String)] = {
+    if dependencies.isEmpty then Seq.empty
+    else
+      fetch(dependencies, notifications)
+        .getDependencies()
+        .asScala
+        .toSeq
+        .map(d => (d.getModule.getOrganization, d.getModule.getName, d.getVersion))
+  }
 }
 
 object DependencyResolver {
