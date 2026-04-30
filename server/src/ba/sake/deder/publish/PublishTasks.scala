@@ -4,6 +4,8 @@ import scala.jdk.CollectionConverters.*
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.publish.{Hasher, PgpSigner, PomGenerator, PomSettings, Publisher}
 import ba.sake.deder.config.DederProject.*
+import ba.sake.deder.config.DederCredentials.*
+import ba.sake.deder.config.CredentialsParser
 import ba.sake.deder.{*, given}
 import ba.sake.deder.jvm.*
 import dependency.ScalaVersion
@@ -407,39 +409,78 @@ class PublishTasks(coreTasks: CoreTasks) {
       publishArtifactsResOpt.map { publishArtifactsRes =>
         val pom = publishArtifactsRes.pom
         val artifacts = os.list(publishArtifactsRes.outDir)
-        // sign files
-        val pgpPassphrase =
-          sys.env.getOrElse("DEDER_PGP_PASSPHRASE", throw RuntimeException("DEDER_PGP_PASSPHRASE env var not set"))
-        val pgpSecret =
-          sys.env.getOrElse("DEDER_PGP_SECRET", throw RuntimeException("DEDER_PGP_SECRET env var not set"))
-        artifacts.foreach(f => PgpSigner.signFile(f, pgpSecret, pgpPassphrase.toCharArray))
-        // generate hashes
-        val allFiles = artifacts.flatMap { f =>
-          val checksumFile = f / os.up / s"${f.last}.asc"
-          Seq(f, checksumFile) ++
-            Hasher.generateChecksums(f) ++
-            Hasher.generateChecksums(checksumFile)
+
+        val publishTo = ctx.project.publishTo
+        if publishTo == null then
+          throw RuntimeException(
+            "publishTo is not configured in deder.pkl. " +
+              "Add e.g. `publishTo = new SonatypeCentralRepo { id = \"my-sonatype\" }` to your deder.pkl."
+          )
+
+        val credentialsFile = os.home / ".deder/credentials.pkl"
+        if !os.exists(credentialsFile) then
+          throw RuntimeException(
+            s"Credentials file not found at ${credentialsFile}. " +
+              "Create ~/.deder/credentials.pkl with your publish credentials."
+          )
+        val credentialsOrError = CredentialsParser.parse(credentialsFile)
+        val credentials = credentialsOrError match {
+          case Right(c) => c
+          case Left(err) => throw RuntimeException(err)
         }
-        val username =
-          sys.env.getOrElse(
-            "DEDER_SONATYPE_USERNAME",
-            throw RuntimeException("DEDER_SONATYPE_USERNAME env var not set")
-          )
-        val password =
-          sys.env.getOrElse(
-            "DEDER_SONATYPE_PASSWORD",
-            throw RuntimeException("DEDER_SONATYPE_PASSWORD env var not set")
-          )
-        os.remove.all(ctx.out)
-        val filesDir =
-          ctx.out / "final" / os.SubPath(s"${pom.groupId.replace('.', '/')}/${pom.artifactId}/${pom.version}")
-        os.makeDir.all(filesDir)
-        allFiles.foreach(f => os.copy(f, filesDir / f.last))
-        val filesZip = ctx.out / s"${pom.artifactId}_bundle.zip"
-        os.zip(filesZip, Seq(ctx.out / "final"))
+
         val publisher = Publisher(ctx.notifications, ctx.module.id)
-        if pom.version.endsWith("-SNAPSHOT") then publisher.publishSonatypeSnapshot(username, password, pom, allFiles)
-        else publisher.publishSonatypeCentral(username, password, pom, filesZip)
+
+        publishTo match {
+          case _: SonatypeCentralRepo =>
+            val creds = credentials.credentials.get(publishTo.id) match {
+              case c: SonatypeCentralCredentials => c
+              case other =>
+                throw RuntimeException(
+                  s"Expected SonatypeCentralCredentials for repo '${publishTo.id}' but got: ${Option(other).map(_.getClass.getSimpleName).getOrElse("not found")}. " +
+                    s"Add `[\"${publishTo.id}\"] = new SonatypeCentralCredentials {{ ... }}` to ~/.deder/credentials.pkl."
+                )
+            }
+            artifacts.foreach(f => PgpSigner.signFile(f, creds.pgpSecret, creds.pgpPassphrase.toCharArray))
+            val allFiles = artifacts.flatMap { f =>
+              val signatureFile = f / os.up / s"${f.last}.asc"
+              Seq(f, signatureFile) ++
+                Hasher.generateChecksums(f) ++
+                Hasher.generateChecksums(signatureFile)
+            }
+            os.remove.all(ctx.out)
+            val filesDir =
+              ctx.out / "final" / os.SubPath(s"${pom.groupId.replace('.', '/')}/${pom.artifactId}/${pom.version}")
+            os.makeDir.all(filesDir)
+            allFiles.foreach(f => os.copy(f, filesDir / f.last))
+            val filesZip = ctx.out / s"${pom.artifactId}_bundle.zip"
+            os.zip(filesZip, Seq(ctx.out / "final"))
+            publisher.publishSonatypeCentral(creds.username, creds.password, pom, filesZip)
+
+          case _: SonatypeSnapshotRepo =>
+            val creds = credentials.credentials.get(publishTo.id) match {
+              case c: SonatypeSnapshotCredentials => c
+              case other =>
+                throw RuntimeException(
+                  s"Expected SonatypeSnapshotCredentials for repo '${publishTo.id}' but got: ${Option(other).map(_.getClass.getSimpleName).getOrElse("not found")}. " +
+                    s"Add `[\"${publishTo.id}\"] = new SonatypeSnapshotCredentials {{ ... }}` to ~/.deder/credentials.pkl."
+                )
+            }
+            val allFiles = artifacts.flatMap(f => Seq(f) ++ Hasher.generateChecksums(f))
+            publisher.publishSonatypeSnapshot(creds.username, creds.password, pom, allFiles)
+
+          case mavenRepo: MavenRepo =>
+            val creds = credentials.credentials.get(publishTo.id) match {
+              case c: BasicAuthCredentials => c
+              case other =>
+                throw RuntimeException(
+                  s"Expected BasicAuthCredentials for repo '${publishTo.id}' but got: ${Option(other).map(_.getClass.getSimpleName).getOrElse("not found")}. " +
+                    s"Add `[\"${publishTo.id}\"] = new BasicAuthCredentials {{ ... }}` to ~/.deder/credentials.pkl."
+                )
+            }
+            val allFiles = artifacts.flatMap(f => Seq(f) ++ Hasher.generateChecksums(f))
+            publisher.publishMavenRepo(creds.username, creds.password, mavenRepo.url, pom, allFiles)
+        }
       }
       ""
     }

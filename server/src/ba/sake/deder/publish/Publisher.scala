@@ -29,11 +29,20 @@ class Publisher(notifications: ServerNotificationsLogger, moduleId: String) {
     )
   }
 
-  // file by file, old style
+  // file by file upload to Sonatype Snapshots
   def publishSonatypeSnapshot(username: String, password: String, pom: PomSettings, files: Seq[os.Path]): Unit = {
     val baseUrl = "https://central.sonatype.com/repository/maven-snapshots"
+    publishToMavenUrl(username, password, baseUrl, pom, files, "Sonatype Snapshots")
+  }
+
+  // file by file upload to any Maven-compatible repository (e.g. Nexus, Artifactory)
+  def publishMavenRepo(username: String, password: String, repoUrl: String, pom: PomSettings, files: Seq[os.Path]): Unit = {
+    publishToMavenUrl(username, password, repoUrl, pom, files, repoUrl)
+  }
+
+  private def publishToMavenUrl(username: String, password: String, baseUrl: String, pom: PomSettings, files: Seq[os.Path], repoName: String): Unit = {
     notifications.add(
-      ServerNotification.logInfo(s"Publishing to Sonatype Snapshots repository at ${baseUrl}", moduleId)
+      ServerNotification.logInfo(s"Publishing to ${repoName} ...", moduleId)
     )
     val client = HttpClient.newBuilder().build()
     val auth = Base64.getEncoder.encodeToString(s"$username:$password".getBytes("UTF-8"))
@@ -54,13 +63,13 @@ class Publisher(notifications: ServerNotificationsLogger, moduleId: String) {
     }
     notifications.add(
       ServerNotification.logInfo(
-        s"Successfully published ${pom.groupId}:${pom.artifactId}:${pom.version} to Sonatype Snapshots repository",
+        s"Successfully published ${pom.groupId}:${pom.artifactId}:${pom.version} to ${repoName}",
         moduleId
       )
     )
   }
 
-  // Direct Bundle ZIP Upload
+  // Direct Bundle ZIP Upload to Sonatype Central
   def publishSonatypeCentral(username: String, password: String, pom: PomSettings, filesZip: os.Path): Unit = {
     val client = Methanol.create
     val auth = Base64.getEncoder.encodeToString(s"${username}:${password}".getBytes("UTF-8"))
@@ -87,3 +96,4 @@ class Publisher(notifications: ServerNotificationsLogger, moduleId: String) {
     )
   }
 }
+

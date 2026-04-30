@@ -20,6 +20,34 @@ repositories: Listing<MavenRepository> = new Listing {}
 /// If false, `repositories` must be non-empty.
 includeDefaultRepos: Boolean = true
 
+/// The repository to publish artifacts to.
+/// The `id` must match a key in `~/.deder/credentials.pkl`.
+/// Use `SonatypeCentralRepo` for Sonatype Central (releases), `SonatypeSnapshotRepo` for snapshots,
+/// or `MavenRepo` for any other repository.
+publishTo: PublishRepo?
+
+/// Base class for publish repository configuration.
+/// Credentials for the repository are looked up by `id` in `~/.deder/credentials.pkl`.
+abstract class PublishRepo {
+  /// Unique identifier for this repository. Must match a key in `~/.deder/credentials.pkl`.
+  id: String(!isEmpty)
+}
+
+/// Publish to Sonatype Central (https://central.sonatype.com). Use for release versions.
+/// Requires `SonatypeCentralCredentials` (username, password, pgpSecret, pgpPassphrase) in `~/.deder/credentials.pkl`.
+class SonatypeCentralRepo extends PublishRepo {}
+
+/// Publish to Sonatype Central Snapshots (https://central.sonatype.com/repository/maven-snapshots).
+/// Use for SNAPSHOT versions. Requires `SonatypeSnapshotCredentials` (username, password) in `~/.deder/credentials.pkl`.
+class SonatypeSnapshotRepo extends PublishRepo {}
+
+/// Publish to any Maven-compatible repository (e.g. Nexus, Artifactory).
+/// Requires `BasicAuthCredentials` (username, password) in `~/.deder/credentials.pkl`.
+class MavenRepo extends PublishRepo {
+  /// Base URL of the repository, e.g. "https://nexus.example.com/repository/releases".
+  url: String(!isEmpty)
+}
+
 class MavenRepository {
   /// Repository URL. Supports http(s):// and file:// schemes.
   /// Credentials (if required) come from Coursier's native config:
