@@ -187,76 +187,103 @@ class SbtImporter(
 
   // there is no nice way to serialize DederProject back to Pkl..
   private def generateDederBuild(dederProject: DederProject): String = {
-    val moduleIds = dederProject.modules.asScala.map(_.id)
-    val moduleDefs = dederProject.modules.asScala
-      .map { case m: ScalaModule =>
-        val deps = m.deps.asScala.map(d => s""" "$d" """.trim).distinct
-        val depsOpt = Option
-          .when(deps.nonEmpty) {
-            s"""deps {
-               |${deps.map(d => s"  ${d}").mkString("\n")}
-               |}""".stripMargin.indent(2).stripTrailing
-          }
-        val sources = m.sources.asScala.map(s => s""" "$s" """.trim).distinct
-        val sourcesOpt = Option
-          .when(sources.nonEmpty) {
-            s"""sources = new Listing {
-               |${sources.map(d => s"  ${d}").mkString("\n")}
-               |}""".stripMargin.indent(2).stripTrailing
-          }
-        val resources = m.resources.asScala.map(s => s""" "$s" """.trim).distinct
-        val resourcesOpt = Option
-          .when(resources.nonEmpty) {
-            s"""resources = new Listing {
-               |${resources.map(d => s"  ${d}").mkString("\n")}
-               |}""".stripMargin.indent(2).stripTrailing
-          }
-        val moduleDeps = m.moduleDeps.asScala.map(_.id)
-        val moduleDepsOpt = Option
-          .when(moduleDeps.nonEmpty) {
-            s"""moduleDeps {
-               |${moduleDeps.map(d => s"  ${d}").mkString("\n")}
-               |}""".stripMargin.indent(2).stripTrailing
-          }
-        val javacOptionsOpt = Option
-          .when(!m.javacOptions.isEmpty) {
-            s"""javacOptions {
-               |${m.javacOptions.asScala.map(d => s"  ${d}").mkString("\n")}
-               |}""".stripMargin.indent(2).stripTrailing
-          }
-        val scalacOptionsOpt = Option
-          .when(!m.scalacOptions.isEmpty) {
-            s"""scalacOptions {
-               |${m.scalacOptions.asScala.map(d => s"""  "${d}"""").mkString("\n")}
-               |}""".stripMargin.indent(2).stripTrailing
-          }
-        val scalacPluginDeps = m.scalacPluginDeps.asScala.map(d => s""" "$d" """.trim).distinct
-        val scalacPluginDepsOpt = Option
-          .when(scalacPluginDeps.nonEmpty) {
-            s"""scalacPluginDeps {
-               |${scalacPluginDeps.map(d => s"  ${d}").mkString("\n")}
-               |}""".stripMargin.indent(2).stripTrailing
-          }
-        val optionals =
-          List(sourcesOpt, resourcesOpt, moduleDepsOpt, depsOpt, scalacOptionsOpt, scalacPluginDepsOpt).flatten
-            .mkString("\n")
-        val moduleType = m match {
-          case module: ScalaTestModule => "ScalaTestModule"
-          case _                       => "ScalaModule"
-        }
-        s"""|local const ${m.id} = new ${moduleType} {
-            |  id = "${m.id}"
-            |  root = "${m.root}"
-            |  scalaVersion = "${m.scalaVersion}"
-            |${optionals}
-            |}
-             |""".stripMargin
+    val allModules = dederProject.modules.asScala
+    val mainModules = allModules.collect { case m: ScalaModule if !m.isInstanceOf[ScalaTestModule] => m }
+    val testModules = allModules.collect { case m: ScalaTestModule => m }
+
+    // Map: main module ID → test module
+    val mainToTest: Map[String, ScalaTestModule] = testModules.flatMap { tm =>
+      tm.moduleDeps.asScala
+        .collectFirst { case dep if mainModules.exists(_.id == dep.id) => dep.id }
+        .map(mainId => mainId -> tm)
+    }.toMap
+
+    // Build old-ID → Pkl variable reference mapping for moduleDeps substitution
+    val idToRef: Map[String, String] =
+      mainModules.map(m => m.id -> s"${m.id}.main").toMap ++
+        testModules.flatMap { tm =>
+          tm.moduleDeps.asScala
+            .collectFirst { case dep if mainModules.exists(_.id == dep.id) => dep.id }
+            .map(mainId => tm.id -> s"${mainId}.test")
+        }.toMap
+
+    def renderStringListing(name: String, items: Seq[String]): Option[String] =
+      Option.when(items.nonEmpty) {
+        val lines = items.map(d => s"""  "$d"""").mkString("\n")
+        s"$name {\n$lines\n}"
       }
-    s"""amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+
+    def renderRefListing(name: String, refs: Seq[String]): Option[String] =
+      Option.when(refs.nonEmpty) {
+        val lines = refs.map(d => s"  $d").mkString("\n")
+        s"$name {\n$lines\n}"
+      }
+
+    def renderModuleBody(
+        m: ScalaModule,
+        excludeDeps: Set[String] = Set.empty,
+        excludeModuleDeps: Set[String] = Set.empty,
+        excludeScalacOpts: Set[String] = Set.empty,
+        excludePluginDeps: Set[String] = Set.empty
+    ): Seq[String] = {
+      val deps = m.deps.asScala.distinct.filterNot(excludeDeps.contains)
+      val moduleDepsRefs = m.moduleDeps.asScala
+        .map(_.id)
+        .filterNot(excludeModuleDeps.contains)
+        .map(id => idToRef.getOrElse(id, id))
+      val javacOpts = m.javacOptions.asScala.toSeq
+      val scalacOpts = m.scalacOptions.asScala.distinct.filterNot(excludeScalacOpts.contains)
+      val pluginDeps = m.scalacPluginDeps.asScala.distinct.filterNot(excludePluginDeps.contains)
+      List(
+        renderStringListing("deps", deps.toSeq),
+        renderRefListing("moduleDeps", moduleDepsRefs.toSeq),
+        Option.when(javacOpts.nonEmpty)(s"javacOptions {\n${javacOpts.map(d => s"  $d").mkString("\n")}\n}"),
+        renderStringListing("scalacOptions", scalacOpts.toSeq),
+        renderStringListing("scalacPluginDeps", pluginDeps.toSeq)
+      ).flatten
+    }
+
+    val moduleDefs = mainModules.map { mainMod =>
+      val testModOpt = mainToTest.get(mainMod.id)
+
+      val templateLines = s"""scalaVersion = "${mainMod.scalaVersion}"""" +:
+        renderModuleBody(mainMod)
+      val templateBody = templateLines.mkString("\n").indent(4).stripTrailing
+
+      val testTemplatePart = testModOpt.map { testMod =>
+        val mainAndDepIds = mainMod.moduleDeps.asScala.map(_.id).toSet + mainMod.id
+        val testLines = renderModuleBody(
+          testMod,
+          excludeDeps = mainMod.deps.asScala.toSet,
+          excludeModuleDeps = mainAndDepIds,
+          excludeScalacOpts = mainMod.scalacOptions.asScala.toSet,
+          excludePluginDeps = mainMod.scalacPluginDeps.asScala.toSet
+        )
+        if testLines.isEmpty then ""
+        else {
+          val body = testLines.mkString("\n").indent(4).stripTrailing
+          s"""
+             |  testTemplate = (template.asTest()) {
+             |$body
+             |  }""".stripMargin
+        }
+      }.getOrElse("")
+
+      s"""local const ${mainMod.id} = new CreateScalaModules {
+         |  root = "${mainMod.root}"
+         |  layout = "maven"
+         |  template = new {
+         |$templateBody
+         |  }$testTemplatePart
+         |}.get
+         |""".stripMargin
+    }
+
+    s"""amends "https://sake92.github.io/deder/config/v0.7.2/DederProject.pkl"
        |
        |${moduleDefs.mkString("\n")}
        |modules {
-       |${moduleIds.map(id => s"  ${id}").mkString("\n")}
+       |${mainModules.map(m => s"  ...${m.id}.all").mkString("\n")}
        |}
        |""".stripMargin
   }
