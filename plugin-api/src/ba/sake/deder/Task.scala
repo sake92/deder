@@ -102,17 +102,26 @@ case class TaskExecContext[T, Deps <: Tuple](
     dependencyResolver: DependencyResolverApi
 )(using ev: TaskDeps[Deps] =:= true)
 
-sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] =:= true) {
-  type Res = T
+/** Public-facing base for a task, without exposing the `Deps` type parameter.
+ *  Use this type in plugin APIs and `CoreTasksApi` so callers don't need to
+ *  know (or spell out) the dependency tuple.
+ */
+trait AbstractTask[T] {
   def name: String
   def description: String
-  def supportedModuleTypes: Set[ModuleType]
   def transitive: Boolean
-  def singleton: Boolean // e.g. you can only "run" ONE MODULE!
+  def singleton: Boolean
+  def supportedModuleTypes: Set[ModuleType]
+  def isResultSuccessful: T => Boolean
+}
+
+sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] =:= true)
+    extends AbstractTask[T] {
+  type Res = T
   def taskDeps: Deps
   def execute: TaskExecContext[T, Deps] => T
   def summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit
-  def isResultSuccessful: T => Boolean = _ => true
+  override def isResultSuccessful: T => Boolean = _ => true
   private[deder] def executeUnsafe(
       project: DederProject,
       module: DederModule,
