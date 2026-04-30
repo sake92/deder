@@ -1,6 +1,6 @@
 package uber
 
-class MyTestSuite1 extends munit.FunSuite {
+class BackendTestSuite1 extends munit.FunSuite {
 
   test("successful test") {
     println("running test 1-1")

@@ -686,7 +686,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(resourcesTask)
     .build { ctx =>
       val (_, compileClasspath, resourceDirs) = ctx.depResults
-      val resources = resourceDirs.map(_.absPath)
+      val resources = resourceDirs.map(_.absPath).filter(p => os.exists(p))
       val localRunClasspath = compileClasspath ++ resources
       (localRunClasspath ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
     }
@@ -1109,10 +1109,7 @@ class CoreTasks() extends StrictLogging {
           val cp = allJars.mkString(File.pathSeparator)
           val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)
           val mainClass =
-            if scalaVersion.startsWith("3.") then
-              val minorVersion = scalaVersion.split("\\.").lift(1).flatMap(_.toIntOption).getOrElse(0)
-              if minorVersion >= 8 then "dotty.tools.repl.Main"
-              else "scala.tools.nsc.MainGenericRunner"
+            if scalaVersion.startsWith("3.") then "dotty.tools.repl.Main"
             else "scala.tools.nsc.MainGenericRunner"
           Seq("java") ++ jvmOptions ++ Seq("-cp", cp, mainClass, "-classpath", userClasspath) ++ ctx.args
         case _ =>

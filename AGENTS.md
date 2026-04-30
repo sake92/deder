@@ -87,6 +87,9 @@ Check @CONTRIBUTING.md for technical details, how to test server, client, test-r
 
 You can use one of @examples/ scenarios to test changes, just make sure to revert when you finish testing.
 
+You can clean results/cache/metadata per task and per module with "deder clean -m mymodule -t mytask".  
+Or leave out both to clean everything.
+
 Keep integration test classes rather small, because then it is easier to run them one by one.  
 Run minimal affected integration tests, rarely all of them.
 
