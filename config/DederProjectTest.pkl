@@ -16,18 +16,6 @@ facts {
     result.main.sources.toList() == List("src", "src-2", "src-2.13", "src-2.13.18")
   }
 
-  ["scalaModules default layout with 2-part version"] {
-    local mod = new DederProject.ScalaModule { scalaVersion = "2.13"; id = "x" }
-    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "default")
-    result.main.sources.toList() == List("src", "src-2", "src-2.13")
-  }
-
-  ["scalaModules default layout with 1-part version"] {
-    local mod = new DederProject.ScalaModule { scalaVersion = "21"; id = "x" }
-    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "default")
-    result.main.sources.toList() == List("src", "src-21")
-  }
-
   ["scalaModules maven layout with 3-part version"] {
     local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
     local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "maven")

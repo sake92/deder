@@ -210,7 +210,13 @@ class JavaTestModule extends JavaModule {
 
 open class ScalaModule extends JavaModule {
   type = "scala"
-  scalaVersion: String(!isEmpty) // TODO validate semver-ish format
+  scalaVersion: String(!isEmpty, scalaVersionValidation)
+
+  hidden scalaVersionValidation = (value: String) ->
+    if (value.matches(Regex("^\\d+\\.\\d+\\.\\d+.*$")))
+      true
+    else
+      throw("scalaVersion must be in `major.minor.patch` format, e.g. \"3.7.4\" or \"2.13.18+3\", but got: \(value)")
   scalacOptions: Listing<String> = new Listing {}
   scalacPluginDeps: Listing<String> = new Listing {}
   scalaSemanticdbVersion: String?
