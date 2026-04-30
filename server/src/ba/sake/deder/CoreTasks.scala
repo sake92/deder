@@ -1055,7 +1055,12 @@ class CoreTasks() extends StrictLogging {
       ctx.module match {
         case _: ScalaModule =>
           if scalaVersion.startsWith("3.") then
-            Seq(Dependency.make(s"org.scala-lang::scala3-repl:${scalaVersion}", scalaVersion))
+            // scala3-repl is a separate artifact only from 3.8+; older 3.x include the REPL in scala3-compiler
+            val minorVersion = scalaVersion.split("\\.").lift(1).flatMap(_.toIntOption).getOrElse(0)
+            if minorVersion >= 8 then
+              Seq(Dependency.make(s"org.scala-lang::scala3-repl:${scalaVersion}", scalaVersion))
+            else
+              Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion))
           else
             Seq(
               Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
@@ -1104,7 +1109,10 @@ class CoreTasks() extends StrictLogging {
           val cp = allJars.mkString(File.pathSeparator)
           val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)
           val mainClass =
-            if scalaVersion.startsWith("3.") then "dotty.tools.repl.Main"
+            if scalaVersion.startsWith("3.") then
+              val minorVersion = scalaVersion.split("\\.").lift(1).flatMap(_.toIntOption).getOrElse(0)
+              if minorVersion >= 8 then "dotty.tools.repl.Main"
+              else "scala.tools.nsc.MainGenericRunner"
             else "scala.tools.nsc.MainGenericRunner"
           Seq("java") ++ jvmOptions ++ Seq("-cp", cp, mainClass, "-classpath", userClasspath) ++ ctx.args
         case _ =>
