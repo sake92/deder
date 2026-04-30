@@ -8,7 +8,7 @@ object WildcardUtils {
   }
 
   def getMatches(allEntries: Seq[String], matchers: Seq[String]): Seq[String] = {
-    val (includeMatchers, excludeMatchers) = matchers.partition(m => !m.startsWith("!"))
+    val (includeMatchers, excludeMatchers) = matchers.partition(m => !m.startsWith("~"))
 
     // Stage 1: include set (union of all include matchers against all entries)
     val includeSet: Set[String] =
@@ -28,7 +28,7 @@ object WildcardUtils {
     val res = getMatches(allEntries, matchers)
     if res.isEmpty then
       Left {
-        val normalizedMatchers = matchers.filterNot(_.startsWith("!")).map(_.replaceAll("%", ""))
+        val normalizedMatchers = matchers.filterNot(_.startsWith("~")).map(_.replaceAll("%", ""))
         normalizedMatchers.flatMap(m => StringUtils.recommend(m, allEntries))
       }
     else Right(res)

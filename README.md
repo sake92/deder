@@ -107,6 +107,8 @@ deder exec -t compile
 deder exec -t compile -m common
 # compile modules that start with "uber"
 deder exec -t compile -m uber%
+# compile modules that start with "uber", except "uber-test"
+deder exec -t compile -m uber% -m ~uber-test
 
 # run the "uber" module
 deder exec -t run -m uber
@@ -130,6 +132,8 @@ deder exec -t test uber.MyTestSuite1
 deder exec -t test uber.%
 # execute specific test called "test1" in suite uber.MyTestSuite1
 deder exec -t test uber.MyTestSuite1#test1
+# execute tests not starting with "uber", negation
+deder exec -t test ~uber.%
 
 ################ Misc
 # write BSP config file
