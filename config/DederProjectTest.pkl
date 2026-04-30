@@ -1,10 +1,32 @@
 amends "pkl:test"
 
+import "pkl:test" as test
 import "DederProject.pkl"
 
 facts {
+  // validScalaVersion tests
+  ["validScalaVersion accepts 3-part"] {
+    DederProject.validScalaVersion("3.7.4") == true
+  }
+
+  ["validScalaVersion accepts 3-part with suffix"] {
+    DederProject.validScalaVersion("2.13.18+3") == true
+  }
+
+  ["validScalaVersion rejects 2-part"] {
+    test.catchOrNull(() -> DederProject.validScalaVersion("2.13")) != null
+  }
+
+  ["validScalaVersion rejects 1-part"] {
+    test.catchOrNull(() -> DederProject.validScalaVersion("21")) != null
+  }
+
+  ["validScalaVersion rejects empty"] {
+    test.catchOrNull(() -> DederProject.validScalaVersion("")) != null
+  }
+
   // Test version prefix extraction indirectly via scalaModules
-  ["scalaModules default layout with 3-part version"] {
+  ["scalaModules default layout"] {
     local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
     local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "default")
     result.main.sources.toList() == List("src", "src-3", "src-3.7", "src-3.7.4")
@@ -16,7 +38,7 @@ facts {
     result.main.sources.toList() == List("src", "src-2", "src-2.13", "src-2.13.18")
   }
 
-  ["scalaModules maven layout with 3-part version"] {
+  ["scalaModules maven layout"] {
     local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
     local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "maven")
     result.main.sources.toList() == List("src/main/scala", "src/main/java", "src/main/scala-3", "src/main/scala-3.7", "src/main/scala-3.7.4")

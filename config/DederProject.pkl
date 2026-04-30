@@ -79,6 +79,13 @@ typealias CompileOrder = "java-then-scala" | "scala-then-java" | "mixed"
 /// `maven` — Maven/SBT/Gradle convention: sources under `src/main/<lang>/` and `src/test/<lang>/`.
 typealias DirLayout = "default" | "maven"
 
+/// Validates that a scalaVersion is in `major.minor.patch` format, e.g. "3.7.4" or "2.13.18+3".
+const function validScalaVersion(value: String): Boolean =
+  if (value.matches(Regex("^\\d+\\.\\d+\\.\\d+.*$")))
+    true
+  else
+    throw("scalaVersion must be in `major.minor.patch` format, e.g. \"3.7.4\" or \"2.13.18+3\", but got: \(value)")
+
 class PomLicense {
   /// SPDX identifier or full license name, e.g. "MIT" or "MIT License"
   name: String(!isEmpty)
@@ -210,13 +217,9 @@ class JavaTestModule extends JavaModule {
 
 open class ScalaModule extends JavaModule {
   type = "scala"
-  scalaVersion: String(!isEmpty, scalaVersionValidation)
+  scalaVersion: String(scalaVersionValidation)
 
-  hidden scalaVersionValidation = (value: String) ->
-    if (value.matches(Regex("^\\d+\\.\\d+\\.\\d+.*$")))
-      true
-    else
-      throw("scalaVersion must be in `major.minor.patch` format, e.g. \"3.7.4\" or \"2.13.18+3\", but got: \(value)")
+  hidden scalaVersionValidation = (value: String) -> validScalaVersion(value)
   scalacOptions: Listing<String> = new Listing {}
   scalacPluginDeps: Listing<String> = new Listing {}
   scalaSemanticdbVersion: String?
