@@ -233,7 +233,7 @@ class JavaTestModule extends JavaModule {
 
 open class ScalaModule extends JavaModule {
   type = "scala"
-  scalaVersion: String(!isEmpty)
+  scalaVersion: String(!isEmpty) // TODO validate semver-ish format
   scalacOptions: Listing<String> = new Listing {}
   scalacPluginDeps: Listing<String> = new Listing {}
   scalaSemanticdbVersion: String?
