@@ -422,6 +422,42 @@ class ScalaNativeTestModule extends ScalaNativeModule {
 // helpers
 // https://pkl-lang.org/blog/class-as-a-function.html
 
+/// Resolves layout-specific directory paths for Create*Modules helpers.
+/// `mainScalaSrcBase` / `testScalaSrcBase` — directories that get Scala version-prefixed.
+/// `mainExtraSrc` / `testExtraSrc` — additional unversioned source dirs (e.g. `src/main/java` for Scala modules).
+class LayoutConfig {
+  mainScalaSrcBase: String
+  testScalaSrcBase: String
+  mainExtraSrc: Listing<String>
+  testExtraSrc: Listing<String>
+  mainResources: Listing<String>
+  testResources: Listing<String>
+  testRootSuffix: String
+}
+
+const function resolveLayout(layout: DirLayout, lang: String): LayoutConfig =
+  if (layout == "maven")
+    if (lang == "scala")
+      new LayoutConfig {
+        mainScalaSrcBase = "src/main/scala"; testScalaSrcBase = "src/test/scala"
+        mainExtraSrc { "src/main/java" }; testExtraSrc { "src/test/java" }
+        mainResources { "src/main/resources" }; testResources { "src/test/resources" }
+        testRootSuffix = ""
+      }
+    else // "java"
+      new LayoutConfig {
+        mainScalaSrcBase = "src/main/java"; testScalaSrcBase = "src/test/java"
+        mainExtraSrc {}; testExtraSrc {}
+        mainResources { "src/main/resources" }; testResources { "src/test/resources" }
+        testRootSuffix = ""
+      }
+  else // "default"
+    new LayoutConfig {
+      mainScalaSrcBase = "src"; testScalaSrcBase = "src"
+      mainExtraSrc {}; testExtraSrc {}
+      mainResources { "resources" }; testResources { "resources" }
+      testRootSuffix = "/test"
+    }
 class JavaModules {
   main: JavaModule
   test: JavaTestModule
@@ -441,27 +477,25 @@ const function javaModules(
   _root: String,
   _layout: DirLayout
 ): JavaModules =
-  let (mainSrcBase = if (_layout == "maven") "src/main/java" else "src")
-  let (testSrcBase = if (_layout == "maven") "src/test/java" else "src")
-  let (mainRes = if (_layout == "maven") new Listing { "src/main/resources" } else new Listing { "resources" })
-  let (testRes = if (_layout == "maven") new Listing { "src/test/resources" } else new Listing { "resources" })
-  let (testRoot = if (_layout == "maven") _root else "\(_root)/test")
+  let (cfg = resolveLayout(_layout, "java"))
   new {
     main = (_template) {
       id = _root.replaceAll("/", "-")
       root = _root
       sources = new Listing {
-        mainSrcBase
+        cfg.mainScalaSrcBase
+        ...(cfg.mainExtraSrc)
       }
-      resources = mainRes
+      resources = cfg.mainResources
     }
     test = (_testTemplate) {
       id = "\(_root.replaceAll("/", "-"))-test"
-      root = testRoot
+      root = "\(_root)\(cfg.testRootSuffix)"
       sources = new Listing {
-        testSrcBase
+        cfg.testScalaSrcBase
+        ...(cfg.testExtraSrc)
       }
-      resources = testRes
+      resources = cfg.testResources
       moduleDeps {
         main
       }
@@ -487,33 +521,31 @@ const function scalaModules(
   _root: String,
   _layout: DirLayout
 ): ScalaModules =
-  let (mainSrcBase = if (_layout == "maven") "src/main/scala" else "src")
-  let (testSrcBase = if (_layout == "maven") "src/test/scala" else "src")
-  let (mainRes = if (_layout == "maven") new Listing { "src/main/resources" } else new Listing { "resources" })
-  let (testRes = if (_layout == "maven") new Listing { "src/test/resources" } else new Listing { "resources" })
-  let (testRoot = if (_layout == "maven") _root else "\(_root)/test")
+  let (cfg = resolveLayout(_layout, "scala"))
   new {
     main = (_template) {
       id = _root.replaceAll("/", "-")
       root = _root
       sources = new Listing {
-        mainSrcBase
+        cfg.mainScalaSrcBase
+        ...(cfg.mainExtraSrc)
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(mainSrcBase)-\(prefix)"
+          "\(cfg.mainScalaSrcBase)-\(prefix)"
         }
       }
-      resources = mainRes
+      resources = cfg.mainResources
     }
     test = (_testTemplate) {
       id = "\(_root.replaceAll("/", "-"))-test"
-      root = testRoot
+      root = "\(_root)\(cfg.testRootSuffix)"
       sources = new Listing {
-        testSrcBase
+        cfg.testScalaSrcBase
+        ...(cfg.testExtraSrc)
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(testSrcBase)-\(prefix)"
+          "\(cfg.testScalaSrcBase)-\(prefix)"
         }
       }
-      resources = testRes
+      resources = cfg.testResources
       moduleDeps {
         main
       }
@@ -539,33 +571,31 @@ const function scalaJsModules(
   _root: String,
   _layout: DirLayout
 ): ScalaJsModules =
-  let (mainSrcBase = if (_layout == "maven") "src/main/scala" else "src")
-  let (testSrcBase = if (_layout == "maven") "src/test/scala" else "src")
-  let (mainRes = if (_layout == "maven") new Listing { "src/main/resources" } else new Listing { "resources" })
-  let (testRes = if (_layout == "maven") new Listing { "src/test/resources" } else new Listing { "resources" })
-  let (testRoot = if (_layout == "maven") _root else "\(_root)/test")
+  let (cfg = resolveLayout(_layout, "scala"))
   new {
     main = (_template) {
       id = _root.replaceAll("/", "-")
       root = _root
       sources = new Listing {
-        mainSrcBase
+        cfg.mainScalaSrcBase
+        ...(cfg.mainExtraSrc)
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(mainSrcBase)-\(prefix)"
+          "\(cfg.mainScalaSrcBase)-\(prefix)"
         }
       }
-      resources = mainRes
+      resources = cfg.mainResources
     }
     test = (_testTemplate) {
       id = "\(_root.replaceAll("/", "-"))-test"
-      root = testRoot
+      root = "\(_root)\(cfg.testRootSuffix)"
       sources = new Listing {
-        testSrcBase
+        cfg.testScalaSrcBase
+        ...(cfg.testExtraSrc)
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(testSrcBase)-\(prefix)"
+          "\(cfg.testScalaSrcBase)-\(prefix)"
         }
       }
-      resources = testRes
+      resources = cfg.testResources
       moduleDeps {
         main
       }
@@ -591,33 +621,31 @@ const function scalaNativeModules(
   _root: String,
   _layout: DirLayout
 ): ScalaNativeModules =
-  let (mainSrcBase = if (_layout == "maven") "src/main/scala" else "src")
-  let (testSrcBase = if (_layout == "maven") "src/test/scala" else "src")
-  let (mainRes = if (_layout == "maven") new Listing { "src/main/resources" } else new Listing { "resources" })
-  let (testRes = if (_layout == "maven") new Listing { "src/test/resources" } else new Listing { "resources" })
-  let (testRoot = if (_layout == "maven") _root else "\(_root)/test")
+  let (cfg = resolveLayout(_layout, "scala"))
   new {
     main = (_template) {
       id = _root.replaceAll("/", "-")
       root = _root
       sources = new Listing {
-        mainSrcBase
+        cfg.mainScalaSrcBase
+        ...(cfg.mainExtraSrc)
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(mainSrcBase)-\(prefix)"
+          "\(cfg.mainScalaSrcBase)-\(prefix)"
         }
       }
-      resources = mainRes
+      resources = cfg.mainResources
     }
     test = (_testTemplate) {
       id = "\(_root.replaceAll("/", "-"))-test"
-      root = testRoot
+      root = "\(_root)\(cfg.testRootSuffix)"
       sources = new Listing {
-        testSrcBase
+        cfg.testScalaSrcBase
+        ...(cfg.testExtraSrc)
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(testSrcBase)-\(prefix)"
+          "\(cfg.testScalaSrcBase)-\(prefix)"
         }
       }
-      resources = testRes
+      resources = cfg.testResources
       moduleDeps {
         main
       }
@@ -666,41 +694,39 @@ const function crossModules(
   _root: String,
   _layout: DirLayout
 ): CrossModules =
-  let (mainSrcBase = if (_layout == "maven") "src/main/scala" else "src")
-  let (testSrcBase = if (_layout == "maven") "src/test/scala" else "src")
-  let (mainRes = if (_layout == "maven") new Listing { "src/main/resources" } else new Listing { "resources" })
-  let (testRes = if (_layout == "maven") new Listing { "src/test/resources" } else new Listing { "resources" })
-  let (testRoot = if (_layout == "maven") _root else "\(_root)/test")
-  let (jvmSuffix = if (_layout == "maven") "src/main/scala-jvm" else "src-jvm")
-  let (jsSuffix = if (_layout == "maven") "src/main/scala-js" else "src-js")
-  let (nativeSuffix = if (_layout == "maven") "src/main/scala-native" else "src-native")
-  let (testJvmSuffix = if (_layout == "maven") "src/test/scala-jvm" else "src-jvm")
-  let (testJsSuffix = if (_layout == "maven") "src/test/scala-js" else "src-js")
-  let (testNativeSuffix = if (_layout == "maven") "src/test/scala-native" else "src-native")
+  let (cfg = resolveLayout(_layout, "scala"))
+  let (jvmSuffix = "\(cfg.mainScalaSrcBase)-jvm")
+  let (jsSuffix = "\(cfg.mainScalaSrcBase)-js")
+  let (nativeSuffix = "\(cfg.mainScalaSrcBase)-native")
+  let (testJvmSuffix = "\(cfg.testScalaSrcBase)-jvm")
+  let (testJsSuffix = "\(cfg.testScalaSrcBase)-js")
+  let (testNativeSuffix = "\(cfg.testScalaSrcBase)-native")
   new {
     jvm = (_template) {
       id = "\(_root)-jvm-\(_template.scalaVersion)"
       root = _root
       sources = new Listing {
-        mainSrcBase
+        cfg.mainScalaSrcBase
+        ...(cfg.mainExtraSrc)
         jvmSuffix
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(mainSrcBase)-\(prefix)"
+          "\(cfg.mainScalaSrcBase)-\(prefix)"
         }
       }
-      resources = mainRes
+      resources = cfg.mainResources
     }
     jvm_test = (_testTemplate) {
       id = "\(_root)-jvm-test-\(_template.scalaVersion)"
-      root = testRoot
+      root = "\(_root)\(cfg.testRootSuffix)"
       sources = new Listing {
-        testSrcBase
+        cfg.testScalaSrcBase
+        ...(cfg.testExtraSrc)
         testJvmSuffix
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(testSrcBase)-\(prefix)"
+          "\(cfg.testScalaSrcBase)-\(prefix)"
         }
       }
-      resources = testRes
+      resources = cfg.testResources
       moduleDeps {
         jvm
       }
@@ -709,25 +735,27 @@ const function crossModules(
       id = "\(_root)-js-\(_template.scalaVersion)"
       root = _root
       sources = new Listing {
-        mainSrcBase
+        cfg.mainScalaSrcBase
+        ...(cfg.mainExtraSrc)
         jsSuffix
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(mainSrcBase)-\(prefix)"
+          "\(cfg.mainScalaSrcBase)-\(prefix)"
         }
       }
-      resources = mainRes
+      resources = cfg.mainResources
     }
     js_test = (_jsTestTemplate) {
       id = "\(_root)-js-test-\(_template.scalaVersion)"
-      root = testRoot
+      root = "\(_root)\(cfg.testRootSuffix)"
       sources = new Listing {
-        testSrcBase
+        cfg.testScalaSrcBase
+        ...(cfg.testExtraSrc)
         testJsSuffix
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(testSrcBase)-\(prefix)"
+          "\(cfg.testScalaSrcBase)-\(prefix)"
         }
       }
-      resources = testRes
+      resources = cfg.testResources
       moduleDeps {
         js
       }
@@ -736,25 +764,27 @@ const function crossModules(
       id = "\(_root)-native-\(_template.scalaVersion)"
       root = _root
       sources = new Listing {
-        mainSrcBase
+        cfg.mainScalaSrcBase
+        ...(cfg.mainExtraSrc)
         nativeSuffix
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(mainSrcBase)-\(prefix)"
+          "\(cfg.mainScalaSrcBase)-\(prefix)"
         }
       }
-      resources = mainRes
+      resources = cfg.mainResources
     }
     native_test = (_nativeTestTemplate) {
       id = "\(_root)-native-test-\(_template.scalaVersion)"
-      root = testRoot
+      root = "\(_root)\(cfg.testRootSuffix)"
       sources = new Listing {
-        testSrcBase
+        cfg.testScalaSrcBase
+        ...(cfg.testExtraSrc)
         testNativeSuffix
         for (prefix in versionPrefixes(_template.scalaVersion)) {
-          "\(testSrcBase)-\(prefix)"
+          "\(cfg.testScalaSrcBase)-\(prefix)"
         }
       }
-      resources = testRes
+      resources = cfg.testResources
       moduleDeps {
         native
       }
