@@ -65,6 +65,7 @@ deder clean                      # clean all modules
 deder clean -m mymodule          # clean specific module
 deder clean -m mod1 -m mod2      # clean multiple modules
 deder clean -m mod%              # clean modules matching wildcard
+deder clean -m mod% -m ~mod-test  # exclude module from wildcard match (~ negates)
 deder clean -t compile           # clean compile task on all modules
 deder clean -m mymodule -t test  # clean test task on specific module
 
@@ -101,6 +102,8 @@ deder exec -t compile
 deder exec -t compile -m common
 <span class="hljs-meta prompt_"># </span><span class="language-bash">compile modules that start with <span class="hljs-string">"uber"</span></span>
 deder exec -t compile -m uber%
+<span class="hljs-meta prompt_"># </span><span class="language-bash">compile modules that start with <span class="hljs-string">"uber"</span>, except <span class="hljs-string">"uber-test"</span></span>
+deder exec -t compile -m uber% -m ~uber-test
 <span class="hljs-meta prompt_">
 # </span><span class="language-bash">run the <span class="hljs-string">"uber"</span> module</span>
 deder exec -t run -m uber
