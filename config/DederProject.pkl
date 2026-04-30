@@ -99,7 +99,7 @@ typealias CompileOrder = "java-then-scala" | "scala-then-java" | "mixed"
 /// Controls source/resource directory layout convention.
 /// `default` — Deder's own convention: sources and resources at module root level.
 /// `maven` — Maven/SBT/Gradle convention: sources under `src/main/<lang>/` and `src/test/<lang>/`.
-typealias DirLayout = "default" | "maven"
+typealias DirLayout = "default" | "maven" | "sbt" | "sbt-cross-full" | "sbt-cross-pure" | "sbt-cross-dummy"
 
 /// Validates that a scalaVersion is in `major.minor.patch` format, e.g. "3.7.4" or "2.13.18+3".
 const function validScalaVersion(value: String): Boolean =
@@ -442,8 +442,15 @@ class ScalaNativeTestModule extends ScalaNativeModule {
 // helpers
 // https://pkl-lang.org/blog/class-as-a-function.html
 
-const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig =
-  if (layout == "maven")
+const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig = {
+  let (style = if (layout.startsWith("sbt")) "sbt" else "deder")
+  let (crossType = 
+    if (layout == "sbt-cross-full") "full"
+    else if (layout == "sbt-cross-pure") "pure"
+    else if (layout == "sbt-cross-dummy") "dummy"
+    else null
+  )
+  if (layout == "maven" || layout.startsWith("sbt"))
     if (lang == "scala")
       new I.LayoutConfig {
         mainScalaSrcBase = "src/main/scala"
@@ -453,6 +460,8 @@ const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig =
         mainResources { "src/main/resources" }
         testResources { "src/test/resources" }
         testRootSuffix = ""
+        versionStyle = style
+        crossType = crossType
       }
     else // "java"
       new I.LayoutConfig {
@@ -463,6 +472,8 @@ const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig =
         mainResources { "src/main/resources" }
         testResources { "src/test/resources" }
         testRootSuffix = ""
+        versionStyle = style
+        crossType = crossType
       }
   else // "default"
     new I.LayoutConfig {
@@ -473,7 +484,10 @@ const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig =
       mainResources { "resources" }
       testResources { "resources" }
       testRootSuffix = "/test"
+      versionStyle = style
+      crossType = crossType
     }
+}
 
 class JavaModules {
   main: JavaModule
