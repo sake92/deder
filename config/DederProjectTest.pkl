@@ -2,6 +2,7 @@ amends "pkl:test"
 
 import "pkl:test" as test
 import "DederProject.pkl"
+import "DederInternals.pkl" as I
 
 facts {
   // validScalaVersion tests
@@ -88,5 +89,106 @@ facts {
     result.jvm.resources.toList() == List("src/main/resources")
     result.jvm.root == "mylib"
     result.jvm_test.root == "mylib"
+  }
+
+  // sbt version prefix tests
+  ["sbtVersionPrefixes 2.13.18"] {
+    val result = I.sbtVersionPrefixes("2.13.18")
+    result == List("2", "2.13", "2.13.18", "2.13+")
+  }
+
+  ["sbtVersionPrefixes 3.3.4"] {
+    val result = I.sbtVersionPrefixes("3.3.4")
+    result == List("3", "3.3", "3.3.4", "3.3+", "2.13+")
+  }
+
+  ["sbtVersionPrefixes 2.12.20"] {
+    val result = I.sbtVersionPrefixes("2.12.20")
+    result == List("2", "2.12", "2.12.20", "2.12+")
+  }
+
+  ["sbtVersionPrefixes with Coursier suffix"] {
+    val result = I.sbtVersionPrefixes("2.13.18+3")
+    result == List("2", "2.13", "2.13.18", "2.13+")
+  }
+
+  // sbt layout tests
+  ["scalaModules sbt layout 2.13.18"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "2.13.18"; id = "x" }
+    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "sbt", null)
+    val srcs = result.main.sources.toList()
+    srcs.contains("src/main/scala") == true
+    && srcs.contains("src/main/scala-2.13+") == true
+    && srcs.contains("src/main/scala-2") == true
+  }
+
+  ["scalaModules sbt layout 3.3.4 includes 2.13+"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "3.3.4"; id = "x" }
+    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "sbt", null)
+    val srcs = result.main.sources.toList()
+    srcs.contains("src/main/scala") == true
+    && srcs.contains("src/main/scala-3.3+") == true
+    && srcs.contains("src/main/scala-2.13+") == true
+  }
+
+  // sbt-cross-full layout
+  ["crossModules sbt-cross-full 2.13.18 shared dirs"] {
+    local scalaMod = new DederProject.ScalaModule { scalaVersion = "2.13.18"; id = "x" }
+    local jsMod = (scalaMod.asJs()) { scalaJsVersion = "1.18.2" }
+    local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
+    local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), "mylib", "sbt-cross-full", null)
+    val jvmSrcs = result.jvm.sources.toList()
+    jvmSrcs.contains("shared/src/main/scala") == true
+    && jvmSrcs.contains("jvm/src/main/scala") == true
+    && result.jvm.resources.toList().contains("shared/src/main/resources") == true
+  }
+
+  // sbt-cross-pure layout  
+  ["crossModules sbt-cross-pure 3.3.4 shared base"] {
+    local scalaMod = new DederProject.ScalaModule { scalaVersion = "3.3.4"; id = "x" }
+    local jsMod = (scalaMod.asJs()) { scalaJsVersion = "1.18.2" }
+    local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
+    local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), "mylib", "sbt-cross-pure", null)
+    val jvmSrcs = result.jvm.sources.toList()
+    jvmSrcs.contains("src/main/scala") == true
+    && jvmSrcs.contains(".jvm/src/main/scala") == true
+    && jvmSrcs.contains("src/main/scala-2.13+") == true
+  }
+
+  // sbt-cross-dummy layout
+  ["crossModules sbt-cross-dummy no shared"] {
+    local scalaMod = new DederProject.ScalaModule { scalaVersion = "2.13.18"; id = "x" }
+    local jsMod = (scalaMod.asJs()) { scalaJsVersion = "1.18.2" }
+    local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
+    local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), "mylib", "sbt-cross-dummy", null)
+    val jvmSrcs = result.jvm.sources.toList()
+    jvmSrcs.contains("jvm/src/main/scala") == true
+    && jvmSrcs.contains("shared/src/main/scala") == false
+    && jvmSrcs.contains("src/main/scala") == false
+  }
+
+  // id override tests
+  ["scalaModules id override"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
+    local result = DederProject.scalaModules(mod, mod.asTest(), ".", "default", "myproject")
+    result.main.id == "myproject"
+    && result.test.id == "myproject-test"
+  }
+
+  ["scalaModules id null uses root"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
+    local result = DederProject.scalaModules(mod, mod.asTest(), "sub/dir", "default", null)
+    result.main.id == "sub-dir"
+    && result.test.id == "sub-dir-test"
+  }
+
+  ["crossModules id override"] {
+    local scalaMod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
+    local jsMod = (scalaMod.asJs()) { scalaJsVersion = "1.18.2" }
+    local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
+    local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), ".", "default", "myapp")
+    result.jvm.id == "myapp-jvm-3.7.4"
+    && result.js.id == "myapp-js-3.7.4"
+    && result.native_test.id == "myapp-native-test-3.7.4"
   }
 }
