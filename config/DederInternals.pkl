@@ -62,6 +62,22 @@ const function sbtVersionSourceDirs(scalaVersion: String, baseDir: String): List
   }
 }
 
+/// Dispatches version source dirs based on versionStyle.
+const function resolveVersionSourceDirs(versionStyle: String, scalaVersion: String, baseDir: String): Listing<String> =
+  if (versionStyle == "sbt") sbtVersionSourceDirs(scalaVersion, baseDir)
+  else versionSourceDirs(scalaVersion, baseDir)
+
+/// Builds source directory list for crossModules: shared base (with extra+versioned) + platform-specific base.
+const function crossPlatformSources(baseDir: String, platformDir: String, extraSrc: Listing<String>, includeShared: Boolean, versionStyle: String, scalaVersion: String): Listing<String> =
+  new Listing {
+    when (includeShared) {
+      baseDir
+      ...(extraSrc)
+      ...resolveVersionSourceDirs(versionStyle, scalaVersion, baseDir)
+    }
+    platformDir
+  }
+
 /// Resolves layout-specific directory paths for Create*Modules helpers.
 class LayoutConfig {
   mainScalaSrcBase: String

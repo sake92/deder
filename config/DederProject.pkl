@@ -442,7 +442,7 @@ class ScalaNativeTestModule extends ScalaNativeModule {
 // helpers
 // https://pkl-lang.org/blog/class-as-a-function.html
 
-const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig = {
+const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig =
   let (style = if (layout.startsWith("sbt")) "sbt" else "deder")
   let (crossType = 
     if (layout == "sbt-cross-full") "full"
@@ -487,7 +487,6 @@ const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig = 
       versionStyle = style
       crossType = crossType
     }
-}
 
 class JavaModules {
   main: JavaModule
@@ -566,12 +565,14 @@ const function scalaModules(
         sources = new Listing {
           cfg.mainScalaSrcBase
           ...(cfg.mainExtraSrc)
-          if (cfg.versionStyle == "sbt")
+          when (cfg.versionStyle == "sbt") {
             ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.mainScalaSrcBase)
-          else
+          }
+          when (cfg.versionStyle != "sbt") {
             for (prefix in I.versionPrefixes(_template.scalaVersion)) {
               "\(cfg.mainScalaSrcBase)-\(prefix)"
             }
+          }
         }
         resources = cfg.mainResources
       }
@@ -581,12 +582,14 @@ const function scalaModules(
         sources = new Listing {
           cfg.testScalaSrcBase
           ...(cfg.testExtraSrc)
-          if (cfg.versionStyle == "sbt")
+          when (cfg.versionStyle == "sbt") {
             ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.testScalaSrcBase)
-          else
+          }
+          when (cfg.versionStyle != "sbt") {
             for (prefix in I.versionPrefixes(_template.scalaVersion)) {
               "\(cfg.testScalaSrcBase)-\(prefix)"
             }
+          }
         }
         resources = cfg.testResources
         moduleDeps {
@@ -625,12 +628,14 @@ const function scalaJsModules(
         sources = new Listing {
           cfg.mainScalaSrcBase
           ...(cfg.mainExtraSrc)
-          if (cfg.versionStyle == "sbt")
+          when (cfg.versionStyle == "sbt") {
             ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.mainScalaSrcBase)
-          else
+          }
+          when (cfg.versionStyle != "sbt") {
             for (prefix in I.versionPrefixes(_template.scalaVersion)) {
               "\(cfg.mainScalaSrcBase)-\(prefix)"
             }
+          }
         }
         resources = cfg.mainResources
       }
@@ -640,12 +645,14 @@ const function scalaJsModules(
         sources = new Listing {
           cfg.testScalaSrcBase
           ...(cfg.testExtraSrc)
-          if (cfg.versionStyle == "sbt")
+          when (cfg.versionStyle == "sbt") {
             ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.testScalaSrcBase)
-          else
+          }
+          when (cfg.versionStyle != "sbt") {
             for (prefix in I.versionPrefixes(_template.scalaVersion)) {
               "\(cfg.testScalaSrcBase)-\(prefix)"
             }
+          }
         }
         resources = cfg.testResources
         moduleDeps {
@@ -684,12 +691,14 @@ const function scalaNativeModules(
         sources = new Listing {
           cfg.mainScalaSrcBase
           ...(cfg.mainExtraSrc)
-          if (cfg.versionStyle == "sbt")
+          when (cfg.versionStyle == "sbt") {
             ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.mainScalaSrcBase)
-          else
+          }
+          when (cfg.versionStyle != "sbt") {
             for (prefix in I.versionPrefixes(_template.scalaVersion)) {
               "\(cfg.mainScalaSrcBase)-\(prefix)"
             }
+          }
         }
         resources = cfg.mainResources
       }
@@ -699,12 +708,14 @@ const function scalaNativeModules(
         sources = new Listing {
           cfg.testScalaSrcBase
           ...(cfg.testExtraSrc)
-          if (cfg.versionStyle == "sbt")
+          when (cfg.versionStyle == "sbt") {
             ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.testScalaSrcBase)
-          else
+          }
+          when (cfg.versionStyle != "sbt") {
             for (prefix in I.versionPrefixes(_template.scalaVersion)) {
               "\(cfg.testScalaSrcBase)-\(prefix)"
             }
+          }
         }
         resources = cfg.testResources
         moduleDeps {
@@ -762,90 +773,62 @@ const function crossModules(
   let (baseId = if (_id != null) _id else _root.replaceAll("/", "-"))
   let (sv = _template.scalaVersion)
 
-  // Helper: generates version-specific source dirs for a base dir
-  local const function versionedDirs(baseSrc: String): Listing<String> =
-    if (cfg.versionStyle == "sbt")
-      I.sbtVersionSourceDirs(sv, baseSrc)
-    else
-      new Listing {
-        for (prefix in I.versionPrefixes(sv)) {
-          "\(baseSrc)-\(prefix)"
-        }
-      }
-
   // Determine platform base directories and shared source configuration
-  let (jvmMainBase: String)
-  let (jsMainBase: String)
-  let (nativeMainBase: String)
-  let (jvmTestBase: String)
-  let (jsTestBase: String)
-  let (nativeTestBase: String)
-  let (hasSharedSource: Boolean)   // whether to include the shared/base dir in sources
-  let (sharedPrefix: String?)      // "shared/" for full, null otherwise
+  let (jvmMainBase = 
+    if (cfg.crossType == "full") "jvm/\(cfg.mainScalaSrcBase)"
+    else if (cfg.crossType == "pure") ".jvm/\(cfg.mainScalaSrcBase)"
+    else if (cfg.crossType == "dummy") "jvm/\(cfg.mainScalaSrcBase)"
+    else "\(cfg.mainScalaSrcBase)-jvm"
+  )
+  let (jsMainBase = 
+    if (cfg.crossType == "full") "js/\(cfg.mainScalaSrcBase)"
+    else if (cfg.crossType == "pure") ".js/\(cfg.mainScalaSrcBase)"
+    else if (cfg.crossType == "dummy") "js/\(cfg.mainScalaSrcBase)"
+    else "\(cfg.mainScalaSrcBase)-js"
+  )
+  let (nativeMainBase = 
+    if (cfg.crossType == "full") "native/\(cfg.mainScalaSrcBase)"
+    else if (cfg.crossType == "pure") ".native/\(cfg.mainScalaSrcBase)"
+    else if (cfg.crossType == "dummy") "native/\(cfg.mainScalaSrcBase)"
+    else "\(cfg.mainScalaSrcBase)-native"
+  )
+  let (jvmTestBase = 
+    if (cfg.crossType == "full") "jvm/\(cfg.testScalaSrcBase)"
+    else if (cfg.crossType == "pure") ".jvm/\(cfg.testScalaSrcBase)"
+    else if (cfg.crossType == "dummy") "jvm/\(cfg.testScalaSrcBase)"
+    else "\(cfg.testScalaSrcBase)-jvm"
+  )
+  let (jsTestBase = 
+    if (cfg.crossType == "full") "js/\(cfg.testScalaSrcBase)"
+    else if (cfg.crossType == "pure") ".js/\(cfg.testScalaSrcBase)"
+    else if (cfg.crossType == "dummy") "js/\(cfg.testScalaSrcBase)"
+    else "\(cfg.testScalaSrcBase)-js"
+  )
+  let (nativeTestBase = 
+    if (cfg.crossType == "full") "native/\(cfg.testScalaSrcBase)"
+    else if (cfg.crossType == "pure") ".native/\(cfg.testScalaSrcBase)"
+    else if (cfg.crossType == "dummy") "native/\(cfg.testScalaSrcBase)"
+    else "\(cfg.testScalaSrcBase)-native"
+  )
+  let (hasSharedSource = cfg.crossType != "dummy")
+  let (sharedPrefix = if (cfg.crossType == "full") "shared/" else null)
 
-  if (cfg.crossType == "full")
-    jvmMainBase = "jvm/\(cfg.mainScalaSrcBase)"
-    jsMainBase = "js/\(cfg.mainScalaSrcBase)"
-    nativeMainBase = "native/\(cfg.mainScalaSrcBase)"
-    jvmTestBase = "jvm/\(cfg.testScalaSrcBase)"
-    jsTestBase = "js/\(cfg.testScalaSrcBase)"
-    nativeTestBase = "native/\(cfg.testScalaSrcBase)"
-    hasSharedSource = true
-    sharedPrefix = "shared/"
-  else if (cfg.crossType == "pure")
-    jvmMainBase = ".jvm/\(cfg.mainScalaSrcBase)"
-    jsMainBase = ".js/\(cfg.mainScalaSrcBase)"
-    nativeMainBase = ".native/\(cfg.mainScalaSrcBase)"
-    jvmTestBase = ".jvm/\(cfg.testScalaSrcBase)"
-    jsTestBase = ".js/\(cfg.testScalaSrcBase)"
-    nativeTestBase = ".native/\(cfg.testScalaSrcBase)"
-    hasSharedSource = true   // the base src/main/scala IS the shared dir
-    sharedPrefix = null
-  else if (cfg.crossType == "dummy")
-    jvmMainBase = "jvm/\(cfg.mainScalaSrcBase)"
-    jsMainBase = "js/\(cfg.mainScalaSrcBase)"
-    nativeMainBase = "native/\(cfg.mainScalaSrcBase)"
-    jvmTestBase = "jvm/\(cfg.testScalaSrcBase)"
-    jsTestBase = "js/\(cfg.testScalaSrcBase)"
-    nativeTestBase = "native/\(cfg.testScalaSrcBase)"
-    hasSharedSource = false
-    sharedPrefix = null
-  else // deder fallback: src-jvm etc. suffixes, base dir is shared
-    jvmMainBase = "\(cfg.mainScalaSrcBase)-jvm"
-    jsMainBase = "\(cfg.mainScalaSrcBase)-js"
-    nativeMainBase = "\(cfg.mainScalaSrcBase)-native"
-    jvmTestBase = "\(cfg.testScalaSrcBase)-jvm"
-    jsTestBase = "\(cfg.testScalaSrcBase)-js"
-    nativeTestBase = "\(cfg.testScalaSrcBase)-native"
-    hasSharedSource = true   // base dir (e.g., "src") included alongside platform suffix
-    sharedPrefix = null
-
-  // Shared dir: uses prefix for full layout, bare base otherwise
+  // Compute shared base with optional prefix
   let (sharedMainBase = if (sharedPrefix != null) "\(sharedPrefix)\(cfg.mainScalaSrcBase)" else cfg.mainScalaSrcBase)
   let (sharedTestBase = if (sharedPrefix != null) "\(sharedPrefix)\(cfg.testScalaSrcBase)" else cfg.testScalaSrcBase)
 
-  // Build sources: shared base (with extra+versioned) + platform-specific base
-  local const function sources(baseDir: String, platformDir: String, extraSrc: Listing<String>, includeShared: Boolean, versioned: (String) -> Listing<String>): Listing<String> =
-    new Listing {
-      when (includeShared) {
-        baseDir
-        ...(extraSrc)
-        ...versioned(baseDir)
-      }
-      platformDir
-    }
 
     new {
       jvm = (_template) {
         id = "\(baseId)-jvm-\(sv)"
         root = _root
-        sources = sources(sharedMainBase, jvmMainBase, cfg.mainExtraSrc, hasSharedSource, versionedDirs)
+        sources = I.crossPlatformSources(sharedMainBase, jvmMainBase, cfg.mainExtraSrc, hasSharedSource, cfg.versionStyle, sv)
         resources = if (sharedPrefix != null) new Listing { ...cfg.mainResources; for (r in cfg.mainResources) { "shared/\(r)" } } else cfg.mainResources
       }
       jvm_test = (_testTemplate) {
         id = "\(baseId)-jvm-test-\(sv)"
         root = "\(_root)\(cfg.testRootSuffix)"
-        sources = sources(sharedTestBase, jvmTestBase, cfg.testExtraSrc, hasSharedSource, versionedDirs)
+        sources = I.crossPlatformSources(sharedTestBase, jvmTestBase, cfg.testExtraSrc, hasSharedSource, cfg.versionStyle, sv)
         resources = if (sharedPrefix != null) new Listing { ...cfg.testResources; for (r in cfg.testResources) { "shared/\(r)" } } else cfg.testResources
         moduleDeps {
           jvm
@@ -854,13 +837,13 @@ const function crossModules(
       js = (_jsTemplate) {
         id = "\(baseId)-js-\(sv)"
         root = _root
-        sources = sources(sharedMainBase, jsMainBase, cfg.mainExtraSrc, hasSharedSource, versionedDirs)
+        sources = I.crossPlatformSources(sharedMainBase, jsMainBase, cfg.mainExtraSrc, hasSharedSource, cfg.versionStyle, sv)
         resources = if (sharedPrefix != null) new Listing { ...cfg.mainResources; for (r in cfg.mainResources) { "shared/\(r)" } } else cfg.mainResources
       }
       js_test = (_jsTestTemplate) {
         id = "\(baseId)-js-test-\(sv)"
         root = "\(_root)\(cfg.testRootSuffix)"
-        sources = sources(sharedTestBase, jsTestBase, cfg.testExtraSrc, hasSharedSource, versionedDirs)
+        sources = I.crossPlatformSources(sharedTestBase, jsTestBase, cfg.testExtraSrc, hasSharedSource, cfg.versionStyle, sv)
         resources = if (sharedPrefix != null) new Listing { ...cfg.testResources; for (r in cfg.testResources) { "shared/\(r)" } } else cfg.testResources
         moduleDeps {
           js
@@ -869,13 +852,13 @@ const function crossModules(
       native = (_nativeTemplate) {
         id = "\(baseId)-native-\(sv)"
         root = _root
-        sources = sources(sharedMainBase, nativeMainBase, cfg.mainExtraSrc, hasSharedSource, versionedDirs)
+        sources = I.crossPlatformSources(sharedMainBase, nativeMainBase, cfg.mainExtraSrc, hasSharedSource, cfg.versionStyle, sv)
         resources = if (sharedPrefix != null) new Listing { ...cfg.mainResources; for (r in cfg.mainResources) { "shared/\(r)" } } else cfg.mainResources
       }
       native_test = (_nativeTestTemplate) {
         id = "\(baseId)-native-test-\(sv)"
         root = "\(_root)\(cfg.testRootSuffix)"
-        sources = sources(sharedTestBase, nativeTestBase, cfg.testExtraSrc, hasSharedSource, versionedDirs)
+        sources = I.crossPlatformSources(sharedTestBase, nativeTestBase, cfg.testExtraSrc, hasSharedSource, cfg.versionStyle, sv)
         resources = if (sharedPrefix != null) new Listing { ...cfg.testResources; for (r in cfg.testResources) { "shared/\(r)" } } else cfg.testResources
         moduleDeps {
           native
