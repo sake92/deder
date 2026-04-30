@@ -102,14 +102,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
 
       // Resolve all deps with Coursier to capture transitive coordinates too
       val resolvedCoords: Seq[(String, String, String)] =
-        if allDeps.isEmpty then Seq.empty
-        else
-          ctx.dependencyResolver
-            .fetch(allDeps, Some(ctx.notifications))
-            .getDependencies()
-            .asScala
-            .toSeq
-            .map(d => (d.getModule.getOrganization, d.getModule.getName, d.getVersion))
+        ctx.dependencyResolver.resolveTransitiveCoordinates(allDeps, Some(ctx.notifications))
 
       // Finds the config dir for a module+version: tries exact version match, falls back to latest.
       // Required modules (from `requires`) don't have a version, so pass "" to always fall back to latest.
