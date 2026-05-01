@@ -387,7 +387,7 @@ class PublishTasks(coreTasks: CoreTasks) {
             if javaModule.publish then {
               val customRepoPath = Option(javaModule.publishLocalTo).map { pathStr =>
                 scala.util.Try(os.RelPath(pathStr))
-                  .map(DederGlobals.projectRootDir / _)
+                  .map(rel => DederGlobals.projectRootDir / rel)
                   .getOrElse(
                     scala.util.Try(os.Path(pathStr))
                       .getOrElse(throw RuntimeException(
