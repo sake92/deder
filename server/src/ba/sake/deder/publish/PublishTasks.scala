@@ -418,30 +418,26 @@ class PublishTasks(coreTasks: CoreTasks) {
           )
 
         val credentialsFile = os.home / ".deder/credentials.pkl"
-        if !os.exists(credentialsFile) then
-          throw RuntimeException(
-            s"Credentials file not found at ${credentialsFile}. " +
-              "Create ~/.deder/credentials.pkl with your publish credentials."
-          )
-        val credentialsOrError = CredentialsParser.parse(credentialsFile)
-        val credentials = credentialsOrError match {
-          case Right(c) => c
-          case Left(err) => throw RuntimeException(err)
-        }
+        val credentialsOpt = if os.exists(credentialsFile) then
+          CredentialsParser.parse(credentialsFile) match {
+            case Right(c) => Some(c)
+            case Left(err) => throw RuntimeException(err)
+          }
+        else
+          None
+
+        val clientEnv = Option(RequestContext.clientParams.get())
+          .map(_.envVars)
+          .getOrElse(Map.empty)
+
+        val creds = CredentialsResolver.resolve(publishTo, credentialsOpt, clientEnv, sys.env)
 
         val publisher = Publisher(ctx.notifications, ctx.module.id)
 
         publishTo match {
           case _: SonatypeCentralRepo =>
-            val creds = credentials.credentials.get(publishTo.id) match {
-              case c: SonatypeCentralCredentials => c
-              case other =>
-                throw RuntimeException(
-                  s"Expected SonatypeCentralCredentials for repo '${publishTo.id}' but got: ${Option(other).map(_.getClass.getSimpleName).getOrElse("not found")}. " +
-                    s"Add `[\"${publishTo.id}\"] = new SonatypeCentralCredentials {{ ... }}` to ~/.deder/credentials.pkl."
-                )
-            }
-            artifacts.foreach(f => PgpSigner.signFile(f, creds.pgpSecret, creds.pgpPassphrase.toCharArray))
+            val scCreds = creds.asInstanceOf[SonatypeCentralCredentials]
+            artifacts.foreach(f => PgpSigner.signFile(f, scCreds.pgpSecret, scCreds.pgpPassphrase.toCharArray))
             val allFiles = artifacts.flatMap { f =>
               val signatureFile = f / os.up / s"${f.last}.asc"
               Seq(f, signatureFile) ++
@@ -455,31 +451,17 @@ class PublishTasks(coreTasks: CoreTasks) {
             allFiles.foreach(f => os.copy(f, filesDir / f.last))
             val filesZip = ctx.out / s"${pom.artifactId}_bundle.zip"
             os.zip(filesZip, Seq(ctx.out / "final"))
-            publisher.publishSonatypeCentral(creds.username, creds.password, pom, filesZip)
+            publisher.publishSonatypeCentral(scCreds.username, scCreds.password, pom, filesZip)
 
           case _: SonatypeSnapshotRepo =>
-            val creds = credentials.credentials.get(publishTo.id) match {
-              case c: SonatypeSnapshotCredentials => c
-              case other =>
-                throw RuntimeException(
-                  s"Expected SonatypeSnapshotCredentials for repo '${publishTo.id}' but got: ${Option(other).map(_.getClass.getSimpleName).getOrElse("not found")}. " +
-                    s"Add `[\"${publishTo.id}\"] = new SonatypeSnapshotCredentials {{ ... }}` to ~/.deder/credentials.pkl."
-                )
-            }
+            val ssCreds = creds.asInstanceOf[SonatypeSnapshotCredentials]
             val allFiles = artifacts.flatMap(f => Seq(f) ++ Hasher.generateChecksums(f))
-            publisher.publishSonatypeSnapshot(creds.username, creds.password, pom, allFiles)
+            publisher.publishSonatypeSnapshot(ssCreds.username, ssCreds.password, pom, allFiles)
 
           case mavenRepo: MavenRepo =>
-            val creds = credentials.credentials.get(publishTo.id) match {
-              case c: BasicAuthCredentials => c
-              case other =>
-                throw RuntimeException(
-                  s"Expected BasicAuthCredentials for repo '${publishTo.id}' but got: ${Option(other).map(_.getClass.getSimpleName).getOrElse("not found")}. " +
-                    s"Add `[\"${publishTo.id}\"] = new BasicAuthCredentials {{ ... }}` to ~/.deder/credentials.pkl."
-                )
-            }
+            val baCreds = creds.asInstanceOf[BasicAuthCredentials]
             val allFiles = artifacts.flatMap(f => Seq(f) ++ Hasher.generateChecksums(f))
-            publisher.publishMavenRepo(creds.username, creds.password, mavenRepo.url, pom, allFiles)
+            publisher.publishMavenRepo(baCreds.username, baCreds.password, mavenRepo.url, pom, allFiles)
         }
       }
       ""
