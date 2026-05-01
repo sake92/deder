@@ -137,6 +137,7 @@ class SbtImporter(
           new DederProject.ManifestSettings(java.util.Map.of(), java.util.Map.of()), // manifest
           false, // publish
           null, // pomSettings
+          null, // publishTo
           null, // graalvm
           java.util.Map.of(), // mvnApps
           sbtProjectExport.scalaVersion,
@@ -170,6 +171,7 @@ class SbtImporter(
           new DederProject.ManifestSettings(java.util.Map.of(), java.util.Map.of()), // manifest
           false, // publish
           null, // pomSettings
+          null, // publishTo
           null, // graalvm
           java.util.Map.of(), // mvnApps
           sbtProjectExport.scalaVersion,
