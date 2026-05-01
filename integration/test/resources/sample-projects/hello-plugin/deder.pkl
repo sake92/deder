@@ -1,0 +1,26 @@
+amends "../../../../../config/DederProject.pkl"
+
+// Local Maven repository where deder-plugin-api is available (injected by integration test)
+repositories {
+  new MavenRepository { url = "__M2_REPO_URL__" }
+}
+
+modules {
+  new ScalaModule {
+    id = "hello-plugin"
+    scalaVersion = "3.7.4"
+    resources { "resources" }
+    deps {
+      "ba.sake::deder-plugin-api:__PLUGIN_API_VERSION__"
+    }
+    pomSettings {
+      groupId = "ba.sake"
+      artifactId = "deder-hello-plugin"
+      version = "0.1.0-SNAPSHOT"
+      name = "Deder Hello Plugin"
+      description = "Example Deder plugin that adds a hello task"
+    }
+    publish = true
+    publishLocalTo = "__PLUGIN_LOCAL_REPO__"
+  }
+}
