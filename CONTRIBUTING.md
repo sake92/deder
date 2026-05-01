@@ -35,6 +35,11 @@ The `early-access` version also skips caching to ensure you get the latest pre-r
 
 ----
 
+## Running unit tests on server
+deder exec -t test -m server-test
+
+## Running unit tests on test-common
+deder exec -t testInMemory -m test-common-test
 
 ## Running integration tests
 

@@ -8,7 +8,7 @@ if [ ! -f pkl-codegen-java ]; then
 fi
 
 chmod +x pkl-codegen-java
-./pkl-codegen-java config/DederProject.pkl -o config/src
+./pkl-codegen-java config/DederProject.pkl config/DederCredentials.pkl -o config/src
 
 
 mv config/src/resources config/resources

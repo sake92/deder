@@ -3,7 +3,7 @@ rm -rf ./tmp
 
 ./scripts/gen-config-bindings.sh
 
-deder exec -t assembly -m server -m client -m test-runner
+./scripts/build-jars.sh
 
 export DEDER_CLIENT_PATH=$(realpath .deder/out/client/assembly/out.jar)
 export DEDER_SERVER_PATH=$(realpath .deder/out/server/assembly/out.jar)

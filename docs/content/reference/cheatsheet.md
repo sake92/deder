@@ -17,6 +17,7 @@ deder clean                      # clean all modules
 deder clean -m mymodule          # clean specific module
 deder clean -m mod1 -m mod2      # clean multiple modules
 deder clean -m mod%              # clean modules matching wildcard
+deder clean -m mod% -m ~mod-test  # exclude module from wildcard match (~ negates)
 deder clean -t compile           # clean compile task on all modules
 deder clean -m mymodule -t test  # clean test task on specific module
 
@@ -29,17 +30,17 @@ deder complete -s bash -o > ~/.local/share/bash-completion/completions/deder
 
 ################ explore the build
 # list modules
-# supports flags: --json, --dot
+# supports flags: --json, --dot, --mermaid
 deder modules
 
 ################
 # list tasks
-# supports flags: --json, --dot
+# supports flags: --json, --dot, --mermaid
 deder tasks
 
 ################
 # print execution plan for a task
-# supports flags: --json, --dot
+# supports flags: --json, --dot, --mermaid
 deder plan -m common -t compileClasspath
 
 
@@ -53,6 +54,8 @@ deder exec -t compile
 deder exec -t compile -m common
 # compile modules that start with "uber"
 deder exec -t compile -m uber%
+# compile modules that start with "uber", except "uber-test"
+deder exec -t compile -m uber% -m ~uber-test
 
 # run the "uber" module
 deder exec -t run -m uber

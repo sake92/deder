@@ -4,4 +4,4 @@ mkdir -p .metals
 touch .metals/bsp.trace.json
 
 deder shutdown
-deder bsp install
+#deder bsp install

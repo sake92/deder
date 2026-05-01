@@ -34,16 +34,16 @@ class TabCompleter(tasksResolver: TasksResolver) {
             completeModule(prevWord, currentWord)
               .orElse(completeTask(prevWord, currentWord))
               .getOrElse(Seq("-m", "--module", "-t", "--task").filter(_.startsWith(currentWord)))
-          case Seq("modules", _*) => Seq("--json", "--dot").filter(_.startsWith(currentWord))
+          case Seq("modules", _*) => Seq("--json", "--dot", "--mermaid").filter(_.startsWith(currentWord))
           case Seq("tasks", _*) =>
             completeModule(prevWord, currentWord).getOrElse(
-              Seq("-m", "--module", "--json", "--dot").filter(_.startsWith(currentWord))
+              Seq("-m", "--module", "--json", "--dot", "--mermaid").filter(_.startsWith(currentWord))
             )
           case Seq("plan", _*) =>
             completeModule(prevWord, currentWord)
               .orElse(completeTask(prevWord, currentWord))
               .getOrElse(
-                Seq("-m", "--module", "-t", "--task", "--json", "--dot").filter(_.startsWith(currentWord))
+                Seq("-m", "--module", "-t", "--task", "--json", "--dot", "--mermaid").filter(_.startsWith(currentWord))
               )
           case Seq("exec", _*) =>
             completeModule(prevWord, currentWord)

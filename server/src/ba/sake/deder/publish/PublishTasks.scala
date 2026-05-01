@@ -4,6 +4,8 @@ import scala.jdk.CollectionConverters.*
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.publish.{Hasher, PgpSigner, PomGenerator, PomSettings, Publisher}
 import ba.sake.deder.config.DederProject.*
+import ba.sake.deder.config.DederCredentials.*
+import ba.sake.deder.config.CredentialsParser
 import ba.sake.deder.{*, given}
 import ba.sake.deder.jvm.*
 import dependency.ScalaVersion
@@ -383,8 +385,19 @@ class PublishTasks(coreTasks: CoreTasks) {
         ctx.module match {
           case javaModule: JavaModule =>
             if javaModule.publish then {
+              val customRepoPath = Option(javaModule.publishLocalTo).map { pathStr =>
+                scala.util.Try(os.RelPath(pathStr))
+                  .map(rel => DederGlobals.projectRootDir / rel)
+                  .getOrElse(
+                    scala.util.Try(os.Path(pathStr))
+                      .getOrElse(throw RuntimeException(
+                        s"Invalid publishLocalTo path '${pathStr}' for module '${javaModule.id}'. " +
+                          "Provide a valid relative or absolute path."
+                      ))
+                  )
+              }
               val publisher = Publisher(ctx.notifications, ctx.module.id)
-              publisher.publishLocalM2(pom, allFiles)
+              publisher.publishLocalM2(pom, allFiles, customRepoPath)
             } else {
               ctx.notifications.add(
                 ServerNotification
@@ -407,39 +420,63 @@ class PublishTasks(coreTasks: CoreTasks) {
       publishArtifactsResOpt.map { publishArtifactsRes =>
         val pom = publishArtifactsRes.pom
         val artifacts = os.list(publishArtifactsRes.outDir)
-        // sign files
-        val pgpPassphrase =
-          sys.env.getOrElse("DEDER_PGP_PASSPHRASE", throw RuntimeException("DEDER_PGP_PASSPHRASE env var not set"))
-        val pgpSecret =
-          sys.env.getOrElse("DEDER_PGP_SECRET", throw RuntimeException("DEDER_PGP_SECRET env var not set"))
-        artifacts.foreach(f => PgpSigner.signFile(f, pgpSecret, pgpPassphrase.toCharArray))
-        // generate hashes
-        val allFiles = artifacts.flatMap { f =>
-          val checksumFile = f / os.up / s"${f.last}.asc"
-          Seq(f, checksumFile) ++
-            Hasher.generateChecksums(f) ++
-            Hasher.generateChecksums(checksumFile)
+
+        val publishTo = ctx.module match {
+          case jm: JavaModule => jm.publishTo
+          case _ => null
         }
-        val username =
-          sys.env.getOrElse(
-            "DEDER_SONATYPE_USERNAME",
-            throw RuntimeException("DEDER_SONATYPE_USERNAME env var not set")
+        if publishTo == null then
+          throw RuntimeException(
+            s"publishTo is not configured for module '${ctx.module.id}' in deder.pkl. " +
+              "Add e.g. `publishTo = new SonatypeCentralRepo { id = \"my-sonatype\" }` to the module definition."
           )
-        val password =
-          sys.env.getOrElse(
-            "DEDER_SONATYPE_PASSWORD",
-            throw RuntimeException("DEDER_SONATYPE_PASSWORD env var not set")
-          )
-        os.remove.all(ctx.out)
-        val filesDir =
-          ctx.out / "final" / os.SubPath(s"${pom.groupId.replace('.', '/')}/${pom.artifactId}/${pom.version}")
-        os.makeDir.all(filesDir)
-        allFiles.foreach(f => os.copy(f, filesDir / f.last))
-        val filesZip = ctx.out / s"${pom.artifactId}_bundle.zip"
-        os.zip(filesZip, Seq(ctx.out / "final"))
+
+        val credentialsFile = os.home / ".deder/credentials.pkl"
+        val credentialsOpt = if os.exists(credentialsFile) then
+          CredentialsParser.parse(credentialsFile) match {
+            case Right(c) => Some(c)
+            case Left(err) => throw RuntimeException(err)
+          }
+        else
+          None
+
+        val clientEnv = Option(RequestContext.clientParams.get())
+          .map(_.envVars)
+          .getOrElse(Map.empty)
+
+        val creds = CredentialsResolver.resolve(publishTo, credentialsOpt, clientEnv, sys.env)
+
         val publisher = Publisher(ctx.notifications, ctx.module.id)
-        if pom.version.endsWith("-SNAPSHOT") then publisher.publishSonatypeSnapshot(username, password, pom, allFiles)
-        else publisher.publishSonatypeCentral(username, password, pom, filesZip)
+
+        publishTo match {
+          case _: SonatypeCentralRepo =>
+            val scCreds = creds.asInstanceOf[SonatypeCentralCredentials]
+            artifacts.foreach(f => PgpSigner.signFile(f, scCreds.pgpSecret, scCreds.pgpPassphrase.toCharArray))
+            val allFiles = artifacts.flatMap { f =>
+              val signatureFile = f / os.up / s"${f.last}.asc"
+              Seq(f, signatureFile) ++
+                Hasher.generateChecksums(f) ++
+                Hasher.generateChecksums(signatureFile)
+            }
+            os.remove.all(ctx.out)
+            val filesDir =
+              ctx.out / "final" / os.SubPath(s"${pom.groupId.replace('.', '/')}/${pom.artifactId}/${pom.version}")
+            os.makeDir.all(filesDir)
+            allFiles.foreach(f => os.copy(f, filesDir / f.last))
+            val filesZip = ctx.out / s"${pom.artifactId}_bundle.zip"
+            os.zip(filesZip, Seq(ctx.out / "final"))
+            publisher.publishSonatypeCentral(scCreds.username, scCreds.password, pom, filesZip)
+
+          case _: SonatypeSnapshotRepo =>
+            val ssCreds = creds.asInstanceOf[SonatypeSnapshotCredentials]
+            val allFiles = artifacts.flatMap(f => Seq(f) ++ Hasher.generateChecksums(f))
+            publisher.publishSonatypeSnapshot(ssCreds.username, ssCreds.password, pom, allFiles)
+
+          case mavenRepo: MavenRepo =>
+            val baCreds = creds.asInstanceOf[BasicAuthCredentials]
+            val allFiles = artifacts.flatMap(f => Seq(f) ++ Hasher.generateChecksums(f))
+            publisher.publishMavenRepo(baCreds.username, baCreds.password, mavenRepo.url, pom, allFiles)
+        }
       }
       ""
     }

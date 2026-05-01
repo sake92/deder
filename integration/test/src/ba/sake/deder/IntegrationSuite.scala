@@ -230,16 +230,16 @@ class IntegrationSuite extends BaseIntegrationSuite {
 
   test("deder exec should support negation in module filters") {
     withTestProject("sample-projects/multi") { projectPath =>
-      // exec with -m common -m !nonexistent: select common, negation of nonexistent has no effect
-      val dederRes = executeDederCommand(projectPath, "exec", "-m", "common", "-m", "!nonexistent", "-t", "compileClasspath", "--json")
+      // exec with -m common -m ~nonexistent: select common, negation of nonexistent has no effect
+      val dederRes = executeDederCommand(projectPath, "exec", "-m", "common", "-m", "~nonexistent", "-t", "compileClasspath", "--json")
       assert(dederRes.exitCode == 0, s"exec failed with exit=${dederRes.exitCode}: ${dederRes.err.text()}")
     }
   }
 
   test("deder plan should support negation in module filters") {
     withTestProject("sample-projects/multi") { projectPath =>
-      // plan with -m uber% -m !uber-test: exclude uber-test from uber% match
-      val dederRes = executeDederCommand(projectPath, "plan", "-m", "uber%", "-m", "!uber-test", "-t", "compile")
+      // plan with -m uber% -m ~uber-test: exclude uber-test from uber% match
+      val dederRes = executeDederCommand(projectPath, "plan", "-m", "uber%", "-m", "~uber-test", "-t", "compile")
       val dederOutput = dederRes.out.text()
       assert(dederOutput.contains("uber.compile"), s"uber.compile not found in output: ${dederOutput}")
       assert(!dederOutput.contains("uber-test.compile"), s"uber-test.compile should have been excluded: ${dederOutput}")
@@ -249,7 +249,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
   test("deder clean should support negation in task filter") {
     withTestProject("sample-projects/multi") { projectPath =>
       // clean with negated task filter should not crash
-      val dederRes = executeDederCommand(projectPath, "clean", "-m", "common", "-t", "!nonExistentTask")
+      val dederRes = executeDederCommand(projectPath, "clean", "-m", "common", "-t", "~nonExistentTask")
       val dederOutput = dederRes.out.text()
       assert(dederRes.exitCode == 0, s"clean failed: ${dederOutput}")
     }

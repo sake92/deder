@@ -13,30 +13,30 @@ class WildcardUtilsSuite extends munit.FunSuite {
     assertEquals(WildcardUtils.getMatches(entries, Seq("%test", "%-test")), Seq("uber-test"))
   }
 
-  test("getMatches with Seq should support negation (!) prefix") {
+  test("getMatches with Seq should support negation (~) prefix") {
     assertEquals(
-      WildcardUtils.getMatches(List("a", "ab", "abc", "bc"), Seq("a%", "!ab%")).toSet,
+      WildcardUtils.getMatches(List("a", "ab", "abc", "bc"), Seq("a%", "~ab%")).toSet,
       Set("a")
     )
   }
 
   test("getMatches with Seq should support only negations") {
     assertEquals(
-      WildcardUtils.getMatches(List("a", "ab", "abc", "bc"), Seq("!ab", "!bc")).toSet,
+      WildcardUtils.getMatches(List("a", "ab", "abc", "bc"), Seq("~ab", "~bc")).toSet,
       Set("a", "abc")
     )
   }
 
   test("getMatches with Seq should support no includes only negations") {
     assertEquals(
-      WildcardUtils.getMatches(List("a", "ab", "bc"), Seq("!a")).toSet,
+      WildcardUtils.getMatches(List("a", "ab", "bc"), Seq("~a")).toSet,
       Set("ab", "bc")
     )
   }
 
   test("getMatches with Seq should return empty when all excluded") {
     assertEquals(
-      WildcardUtils.getMatches(List("a", "ab", "abc"), Seq("ab%", "!ab%")).toSet,
+      WildcardUtils.getMatches(List("a", "ab", "abc"), Seq("ab%", "~ab%")).toSet,
       Set.empty[String]
     )
   }
@@ -49,13 +49,13 @@ class WildcardUtilsSuite extends munit.FunSuite {
   }
 
   test("getMatchesOrRecommendations should use negation and return recommendations when empty") {
-    val result = WildcardUtils.getMatchesOrRecommendations(entries, Seq("uber%", "!uber%"))
+    val result = WildcardUtils.getMatchesOrRecommendations(entries, Seq("uber%", "~uber%"))
     assert(result.isLeft, "expected Left with recommendations but got Right")
     assert(result.left.getOrElse(Seq.empty).nonEmpty)
   }
 
   test("getMatchesOrRecommendations should work with negation producing non-empty result") {
-    val result = WildcardUtils.getMatchesOrRecommendations(entries, Seq("uber%", "!uber-test"))
+    val result = WildcardUtils.getMatchesOrRecommendations(entries, Seq("uber%", "~uber-test"))
     assert(result.isRight)
     assertEquals(result.getOrElse(Seq.empty).toSet, Set("uber"))
   }
