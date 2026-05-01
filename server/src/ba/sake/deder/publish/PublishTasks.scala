@@ -410,11 +410,14 @@ class PublishTasks(coreTasks: CoreTasks) {
         val pom = publishArtifactsRes.pom
         val artifacts = os.list(publishArtifactsRes.outDir)
 
-        val publishTo = ctx.project.publishTo
+        val publishTo = ctx.module match {
+          case jm: JavaModule => jm.publishTo
+          case _ => null
+        }
         if publishTo == null then
           throw RuntimeException(
-            "publishTo is not configured in deder.pkl. " +
-              "Add e.g. `publishTo = new SonatypeCentralRepo { id = \"my-sonatype\" }` to your deder.pkl."
+            s"publishTo is not configured for module '${ctx.module.id}' in deder.pkl. " +
+              "Add e.g. `publishTo = new SonatypeCentralRepo { id = \"my-sonatype\" }` to the module definition."
           )
 
         val credentialsFile = os.home / ".deder/credentials.pkl"

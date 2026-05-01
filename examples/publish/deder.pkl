@@ -2,20 +2,19 @@ amends "../../config/DederProject.pkl"
 // use this in prod:
 //amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
-// Publish to Sonatype Central for releases, or SonatypeSnapshotRepo for snapshots.
-// The `id` must match a key in ~/.deder/credentials.pkl.
-publishTo = new SonatypeCentralRepo {
-  id = "sonatype-central"
-}
-// For SNAPSHOT versions, use SonatypeSnapshotRepo instead:
-// publishTo = new SonatypeSnapshotRepo { id = "sonatype-central" }
-
 local const lib1 = new ScalaModule {
   scalaVersion = "3.7.1"
   id = "lib1"
   deps {
     "ba.sake::sharaf-undertow:0.13.0"
   }
+  // Publish to Sonatype Central for releases, or SonatypeSnapshotRepo for snapshots.
+  // The `id` must match a key in ~/.deder/credentials.pkl.
+  publishTo = new SonatypeCentralRepo {
+    id = "sonatype-central"
+  }
+  // For SNAPSHOT versions, use SonatypeSnapshotRepo instead:
+  // publishTo = new SonatypeSnapshotRepo { id = "sonatype-central" }
   pomSettings {
     groupId = "com.example"
     artifactId = "lib1"

@@ -20,12 +20,6 @@ repositories: Listing<MavenRepository> = new Listing {}
 /// If false, `repositories` must be non-empty.
 includeDefaultRepos: Boolean = true
 
-/// The repository to publish artifacts to.
-/// The `id` must match a key in `~/.deder/credentials.pkl`.
-/// Use `SonatypeCentralRepo` for Sonatype Central (releases), `SonatypeSnapshotRepo` for snapshots,
-/// or `MavenRepo` for any other repository.
-publishTo: PublishRepo?
-
 /// Base class for publish repository configuration.
 /// Credentials for the repository are looked up by `id` in `~/.deder/credentials.pkl`.
 abstract class PublishRepo {
@@ -229,6 +223,11 @@ open class JavaModule extends DederModule {
   manifest: ManifestSettings = new ManifestSettings {}
   publish: Boolean = true
   pomSettings: PomSettings?
+  /// The repository to publish artifacts to.
+  /// The `id` must match a key in `~/.deder/credentials.pkl`.
+  /// Use `SonatypeCentralRepo` for Sonatype Central (releases), `SonatypeSnapshotRepo` for snapshots,
+  /// or `MavenRepo` for any other repository.
+  publishTo: PublishRepo?
   /// GraalVM native image settings. When non-null, the nativeImage task is available for this module.
   graalvm: GraalVmSettings?
   /// Named maven apps that can be run via `deder exec -t runMvnApp <name> [args...]`.
