@@ -37,7 +37,7 @@ object CredentialsResolver {
     val prefix = envPrefix(publishTo.id)
 
     def field(name: String, pklValue: => Option[String]): String = {
-      val envKey = prefix + name.toUpperCase
+      val envKey = prefix + camelToScreamingSnake(name)
       clientEnv.get(envKey)
         .orElse(sysEnv.get(envKey))
         .orElse(pklValue.filter(_.nonEmpty))
@@ -78,6 +78,9 @@ object CredentialsResolver {
 
   private def envPrefix(repoId: String): String =
     "DEDER_" + repoId.toUpperCase.replace('-', '_') + "_"
+
+  private def camelToScreamingSnake(name: String): String =
+    name.replaceAll("([A-Z])", "_$1").toUpperCase
 
   private def getCreds[T <: RepoCredentials: ClassTag](
     creds: DederCredentials,
