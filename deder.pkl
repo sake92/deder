@@ -52,7 +52,6 @@ local const pluginApi = new ScalaModule {
   id = "plugin-api"
   root = "plugin-api"
   scalaVersion = scalaVer
-  publish = false
   moduleDeps { config }
   pomSettings = pom("deder-plugin-api")
   deps {
