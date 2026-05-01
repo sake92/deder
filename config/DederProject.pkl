@@ -45,26 +45,16 @@ repositories: Listing<MavenRepository> = new Listing {}
 /// If false, `repositories` must be non-empty.
 includeDefaultRepos: Boolean = true
 
-/// Base class for publish repository configuration.
-/// Credentials for the repository are looked up by `id` in `~/.deder/credentials.pkl`.
-abstract class PublishRepo {
-  /// Unique identifier for this repository. Must match a key in `~/.deder/credentials.pkl`.
+/// Base class for build tool plugin configurations.
+/// Plugin authors extend this with typed fields for plugin-specific settings.
+open class Plugin {
+  /// Unique identifier. Must match the `id` returned by the
+  /// DederPlugin implementation in the plugin JAR.
   id: String(!isEmpty)
-}
 
-/// Publish to Sonatype Central (https://central.sonatype.com). Use for release versions.
-/// Requires `SonatypeCentralCredentials` (username, password, pgpSecret, pgpPassphrase) in `~/.deder/credentials.pkl`.
-class SonatypeCentralRepo extends PublishRepo {}
-
-/// Publish to Sonatype Central Snapshots (https://central.sonatype.com/repository/maven-snapshots).
-/// Use for SNAPSHOT versions. Requires `SonatypeSnapshotCredentials` (username, password) in `~/.deder/credentials.pkl`.
-class SonatypeSnapshotRepo extends PublishRepo {}
-
-/// Publish to any Maven-compatible repository (e.g. Nexus, Artifactory).
-/// Requires `BasicAuthCredentials` (username, password) in `~/.deder/credentials.pkl`.
-class MavenRepo extends PublishRepo {
-  /// Base URL of the repository, e.g. "https://nexus.example.com/repository/releases".
-  url: String(!isEmpty)
+  /// Maven coordinates for the JAR containing the DederPlugin
+  /// implementation, generated Java classes, and ServiceLoader entry.
+  deps: Listing<String>(!isEmpty)
 }
 
 class MavenRepository {
@@ -86,6 +76,9 @@ abstract class DederModule {
 
   /// Module dependencies
   moduleDeps: Listing<DederModule>
+
+  /// Build tool plugins applied to this module.
+  plugins: Listing<Plugin> = new Listing {}
 
   type: ModuleType
 
