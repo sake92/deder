@@ -16,6 +16,7 @@ import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
 import ba.sake.deder.deps.DependencyResolver
+import ba.sake.deder.plugin.PluginLoader
 
 class DederProjectState(
     tasksRegistry: TasksRegistry,
@@ -85,6 +86,16 @@ class DederProjectState(
                   current = Left(e.getMessage)
                   return
             val dependencyResolver = new DependencyResolver(assembledRepos)
+
+            val coreTasksApi = CoreTasksApiAdapter(new CoreTasks())
+            val pluginLoader = PluginLoader(coreTasksApi, dependencyResolver)
+            pluginLoader.load(configFile) match {
+              case Left(err) =>
+                logger.warn(s"Failed to reload plugins: $err")
+              case Right(tasks) =>
+                tasks.foreach(t => tasksRegistry.add(t.asInstanceOf[Task[?, ?]]))
+            }
+
             val goodProjectStateData =
               DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner, dependencyResolver)
             lastGood = Right(goodProjectStateData)
