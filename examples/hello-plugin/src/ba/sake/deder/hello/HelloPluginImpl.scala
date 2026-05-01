@@ -20,3 +20,6 @@ class HelloPluginImpl extends DederPlugin {
     Seq(helloTask)
   }
 }
+
+// Dummy class to ensure .tasty files are generated (required for scaladoc during publish)
+case class HelloPluginConfig(greeting: String = "Hello!")
