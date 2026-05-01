@@ -95,6 +95,7 @@ object ServerMain extends StrictLogging {
     val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)
     val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
     val graalvmNativeImageTasks = GraalVmNativeImageTasks(coreTasks)
+
     val allTasks =
       coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)

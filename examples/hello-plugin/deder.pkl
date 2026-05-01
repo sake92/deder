@@ -1,0 +1,26 @@
+amends "../../config/DederProject.pkl"
+
+// Local Maven repository so we can resolve deder-plugin-api published via publishLocal.
+// Replace /home/sake with your actual home directory.
+repositories {
+  new MavenRepository { url = "file:///home/sake/.m2/repository" }
+}
+
+modules {
+  new ScalaModule {
+    id = "hello-plugin"
+    scalaVersion = "3.7.4"
+    resources { "resources" }
+    deps {
+      "ba.sake::deder-plugin-api:0.7.3-SNAPSHOT"
+    }
+    pomSettings {
+      groupId = "ba.sake"
+      artifactId = "deder-hello-plugin"
+      version = "0.1.0-SNAPSHOT"
+      name = "Deder Hello Plugin"
+      description = "Example Deder plugin that adds a 'hello' task"
+    }
+    publish = true
+  }
+}

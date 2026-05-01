@@ -12,6 +12,7 @@ trait BaseIntegrationSuite extends munit.FunSuite {
   val dederClientPath: String = sys.env("DEDER_CLIENT_PATH")
   val dederServerPath: String = sys.env("DEDER_SERVER_PATH")
   val dederTestRunnerPath: String = sys.env("DEDER_TEST_RUNNER_PATH")
+  val dederPluginApiVersion: String = sys.env.getOrElse("DEDER_PLUGIN_API_VERSION", "0.1.0-SNAPSHOT")
 
   def withTestProject(
       testProjectPath: os.RelPath,

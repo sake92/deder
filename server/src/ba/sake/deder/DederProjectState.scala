@@ -16,6 +16,7 @@ import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
 import ba.sake.deder.deps.DependencyResolver
+import ba.sake.deder.plugin.PluginLoader
 
 class DederProjectState(
     tasksRegistry: TasksRegistry,
@@ -73,9 +74,6 @@ class DederProjectState(
             logger.warn(s"Failed to load project config: $errorMessage")
             current = Left(errorMessage)
           case Right(newConfig) =>
-            val tasksResolver = TasksResolver(newConfig, tasksRegistry)
-            val executionPlanner =
-              ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
             val userRepoUrls = newConfig.repositories.asScala.map(_.url).toSeq
             val assembledRepos =
               try DependencyResolver.assembleRepositories(userRepoUrls, newConfig.includeDefaultRepos)
@@ -85,6 +83,21 @@ class DederProjectState(
                   current = Left(e.getMessage)
                   return
             val dependencyResolver = new DependencyResolver(assembledRepos)
+
+            // Load plugin tasks before TasksResolver so they are included in the execution graph
+            val coreTasksApi = CoreTasksApiAdapter(new CoreTasks())
+            val pluginLoader = PluginLoader(coreTasksApi, dependencyResolver)
+            pluginLoader.load(configFile) match {
+              case Left(err) =>
+                logger.warn(s"Failed to reload plugins: $err")
+              case Right(tasks) =>
+                tasks.foreach(t => tasksRegistry.add(t.asInstanceOf[Task[?, ?]]))
+            }
+
+            val tasksResolver = TasksResolver(newConfig, tasksRegistry)
+            val executionPlanner =
+              ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
+
             val goodProjectStateData =
               DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner, dependencyResolver)
             lastGood = Right(goodProjectStateData)

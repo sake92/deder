@@ -22,6 +22,18 @@ repositories: Listing<MavenRepository> = new Listing {}
 /// If false, `repositories` must be non-empty.
 includeDefaultRepos: Boolean = true
 
+/// Base class for build tool plugin configurations.
+/// Plugin authors extend this with typed fields for plugin-specific settings.
+open class Plugin {
+  /// Unique identifier. Must match the `id` returned by the
+  /// DederPlugin implementation in the plugin JAR.
+  id: String(!isEmpty)
+
+  /// Maven coordinates for the JAR containing the DederPlugin
+  /// implementation, generated Java classes, and ServiceLoader entry.
+  deps: Listing<String>(!isEmpty)
+}
+
 /// Base class for publish repository configuration.
 /// Credentials for the repository are looked up by `id` in `~/.deder/credentials.pkl`.
 abstract class PublishRepo {
@@ -63,6 +75,9 @@ abstract class DederModule {
 
   /// Module dependencies
   moduleDeps: Listing<DederModule>
+
+  /// Build tool plugins applied to this module.
+  plugins: Listing<Plugin> = new Listing {}
 
   type: ModuleType
 

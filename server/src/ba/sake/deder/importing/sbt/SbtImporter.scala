@@ -121,6 +121,7 @@ class SbtImporter(
           dederModuleRoot,
           sources.asJava,
           List.empty.asJava, // moduleDeps, filled in next pass..
+          java.util.List.of(), // plugins
           tpe,
           resources.asJava,
           null, // javaHome
@@ -156,6 +157,7 @@ class SbtImporter(
           dederModuleRoot,
           sources.asJava,
           List.empty.asJava, // moduleDeps, filled in next pass..
+          java.util.List.of(), // plugins
           tpe,
           resources.asJava,
           null, // javaHome

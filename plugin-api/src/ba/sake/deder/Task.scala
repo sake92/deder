@@ -2,7 +2,7 @@ package ba.sake.deder
 
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.{DederModule, ModuleType}
-import ba.sake.deder.deps.DependencyResolver
+import ba.sake.deder.deps.DependencyResolverApi
 
 import scala.util.control.Breaks.{break, breakable}
 import scala.Tuple.:*
@@ -19,7 +19,7 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType]
 )(using ev: TaskDeps[Deps] =:= true) {
-  def dependsOn[T2](t: Task[T2, ?]): TaskBuilder[T, Deps :* Task[T2, ?]] =
+  def dependsOn[T2](t: AbstractTask[T2]): TaskBuilder[T, Deps :* AbstractTask[T2]] =
     TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
@@ -60,7 +60,7 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType]
 )(using ev: TaskDeps[Deps] =:= true) {
-  def dependsOn[T2](t: Task[T2, ?]): CachedTaskBuilder[T, Deps :* Task[T2, ?]] =
+  def dependsOn[T2](t: AbstractTask[T2]): CachedTaskBuilder[T, Deps :* AbstractTask[T2]] =
     CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes)
 
   def build(execute: TaskExecContext[T, Deps] => T)(using Deps <:< NonEmptyTuple): Task[T, Deps] =
@@ -77,16 +77,16 @@ object CachedTaskBuilder {
   ): CachedTaskBuilder[T, EmptyTuple] = CachedTaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes)
 }
 
-// this is to make sure that Deps are Task-s and not arbitrary types
+// this is to make sure that Deps are AbstractTask-s and not arbitrary types
 type TaskDeps[T <: Tuple] <: Boolean = T match {
-  case EmptyTuple      => true
-  case t :* Task[?, ?] => TaskDeps[t]
-  case _               => false
+  case EmptyTuple           => true
+  case t :* AbstractTask[?] => TaskDeps[t]
+  case _                    => false
 }
 
 type TaskDepResults[T <: Tuple] <: Tuple = T match {
-  case EmptyTuple         => EmptyTuple
-  case Task[t, ?] *: rest => t *: TaskDepResults[rest]
+  case EmptyTuple                => EmptyTuple
+  case AbstractTask[t] *: rest   => t *: TaskDepResults[rest]
 }
 
 // needs a T because of transitive results
@@ -99,20 +99,29 @@ case class TaskExecContext[T, Deps <: Tuple](
     watch: Boolean,
     notifications: ServerNotificationsLogger,
     out: os.Path,
-    dependencyResolver: DependencyResolver
+    dependencyResolver: DependencyResolverApi
 )(using ev: TaskDeps[Deps] =:= true)
 
-sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] =:= true) {
-  type Res = T
+/** Public-facing base for a task, without exposing the `Deps` type parameter.
+ *  Use this type in plugin APIs and `CoreTasksApi` so callers don't need to
+ *  know (or spell out) the dependency tuple.
+ */
+trait AbstractTask[T] {
   def name: String
   def description: String
-  def supportedModuleTypes: Set[ModuleType]
   def transitive: Boolean
-  def singleton: Boolean // e.g. you can only "run" ONE MODULE!
+  def singleton: Boolean
+  def supportedModuleTypes: Set[ModuleType]
+  def isResultSuccessful: T => Boolean
+}
+
+sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] =:= true)
+    extends AbstractTask[T] {
+  type Res = T
   def taskDeps: Deps
   def execute: TaskExecContext[T, Deps] => T
   def summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit
-  def isResultSuccessful: T => Boolean = _ => true
+  override def isResultSuccessful: T => Boolean = _ => true
   private[deder] def executeUnsafe(
       project: DederProject,
       module: DederModule,
@@ -121,7 +130,7 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
-      dependencyResolver: DependencyResolver
+      dependencyResolver: DependencyResolverApi
   ): (res: TaskResult[T], changed: Boolean)
 
   /** Type-erased summarize for use by the execution engine */
@@ -158,7 +167,7 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple](
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
-      dependencyResolver: DependencyResolver
+      dependencyResolver: DependencyResolverApi
   ): (res: TaskResult[T], changed: Boolean) = {
     serverNotificationsLogger.add(
       ServerNotification.logDebug(s"Executing ${name}", Some(module.id))
@@ -212,7 +221,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
-      dependencyResolver: DependencyResolver
+      dependencyResolver: DependencyResolverApi
   ): (res: TaskResult[T], changed: Boolean) = {
 
     serverNotificationsLogger.add(ServerNotification.logDebug(s"Executing ${name}", Some(module.id)))
