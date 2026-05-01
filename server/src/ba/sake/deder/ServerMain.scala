@@ -20,7 +20,6 @@ import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
 import ba.sake.deder.publish.PublishTasks
 import ba.sake.deder.graalvm.GraalVmNativeImageTasks
-import ba.sake.deder.plugin.PluginLoader
 
 object ServerMain extends StrictLogging {
 
@@ -97,21 +96,8 @@ object ServerMain extends StrictLogging {
     val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
     val graalvmNativeImageTasks = GraalVmNativeImageTasks(coreTasks)
 
-    val coreTasksApi = CoreTasksApiAdapter(coreTasks)
-    val defaultRepos = ba.sake.deder.deps.DependencyResolver.assembleRepositories(Seq.empty, includeDefaultRepos = true)
-    val defaultDependencyResolver = new ba.sake.deder.deps.DependencyResolver(defaultRepos)
-    val pluginLoader = PluginLoader(coreTasksApi, defaultDependencyResolver)
-    val pluginTasks = pluginLoader.load(configFile) match {
-      case Left(err) =>
-        logger.warn(s"Failed to load plugins: $err")
-        Seq.empty[Task[?, ?]]
-      case Right(tasks) =>
-        logger.info(s"Loaded ${tasks.size} plugin task(s)")
-        tasks.asInstanceOf[Seq[Task[?, ?]]]
-    }
-
     val allTasks =
-      coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all ++ pluginTasks
+      coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
     val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
 
