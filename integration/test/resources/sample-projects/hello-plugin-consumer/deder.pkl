@@ -1,0 +1,20 @@
+amends "../../../../../config/DederProject.pkl"
+
+// Local Maven repository where hello-plugin is published (injected by integration test)
+repositories {
+  new MavenRepository { url = "__PLUGIN_LOCAL_REPO_URL__" }
+}
+
+modules {
+  new ScalaModule {
+    id = "app"
+    scalaVersion = "3.7.4"
+    mainClass = "Main"
+    plugins {
+      new Plugin {
+        id = "hello"
+        deps { "ba.sake::deder-hello-plugin:0.1.0-SNAPSHOT" }
+      }
+    }
+  }
+}
