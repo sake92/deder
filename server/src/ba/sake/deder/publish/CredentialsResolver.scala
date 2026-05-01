@@ -1,6 +1,8 @@
 package ba.sake.deder.publish
 
+import scala.reflect.ClassTag
 import ba.sake.deder.config.DederProject.*
+import ba.sake.deder.config.DederCredentials
 import ba.sake.deder.config.DederCredentials.*
 
 object CredentialsResolver {
@@ -77,14 +79,15 @@ object CredentialsResolver {
   private def envPrefix(repoId: String): String =
     "DEDER_" + repoId.toUpperCase.replace('-', '_') + "_"
 
-  private def getCreds[T <: RepoCredentials](
+  private def getCreds[T <: RepoCredentials: ClassTag](
     creds: DederCredentials,
     repoId: String
   ): Option[T] = {
     import scala.jdk.CollectionConverters.*
+    val cls = implicitly[ClassTag[T]].runtimeClass
     creds.credentials.asScala.get(repoId) match {
-      case Some(c: T) => Some(c)
-      case _          => None
+      case Some(c) if cls.isInstance(c) => Some(c.asInstanceOf[T])
+      case _                           => None
     }
   }
 

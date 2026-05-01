@@ -1,6 +1,7 @@
 package ba.sake.deder.publish
 
 import ba.sake.deder.config.DederProject.*
+import ba.sake.deder.config.DederCredentials
 import ba.sake.deder.config.DederCredentials.*
 
 class CredentialsResolverSuite extends munit.FunSuite {
