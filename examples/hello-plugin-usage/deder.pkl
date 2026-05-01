@@ -1,0 +1,16 @@
+amends "../../config/DederProject.pkl"
+
+import "../hello-plugin/HelloPlugin.pkl"
+
+modules {
+  new ScalaModule {
+    id = "app"
+    scalaVersion = "3.7.4"
+    plugins {
+      new HelloPlugin {
+        greeting = "Hello from hello-plugin-usage!"
+      }
+    }
+    mainClass = "Main"
+  }
+}
