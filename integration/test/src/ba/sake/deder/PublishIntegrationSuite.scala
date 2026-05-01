@@ -60,6 +60,17 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("deder publishLocal should publish to custom folder when publishLocalTo is set") {
+    withTestProject("sample-projects/publish") { projectPath =>
+      executeDederCommand(projectPath, "exec", "-m", "lib5", "-t", "publishLocal").out.text()
+      val customRepoPath = projectPath / "out/local-repo" / "com/example/lib5_3/0.0.1-SNAPSHOT"
+      assert(os.exists(customRepoPath), s"Expected custom local repo at $customRepoPath")
+      val files = os.list(customRepoPath).map(_.last).sorted
+      assert(files.exists(_.endsWith(".jar")), s"Expected JAR in $customRepoPath, got: $files")
+      assert(files.exists(_.endsWith(".pom")), s"Expected POM in $customRepoPath, got: $files")
+    }
+  }
+
   test("deder jar should contain custom manifest entries") {
     withTestProject("sample-projects/publish") { projectPath =>
       executeDederCommand(projectPath, "exec", "-t", "jar", "-m", "lib1").out.text()

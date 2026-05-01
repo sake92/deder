@@ -43,11 +43,20 @@ local const lib4 = new ScalaModule {
   pomSettings = makePomSettings("lib4")
 }
 
+local const lib5 = new ScalaModule {
+  scalaVersion = "3.7.1"
+  id = "lib5"
+  root = "lib5"
+  pomSettings = makePomSettings("lib5")
+  publishLocalTo = "out/local-repo"
+}
+
 modules {
   lib1
   lib2
   lib3
   lib4
+  lib5
 }
 
 local const function makePomSettings(_artifactId: String): PomSettings = new {

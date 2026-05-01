@@ -385,8 +385,11 @@ class PublishTasks(coreTasks: CoreTasks) {
         ctx.module match {
           case javaModule: JavaModule =>
             if javaModule.publish then {
+              val customRepoPath = Option(javaModule.publishLocalTo).map { relPath =>
+                DederGlobals.projectRootDir / os.RelPath(relPath)
+              }
               val publisher = Publisher(ctx.notifications, ctx.module.id)
-              publisher.publishLocalM2(pom, allFiles)
+              publisher.publishLocalM2(pom, allFiles, customRepoPath)
             } else {
               ctx.notifications.add(
                 ServerNotification
