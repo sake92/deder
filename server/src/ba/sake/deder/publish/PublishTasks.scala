@@ -385,8 +385,19 @@ class PublishTasks(coreTasks: CoreTasks) {
         ctx.module match {
           case javaModule: JavaModule =>
             if javaModule.publish then {
+              val customRepoPath = Option(javaModule.publishLocalTo).map { pathStr =>
+                scala.util.Try(os.RelPath(pathStr))
+                  .map(rel => DederGlobals.projectRootDir / rel)
+                  .getOrElse(
+                    scala.util.Try(os.Path(pathStr))
+                      .getOrElse(throw RuntimeException(
+                        s"Invalid publishLocalTo path '${pathStr}' for module '${javaModule.id}'. " +
+                          "Provide a valid relative or absolute path."
+                      ))
+                  )
+              }
               val publisher = Publisher(ctx.notifications, ctx.module.id)
-              publisher.publishLocalM2(pom, allFiles)
+              publisher.publishLocalM2(pom, allFiles, customRepoPath)
             } else {
               ctx.notifications.add(
                 ServerNotification
