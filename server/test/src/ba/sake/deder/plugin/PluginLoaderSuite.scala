@@ -41,6 +41,8 @@ class PluginLoaderSuite extends munit.FunSuite {
       emptyManifest,
       false, // publish
       null, // pomSettings
+      null, // publishTo
+      null, // publishLocalTo
       null, // graalvm
       emptyMvnApps
     )
