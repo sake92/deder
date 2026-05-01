@@ -1,11 +1,17 @@
 package ba.sake.deder
 
 import ba.sake.deder.deps.Dependency
+import ba.sake.deder.config.DederProject.Plugin
 
 /** Trait that plugins implement to register additional tasks. */
 trait DederPlugin {
   def id: String
-  def tasks(coreTasks: CoreTasksApi): Seq[AbstractTask[?]]
+
+  /** @param coreTasks Access to built-in server tasks (compile, classes, deps, etc.)
+   *  @param config    The plugin's evaluated Pkl configuration (base Plugin type).
+   *                   Cast to your specific Plugin subclass if needed.
+   */
+  def tasks(coreTasks: CoreTasksApi, config: Plugin): Seq[AbstractTask[?]]
 }
 
 /** Typed access to built-in server tasks, available to plugins as dependency targets. */
