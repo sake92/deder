@@ -214,8 +214,9 @@ open class JavaModule extends DederModule {
   publishTo: PublishRepo?
   /// Custom local Maven repository folder for the `publishLocal` task.
   /// When set, artifacts are published to this folder instead of the default `~/.m2/repository`.
-  /// The path is relative to the project root directory.
-  /// Example: `publishLocalTo = "out/local-repo"`
+  /// Accepts a relative path (resolved against the project root) or an absolute path.
+  /// Example (relative): `publishLocalTo = "out/local-repo"`
+  /// Example (absolute): `publishLocalTo = "/home/user/.custom-repo"`
   publishLocalTo: String?
   /// GraalVM native image settings. When non-null, the nativeImage task is available for this module.
   graalvm: GraalVmSettings?
