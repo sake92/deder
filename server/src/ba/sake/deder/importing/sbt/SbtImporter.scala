@@ -138,6 +138,7 @@ class SbtImporter(
           false, // publish
           null, // pomSettings
           null, // publishTo
+          null, // publishLocalTo
           null, // graalvm
           java.util.Map.of(), // mvnApps
           sbtProjectExport.scalaVersion,
@@ -172,6 +173,7 @@ class SbtImporter(
           false, // publish
           null, // pomSettings
           null, // publishTo
+          null, // publishLocalTo
           null, // graalvm
           java.util.Map.of(), // mvnApps
           sbtProjectExport.scalaVersion,
