@@ -1,0 +1,11 @@
+/// Typed configuration for the hello plugin.
+/// Extends Deder's base Plugin class with a custom greeting field.
+
+import "../../config/DederProject.pkl"
+
+class HelloPlugin extends DederProject.Plugin {
+  id = "hello"
+  deps { "ba.sake::deder-hello-plugin:0.1.0-SNAPSHOT" }
+  /// The greeting message printed by the plugin's hello task.
+  greeting: String = "Hello!"
+}
