@@ -21,6 +21,6 @@ modules {
       description = "Example Deder plugin that adds a hello task"
     }
     publish = true
-    publishLocalTo = "__PLUGIN_LOCAL_REPO__"
+    publishLocalTo = "tmp/m2"
   }
 }
