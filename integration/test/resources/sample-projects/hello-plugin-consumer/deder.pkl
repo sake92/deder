@@ -1,8 +1,10 @@
 amends "../../../../../config/DederProject.pkl"
 
-// Local Maven repository where hello-plugin is published (injected by integration test)
+local localRepoUrl = "file://\(read("env:DEDER_TMP_M2_REPO"))"
+
+// Shared local Maven repository (set by run-it-tests.sh via DEDER_TMP_M2_REPO env var)
 repositories {
-  new MavenRepository { url = "__PLUGIN_LOCAL_REPO_URL__" }
+  new MavenRepository { url = localRepoUrl }
 }
 
 modules {

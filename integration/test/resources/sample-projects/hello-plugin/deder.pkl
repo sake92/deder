@@ -1,8 +1,10 @@
 amends "../../../../../config/DederProject.pkl"
 
-// Local Maven repository where deder-plugin-api is available (injected by integration test)
+local localRepoUrl = "file://\(read("env:DEDER_TMP_M2_REPO"))"
+
+// Shared local Maven repository (set by run-it-tests.sh via DEDER_TMP_M2_REPO env var)
 repositories {
-  new MavenRepository { url = "__M2_REPO_URL__" }
+  new MavenRepository { url = localRepoUrl }
 }
 
 modules {
@@ -11,7 +13,7 @@ modules {
     scalaVersion = "3.7.4"
     resources { "resources" }
     deps {
-      "ba.sake::deder-plugin-api:__PLUGIN_API_VERSION__"
+      "ba.sake::deder-plugin-api:\(read("env:DEDER_PLUGIN_API_VERSION"))"
     }
     pomSettings {
       groupId = "ba.sake"
@@ -21,6 +23,6 @@ modules {
       description = "Example Deder plugin that adds a hello task"
     }
     publish = true
-    publishLocalTo = "tmp/m2"
+    publishLocalTo = read("env:DEDER_TMP_M2_REPO")
   }
 }
