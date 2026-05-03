@@ -292,7 +292,8 @@ class SbtImporter(
          |${if (tmpls.nonEmpty) tmpls + "\n" else ""}  testTemplate = (template.asTest()) {
          |    deps { "org.scalameta::munit:1.2.1" }
          |  }
-         |}.get""".stripMargin
+         |}
+         |.get""".stripMargin
     } else if (gi.hasScalaJs) {
       s"""new CreateScalaJsModules {
          |  root = "${gi.root}"
@@ -302,7 +303,8 @@ class SbtImporter(
          |  testTemplate = (template.asTest()) {
          |    deps { "org.scalameta::munit:1.2.1" }
          |  }
-         |}.get""".stripMargin
+         |}
+         |.get""".stripMargin
     } else if (gi.hasScalaNative) {
       s"""new CreateScalaNativeModules {
          |  root = "${gi.root}"
@@ -312,7 +314,8 @@ class SbtImporter(
          |  testTemplate = (template.asTest()) {
          |    deps { "org.scalameta::munit:1.2.1" }
          |  }
-         |}.get""".stripMargin
+         |}
+         |.get""".stripMargin
     } else {
       s"""new CreateScalaModules {
          |  root = "${gi.root}"
@@ -322,7 +325,8 @@ class SbtImporter(
          |  testTemplate = (template.asTest()) {
          |    deps { "org.scalameta::munit:1.2.1" }
          |  }
-         |}.get""".stripMargin
+         |}
+         |.get""".stripMargin
     }
 
     s"local const ${gi.builderVarName} = $defStr"
