@@ -23,6 +23,7 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 - polish the docs
 
 # Deps
+- expose repositories task
 - document exclude
 
 # CI

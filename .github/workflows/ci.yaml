@@ -54,6 +54,8 @@ jobs:
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder
         run: brew install sake92/tap/deder
+      # for testing importing from sbt
+      - uses: sbt/setup-sbt@v1
       - name: Integration Test Suite
         run: |
           ./scripts/run-it-tests.sh

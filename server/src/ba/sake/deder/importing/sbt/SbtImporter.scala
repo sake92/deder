@@ -8,12 +8,20 @@ class SbtImporter(
     serverNotificationsLogger: ServerNotificationsLogger
 ) {
 
+  private val sbtExportBuildVersion = "0.0.4"
+
+  def doImport() = {
+    dumpSbtBuild()
+    val exportedSbtModules = readAndParseExportedModules()
+    val exporter = new DederSbtExporter(exportedSbtModules, serverNotificationsLogger)
+    exporter.writeBuild()
+  }
+
   private def dumpSbtBuild() = {
     val sbtCmd = if (scala.util.Properties.isWin) "sbt.bat" else "sbt"
-    val exportBuildStructurePluginVersion = "0.0.3+5-81323fe9-SNAPSHOT"
     val exportBuildStructurePluginSource =
-      s"""addSbtPlugin("ba.sake" % "sbt-build-extract" % "$exportBuildStructurePluginVersion")
-         |libraryDependencies += "ba.sake" %% "sbt-build-extract-core" % "$exportBuildStructurePluginVersion"
+      s"""addSbtPlugin("ba.sake" % "sbt-build-extract" % "$sbtExportBuildVersion")
+         |libraryDependencies += "ba.sake" %% "sbt-build-extract-core" % "$sbtExportBuildVersion"
          |""".stripMargin
     val exportBuildStructurePluginPath = os.pwd / "project/exportBuildStructure.sbt"
     os.write.over(exportBuildStructurePluginPath, exportBuildStructurePluginSource)
@@ -46,10 +54,4 @@ class SbtImporter(
     if (allModules.length > 1) allModules.filterNot(_.base == os.pwd.toString) else allModules
   }
 
-  def doImport() = {
-    dumpSbtBuild()
-    val exportedSbtModules = readAndParseExportedModules()
-    val exporter = new DederSbtExporter(exportedSbtModules, serverNotificationsLogger)
-    exporter.writeBuild()
-  }
 }
