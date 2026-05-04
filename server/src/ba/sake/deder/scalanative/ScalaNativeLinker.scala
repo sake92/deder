@@ -25,8 +25,17 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
     multithreading = nativeModule.multithreading,
     lto = nativeModule.lto.toString,
     embedResources = nativeModule.embedResources,
+    linkStubs = nativeModule.linkStubs,
+    check = nativeModule.check,
+    checkFatalWarnings = nativeModule.checkFatalWarnings,
+    optimize = nativeModule.optimize,
+    targetTriple = Option(nativeModule.targetTriple),
     extraLinkingOptions = nativeModule.nativeLinkingOptions.asScala.toSeq,
     extraCompileOptions = nativeModule.nativeCompileOptions.asScala.toSeq,
+    extraCOptions = nativeModule.nativeCOptions.asScala.toSeq,
+    extraCppOptions = nativeModule.nativeCppOptions.asScala.toSeq,
+    resourceIncludePatterns = nativeModule.resourceIncludePatterns.asScala.toSeq,
+    resourceExcludePatterns = nativeModule.resourceExcludePatterns.asScala.toSeq,
     label = "Linking"
   )
 
@@ -45,8 +54,17 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
     multithreading = nativeModule.multithreading,
     lto = "none",
     embedResources = nativeModule.embedResources,
+    linkStubs = nativeModule.linkStubs,
+    check = nativeModule.check,
+    checkFatalWarnings = nativeModule.checkFatalWarnings,
+    optimize = nativeModule.optimize,
+    targetTriple = Option(nativeModule.targetTriple),
     extraLinkingOptions = nativeModule.nativeLinkingOptions.asScala.toSeq,
     extraCompileOptions = nativeModule.nativeCompileOptions.asScala.toSeq,
+    extraCOptions = nativeModule.nativeCOptions.asScala.toSeq,
+    extraCppOptions = nativeModule.nativeCppOptions.asScala.toSeq,
+    resourceIncludePatterns = nativeModule.resourceIncludePatterns.asScala.toSeq,
+    resourceExcludePatterns = nativeModule.resourceExcludePatterns.asScala.toSeq,
     label = "Fast-linking"
   )
 
@@ -65,8 +83,17 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
     multithreading = nativeModule.multithreading,
     lto = "full",
     embedResources = nativeModule.embedResources,
+    linkStubs = nativeModule.linkStubs,
+    check = nativeModule.check,
+    checkFatalWarnings = nativeModule.checkFatalWarnings,
+    optimize = nativeModule.optimize,
+    targetTriple = Option(nativeModule.targetTriple),
     extraLinkingOptions = nativeModule.nativeLinkingOptions.asScala.toSeq,
     extraCompileOptions = nativeModule.nativeCompileOptions.asScala.toSeq,
+    extraCOptions = nativeModule.nativeCOptions.asScala.toSeq,
+    extraCppOptions = nativeModule.nativeCppOptions.asScala.toSeq,
+    resourceIncludePatterns = nativeModule.resourceIncludePatterns.asScala.toSeq,
+    resourceExcludePatterns = nativeModule.resourceExcludePatterns.asScala.toSeq,
     label = "Full-linking"
   )
 
@@ -79,8 +106,17 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
       multithreading: Boolean,
       lto: String,
       embedResources: Boolean,
+      linkStubs: Boolean,
+      check: Boolean,
+      checkFatalWarnings: Boolean,
+      optimize: Boolean,
+      targetTriple: Option[String],
       extraLinkingOptions: Seq[String],
       extraCompileOptions: Seq[String],
+      extraCOptions: Seq[String],
+      extraCppOptions: Seq[String],
+      resourceIncludePatterns: Seq[String],
+      resourceExcludePatterns: Seq[String],
       label: String
   ): os.Path = Scope { implicit scope =>
     notifications.add(ServerNotification.logInfo(s"$label scala-native binary...", Some(moduleId)))
@@ -90,20 +126,32 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
     val linkopts = Discover.linkingOptions()
     val compopts = Discover.compileOptions()
 
+    val nativeConfig = NativeConfig.empty
+      .withGC(GC(gc))
+      .withMode(Mode(mode))
+      .withMultithreading(enabled = multithreading)
+      .withLTO(LTO(lto))
+      .withEmbedResources(embedResources)
+      .withLinkStubs(linkStubs)
+      .withCheck(check)
+      .withCheckFatalWarnings(checkFatalWarnings)
+      .withOptimize(optimize)
+      .withClang(clang)
+      .withClangPP(clangpp)
+      .withLinkingOptions(linkopts ++ extraLinkingOptions)
+      .withCompileOptions(compopts ++ extraCompileOptions)
+      .withCOptions(extraCOptions)
+      .withCppOptions(extraCppOptions)
+      .withResourceIncludePatterns(resourceIncludePatterns)
+      .withResourceExcludePatterns(resourceExcludePatterns)
+
+    val nativeConfigWithTriple = targetTriple match {
+      case Some(triple) => nativeConfig.withTargetTriple(triple)
+      case None         => nativeConfig
+    }
+
     val config = Config.empty
-      .withCompilerConfig {
-        NativeConfig.empty
-          .withGC(GC(gc))
-          .withMode(Mode(mode))
-          .withMultithreading(enabled = multithreading)
-          .withLTO(LTO(lto))
-          .withEmbedResources(embedResources)
-          .withClang(clang)
-          .withClangPP(clangpp)
-          .withLinkingOptions(linkopts ++ extraLinkingOptions)
-          .withCompileOptions(compopts ++ extraCompileOptions)
-          .withLinkStubs(true)
-      }
+      .withCompilerConfig(nativeConfigWithTriple)
       .withClassPath(nirPaths.map(_.toNIO))
       .withModuleName(moduleId)
       .withMainClass(mainClass)
