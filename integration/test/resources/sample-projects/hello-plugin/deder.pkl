@@ -11,7 +11,7 @@ modules {
     pomSettings {
       groupId = "ba.sake"
       artifactId = "deder-hello-plugin"
-      version = "0.1.0-SNAPSHOT"
+      version = "it-test-version"
       name = "Deder Hello Plugin"
       description = "Example Deder plugin that adds a hello task"
     }
