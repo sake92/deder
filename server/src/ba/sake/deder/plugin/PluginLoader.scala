@@ -6,7 +6,7 @@ import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
-import ba.sake.deder.config.DederProject.{DederModule, Plugin}
+import ba.sake.deder.config.DederProject.{DederModule, Plugin, ScalaModule}
 import ba.sake.deder.deps.{Dependency, DependencyResolverApi}
 
 class PluginLoader(
@@ -14,19 +14,19 @@ class PluginLoader(
     dependencyResolver: DependencyResolverApi
 ) extends StrictLogging {
 
-  /** Extract all plugin deps from the project config. */
-  def extractDeps(project: DederProject): Seq[String] = PluginLoader.extractDeps(project)
+  /** Extract plugin deps with their module's Scala version for proper `::` resolution. */
+  def extractPluginDeps(project: DederProject): Seq[(String, String)] = PluginLoader.extractPluginDeps(project)
 
-  /** Phase 1: Evaluate deder.pkl minimally (no plugin JARs) to extract plugin deps.
+  /** Phase 1: Evaluate deder.pkl minimally (no plugin JARs) to get project config.
    *  This works because Plugin base class is always on the classpath (in config/),
    *  and Pkl maps plugin subclass instances to the base Plugin type for the `plugins` field.
    */
-  def evaluatePhase1(pklFile: os.Path): Either[String, Seq[String]] = try {
+  def evaluatePhase1(pklFile: os.Path): Either[String, DederProject] = try {
     val moduleSource = org.pkl.core.ModuleSource.file(pklFile.toIO)
     val project = Using.resource(org.pkl.config.java.ConfigEvaluator.preconfigured) { evaluator =>
       evaluator.evaluate(moduleSource).as(classOf[DederProject])
     }
-    Right(extractDeps(project))
+    Right(project)
   } catch {
     case e: Exception =>
       logger.warn(s"Phase 1 evaluation failed: ${e.getMessage}", e)
@@ -104,13 +104,17 @@ class PluginLoader(
   def load(pklFile: os.Path): Either[String, Seq[AbstractTask[?]]] = {
     evaluatePhase1(pklFile) match {
       case Left(err) => Left(err)
-      case Right(allDeps) if allDeps.isEmpty =>
-        Right(Seq.empty) // no plugins declared
-      case Right(allDeps) =>
-        logger.info(s"Discovered plugin dependencies: ${allDeps.mkString(", ")}")
+      case Right(project) =>
+        val depsWithScalaVer = extractPluginDeps(project)
+        if depsWithScalaVer.isEmpty then return Right(Seq.empty)
 
-        // Resolve plugin JARs. Plugin deps are standard Maven coordinates (single colon).
-        val dependencies = allDeps.map(Dependency.make(_, ""))
+        val allDepStrings = depsWithScalaVer.map(_._1)
+        logger.info(s"Discovered plugin dependencies: ${allDepStrings.mkString(", ")}")
+
+        // Create Dependency objects using the module's actual scalaVersion for `::` resolution
+        val dependencies = depsWithScalaVer.map { case (depStr, scalaVer) =>
+          Dependency.make(depStr, scalaVer)
+        }
         val pluginJarPaths = try {
           dependencyResolver.fetchFiles(dependencies, None)
         } catch {
@@ -124,22 +128,32 @@ class PluginLoader(
         // Phase 2: full evaluation with plugin JARs on classpath
         evaluatePhase2(pklFile, pluginJarPaths) match {
           case Left(err) => Left(err)
-          case Right(project) =>
+          case Right(project2) =>
             // Phase 3: load plugins and collect tasks
-            Right(loadPlugins(project, pluginJarPaths))
+            Right(loadPlugins(project2, pluginJarPaths))
         }
     }
   }
 }
 
 object PluginLoader {
-  /** Extract plugin deps from all modules in the project config. */
-  def extractDeps(project: DederProject): Seq[String] = {
+  /** Extract plugin deps with their module's Scala version. */
+  def extractPluginDeps(project: DederProject): Seq[(String, String)] = {
     import scala.jdk.CollectionConverters.*
     for {
       module <- project.modules.asScala.toSeq
       plugin <- Option(module.plugins).toSeq.flatMap(_.asScala)
       dep <- Option(plugin.deps).toSeq.flatMap(_.asScala)
-    } yield dep
+    } yield {
+      val scalaVer = module match {
+        case sm: ScalaModule => sm.scalaVersion
+        case _               => ""
+      }
+      (dep, scalaVer)
+    }
   }
+
+  /** Convenience: extract flat deps list for tests. */
+  def extractDeps(project: DederProject): Seq[String] =
+    extractPluginDeps(project).map(_._1)
 }
