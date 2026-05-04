@@ -4,7 +4,7 @@ import scala.concurrent.duration.*
 
 class ImportIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 10.minutes
+  override def munitTimeout = 15.minutes
 
   private val sbtAvailable: Boolean =
     try os.proc("sbt", "--version").call(check = false, stderr = os.Pipe).exitCode == 0
@@ -89,13 +89,18 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
         s"Expected >= $expectedMinModules modules, got ${moduleLines.size}\nOutput:\n${allOutput}"
       )
 
+      // 8. Verify the imported project actually compiles
+      val compileRes = executeDederCommand(tempDir, "exec", "-t", "compile")
+      assertEquals(compileRes.exitCode, 0,
+        s"deder exec compile failed (exit ${compileRes.exitCode}):\n${compileRes.err.text()}")
+
     } finally {
       forceShutdownServer(tempDir)
     }
   }
 
-  test("import scalacheck v1.19.0") {
-    testImport("https://github.com/typelevel/scalacheck.git", "v1.19.0", expectedMinModules = 5)
+  test("import jawn v1.6.0") {
+    testImport("https://github.com/typelevel/jawn.git", "v1.6.0", expectedMinModules = 10)
   }
 
   // TODO: enable once importer handles ScalaJsModule/ScalaNativeModule template types correctly

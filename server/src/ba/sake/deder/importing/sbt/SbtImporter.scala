@@ -47,7 +47,7 @@ class SbtImporter(
 
   private def dumpSbtBuild() = {
     val sbtCmd = if (scala.util.Properties.isWin) "sbt.bat" else "sbt"
-    val exportBuildStructurePluginVersion = "0.0.3+0-cd8cf69f+20260504-1211-SNAPSHOT"
+    val exportBuildStructurePluginVersion = "0.0.3+5-81323fe9-SNAPSHOT"
     val exportBuildStructurePluginSource =
       s"""addSbtPlugin("ba.sake" % "sbt-build-extract" % "$exportBuildStructurePluginVersion")
          |libraryDependencies += "ba.sake" %% "sbt-build-extract-core" % "$exportBuildStructurePluginVersion"
@@ -208,7 +208,9 @@ class SbtImporter(
   private def moduleRefs(gi: GroupInfo): Seq[String] = {
     val name = gi.builderVarName
     if (gi.isCross) {
-      Seq(
+      // Use .all shorthand when all 6 platform variants are present
+      if (gi.hasJsModule && gi.hasNativeModule) Seq(s"...$name.all")
+      else Seq(
         Some(s"$name.jvm"),
         Some(s"$name.jvm_test"),
         if (gi.hasJsModule) Some(s"$name.js") else None,
@@ -217,7 +219,7 @@ class SbtImporter(
         if (gi.hasNativeModule) Some(s"$name.native_test") else None,
       ).flatten
     } else {
-      Seq(s"$name.main", s"$name.test")
+      Seq(s"...$name.all")
     }
   }
 
@@ -272,12 +274,34 @@ class SbtImporter(
     val nativePluginDepsStr = formatPluginDeps(nativePlugins)
 
     // Resolve inter-project module dependencies
+    // Compile-scoped deps for main template
     val interModuleDeps = gi.mainModule.interProjectDependencies
-      .filter(_.configuration == "default") // only default config for now
-      .flatMap(ipde => idMap.get(ipde.project)) // sbt project id -> deder module id
+      .filter(ipde => ipde.configuration == "default" || ipde.configuration.contains("compile"))
+      .flatMap(ipde => idMap.get(ipde.project))
     val moduleDepsStr = if (interModuleDeps.nonEmpty)
       s"""moduleDeps {\n${interModuleDeps.map(d => s"""      $d""").mkString("\n")}\n    }"""
     else ""
+
+    // Test-scoped deps for test template
+    val testModuleDeps = gi.mainModule.interProjectDependencies
+      .filter(ipde => ipde.configuration.contains("test"))
+      .flatMap(ipde => idMap.get(ipde.project))
+      // Map compile refs to test refs (e.g., "parser.jvm" -> "parser.jvm_test")
+      .map(ref => ref.replaceFirst("\\.main$", ".test").replaceFirst("\\.jvm$", ".jvm_test").replaceFirst("\\.js$", ".js_test").replaceFirst("\\.native$", ".native_test"))
+      .distinct
+    val testModuleDepsStr = if (testModuleDeps.nonEmpty)
+      s"""    moduleDeps {\n${testModuleDeps.map(d => s"""      $d""").mkString("\n")}\n    }
+         |    deps { "org.scalameta::munit:1.2.1" }""".stripMargin
+    else ""
+
+    val defaultTestTemplate = if (testModuleDepsStr.nonEmpty)
+      s"""  testTemplate = (template.asTest()) {
+         |$testModuleDepsStr
+         |  }"""
+    else
+      s"""  testTemplate = (template.asTest()) {
+         |    deps { "org.scalameta::munit:1.2.1" }
+         |  }"""
 
     val idOverride = s"""id = "${gi.builderVarName}""""
 
@@ -314,9 +338,7 @@ class SbtImporter(
          |  $idOverride
          |  layout = "$layoutStr"
          |$jvmBody
-         |${if (tmpls.nonEmpty) tmpls + "\n" else ""}  testTemplate = (template.asTest()) {
-         |    deps { "org.scalameta::munit:1.2.1" }
-         |  }
+         |${if (tmpls.nonEmpty) tmpls + "\n" else ""}$defaultTestTemplate
          |}
          |.get""".stripMargin
     } else if (gi.hasScalaJs) {
@@ -326,9 +348,7 @@ class SbtImporter(
          |  $idOverride
          |  layout = "$layoutStr"
          |$jsBody
-         |  testTemplate = (template.asTest()) {
-         |    deps { "org.scalameta::munit:1.2.1" }
-         |  }
+         |$defaultTestTemplate
          |}
          |.get""".stripMargin
     } else if (gi.hasScalaNative) {
@@ -338,9 +358,7 @@ class SbtImporter(
          |  $idOverride
          |  layout = "$layoutStr"
          |$nativeBody
-         |  testTemplate = (template.asTest()) {
-         |    deps { "org.scalameta::munit:1.2.1" }
-         |  }
+         |$defaultTestTemplate
          |}
          |.get""".stripMargin
     } else {
@@ -349,9 +367,7 @@ class SbtImporter(
          |  $idOverride
          |  layout = "$layoutStr"
          |$jvmBody
-         |  testTemplate = (template.asTest()) {
-         |    deps { "org.scalameta::munit:1.2.1" }
-         |  }
+         |$defaultTestTemplate
          |}
          |.get""".stripMargin
     }
