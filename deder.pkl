@@ -54,6 +54,7 @@ local const pluginApi = new ScalaModule {
   scalaVersion = scalaVer
   moduleDeps { config }
   pomSettings = pom("deder-plugin-api")
+  publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
   deps {
     "ba.sake::tupson:0.18.0"
     "com.lihaoyi::os-lib:0.11.6"
