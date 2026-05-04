@@ -38,7 +38,8 @@ case class DependencyExport(
     extraAttributes: Map[String, String], // type, classifier ..
     configurations: Option[String], // provided, test ..
     excludes: Seq[DependencyExcludeExport],
-    crossVersion: String
+    crossVersion: String, // "binary", "full", "none", etc.
+    platformOpt: Option[String] = None // "js", "native", or None (JVM)
 ) derives JsonRW
 
 case class DependencyExcludeExport(

@@ -73,7 +73,8 @@ Locally would be interesting to have a dashboard with nice overview:
 
 # Add more commands
 
-- init, import from other build tools...
+- init like giter8
+- import from other build tools... maven effective POM etc
 
 
 ## Plugins

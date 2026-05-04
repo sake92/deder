@@ -47,7 +47,7 @@ class SbtImporter(
 
   private def dumpSbtBuild() = {
     val sbtCmd = if (scala.util.Properties.isWin) "sbt.bat" else "sbt"
-    val exportBuildStructurePluginVersion = "0.0.3"
+    val exportBuildStructurePluginVersion = "0.0.3+0-cd8cf69f+20260504-1211-SNAPSHOT"
     val exportBuildStructurePluginSource =
       s"""addSbtPlugin("ba.sake" % "sbt-build-extract" % "$exportBuildStructurePluginVersion")
          |libraryDependencies += "ba.sake" %% "sbt-build-extract-core" % "$exportBuildStructurePluginVersion"
@@ -194,7 +194,7 @@ class SbtImporter(
       generateModuleGroup(gi, globalIdMap)
     }
 
-    s"""amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+    s"""amends "https://sake92.github.io/deder/config/v0.7.3/DederProject.pkl"
        |
        |${builderDefs.mkString("\n")}
        |
@@ -228,16 +228,16 @@ class SbtImporter(
     val layoutStr = gi.layout.toString.toLowerCase.replace("_", "-")
 
     // Helper: extract deps from a ProjectExport
-    def depsFor(pe: ProjectExport, isCrossPlatform: Boolean = false): (Seq[String], Seq[String]) = {
+    def depsFor(pe: ProjectExport): (Seq[String], Seq[String]) = {
       val deps = pe.externalDependencies
         .filterNot(d => isIgnoredDep(d.organization, d.name))
         .filterNot(d => d.configurations.exists(_.contains("plugin")))
-        .map(d => SbtImporter.formatDependency(d, isCrossPlatform))
+        .map(d => SbtImporter.formatDependency(d))
         .distinct
       val plugins = pe.externalDependencies
         .filter(SbtImporter.isPluginDependency)
         .filterNot(d => isIgnoredDep(d.organization, d.name))
-        .map(d => SbtImporter.formatDependency(d, isCrossPlatform))
+        .map(d => SbtImporter.formatDependency(d))
         .distinct
       (deps, plugins)
     }
@@ -415,15 +415,17 @@ object SbtImporter {
     dep.configurations.exists(_.contains("plugin"))
   }
 
-  /** Formats a DependencyExport into a Maven coordinate string.
-   *  isCrossPlatform should be true for ScalaJS/Native modules (uses :: between name and version for platform cross-version). */
-  def formatDependency(dep: DependencyExport, isCrossPlatform: Boolean = false): String = {
+  /** Formats a DependencyExport into a Maven coordinate string. */
+  def formatDependency(dep: DependencyExport): String = {
     val scalaColon = dep.crossVersion match {
       case "full" => ":::"
       case "binary" => "::"
       case _ => ":"
     }
-    val platformColon = if (isCrossPlatform) "::" else ":"
+    val platformColon = dep.platformOpt match {
+      case Some(_) => "::"
+      case None => ":"
+    }
     s"${dep.organization}${scalaColon}${dep.name}${platformColon}${dep.revision}"
   }
 
