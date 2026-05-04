@@ -19,30 +19,47 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
     assume(gitAvailable, "git not found on PATH - skipping import tests")
   }
 
+  /** Force-stop any deder server running in the given directory. */
+  private def forceShutdownServer(dir: os.Path): Unit = {
+    // Try graceful shutdown first (ignore errors)
+    try executeDederCommand(dir, "shutdown")
+    catch case _: Exception => ()
+    // Kill any remaining server process for this directory
+    val lockFile = dir / ".deder/server.lock"
+    if os.exists(lockFile) then
+      try
+        val pid = os.read(lockFile).trim
+        os.proc("kill", pid).call(check = false)
+      catch case _: Exception => ()
+    // Clean up lock/socket files
+    try os.remove(lockFile) catch case _: Exception => ()
+    try os.remove(dir / ".deder/server-cli.sock") catch case _: Exception => ()
+    try os.remove(dir / ".deder/server-bsp.sock") catch case _: Exception => ()
+    // Kill any sbt orphan processes
+    try os.proc("pkill", "-f", s"sbt.*${dir.last}").call(check = false) catch case _: Exception => ()
+  }
+
   /** Clone a repo at a specific tag, run deder import, validate output. */
   private def testImport(repoUrl: String, gitRef: String, expectedMinModules: Int): Unit = {
     val repoName = repoUrl.split("/").last.stripSuffix(".git")
     val tempDir = os.pwd / "tmp" / s"import-$repoName-${System.currentTimeMillis()}"
 
     try {
-      // 1. Shallow clone at specific tag
-      val cloneRes = os.proc("git", "clone", "--depth", "1", "--branch", gitRef, repoUrl, tempDir.toString)
+      val cloneRes = os
+        .proc("git", "clone", "--depth", "1", "--branch", gitRef, repoUrl, tempDir.toString)
         .call(cwd = os.pwd, stderr = os.Pipe, check = false)
       assertEquals(cloneRes.exitCode, 0, s"git clone $repoUrl@$gitRef failed:\n${cloneRes.err.text()}")
 
-      // 2. Set up server properties so the server JAR can be found
       val serverProps =
         s"localPath=$dederServerPath\n" +
-        s"testRunnerLocalPath=$dederTestRunnerPath\n"
+          s"testRunnerLocalPath=$dederTestRunnerPath\n"
       os.write.over(tempDir / ".deder/server.properties", serverProps, createFolders = true)
 
-      // 3. Run deder import (writes sbt plugin, runs sbt exportBuildStructure, parses JSON, generates deder.pkl)
       val importRes = executeDederCommand(tempDir, "import", "--from", "sbt")
-      assertEquals(importRes.exitCode, 0,
-        s"deder import failed (exit ${importRes.exitCode}):\n${importRes.err.text()}")
+      assertEquals(importRes.exitCode, 0, s"deder import failed (exit ${importRes.exitCode}):\n${importRes.err.text()}")
 
-      // 4. Verify deder.pkl was created and tweak to use local config
       assert(os.exists(tempDir / "deder.pkl"), "deder.pkl was not created by import")
+      // Tweak amends to use local config (so we don't need network)
       val dederPklContent = os.read(tempDir / "deder.pkl")
       val tweakedContent = dederPklContent.replaceFirst(
         "amends \"https://sake92.github.io/deder/config/early-access/DederProject.pkl\"",
@@ -50,33 +67,43 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
       )
       os.write.over(tempDir / "deder.pkl", tweakedContent)
 
-      // 5. Shutdown server so next command starts fresh with the new deder.pkl
-      executeDederCommand(tempDir, "shutdown")
+      // Shutdown server so next command starts fresh
+      forceShutdownServer(tempDir)
 
-      // 6. Validate generated Pkl by listing modules
       val modulesRes = executeDederCommand(tempDir, "modules")
       val modulesOut = modulesRes.out.text()
       val modulesErr = modulesRes.err.text()
-      assertEquals(modulesRes.exitCode, 0,
-        s"deder modules failed (exit ${modulesRes.exitCode}):\nstderr: $modulesErr\nstdout: $modulesOut")
+      assertEquals(
+        modulesRes.exitCode,
+        0,
+        s"deder modules failed (exit ${modulesRes.exitCode}):\nstderr: $modulesErr\nstdout: $modulesOut"
+      )
 
-      // 7. Check module count (at least the expected minimum)  
-      // deder modules outputs module names to stdout, one per line
       val allOutput = if modulesOut.nonEmpty then modulesOut else modulesErr
       val moduleLines = allOutput.linesIterator.filter { line =>
         val t = line.trim
         t.nonEmpty && !t.startsWith("Deder") && !t.startsWith("Using") && !t.startsWith("[")
       }.toSeq
-      assert(moduleLines.size >= expectedMinModules,
-        s"Expected >= $expectedMinModules modules, got ${moduleLines.size}\nOutput:\n${allOutput}")
+      assert(
+        moduleLines.size >= expectedMinModules,
+        s"Expected >= $expectedMinModules modules, got ${moduleLines.size}\nOutput:\n${allOutput}"
+      )
 
     } finally {
-      executeDederCommand(tempDir, "shutdown")
-      // keep temp dir for debugging
+      forceShutdownServer(tempDir)
     }
   }
 
   test("import scalacheck v1.19.0") {
     testImport("https://github.com/typelevel/scalacheck.git", "v1.19.0", expectedMinModules = 5)
   }
+
+  // TODO: enable once importer handles ScalaJsModule/ScalaNativeModule template types correctly
+  // test("import chimney 1.7.3") {
+  //   testImport("https://github.com/scalalandio/chimney.git", "1.7.3", expectedMinModules = 3)
+  // }
+
+  // test("import monocle v3.3.0") {
+  //   testImport("https://github.com/optics-dev/Monocle.git", "v3.3.0", expectedMinModules = 5)
+  // }
 }

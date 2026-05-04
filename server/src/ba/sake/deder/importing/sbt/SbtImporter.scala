@@ -17,7 +17,10 @@ class SbtImporter(
     "org.scala-lang"     -> "scala-library",
     // ScalaJS (auto-added by Deder)
     "org.scala-js"       -> "scalajs-library",
+    "org.scala-js"       -> "scalajs-scalalib",
     "org.scala-js"       -> "scalajs-test-bridge",
+    "org.scala-js"       -> "scalajs-test-interface",
+    "org.scala-js"       -> "scalajs-compiler",
     // ScalaNative (auto-added by Deder)
     "org.scala-native"   -> "scala3lib",
     "org.scala-native"   -> "scalalib",
@@ -26,6 +29,9 @@ class SbtImporter(
     "org.scala-native"   -> "auxlib",
     "org.scala-native"   -> "clib",
     "org.scala-native"   -> "posixlib",
+    "org.scala-native"   -> "test-interface",
+    "org.scala-native"   -> "windowslib",
+    "org.scala-native"   -> "nscplugin",
   )
 
   private def isIgnoredDep(org: String, name: String): Boolean =
@@ -48,16 +54,24 @@ class SbtImporter(
          |""".stripMargin
     val exportBuildStructurePluginPath = os.pwd / "project/exportBuildStructure.sbt"
     os.write.over(exportBuildStructurePluginPath, exportBuildStructurePluginSource)
-    val res = os.spawn((sbtCmd, "exportAllBuildStructures"), mergeErrIntoOut = true)
-    var line = ""
-    while {
-      line = res.stdout.readLine()
-      line != null
-    } do {
-      serverNotificationsLogger.add(ServerNotification.logInfo(line))
+    val sbtProc = os.spawn((sbtCmd, "exportAllBuildStructures"), mergeErrIntoOut = true)
+    try {
+      var line = ""
+      while {
+        line = sbtProc.stdout.readLine()
+        line != null
+      } do {
+        serverNotificationsLogger.add(ServerNotification.logInfo(line))
+      }
+      sbtProc.waitFor()
+    } finally {
+      // Ensure sbt process is destroyed even if we're interrupted
+      if sbtProc.isAlive() then
+        sbtProc.destroy()
+        sbtProc.waitFor(5000L)
+        if sbtProc.isAlive() then sbtProc.destroyForcibly()
+      os.remove(exportBuildStructurePluginPath)
     }
-    res.waitFor()
-    os.remove(exportBuildStructurePluginPath)
   }
 
   /** Info about one module group after first-pass analysis. */
@@ -99,7 +113,7 @@ class SbtImporter(
     val grouped = exportedSbtModules.groupBy { pe =>
       val absPath = os.Path(pe.base)
       val last = absPath.last
-      if (Set("jvm", "js", "native").contains(last)) absPath / os.up
+      if (Set("jvm", "js", "native", ".jvm", ".js", ".native").contains(last)) absPath / os.up
       else absPath
     }.map { case (rootPath, modules) => RawGroup(rootPath, modules) }.toSeq
 
@@ -115,24 +129,29 @@ class SbtImporter(
         !pe.id.endsWith("Test") && !pe.id.contains("JS") && !pe.id.contains("Native")
       ).getOrElse(rg.modules.head)
 
-      val plugins = mainModule.plugins
-      val layout = SbtImporter.detectLayout(plugins, rg.rootPath.toString)
+      // Check ALL modules' plugins for cross-project signals (not just mainModule)
+      val allPlugins = rg.modules.flatMap(_.plugins).distinct
+      val layout = SbtImporter.detectLayout(allPlugins, rg.rootPath.toString)
       val isCross = layout == DederProject.DirLayout.SBT_CROSS_FULL ||
         layout == DederProject.DirLayout.SBT_CROSS_PURE ||
         layout == DederProject.DirLayout.SBT_CROSS_DUMMY
 
-      val hasScalaJs = plugins.exists(p => p.contains("ScalaJSPlugin") || p.contains("scalajs"))
-      val hasScalaNative = plugins.exists(p => p.contains("ScalaNativePlugin") || p.contains("scalanative"))
+      val hasScalaJs = allPlugins.exists(p => p.contains("ScalaJSPlugin") || p.contains("scalajs"))
+      val hasScalaNative = allPlugins.exists(p => p.contains("ScalaNativePlugin") || p.contains("scalanative"))
       val scalaVersion = mainModule.scalaVersion
 
       // Derive builder variable name from project name (must be valid Pkl identifier)
       val rawName = ImportingUtils.sanitizeId(mainModule.name)
-      val builderVarName = rawName.replaceAll("[.-]", "_").replaceAll("[^a-zA-Z0-9_]", "")
+      // Strip platform suffix for cross-modules (e.g., "rootJVM" -> "root", "coreJVM" -> "core")
+      val baseName = if (isCross) rawName.replaceFirst("(?i)jvm$", "") else rawName
+      val builderVarName = baseName.replaceAll("[.-]", "_").replaceAll("[^a-zA-Z0-9_]", "")
 
       // Build sbt-id -> Pkl reference mapping (e.g., "hepekComponentsJVM" -> "hepek_components.jvm")
       val sbtIdToRef = rg.modules.map { pe =>
         val sbtId = pe.id
-        val lastSegment = os.Path(pe.base).last
+        val rawSegment = os.Path(pe.base).last
+        // Strip leading dot for cross modules (e.g., ".js" -> "js")
+        val lastSegment = if (rawSegment.startsWith(".")) rawSegment.tail else rawSegment
         val ref = if (isCross) {
           s"$builderVarName.$lastSegment"
         } else {
@@ -142,8 +161,8 @@ class SbtImporter(
       }.toMap
 
       // Also add default (non-js/native) sbt id mapping
-      val hasJsModule = rg.modules.exists(pe => os.Path(pe.base).last == "js")
-      val hasNativeModule = rg.modules.exists(pe => os.Path(pe.base).last == "native")
+      val hasJsModule = rg.modules.exists(pe => Set("js", ".js").contains(os.Path(pe.base).last))
+      val hasNativeModule = rg.modules.exists(pe => Set("native", ".native").contains(os.Path(pe.base).last))
 
       GroupInfo(
         builderVarName,
@@ -229,23 +248,26 @@ class SbtImporter(
     def formatPluginDeps(plugins: Seq[String]): String =
       if (plugins.nonEmpty) s"""scalacPluginDeps {\n${plugins.map(d => s"""      "$d"""").mkString("\n")}\n    }""" else ""
 
+    def lastIsPlatform(s: String, platform: String): Boolean =
+      s == platform || s == s".$platform"
+
     // JVM deps (for template, or for non-cross modules)
     val jvmModule = if (gi.isCross)
-      gi.allModules.find(pe => os.Path(pe.base).last == "jvm").getOrElse(gi.mainModule)
+      gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "jvm")).getOrElse(gi.mainModule)
     else gi.mainModule
     val (jvmDeps, jvmPlugins) = depsFor(jvmModule)
     val jvmDepsStr = formatDeps(jvmDeps)
     val jvmPluginDepsStr = formatPluginDeps(jvmPlugins)
 
     // JS deps (for cross-project jsTemplate)
-    val jsModule = gi.allModules.find(pe => os.Path(pe.base).last == "js")
-    val (jsDeps, jsPlugins) = jsModule.map(pe => depsFor(pe, isCrossPlatform = true)).getOrElse((Seq.empty, Seq.empty))
+    val jsModule = gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "js"))
+    val (jsDeps, jsPlugins) = jsModule.map(pe => depsFor(pe)).getOrElse((Seq.empty, Seq.empty))
     val jsDepsStr = formatDeps(jsDeps)
     val jsPluginDepsStr = formatPluginDeps(jsPlugins)
 
     // Native deps (for cross-project nativeTemplate)
-    val nativeModule = gi.allModules.find(pe => os.Path(pe.base).last == "native")
-    val (nativeDeps, nativePlugins) = nativeModule.map(pe => depsFor(pe, isCrossPlatform = true)).getOrElse((Seq.empty, Seq.empty))
+    val nativeModule = gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "native"))
+    val (nativeDeps, nativePlugins) = nativeModule.map(pe => depsFor(pe)).getOrElse((Seq.empty, Seq.empty))
     val nativeDepsStr = formatDeps(nativeDeps)
     val nativePluginDepsStr = formatPluginDeps(nativePlugins)
 
@@ -259,10 +281,13 @@ class SbtImporter(
 
     val idOverride = s"""id = "${gi.builderVarName}""""
 
-    val body =
-      s"""  template = new ScalaModule {
+    // Build template body with appropriate module type
+    def templateBody(moduleType: String, extraProps: String = ""): String =
+      s"""  template = new $moduleType {
          |    scalaVersion = "${gi.mainModule.scalaVersion}"
-         |${if (jvmDepsStr.nonEmpty) s"    $jvmDepsStr\n" else ""}${if (jvmPluginDepsStr.nonEmpty) s"    $jvmPluginDepsStr\n" else ""}${if (moduleDepsStr.nonEmpty) s"    $moduleDepsStr\n" else ""}  }""".stripMargin
+         |$extraProps${if (jvmDepsStr.nonEmpty) s"    $jvmDepsStr\n" else ""}${if (jvmPluginDepsStr.nonEmpty) s"    $jvmPluginDepsStr\n" else ""}${if (moduleDepsStr.nonEmpty) s"    $moduleDepsStr\n" else ""}  }""".stripMargin
+
+    val jvmBody = templateBody("ScalaModule")
 
     val defStr = if (gi.isCross) {
       val hasJs = jsModule.isDefined
@@ -288,29 +313,31 @@ class SbtImporter(
          |  root = "${gi.root}"
          |  $idOverride
          |  layout = "$layoutStr"
-         |$body
+         |$jvmBody
          |${if (tmpls.nonEmpty) tmpls + "\n" else ""}  testTemplate = (template.asTest()) {
          |    deps { "org.scalameta::munit:1.2.1" }
          |  }
          |}
          |.get""".stripMargin
     } else if (gi.hasScalaJs) {
+      val jsBody = templateBody("ScalaJsModule", s"""    scalaJsVersion = "1.18.2"\n""")
       s"""new CreateScalaJsModules {
          |  root = "${gi.root}"
          |  $idOverride
          |  layout = "$layoutStr"
-         |$body
+         |$jsBody
          |  testTemplate = (template.asTest()) {
          |    deps { "org.scalameta::munit:1.2.1" }
          |  }
          |}
          |.get""".stripMargin
     } else if (gi.hasScalaNative) {
+      val nativeBody = templateBody("ScalaNativeModule", s"""    scalaNativeVersion = "0.5.10"\n""")
       s"""new CreateScalaNativeModules {
          |  root = "${gi.root}"
          |  $idOverride
          |  layout = "$layoutStr"
-         |$body
+         |$nativeBody
          |  testTemplate = (template.asTest()) {
          |    deps { "org.scalameta::munit:1.2.1" }
          |  }
@@ -321,7 +348,7 @@ class SbtImporter(
          |  root = "${gi.root}"
          |  $idOverride
          |  layout = "$layoutStr"
-         |$body
+         |$jvmBody
          |  testTemplate = (template.asTest()) {
          |    deps { "org.scalameta::munit:1.2.1" }
          |  }
@@ -402,18 +429,21 @@ object SbtImporter {
 
   /** Detects which Deder DirLayout to use based on sbt plugins and directory structure. */
   def detectLayout(plugins: Seq[String], projectBaseDir: String): DederProject.DirLayout = {
-    val hasCrossProject = plugins.exists(p => p.contains("CrossPlugin") || p.contains("crossproject"))
+    val hasCrossProject = plugins.exists(p =>
+      p.contains("sbt-crossproject") || p.contains("ScalaJSCrossPlugin") || p.contains("ScalaNativeCrossPlugin")
+    )
+    val basePath = os.Path(projectBaseDir)
+    val hasSharedDir = os.exists(basePath / "shared")
+    val hasDotDirs = os.exists(basePath / ".jvm") || os.exists(basePath / ".js") || os.exists(basePath / ".native")
+    val hasTopLevelPlatformDirs = os.exists(basePath / "jvm") && os.exists(basePath / "js")
     
     if (hasCrossProject) {
-      val basePath = os.Path(projectBaseDir)
-      val hasSharedDir = os.exists(basePath / "shared")
-      val hasDotDirs = os.exists(basePath / ".jvm") || os.exists(basePath / ".js") || os.exists(basePath / ".native")
-      val hasTopLevelPlatformDirs = os.exists(basePath / "jvm") && os.exists(basePath / "js")
-      
       if (hasSharedDir) DederProject.DirLayout.SBT_CROSS_FULL
       else if (hasDotDirs) DederProject.DirLayout.SBT_CROSS_PURE
       else if (hasTopLevelPlatformDirs) DederProject.DirLayout.SBT_CROSS_DUMMY
       else DederProject.DirLayout.SBT
+    } else if (hasDotDirs) {
+      DederProject.DirLayout.SBT_CROSS_PURE
     } else {
       DederProject.DirLayout.SBT
     }
