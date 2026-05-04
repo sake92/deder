@@ -18,7 +18,7 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
 
       // Step 2: verify the artifact was published to the shared repo
       val localRepoDir = os.Path(sys.env("DEDER_TMP_M2_REPO"))
-      val publishedDir = localRepoDir / "ba" / "sake" / "deder-hello-plugin_3" / "0.1.0-SNAPSHOT"
+      val publishedDir = localRepoDir / "ba" / "sake" / "deder-hello-plugin_3" / "it-test-version"
       assert(os.exists(publishedDir), s"Published artifact directory not found at $publishedDir")
       assert(
         os.list(publishedDir).exists(_.last.endsWith(".jar")),
