@@ -7,7 +7,9 @@ class HelloPluginImpl extends DederPlugin {
   def id: String = "hello"
 
   def tasks(coreTasks: CoreTasksApi, config: Plugin): Seq[AbstractTask[?]] = {
-    val greeting = "Hello from hello-plugin!"
+    val helloConfig = config.asInstanceOf[HelloConfig]
+    val greeting = Option(helloConfig.getGreeting()).getOrElse("Hello!")
+
     val helloTask = TaskBuilder
       .make[String](name = "hello")
       .build { ctx =>

@@ -1,0 +1,7 @@
+import "../../../../../config/DederProject.pkl"
+
+class HelloConfig extends DederProject.Plugin {
+  id = "hello"
+  deps { "ba.sake::deder-hello-plugin:it-test-version" }
+  greeting: String = "Hello from hello-plugin!"
+}

@@ -1,5 +1,8 @@
 amends "../../../../../config/DederProject.pkl"
 
+// __HELLO_CONFIG_IMPORT__ is injected by the test to import the typed plugin config class
+__HELLO_CONFIG_IMPORT__
+
 // Shared local Maven repository (set by run-it-tests.sh via DEDER_TMP_M2_REPO env var)
 repositories {
   new MavenRepository { url = "file://\(read("env:DEDER_TMP_M2_REPO"))" }
@@ -11,9 +14,8 @@ modules {
     scalaVersion = "3.7.4"
     mainClass = "Main"
     plugins {
-      new Plugin {
-        id = "hello"
-        deps { "ba.sake::deder-hello-plugin:0.1.0-SNAPSHOT" }
+      new HelloConfig {
+        greeting = "Hello from typed config!"
       }
     }
   }
