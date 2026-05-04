@@ -5,6 +5,7 @@ amends "../../config/DederProject.pkl"
 local const baseModule: ScalaModule = new {
   scalaVersion = "3.7.4"
   publish = false
+  scalacOptions { "-deprecation" }
 }
 
 local const common = (baseModule) {
