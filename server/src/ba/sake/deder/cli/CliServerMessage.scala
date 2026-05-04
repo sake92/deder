@@ -44,7 +44,17 @@ object CliServerMessage {
         case xsbti.Severity.Error => LogLevel.ERROR
         case xsbti.Severity.Warn  => LogLevel.WARNING
         case _                     => LogLevel.INFO
-      Some(CliServerMessage.Log(formatDiagnostic(cd.problem), sev))
+      val levelString = sev.toString.toLowerCase
+      val coloredLevel = sev match
+        case cli.LogLevel.ERROR   => fansi.Color.Red(levelString)
+        case cli.LogLevel.WARNING => fansi.Color.Yellow(levelString)
+        case _                    => fansi.Color.Green(levelString)
+      val modulePrefix = fansi.Color.Cyan(s" [${cd.moduleId}]")
+      val location = formatDiagnosticLocation(cd.problem)
+      val text = location match
+        case Some(loc) => s"[${coloredLevel}]${modulePrefix} $loc: ${cd.problem.message()}"
+        case None      => s"[${coloredLevel}]${modulePrefix} ${cd.problem.message()}"
+      Some(CliServerMessage.Log(text, sev))
     case cs: ServerNotification.CompileFinished =>
       None
     case cf: ServerNotification.CompileFailed =>
@@ -55,19 +65,20 @@ object CliServerMessage {
       Some(CliServerMessage.Exit(if success then 0 else 1))
   }
 
-  private def formatDiagnostic(problem: xsbti.Problem): String =
+  private def formatDiagnosticLocation(problem: xsbti.Problem): Option[String] =
     val pos = problem.position()
-    val src = pos.sourceFile().map[String] { f =>
+    val srcOpt = pos.sourceFile()
+    if srcOpt.isPresent then
+      val f = srcOpt.get()
       val abs = os.Path(f.toPath)
-      if abs.startsWith(DederGlobals.projectRootDir) then
-        abs.relativeTo(DederGlobals.projectRootDir).toString()
-      else abs.toString()
-    }.orElse("?")
-    val line = pos.startLine().orElse(0)
-    val col = pos.startColumn().orElse(0)
-    val sev = problem.severity() match
-      case xsbti.Severity.Error => "error"
-      case xsbti.Severity.Warn  => "warn"
-      case _                     => "info"
-    s"$src:$line:$col: $sev: ${problem.message()}"
+      val relPath =
+        if abs.startsWith(DederGlobals.projectRootDir) then
+          abs.relativeTo(DederGlobals.projectRootDir).toString()
+        else abs.toString()
+      val line = pos.startLine().orElse(0)
+      val col = pos.startColumn().orElse(0)
+      if line > 0 && col > 0 then Some(s"$relPath:$line:$col")
+      else if line > 0 then Some(s"$relPath:$line")
+      else Some(relPath)
+    else None
 }
