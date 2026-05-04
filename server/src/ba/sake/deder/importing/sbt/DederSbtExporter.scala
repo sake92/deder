@@ -153,7 +153,7 @@ class DederSbtExporter(
       generateModuleGroup(gi, globalIdMap)
     }
 
-    s"""amends "https://sake92.github.io/deder/config/v0.7.3/DederProject.pkl"
+    s"""amends "https://sake92.github.io/deder/config/v0.7.4/DederProject.pkl"
        |
        |${builderDefs.mkString("\n")}
        |
