@@ -14,7 +14,7 @@ const function versionPrefixes(scalaVersion: String): List<String> =
       when (patch != null) { patch }
     }.toList()
 
-/// Returns version-specific source directories for a given base directory and scalaVersion.
+/// Returns version-specific source directories for a given base directory and scalaVersion (deder style).
 /// Example: versionSourceDirs("3.7.4", "src/main/scala") → ["src/main/scala-3", "src/main/scala-3.7", "src/main/scala-3.7.4"]
 const function versionSourceDirs(scalaVersion: String, baseDir: String): Listing<String> = new Listing {
   for (prefix in versionPrefixes(scalaVersion)) {
@@ -22,9 +22,63 @@ const function versionSourceDirs(scalaVersion: String, baseDir: String): Listing
   }
 }
 
+/// sbt-style version prefixes for cross-version source directories.
+/// Examples:
+///   sbtVersionPrefixes("2.13.18") → ["2", "2.13", "2.13.18", "2.13+"]
+///   sbtVersionPrefixes("3.3.4")   → ["3", "3.3", "3.3.4", "3.3+", "2.13+"]
+/// The "+" suffix means "this binary version and higher" using simple semver comparison.
+/// For Scala 3.x, the 2.13+ dir is included automatically (most common cross-version pattern).
+const function sbtVersionPrefixes(scalaVersion: String): List<String> =
+  let (cleanVersion = scalaVersion.replaceAll(Regex("\\+.*$"), ""))
+  let (parts = cleanVersion.split(".").toList())
+  let (len = parts.length)
+  let (majorStr = parts[0])
+  let (minorStr = if (len >= 2) parts[1] else "0")
+  let (patchStr = if (len >= 3) parts[2] else null)
+  let (major = majorStr.toInt())
+  let (minor = minorStr.toInt())
+  
+  let (exactPrefixes = new Listing {
+      majorStr
+      when (len >= 2) { "\(majorStr).\(minorStr)" }
+      when (patchStr != null) { "\(majorStr).\(minorStr).\(patchStr)" }
+    })
+  
+  let (currentPlus = "\(majorStr).\(minorStr)+")
+  
+  let (crossPlus = if (major >= 3) new Listing { "2.13+" } else new Listing {})
+  
+  new Listing {
+    for (p in exactPrefixes) { p }
+    currentPlus
+    for (p in crossPlus) { p }
+  }.toList().distinct
+
+/// Returns sbt-style version-specific source directories for a given base directory and scalaVersion.
+/// Example: sbtVersionSourceDirs("2.13.18", "src/main/scala") → ["src/main/scala-2", "src/main/scala-2.13", "src/main/scala-2.13.18", "src/main/scala-2.13+"]
+const function sbtVersionSourceDirs(scalaVersion: String, baseDir: String): Listing<String> = new Listing {
+  for (prefix in sbtVersionPrefixes(scalaVersion)) {
+    "\(baseDir)-\(prefix)"
+  }
+}
+
+/// Dispatches version source dirs based on versionStyle.
+const function resolveVersionSourceDirs(versionStyle: String, scalaVersion: String, baseDir: String): Listing<String> =
+  if (versionStyle == "sbt") sbtVersionSourceDirs(scalaVersion, baseDir)
+  else versionSourceDirs(scalaVersion, baseDir)
+
+/// Builds source directory list for crossModules: shared base (with extra+versioned) + platform-specific base.
+const function crossPlatformSources(baseDir: String, platformDir: String, extraSrc: Listing<String>, includeShared: Boolean, versionStyle: String, scalaVersion: String): Listing<String> =
+  new Listing {
+    when (includeShared) {
+      baseDir
+      ...(extraSrc)
+      ...resolveVersionSourceDirs(versionStyle, scalaVersion, baseDir)
+    }
+    platformDir
+  }
+
 /// Resolves layout-specific directory paths for Create*Modules helpers.
-/// `mainScalaSrcBase` / `testScalaSrcBase` — directories that get Scala version-prefixed.
-/// `mainExtraSrc` / `testExtraSrc` — additional unversioned source dirs (e.g. `src/main/java` for Scala modules).
 class LayoutConfig {
   mainScalaSrcBase: String
   testScalaSrcBase: String
@@ -33,4 +87,6 @@ class LayoutConfig {
   mainResources: Listing<String>
   testResources: Listing<String>
   testRootSuffix: String
+  versionStyle: String = "deder"
+  crossType: String?
 }
