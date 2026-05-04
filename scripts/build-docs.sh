@@ -1,6 +1,13 @@
 
 mkdir -p docs/static/config
 
+# Always include early-access config from main
+mkdir -p docs/static/config/early-access
+git show main:config/DederProject.pkl > docs/static/config/early-access/DederProject.pkl
+if git cat-file -e main:config/DederInternals.pkl 2>/dev/null; then
+  git show main:config/DederInternals.pkl > docs/static/config/early-access/DederInternals.pkl
+fi
+
 for tag in $(git tag --sort=-creatordate); do
   echo "Processing version: $tag"
   mkdir -p docs/static/config/$tag
