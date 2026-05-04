@@ -33,7 +33,7 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
           res.exitCode == 0,
           s"hello task failed: exit=${res.exitCode}\nstderr=${res.err.text()}\nstdout=${res.out.text()}"
         )
-        val out = res.out.text()
+        val out = res.out.text() + res.err.text()
         assert(out.contains("Hello from hello-plugin!"), s"Expected greeting in output, got: $out")
       }
     }
