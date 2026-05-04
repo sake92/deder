@@ -14,7 +14,7 @@ class SbtImporterSuite extends FunSuite {
       excludes = Seq.empty,
       crossVersion = "full"
     )
-    assert(SbtImporter.isPluginDependency(dep))
+    assert(DederSbtExporter.isPluginDependency(dep))
   }
 
   test("isPluginDependency returns true for 'plugin->default' configuration") {
@@ -27,7 +27,7 @@ class SbtImporterSuite extends FunSuite {
       excludes = Seq.empty,
       crossVersion = "full"
     )
-    assert(SbtImporter.isPluginDependency(dep))
+    assert(DederSbtExporter.isPluginDependency(dep))
   }
 
   test("isPluginDependency returns false for 'test' configuration") {
@@ -40,7 +40,7 @@ class SbtImporterSuite extends FunSuite {
       excludes = Seq.empty,
       crossVersion = "binary"
     )
-    assert(!SbtImporter.isPluginDependency(dep))
+    assert(!DederSbtExporter.isPluginDependency(dep))
   }
 
   test("isPluginDependency returns false for None configuration") {
@@ -53,7 +53,7 @@ class SbtImporterSuite extends FunSuite {
       excludes = Seq.empty,
       crossVersion = "none"
     )
-    assert(!SbtImporter.isPluginDependency(dep))
+    assert(!DederSbtExporter.isPluginDependency(dep))
   }
 
   test("formatDependency produces correct Maven coordinate for full crossVersion") {
@@ -66,7 +66,7 @@ class SbtImporterSuite extends FunSuite {
       excludes = Seq.empty,
       crossVersion = "full"
     )
-    assertEquals(SbtImporter.formatDependency(dep), "org.wartremover:::wartremover:3.5.0")
+    assertEquals(DederSbtExporter.formatDependency(dep), "org.wartremover:::wartremover:3.5.0")
   }
 
   test("formatDependency produces correct Maven coordinate for binary crossVersion") {
@@ -79,7 +79,7 @@ class SbtImporterSuite extends FunSuite {
       excludes = Seq.empty,
       crossVersion = "binary"
     )
-    assertEquals(SbtImporter.formatDependency(dep), "org.scalameta::munit:1.2.1")
+    assertEquals(DederSbtExporter.formatDependency(dep), "org.scalameta::munit:1.2.1")
   }
 
   test("formatDependency produces correct Maven coordinate for Java dependency") {
@@ -92,7 +92,7 @@ class SbtImporterSuite extends FunSuite {
       excludes = Seq.empty,
       crossVersion = "none"
     )
-    assertEquals(SbtImporter.formatDependency(dep), "org.jsoup:jsoup:1.21.1")
+    assertEquals(DederSbtExporter.formatDependency(dep), "org.jsoup:jsoup:1.21.1")
   }
 
   test("dependencies are correctly partitioned between deps and scalacPluginDeps") {
@@ -125,7 +125,7 @@ class SbtImporterSuite extends FunSuite {
     )
 
     val allDeps = Seq(regularDep, pluginDep, testDep)
-    val (plugins, regular) = allDeps.partition(SbtImporter.isPluginDependency)
+    val (plugins, regular) = allDeps.partition(DederSbtExporter.isPluginDependency)
 
     assertEquals(plugins.length, 1)
     assertEquals(plugins.head.name, "wartremover")
