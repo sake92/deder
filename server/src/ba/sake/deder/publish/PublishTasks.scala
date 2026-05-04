@@ -378,8 +378,14 @@ class PublishTasks(coreTasks: CoreTasks) {
       publishArtifactsResOpt.map { publishArtifactsRes =>
         val pom = publishArtifactsRes.pom
         val artifacts = os.list(publishArtifactsRes.outDir)
+        // copy to staging dir so checksums don't pollute publishArtifacts output
+        val stagingDir = ctx.out / "staging"
+        os.remove.all(stagingDir)
+        os.makeDir.all(stagingDir)
+        artifacts.foreach(f => os.copy(f, stagingDir / f.last))
+        val stagingFiles = os.list(stagingDir)
         // generate hashes
-        val allFiles = artifacts.flatMap { f =>
+        val allFiles = stagingFiles.flatMap { f =>
           Seq(f) ++ Hasher.generateChecksums(f)
         }
         ctx.module match {
@@ -420,6 +426,12 @@ class PublishTasks(coreTasks: CoreTasks) {
       publishArtifactsResOpt.map { publishArtifactsRes =>
         val pom = publishArtifactsRes.pom
         val artifacts = os.list(publishArtifactsRes.outDir)
+        // copy to staging dir so signing and checksums don't pollute publishArtifacts output
+        val stagingDir = ctx.out / "staging"
+        os.remove.all(stagingDir)
+        os.makeDir.all(stagingDir)
+        artifacts.foreach(f => os.copy(f, stagingDir / f.last))
+        val stagingFiles = os.list(stagingDir)
 
         val publishTo = ctx.module match {
           case jm: JavaModule => jm.publishTo
@@ -451,14 +463,16 @@ class PublishTasks(coreTasks: CoreTasks) {
         publishTo match {
           case _: SonatypeCentralRepo =>
             val scCreds = creds.asInstanceOf[SonatypeCentralCredentials]
-            artifacts.foreach(f => PgpSigner.signFile(f, scCreds.pgpSecret, scCreds.pgpPassphrase.toCharArray))
-            val allFiles = artifacts.flatMap { f =>
+            stagingFiles.foreach(f => PgpSigner.signFile(f, scCreds.pgpSecret, scCreds.pgpPassphrase.toCharArray))
+            val allFiles = stagingFiles.flatMap { f =>
               val signatureFile = f / os.up / s"${f.last}.asc"
               Seq(f, signatureFile) ++
                 Hasher.generateChecksums(f) ++
                 Hasher.generateChecksums(signatureFile)
             }
-            os.remove.all(ctx.out)
+            // clean previous output (but keep staging dir), then assemble final bundle
+            os.remove.all(ctx.out / "final")
+            os.remove.all(ctx.out / s"${pom.artifactId}_bundle.zip")
             val filesDir =
               ctx.out / "final" / os.SubPath(s"${pom.groupId.replace('.', '/')}/${pom.artifactId}/${pom.version}")
             os.makeDir.all(filesDir)
@@ -469,12 +483,12 @@ class PublishTasks(coreTasks: CoreTasks) {
 
           case _: SonatypeSnapshotRepo =>
             val ssCreds = creds.asInstanceOf[SonatypeSnapshotCredentials]
-            val allFiles = artifacts.flatMap(f => Seq(f) ++ Hasher.generateChecksums(f))
+            val allFiles = stagingFiles.flatMap(f => Seq(f) ++ Hasher.generateChecksums(f))
             publisher.publishSonatypeSnapshot(ssCreds.username, ssCreds.password, pom, allFiles)
 
           case mavenRepo: MavenRepo =>
             val baCreds = creds.asInstanceOf[BasicAuthCredentials]
-            val allFiles = artifacts.flatMap(f => Seq(f) ++ Hasher.generateChecksums(f))
+            val allFiles = stagingFiles.flatMap(f => Seq(f) ++ Hasher.generateChecksums(f))
             publisher.publishMavenRepo(baCreds.username, baCreds.password, mavenRepo.url, pom, allFiles)
         }
       }

@@ -28,6 +28,21 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("publishArtifacts should contain exactly 4 files, no checksums") {
+    withTestProject("sample-projects/publish") { projectPath =>
+      executeDederCommand(projectPath, "exec", "-m", "lib1", "-t", "publishArtifacts").out.text()
+      val artifactsDir = projectPath / ".deder/out/lib1/publishArtifacts/artifacts"
+      val files = os.list(artifactsDir).map(_.last).sorted
+      val expected = Seq(
+        "lib1_3-0.0.1-SNAPSHOT.jar",
+        "lib1_3-0.0.1-SNAPSHOT-javadoc.jar",
+        "lib1_3-0.0.1-SNAPSHOT-sources.jar",
+        "lib1_3-0.0.1-SNAPSHOT.pom"
+      ).sorted
+      assertEquals(files, expected, s"publishArtifacts must contain exactly 4 artifact files, no checksums, got: $files")
+    }
+  }
+
   test("deder POM should only contain direct module deps, not transitive") {
     withTestProject("sample-projects/publish") { projectPath =>
       executeDederCommand(projectPath, "exec", "-m", "lib3", "-t", "publishArtifacts").out.text()
@@ -60,18 +75,18 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
-  test("deder publishLocal should publish to custom folder when publishLocalTo is set") {
+  test("deder publishLocal should publish exactly 12 files to custom folder (relative path)") {
     withTestProject("sample-projects/publish") { projectPath =>
       executeDederCommand(projectPath, "exec", "-m", "lib5", "-t", "publishLocal").out.text()
       val customRepoPath = projectPath / "out/local-repo" / "com/example/lib5_3/0.0.1-SNAPSHOT"
       assert(os.exists(customRepoPath), s"Expected custom local repo at $customRepoPath")
       val files = os.list(customRepoPath).map(_.last).sorted
-      assert(files.exists(_.endsWith(".jar")), s"Expected JAR in $customRepoPath, got: $files")
-      assert(files.exists(_.endsWith(".pom")), s"Expected POM in $customRepoPath, got: $files")
+      assertEquals(files, expectedPublishLocalFiles("lib5_3-0.0.1-SNAPSHOT").sorted,
+        s"publishLocal should produce exactly 12 files (4 artifacts × 3 checksums), got: $files")
     }
   }
 
-  test("deder publishLocal should publish to absolute custom folder when publishLocalTo is an absolute path") {
+  test("deder publishLocal should publish exactly 12 files to absolute custom folder") {
     val absoluteRepoDir = os.temp.dir()
     try {
       withTestProject("sample-projects/publish") { projectPath =>
@@ -83,8 +98,8 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
         val customRepoPath = absoluteRepoDir / "com/example/lib5_3/0.0.1-SNAPSHOT"
         assert(os.exists(customRepoPath), s"Expected custom local repo at $customRepoPath")
         val files = os.list(customRepoPath).map(_.last).sorted
-        assert(files.exists(_.endsWith(".jar")), s"Expected JAR in $customRepoPath, got: $files")
-        assert(files.exists(_.endsWith(".pom")), s"Expected POM in $customRepoPath, got: $files")
+        assertEquals(files, expectedPublishLocalFiles("lib5_3-0.0.1-SNAPSHOT").sorted,
+          s"publishLocal should produce exactly 12 files (4 artifacts × 3 checksums), got: $files")
       }
     } finally {
       os.remove.all(absoluteRepoDir)
@@ -109,4 +124,9 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
       }
     }
   }
+
+  private def expectedPublishLocalFiles(baseName: String): Seq[String] =
+    for { art <- Seq(".jar", "-sources.jar", "-javadoc.jar", ".pom")
+          suf <- Seq("", ".md5", ".sha1")
+    } yield s"$baseName$art$suf"
 }
