@@ -1,10 +1,8 @@
 amends "../../../../../config/DederProject.pkl"
 
-local localRepoUrl = "file://\(read("env:DEDER_TMP_M2_REPO"))"
-
 // Shared local Maven repository (set by run-it-tests.sh via DEDER_TMP_M2_REPO env var)
 repositories {
-  new MavenRepository { url = localRepoUrl }
+  new MavenRepository { url = "file://\(read("env:DEDER_TMP_M2_REPO"))" }
 }
 
 modules {

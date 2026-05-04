@@ -2,7 +2,7 @@
 rm -rf ./tmp
 
 # Clean up any lingering server artifacts in sample projects
-find integration/test/resources/sample-projects -name ".deder" -type d -exec rm -rf {} + 2>/dev/null || true
+#find integration/test/resources/sample-projects -name ".deder" -type d -exec rm -rf {} + 2>/dev/null || true
 
 ./scripts/gen-config-bindings.sh
 

@@ -1,12 +1,5 @@
 amends "../../../../../config/DederProject.pkl"
 
-local localRepoUrl = "file://\(read("env:DEDER_TMP_M2_REPO"))"
-
-// Shared local Maven repository (set by run-it-tests.sh via DEDER_TMP_M2_REPO env var)
-repositories {
-  new MavenRepository { url = localRepoUrl }
-}
-
 modules {
   new ScalaModule {
     id = "hello-plugin"
@@ -23,6 +16,7 @@ modules {
       description = "Example Deder plugin that adds a hello task"
     }
     publish = true
+    // local folder tmp/m2
     publishLocalTo = read("env:DEDER_TMP_M2_REPO")
   }
 }
