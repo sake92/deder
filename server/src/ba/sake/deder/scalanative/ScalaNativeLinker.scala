@@ -2,8 +2,7 @@ package ba.sake.deder.scalanative
 
 import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters.*
 import scala.scalanative.build.*
 import scala.scalanative.util.Scope
@@ -17,7 +16,7 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
       outputDir: os.Path,
       mainClass: Option[String],
       nativeModule: ScalaNativeModule
-  ): Unit = linkImpl(
+  ): os.Path = linkImpl(
     nirPaths = nirPaths,
     outputDir = outputDir,
     mainClass = mainClass,
@@ -37,7 +36,7 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
       outputDir: os.Path,
       mainClass: Option[String],
       nativeModule: ScalaNativeModule
-  ): Unit = linkImpl(
+  ): os.Path = linkImpl(
     nirPaths = nirPaths,
     outputDir = outputDir,
     mainClass = mainClass,
@@ -57,7 +56,7 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
       outputDir: os.Path,
       mainClass: Option[String],
       nativeModule: ScalaNativeModule
-  ): Unit = linkImpl(
+  ): os.Path = linkImpl(
     nirPaths = nirPaths,
     outputDir = outputDir,
     mainClass = mainClass,
@@ -83,7 +82,7 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
       extraLinkingOptions: Seq[String],
       extraCompileOptions: Seq[String],
       label: String
-  ): Unit = Scope { implicit scope =>
+  ): os.Path = Scope { implicit scope =>
     notifications.add(ServerNotification.logInfo(s"$label scala-native binary...", Some(moduleId)))
 
     val clang = Discover.clang()
@@ -114,5 +113,6 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
     notifications.add(
       ServerNotification.logInfo(s"$label succeeded: " + binaryPath, Some(moduleId))
     )
+    os.Path(binaryPath)
   }
 }

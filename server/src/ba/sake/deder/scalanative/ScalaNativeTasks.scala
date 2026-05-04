@@ -2,8 +2,8 @@ package ba.sake.deder.scalanative
 
 import java.nio.file.Files
 import scala.util.Properties
-import scala.jdk.CollectionConverters.*
-import ba.sake.deder.config.DederProject.{ModuleType, ScalaNativeModule, ScalaNativeTestModule}
+import scala.concurrent.ExecutionContext.Implicits.global
+import ba.sake.deder.config.DederProject.{DederModule, ModuleType, ScalaNativeModule, ScalaNativeTestModule}
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, JUnitXmlReportWriter, TestResultsSummary}
 import ba.sake.deder.*
 
@@ -19,21 +19,9 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     .build { ctx =>
       val (classpath, mainClass) = ctx.depResults
       os.makeDir.all(ctx.out)
-      import scala.concurrent.ExecutionContext.Implicits.global
-      val effectiveMainClass = ctx.module match {
-        case _: ScalaNativeTestModule =>
-          Some("scala.scalanative.testinterface.TestMain")
-        case _ => mainClass
-      }
-      val linker = new ScalaNativeLinker(ctx.notifications, ctx.module.id)
-      val nativeModule = ctx.module.asInstanceOf[ScalaNativeModule]
-      linker.linkFast(
-        nirPaths = classpath,
-        outputDir = ctx.out,
-        mainClass = effectiveMainClass,
-        nativeModule = nativeModule
-      )
-      ""
+      buildNativeLink(ctx.module, ctx.notifications, classpath, mainClass, ctx.out) { (linker, nativeModule, mc) =>
+        linker.linkFast(nirPaths = classpath, outputDir = ctx.out, mainClass = mc, nativeModule = nativeModule)
+      }.toString
     }
 
   val fullNativeLinkTask = CachedTaskBuilder
@@ -46,21 +34,9 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     .build { ctx =>
       val (classpath, mainClass) = ctx.depResults
       os.makeDir.all(ctx.out)
-      import scala.concurrent.ExecutionContext.Implicits.global
-      val effectiveMainClass = ctx.module match {
-        case _: ScalaNativeTestModule =>
-          Some("scala.scalanative.testinterface.TestMain")
-        case _ => mainClass
-      }
-      val linker = new ScalaNativeLinker(ctx.notifications, ctx.module.id)
-      val nativeModule = ctx.module.asInstanceOf[ScalaNativeModule]
-      linker.linkFull(
-        nirPaths = classpath,
-        outputDir = ctx.out,
-        mainClass = effectiveMainClass,
-        nativeModule = nativeModule
-      )
-      ""
+      buildNativeLink(ctx.module, ctx.notifications, classpath, mainClass, ctx.out) { (linker, nativeModule, mc) =>
+        linker.linkFull(nirPaths = classpath, outputDir = ctx.out, mainClass = mc, nativeModule = nativeModule)
+      }.toString
     }
 
   val nativeLinkTask = CachedTaskBuilder
@@ -72,24 +48,10 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     .dependsOn(coreTasks.finalMainClassTask)
     .build { ctx =>
       val (classpath, mainClass) = ctx.depResults
-      val nirPaths = classpath
       os.makeDir.all(ctx.out)
-      // TODO thread pool.. ?
-      import scala.concurrent.ExecutionContext.Implicits.global
-      val effectiveMainClass = ctx.module match {
-        case _: ScalaNativeTestModule =>
-          Some("scala.scalanative.testinterface.TestMain")
-        case _ => mainClass
-      }
-      val linker = new ScalaNativeLinker(ctx.notifications, ctx.module.id)
-      val nativeModule = ctx.module.asInstanceOf[ScalaNativeModule]
-      linker.link(
-        nirPaths = nirPaths,
-        outputDir = ctx.out,
-        mainClass = effectiveMainClass,
-        nativeModule = nativeModule
-      )
-      ""
+      buildNativeLink(ctx.module, ctx.notifications, classpath, mainClass, ctx.out) { (linker, nativeModule, mc) =>
+        linker.link(nirPaths = classpath, outputDir = ctx.out, mainClass = mc, nativeModule = nativeModule)
+      }.toString
     }
 
   val runNativeTask = TaskBuilder
@@ -100,9 +62,8 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     )
     .dependsOn(fastNativeLinkTask)
     .build { ctx =>
-      val _ = ctx.depResults
-      val nativeBinaryPath = ScalaNativeTasks.findNativeBinary(ctx.out / os.up / "fastNativeLink")
-      val cmd = Seq(nativeBinaryPath.toString) ++ ctx.args
+      val linkedBinaryPath = ctx.depResults._1
+      val cmd = Seq(linkedBinaryPath) ++ ctx.args
       ctx.notifications.add(ServerNotification.RunSubprocess(cmd, Map.empty, ctx.watch))
       cmd
     }
@@ -116,15 +77,14 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     .dependsOn(coreTasks.testClassesTask)
     .buildWithSummary(
       execute = { ctx =>
-        val (_, discoveredTests) = ctx.depResults
+        val (linkedBinaryPath, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
           val testOptions = DederTestOptions(ctx.args)
-          val nativeBinaryPath = ScalaNativeTasks.findNativeBinary(ctx.out / os.up / "fastNativeLink")
           val nativeModule = ctx.module.asInstanceOf[ScalaNativeTestModule]
           val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
           val results = runner.run(
             discoveredTests = discoveredTests,
-            nativeBinaryPath = nativeBinaryPath,
+            nativeBinaryPath = os.Path(linkedBinaryPath),
             testOptions = testOptions,
             testParallelism = { val n = nativeModule.testParallelism.toInt; if n == 0 then Runtime.getRuntime.availableProcessors() else n }
           )
@@ -143,6 +103,22 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     runNativeTask,
     testNativeTask
   )
+
+  private def buildNativeLink(
+      module: DederModule,
+      notifications: ServerNotificationsLogger,
+      classpath: Seq[os.Path],
+      mainClass: Option[String],
+      outputDir: os.Path
+  )(linkFn: (ScalaNativeLinker, ScalaNativeModule, Option[String]) => os.Path): os.Path = {
+    val effectiveMainClass = module match {
+      case _: ScalaNativeTestModule => Some("scala.scalanative.testinterface.TestMain")
+      case _                        => mainClass
+    }
+    val linker = new ScalaNativeLinker(notifications, module.id)
+    val nativeModule = module.asInstanceOf[ScalaNativeModule]
+    linkFn(linker, nativeModule, effectiveMainClass)
+  }
 }
 
 object ScalaNativeTasks {
