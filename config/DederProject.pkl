@@ -290,6 +290,7 @@ class ScalaTestModule extends ScalaModule {
     "utest.runner.Framework"
     "zio.test.sbt.ZTestFramework"
     "weaver.framework.CatsEffect"
+    "org.scalacheck.ScalaCheckFramework"
   }
 }
 
@@ -389,6 +390,7 @@ class ScalaJsTestModule extends ScalaJsModule {
     "utest.runner.Framework"
     "zio.test.sbt.ZTestFramework"
     "weaver.framework.CatsEffect"
+    "org.scalacheck.ScalaCheckFramework"
   }
 }
 
@@ -436,6 +438,7 @@ class ScalaNativeTestModule extends ScalaNativeModule {
     "utest.runner.Framework"
     "zio.test.sbt.ZTestFramework"
     "weaver.framework.CatsEffect"
+    "org.scalacheck.ScalaCheckFramework"
   }
 }
 

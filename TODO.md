@@ -15,6 +15,7 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 # Client
 
 # Compilers
+- fix moduleId and level
 - add compileOnly deps
 
 # Caching

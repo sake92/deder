@@ -39,12 +39,6 @@ class SbtImporter(
       org == ignoredOrg && name.startsWith(ignoredName)
     }
 
-  def doImport() = {
-    dumpSbtBuild()
-    val dederBuild = parseAndGenerateBuild()
-    os.write.over(os.pwd / "deder.pkl", dederBuild)
-  }
-
   private def dumpSbtBuild() = {
     val sbtCmd = if (scala.util.Properties.isWin) "sbt.bat" else "sbt"
     val exportBuildStructurePluginVersion = "0.0.3+5-81323fe9-SNAPSHOT"
@@ -74,6 +68,12 @@ class SbtImporter(
     }
   }
 
+  def doImport() = {
+    dumpSbtBuild()
+    val dederBuild = parseAndGenerateBuild()
+    os.write.over(os.pwd / "deder.pkl", dederBuild)
+  }
+
   /** Info about one module group after first-pass analysis. */
   private case class GroupInfo(
       builderVarName: String,
@@ -93,8 +93,13 @@ class SbtImporter(
       allModules: Seq[ProjectExport]
   )
 
-  private def parseAndGenerateBuild(): String = {
-    val exportedSbtModuleFiles = os.list(os.pwd / "target/build-export").filter(_.ext == "json")
+  /** Parse JSON exports from the default location and generate deder.pkl. */
+  private def parseAndGenerateBuild(): String =
+    parseAndGenerateBuildFrom(os.pwd / "target/build-export")
+
+  /** Parse JSON exports from a given directory (testable). */
+  private[sbt] def parseAndGenerateBuildFrom(exportDir: os.Path): String = {
+    val exportedSbtModuleFiles = os.list(exportDir).filter(_.ext == "json")
     val allModules = exportedSbtModuleFiles
       .map(mf => os.read(mf).parseJson[ProjectExport])
     // skip root aggregating project
@@ -230,18 +235,24 @@ class SbtImporter(
     val layoutStr = gi.layout.toString.toLowerCase.replace("_", "-")
 
     // Helper: extract deps from a ProjectExport
-    def depsFor(pe: ProjectExport): (Seq[String], Seq[String]) = {
-      val deps = pe.externalDependencies
+    def depsFor(pe: ProjectExport): (Seq[String], Seq[String], Seq[String]) = {
+      val compileDeps = pe.externalDependencies
         .filterNot(d => isIgnoredDep(d.organization, d.name))
-        .filterNot(d => d.configurations.exists(_.contains("plugin")))
+        .filterNot(d => d.configurations.exists(c => c.contains("plugin") || c.contains("test") || c == "provided"))
         .map(d => SbtImporter.formatDependency(d))
         .distinct
-      val plugins = pe.externalDependencies
+      val pluginDeps = pe.externalDependencies
         .filter(SbtImporter.isPluginDependency)
         .filterNot(d => isIgnoredDep(d.organization, d.name))
         .map(d => SbtImporter.formatDependency(d))
         .distinct
-      (deps, plugins)
+      val testDeps = pe.externalDependencies
+        .filterNot(d => isIgnoredDep(d.organization, d.name))
+        .filter(d => d.configurations.exists(_.contains("test")))
+        .filterNot(d => d.configurations.exists(_.contains("plugin")))
+        .map(d => SbtImporter.formatDependency(d))
+        .distinct
+      (compileDeps, pluginDeps, testDeps)
     }
 
     def formatDeps(deps: Seq[String]): String =
@@ -257,19 +268,20 @@ class SbtImporter(
     val jvmModule = if (gi.isCross)
       gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "jvm")).getOrElse(gi.mainModule)
     else gi.mainModule
-    val (jvmDeps, jvmPlugins) = depsFor(jvmModule)
+    val (jvmDeps, jvmPlugins, jvmTestDeps) = depsFor(jvmModule)
     val jvmDepsStr = formatDeps(jvmDeps)
     val jvmPluginDepsStr = formatPluginDeps(jvmPlugins)
+    val jvmTestDepsStr = formatDeps(jvmTestDeps)
 
     // JS deps (for cross-project jsTemplate)
     val jsModule = gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "js"))
-    val (jsDeps, jsPlugins) = jsModule.map(pe => depsFor(pe)).getOrElse((Seq.empty, Seq.empty))
+    val (jsDeps, jsPlugins, _) = jsModule.map(pe => depsFor(pe)).getOrElse((Seq.empty, Seq.empty, Seq.empty))
     val jsDepsStr = formatDeps(jsDeps)
     val jsPluginDepsStr = formatPluginDeps(jsPlugins)
 
     // Native deps (for cross-project nativeTemplate)
     val nativeModule = gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "native"))
-    val (nativeDeps, nativePlugins) = nativeModule.map(pe => depsFor(pe)).getOrElse((Seq.empty, Seq.empty))
+    val (nativeDeps, nativePlugins, _) = nativeModule.map(pe => depsFor(pe)).getOrElse((Seq.empty, Seq.empty, Seq.empty))
     val nativeDepsStr = formatDeps(nativeDeps)
     val nativePluginDepsStr = formatPluginDeps(nativePlugins)
 
@@ -290,17 +302,17 @@ class SbtImporter(
       .map(ref => ref.replaceFirst("\\.main$", ".test").replaceFirst("\\.jvm$", ".jvm_test").replaceFirst("\\.js$", ".js_test").replaceFirst("\\.native$", ".native_test"))
       .distinct
     val testModuleDepsStr = if (testModuleDeps.nonEmpty)
-      s"""    moduleDeps {\n${testModuleDeps.map(d => s"""      $d""").mkString("\n")}\n    }
-         |    deps { "org.scalameta::munit:1.2.1" }""".stripMargin
+      s"""    moduleDeps {\n${testModuleDeps.map(d => s"""      $d""").mkString("\n")}\n    }"""
     else ""
 
-    val defaultTestTemplate = if (testModuleDepsStr.nonEmpty)
+    val testDepsContent = if (jvmTestDeps.nonEmpty)
+      s"""    deps {\n${jvmTestDeps.map(d => s"""      "$d"""").mkString("\n")}\n    }"""
+    else """    deps { "org.scalameta::munit:1.2.1" }"""
+
+    val defaultTestTemplate =
       s"""  testTemplate = (template.asTest()) {
          |$testModuleDepsStr
-         |  }"""
-    else
-      s"""  testTemplate = (template.asTest()) {
-         |    deps { "org.scalameta::munit:1.2.1" }
+         |$testDepsContent
          |  }"""
 
     val idOverride = s"""id = "${gi.builderVarName}""""
@@ -331,7 +343,19 @@ class SbtImporter(
 
       val jsTmpl = if (hasJs) s"  jsTemplate = (template.asJs())$jsOverride" else ""
       val nativeTmpl = if (hasNative) s"  nativeTemplate = (template.asNative())$nativeOverride" else ""
-      val tmpls = Seq(jsTmpl, nativeTmpl).filter(_.nonEmpty).mkString("\n")
+      // Extract test deps from JS/Native modules (with correct platform-specific cross-version)
+      val (_, _, jsTestDeps) = jsModule.map(pe => depsFor(pe)).getOrElse((Seq.empty, Seq.empty, Seq.empty))
+      val (_, _, nativeTestDeps) = nativeModule.map(pe => depsFor(pe)).getOrElse((Seq.empty, Seq.empty, Seq.empty))
+      // Fall back to JVM test deps if platform-specific not available
+      val jsTestDepList = if (jsTestDeps.nonEmpty) jsTestDeps else jvmTestDeps
+      val nativeTestDepList = if (nativeTestDeps.nonEmpty) nativeTestDeps else jvmTestDeps
+      val jsTestTmpl = if (hasJs && jsTestDepList.nonEmpty)
+        s"  jsTestTemplate = (jsTemplate.asTest()) {\n    deps {\n${jsTestDepList.map(d => s"""      "$d"""").mkString("\n")}\n    }\n  }"
+      else ""
+      val nativeTestTmpl = if (hasNative && nativeTestDepList.nonEmpty)
+        s"  nativeTestTemplate = (nativeTemplate.asTest()) {\n    deps {\n${nativeTestDepList.map(d => s"""      "$d"""").mkString("\n")}\n    }\n  }"
+      else ""
+      val tmpls = Seq(jsTmpl, nativeTmpl, jsTestTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
 
       s"""new CreateCrossModules {
          |  root = "${gi.root}"
