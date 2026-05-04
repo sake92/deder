@@ -75,6 +75,7 @@ Locally would be interesting to have a dashboard with nice overview:
 # Add more commands
 
 - init like giter8
+- handle crossScalaVersions in sbt import
 - import from other build tools... maven effective POM etc
 
 
