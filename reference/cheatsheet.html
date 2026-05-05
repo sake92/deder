@@ -44,6 +44,7 @@
         <li><a href="#cheatsheet">Cheatsheet</a>
          <ul>
           <li><a href="#custom-repositories">Custom repositories</a></li>
+          <li><a href="#dependency-exclusions">Dependency Exclusions</a></li>
          </ul></li>
        </ul>
       </div>
@@ -148,6 +149,17 @@ deder exec -t runMvnApp fmtCheck
 # includeDefaultRepos = false  # air-gapped mode
 </code></pre>
    <p>See <a href="https://sake92.github.io/deder/reference/repositories.html">Repositories</a> for details.</p>
+   <h2 id="dependency-exclusions">Dependency Exclusions<a href="#dependency-exclusions" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Exclude transitive dependencies at declaration time using Coursier's <code>,exclude=</code> syntax:</p>
+   <pre><code class="language-pkl">deps {
+  "org.example:lib:1.0"
+  // exclude a specific transitive dependency:
+  "org.other:lib:2.0,exclude=org.example%%transitive-dep"
+  // multiple exclusions are comma-separated:
+  "org.another:lib:3.0,exclude=org.foo%foo-lib,exclude=org.bar%%bar-lib"
+}
+</code></pre>
+   <p>Use <code>%%</code> for Scala cross-versioned modules and <code>%</code> for plain Java modules in the exclusion coordinates.</p>
    <div role="group">
     <span></span> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/architecture.html">Architecture ➡️</a>
    </div>
