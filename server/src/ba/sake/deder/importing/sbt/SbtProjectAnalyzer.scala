@@ -14,6 +14,8 @@ class SbtProjectAnalyzer(
     def analyze(
         exportedSbtModules: IndexedSeq[ProjectExport]
     ): DederBuild = {
+        var filteredDepCount = 0
+
         serverNotificationsLogger.add(ServerNotification.logInfo(s"Discovered ${exportedSbtModules.length} modules"))
 
         // ---- PASS 1: group modules by cross-project root ----
@@ -43,11 +45,16 @@ class SbtProjectAnalyzer(
         val warnings = Seq.newBuilder[ImportWarning]
 
         val moduleGroups = sortedGroups.map { gi =>
-            val jvmModule = buildModuleDef(gi.mainModule, globalIdMap, warnings)
-            val jsModule = gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "js"))
+            val (jvmModule, jvmFiltered) = buildModuleDef(gi.mainModule, globalIdMap, warnings)
+            filteredDepCount += jvmFiltered
+            val jsResult = gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "js"))
                 .map(pe => buildModuleDef(pe, globalIdMap, warnings, isJs = true))
-            val nativeModule = gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "native"))
+            val (jsModule, jsFiltered) = (jsResult.map(_._1), jsResult.map(_._2).getOrElse(0))
+            filteredDepCount += jsFiltered
+            val nativeResult = gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "native"))
                 .map(pe => buildModuleDef(pe, globalIdMap, warnings, isNative = true))
+            val (nativeModule, nativeFiltered) = (nativeResult.map(_._1), nativeResult.map(_._2).getOrElse(0))
+            filteredDepCount += nativeFiltered
 
             ModuleGroup(
                 builderVarName = gi.builderVarName,
@@ -61,7 +68,7 @@ class SbtProjectAnalyzer(
             )
         }
 
-        _cachedSummary = buildSummary(moduleGroups, warnings.result())
+        _cachedSummary = buildSummary(moduleGroups, warnings.result(), filteredDepCount)
 
         DederBuild(
             dederVersion = DederVersion,
@@ -86,8 +93,6 @@ class SbtProjectAnalyzer(
         root: String,
         layout: DederProject.DirLayout,
         isCross: Boolean,
-        hasScalaJs: Boolean,
-        hasScalaNative: Boolean,
         hasJsModule: Boolean,
         hasNativeModule: Boolean,
         scalaVersion: String,
@@ -112,8 +117,6 @@ class SbtProjectAnalyzer(
             layout == DederProject.DirLayout.SBT_CROSS_PURE ||
             layout == DederProject.DirLayout.SBT_CROSS_DUMMY
 
-        val hasScalaJs = allPlugins.exists(p => p.contains("ScalaJSPlugin") || p.contains("scalajs"))
-        val hasScalaNative = allPlugins.exists(p => p.contains("ScalaNativePlugin") || p.contains("scalanative"))
         val scalaVersion = mainModule.scalaVersion
 
         val rawName = ImportingUtils.sanitizeId(mainModule.name)
@@ -133,7 +136,7 @@ class SbtProjectAnalyzer(
 
         GroupInfo(
             builderVarName, root, layout, isCross,
-            hasScalaJs, hasScalaNative, hasJsModule, hasNativeModule,
+            hasJsModule, hasNativeModule,
             scalaVersion, sbtIdToRef, mainModule, rg.modules,
         )
     }
@@ -146,8 +149,8 @@ class SbtProjectAnalyzer(
         warnings: scala.collection.mutable.Builder[ImportWarning, Seq[ImportWarning]],
         isJs: Boolean = false,
         isNative: Boolean = false,
-    ): ModuleDef = {
-        val (compileDeps, pluginDeps, testDeps) = partitionDeps(pe)
+    ): (ModuleDef, Int) = {
+        val (compileDeps, pluginDeps, testDeps, filteredCount) = partitionDeps(pe)
         val moduleDeps = pe.interProjectDependencies
             .filter(ipde => ipde.configuration == "default" || ipde.configuration.contains("compile"))
             .flatMap(ipde => idMap.get(ipde.project))
@@ -181,7 +184,7 @@ class SbtProjectAnalyzer(
             )
         }
 
-        ModuleDef(
+        val moduleDef = ModuleDef(
             scalaVersion = pe.scalaVersion,
             scalacOptions = pe.scalacOptions,
             javacOptions = pe.javacOptions,
@@ -191,17 +194,19 @@ class SbtProjectAnalyzer(
             testDeps = testDeps,
             moduleDeps = moduleDeps,
             testModuleDeps = testModuleDeps,
-            scalaJsVersion = if (isJs) Some("1.18.2") else None,
-            scalaNativeVersion = if (isNative) Some("0.5.10") else None,
+            scalaJsVersion = if (isJs) Some(SbtProjectAnalyzer.DefaultScalaJsVersion) else None,
+            scalaNativeVersion = if (isNative) Some(SbtProjectAnalyzer.DefaultScalaNativeVersion) else None,
             publish = publish,
             sources = pe.sourceDirs,
             testSources = pe.testSourceDirs,
             resources = pe.resourceDirs,
             testResources = pe.testResourceDirs,
         )
+        (moduleDef, filteredCount)
     }
 
-    private def partitionDeps(pe: ProjectExport): (Seq[DepDef], Seq[DepDef], Seq[DepDef]) = {
+    private def partitionDeps(pe: ProjectExport): (Seq[DepDef], Seq[DepDef], Seq[DepDef], Int) = {
+        val ignoredCount = pe.externalDependencies.count(d => isIgnoredDep(d.organization, d.name))
         val compileDeps = pe.externalDependencies
             .filterNot(d => isIgnoredDep(d.organization, d.name))
             .filterNot(d => d.configurations.exists(c => c.contains("plugin") || c.contains("test") || c == "provided"))
@@ -218,7 +223,7 @@ class SbtProjectAnalyzer(
             .filterNot(d => d.configurations.exists(_.contains("plugin")))
             .map(toDepDef)
             .distinct
-        (compileDeps, pluginDeps, testDeps)
+        (compileDeps, pluginDeps, testDeps, ignoredCount)
     }
 
     private def toDepDef(d: DependencyExport): DepDef = DepDef(
@@ -242,6 +247,7 @@ class SbtProjectAnalyzer(
     private def buildSummary(
         groups: Seq[ModuleGroup],
         warnings: Seq[ImportWarning],
+        filteredDepCount: Int,
     ): ImportSummary = {
         val concreteModules = groups.size * 2 + groups.count(_.hasJsModule) * 2 + groups.count(_.hasNativeModule) * 2
         val allDeps = groups.flatMap(g =>
@@ -251,7 +257,7 @@ class SbtProjectAnalyzer(
             modulesImported = concreteModules,
             moduleGroups = groups.size,
             dependenciesMapped = allDeps.size,
-            depsFiltered = 0,
+            depsFiltered = filteredDepCount,
             depsSkipped = 0,
             warnings = warnings,
             errors = Seq.empty,
@@ -306,6 +312,8 @@ class SbtProjectAnalyzer(
 object SbtProjectAnalyzer {
 
     val DederVersion = "v0.7.4"
+    val DefaultScalaJsVersion = "1.18.2"
+    val DefaultScalaNativeVersion = "0.5.10"
 
     private val IgnoredDeps = Set(
         ("org.scala-lang", "scala3-library"),

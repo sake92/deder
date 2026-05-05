@@ -17,6 +17,7 @@ class DederPklRendererSuite extends FunSuite {
         moduleDeps: Seq[ModuleDepRef] = Seq.empty,
         testModuleDeps: Seq[ModuleDepRef] = Seq.empty,
         publish: Option[PublishInfo] = None,
+        scalaJsVersion: Option[String] = None,
     ): ModuleDef = ModuleDef(
         scalaVersion = scalaVersion,
         scalacOptions = scalacOptions,
@@ -27,7 +28,7 @@ class DederPklRendererSuite extends FunSuite {
         testDeps = testDeps,
         moduleDeps = moduleDeps,
         testModuleDeps = testModuleDeps,
-        scalaJsVersion = None,
+        scalaJsVersion = scalaJsVersion,
         scalaNativeVersion = None,
         publish = publish,
         sources = Seq.empty,
@@ -116,6 +117,13 @@ class DederPklRendererSuite extends FunSuite {
         assert(!result.contains("scalacOptions"))
     }
 
+    test("does not emit javacOptions when empty") {
+        val mod = emptyModule(javacOptions = Seq.empty)
+        val build = singleModuleBuild(jvmMod = mod)
+        val result = DederPklRenderer.render(build)
+        assert(!result.contains("javacOptions"))
+    }
+
     test("places regular compile deps in deps block") {
         val d = dep("org.jsoup", "jsoup", "1.21.1")
         val mod = emptyModule(deps = Seq(d))
@@ -202,5 +210,32 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("local const my_lib_ext"))
         assert(result.contains("id = \"my_lib_ext\""))
         assert(result.contains("...my_lib_ext.all"))
+    }
+
+    test("cross-project with JS module generates CreateCrossModules") {
+        val jvmMod = emptyModule(scalaVersion = "3.3.5")
+        val jsMod = emptyModule(scalaVersion = "3.3.5", scalaJsVersion = Some("1.18.2"))
+        val build = DederBuild(
+            dederVersion = "v0.7.4",
+            moduleGroups = Seq(ModuleGroup(
+                builderVarName = "core",
+                root = ".",
+                layout = DederProject.DirLayout.SBT_CROSS_PURE,
+                jvmModule = jvmMod,
+                jsModule = Some(jsMod),
+                nativeModule = None,
+                hasJsModule = true,
+                hasNativeModule = false,
+            )),
+            repositories = Seq.empty,
+            warnings = Seq.empty,
+        )
+        val result = DederPklRenderer.render(build)
+        assert(result.contains("new CreateCrossModules"))
+        assert(result.contains("layout = \"sbt-cross-pure\""))
+        assert(result.contains("jsTemplate = (template.asJs())"))
+        assert(result.contains("scalaJsVersion = \"1.18.2\""))
+        assert(result.contains("core.jvm"))
+        assert(result.contains("core.js"))
     }
 }

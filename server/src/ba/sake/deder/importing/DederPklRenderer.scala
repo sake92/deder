@@ -61,9 +61,7 @@ object DederPklRenderer {
     }
 
     private def builderTypeFor(g: ModuleGroup): String = {
-        if (g.hasJsModule && g.hasNativeModule) "CreateCrossModules"
-        else if (g.hasJsModule && !g.hasNativeModule) "CreateCrossModules"
-        else if (!g.hasJsModule && g.hasNativeModule) "CreateCrossModules"
+        if (g.hasJsModule || g.hasNativeModule) "CreateCrossModules"
         else if (g.jsModule.isDefined) "CreateScalaJsModules"
         else if (g.nativeModule.isDefined) "CreateScalaNativeModules"
         else "CreateScalaModules"
@@ -113,7 +111,11 @@ object DederPklRenderer {
 
     private def renderTemplateBody(m: ModuleDef, moduleType: String, extraProps: Option[String]): String = {
         val extra = extraProps.map(e => s"    $e\n").getOrElse("")
+        val crossScalaVersionsComment = if (m.crossScalaVersions.nonEmpty) {
+            Some(s"""    /// original crossScalaVersions = ${m.crossScalaVersions.map(v => s""""$v"""").mkString("[", ", ", "]")}""")
+        } else None
         val props = Seq(
+            crossScalaVersionsComment,
             if (moduleType != "ScalaJsModule" && moduleType != "ScalaNativeModule")
                 Some(s"""    scalaVersion = "${m.scalaVersion}"""")
             else None,

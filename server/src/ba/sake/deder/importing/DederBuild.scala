@@ -81,4 +81,3 @@ enum ImportWarning:
         versions:        Seq[String],
         selectedVersion: String
     )
-    case CustomSourceDirs(moduleName: String, dirs: Seq[String])
