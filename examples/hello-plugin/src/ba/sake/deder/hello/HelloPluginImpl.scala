@@ -1,14 +1,17 @@
 package ba.sake.deder.hello
 
 import ba.sake.deder.*
-import ba.sake.tupson.*
 
 class HelloPluginImpl extends DederPlugin {
   def id: String = "hello"
 
   def tasks(coreTasks: CoreTasksApi, jsonConfig: String): Seq[AbstractTask[?]] = {
-    val json = jsonConfig.parseJson
-    val greeting = json("greeting").asStr
+    val jsonNode = org.pkl.core.util.json.Json.parse(jsonConfig)
+    val greeting = {
+      val obj = jsonNode.asObject()
+      if obj.containsKey("greeting") then obj.get("greeting").asString()
+      else "Hello!"
+    }
 
     val helloTask = TaskBuilder.make[String](name = "hello")
       .build { ctx =>
