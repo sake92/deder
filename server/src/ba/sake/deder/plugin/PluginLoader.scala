@@ -48,7 +48,8 @@ class PluginLoader(
     val evaluator = org.pkl.core.EvaluatorBuilder.preconfigured()
       .setOutputFormat(org.pkl.core.OutputFormat.JSON)
       .build()
-    Some(evaluator.evaluateOutputText(org.pkl.core.ModuleSource.text(snippet)))
+      val res = evaluator.evaluateOutputText(org.pkl.core.ModuleSource.text(snippet))
+    Some(res)
   } catch {
     case e: Exception =>
       logger.warn(s"Failed to serialize plugin config for id='$pluginId': ${e.getMessage}", e)
@@ -110,7 +111,7 @@ class PluginLoader(
             logger.warn(s"Failed to resolve plugin dependencies: ${e.getMessage}", e)
             return Left(s"Failed to resolve plugin dependencies: ${e.getMessage}")
         }
-        logger.debug(s"Resolved plugin JARs: ${pluginJarPaths.map(_.last).mkString(", ")}")
+        logger.info(s"Resolved plugin JARs: ${pluginJarPaths.map(_.last).mkString(", ")}")
 
         // Collect plugin ids from Phase 1 and serialize each config as Pkl text
         val pluginIds = for {
