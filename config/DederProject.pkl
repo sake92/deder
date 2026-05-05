@@ -411,10 +411,28 @@ open class ScalaNativeModule extends ScalaModule {
   lto: ScalaNativeLTO = "none"
   /// Embed classpath resources into the native binary.
   embedResources: Boolean = false
+  /// Should unresolved stubs be linked into the binary (required for linking without a main class).
+  linkStubs: Boolean = true
+  /// Shall the NIR linker check well-formedness after every phase.
+  check: Boolean = false
+  /// Shall NIR check warnings be treated as errors.
+  checkFatalWarnings: Boolean = false
+  /// Shall the NIR optimizer run on the linked program.
+  optimize: Boolean = true
+  /// Optional LLVM target triple (e.g. "x86_64-pc-linux-gnu"). Leave null to auto-detect.
+  targetTriple: String? = null
   /// Extra linker flags, appended to auto-discovered options.
   nativeLinkingOptions: Listing<String> = new Listing {}
-  /// Extra clang compile flags, appended to auto-discovered options.
+  /// Extra clang compile flags (applied to all sources), appended to auto-discovered options.
   nativeCompileOptions: Listing<String> = new Listing {}
+  /// Extra clang flags applied only to C source files.
+  nativeCOptions: Listing<String> = new Listing {}
+  /// Extra clang flags applied only to C++ source files.
+  nativeCppOptions: Listing<String> = new Listing {}
+  /// Glob patterns selecting which resource files are embedded into the binary (requires embedResources = true).
+  resourceIncludePatterns: Listing<String> = new Listing { "**" }
+  /// Glob patterns excluding resource files from embedding (requires embedResources = true).
+  resourceExcludePatterns: Listing<String> = new Listing {}
   function asTest(): ScalaNativeTestModule = (this.toDynamic().toTyped(ScalaNativeTestModule)) {
     type = "scala-native-test"
     publish = false
