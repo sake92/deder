@@ -62,7 +62,7 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
       // Tweak amends to use local config (so we don't need network)
       val dederPklContent = os.read(tempDir / "deder.pkl")
       val tweakedContent = dederPklContent.replaceFirst(
-        "amends \"https://sake92.github.io/deder/config/v0.7.3/DederProject.pkl\"",
+        s"amends \"https://sake92.github.io/deder/config/${DederSbtExporter.DederVersion}/DederProject.pkl\"",
         "amends \"../../config/DederProject.pkl\""
       )
       os.write.over(tempDir / "deder.pkl", tweakedContent)
