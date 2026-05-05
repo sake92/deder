@@ -1,13 +1,11 @@
 package ba.sake.deder.config
 
-import ba.sake.deder.DederGlobals
-
+import scala.util.Using
 import scala.jdk.CollectionConverters.*
 import org.pkl.config.java.ConfigEvaluator
 import org.pkl.core.{EvaluatorBuilder, ModuleSource, OutputFormat, PklException}
 import ba.sake.deder.config.DederProject
-
-import scala.util.Using
+import ba.sake.deder.DederGlobals
 
 class ConfigParser(writeJson: Boolean) {
 
@@ -15,8 +13,8 @@ class ConfigParser(writeJson: Boolean) {
     parse(ModuleSource.file(configFile.toIO))
 
   def parse(moduleSource: ModuleSource): Either[String, DederProject] = try {
-    Using.resource(ConfigEvaluator.preconfigured) { evaluator =>
-      val config = evaluator.evaluate(moduleSource)
+    Using.resource(ConfigEvaluator.preconfigured) { configEvaluator =>
+      val config = configEvaluator.evaluate(moduleSource)
       val dederProject = config.as(classOf[DederProject])
       val moduleIds = dederProject.modules.asScala.map(_.id)
       val diff = moduleIds.diff(moduleIds.distinct)

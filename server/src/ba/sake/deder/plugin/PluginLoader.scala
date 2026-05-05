@@ -29,18 +29,25 @@ class PluginLoader(
       Left(s"Phase 1 evaluation failed: ${e.getMessage}")
   }
 
-  /** Serialize a single plugin config as Pkl source text using PklRenderer (round-trips perfectly). */
+  /** Serialize a single plugin config as JSON via Pkl's evaluator with OutputFormat.JSON.
+   *  The plugin can re-evaluate this JSON via Pkl (since Pkl is a JSON superset) to get
+   *  a typed config object.
+   */
   def serializePluginConfig(pklFile: os.Path, pluginId: String): Option[String] = try {
     val snippet =
-      s"""amends "${pklFile.toIO.toURI}"
+      s"""
+         |import "${pklFile.toIO.toURI}" as cfg
+         |
          |output {
-         |  value = modules.toList()
-         |    .flatMap((it) -> it.plugins.toList())
-         |    .filter((it) -> it.id == "$pluginId")
-         |    .first
+         |  value = cfg.modules.toList()
+         |            .flatMap((it) -> it.plugins.toList())
+         |            .filter((it) -> it.id == "$pluginId")
+         |            .first
          |}
          |""".stripMargin
-    val evaluator = org.pkl.core.EvaluatorBuilder.preconfigured().build()
+    val evaluator = org.pkl.core.EvaluatorBuilder.preconfigured()
+      .setOutputFormat(org.pkl.core.OutputFormat.JSON)
+      .build()
     Some(evaluator.evaluateOutputText(org.pkl.core.ModuleSource.text(snippet)))
   } catch {
     case e: Exception =>
@@ -65,9 +72,9 @@ class PluginLoader(
       matchingImpl match {
         case Some(plugin) =>
           logger.info(s"Loaded plugin '$pluginId'")
-          logger.debug(s"Plugin config Pkl text: $configText")
+          logger.info(s"Plugin config Pkl text: $configText")
           val ts = plugin.tasks(coreTasksApi, configText)
-          logger.debug(s"Plugin '$pluginId' contributed ${ts.size} tasks")
+          logger.info(s"Plugin '$pluginId' contributed ${ts.size} tasks")
           ts
         case None =>
           logger.warn(
