@@ -8,21 +8,18 @@ import ba.sake.deder.*
 class HelloPluginImpl extends DederPlugin {
   def id: String = "hello"
 
-  def tasks(coreTasks: CoreTasksApi, jsonConfig: String): Seq[AbstractTask[?]] = {
-    // Parse JSON via Pkl's pkl:json module, then convert to typed HelloConfig.
-    // Use Pkl's custom-delim raw string: ##"..."## avoids needing to escape " and \
-    val pklSource =
-      s"""|import "pkl:json"
-          |output {
-          |  value = new json.Parser {}.parse(##\"\"\"
-          |$jsonConfig
-          |\"\"\"##)
-          |}
-          |""".stripMargin
-    val config = Using.resource(ConfigEvaluator.preconfigured) { configEvaluator =>
-      configEvaluator.evaluate(ModuleSource.text(pklSource)).as(classOf[HelloConfig])
+  def tasks(coreTasks: CoreTasksApi, pklSource: String): Seq[AbstractTask[?]] = {
+    val config = Using.resource(ConfigEvaluator.preconfigured) { evaluator =>
+      evaluator.evaluate(ModuleSource.text(s"""
+        output {
+          new {
+            $pklSource
+          }
+        }
+      """)).as(classOf[HelloConfig])
     }
-    val greeting = config.getGreeting()
+
+    val greeting = Option(config.getGreeting()).getOrElse("Hello!")
 
     val helloTask = TaskBuilder
       .make[String](name = "hello")
