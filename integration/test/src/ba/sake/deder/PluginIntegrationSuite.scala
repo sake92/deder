@@ -26,7 +26,7 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
 
       // Step 3: run hello task in consumer project with typed config
       // Inject the import path to the typed plugin config Pkl module
-      val helloConfigImport = s"""import "file://${pluginPath}/resources/hello-config.pkl""""
+      val helloConfigImport = s"""import "file://${pluginPath}/resources/hello-config.pkl" as hc"""
       withTestProject("sample-projects/hello-plugin-consumer") { consumerPath =>
         val pkl = os.read(consumerPath / "deder.pkl")
         val rewritten = pkl.replace("__HELLO_CONFIG_IMPORT__", helloConfigImport)

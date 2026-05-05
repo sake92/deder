@@ -14,7 +14,7 @@ modules {
     scalaVersion = "3.7.4"
     mainClass = "Main"
     plugins {
-      new HelloConfig {
+      new hc.HelloConfig {
         greeting = "Hello from typed config!"
       }
     }
