@@ -21,7 +21,7 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     category: String
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: AbstractTask[T2]): TaskBuilder[T, Deps :* AbstractTask[T2]] =
-    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes)
+    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category = category)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
     TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category)
@@ -65,7 +65,7 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     category: String
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: AbstractTask[T2]): CachedTaskBuilder[T, Deps :* AbstractTask[T2]] =
-    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes)
+    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category = category)
 
   def build(execute: TaskExecContext[T, Deps] => T)(using Deps <:< NonEmptyTuple): Task[T, Deps] =
     CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category)
@@ -118,6 +118,7 @@ trait AbstractTask[T] {
   def singleton: Boolean
   def supportedModuleTypes: Set[ModuleType]
   def isResultSuccessful: T => Boolean
+  def category: String
 }
 
 sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] =:= true)
