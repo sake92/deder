@@ -3,6 +3,7 @@ package ba.sake.deder.importing.sbt
 import ba.sake.tupson.parseJson
 import ba.sake.deder.ServerNotification
 import ba.sake.deder.ServerNotificationsLogger
+import ba.sake.deder.importing.DederPklRenderer
 
 class SbtImporter(
     serverNotificationsLogger: ServerNotificationsLogger
@@ -13,8 +14,17 @@ class SbtImporter(
   def doImport() = {
     dumpSbtBuild()
     val exportedSbtModules = readAndParseExportedModules()
-    val exporter = new DederSbtExporter(exportedSbtModules, serverNotificationsLogger)
-    exporter.writeBuild()
+    // Analysis phase
+    val analyzer = new SbtProjectAnalyzer(serverNotificationsLogger)
+    val build = analyzer.analyze(exportedSbtModules)
+
+    // Render phase
+    val pklContent = DederPklRenderer.render(build)
+    os.write.over(os.pwd / "deder.pkl", pklContent)
+
+    // Summary
+    val summary = analyzer.summary()
+    summary.log(serverNotificationsLogger)
   }
 
   private def dumpSbtBuild() = {
