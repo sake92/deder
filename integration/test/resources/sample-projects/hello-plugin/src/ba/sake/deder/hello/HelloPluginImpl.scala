@@ -9,11 +9,14 @@ class HelloPluginImpl extends DederPlugin {
   def id: String = "hello"
 
   def tasks(coreTasks: CoreTasksApi, jsonConfig: String): Seq[AbstractTask[?]] = {
-    // Wrap JSON object as a Pkl expression value, then convert to typed HelloConfig
-    // (Pkl evaluator can't parse a JSON object as a module top-level, but it can as an expression)
+    // Parse JSON via Pkl's pkl:json module, then convert to typed HelloConfig.
+    // Use Pkl's custom-delim raw string: ##"..."## avoids needing to escape " and \
     val pklSource =
-      s"""|output {
-          |  value = $jsonConfig
+      s"""|import "pkl:json"
+          |output {
+          |  value = new json.Parser {}.parse(##\"\"\"
+          |$jsonConfig
+          |\"\"\"##)
           |}
           |""".stripMargin
     val config = Using.resource(ConfigEvaluator.preconfigured) { configEvaluator =>
