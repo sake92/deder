@@ -33,9 +33,7 @@ class PluginLoader(
   def serializePluginConfig(pklFile: os.Path, pluginId: String): Option[String] = try {
     val snippet =
       s"""amends "${pklFile.toIO.toURI}"
-         |import "pkl:text"
          |output {
-         |  renderer = new text.PklRenderer {}
          |  value = modules.toList()
          |    .flatMap((it) -> it.plugins.toList())
          |    .filter((it) -> it.id == "$pluginId")

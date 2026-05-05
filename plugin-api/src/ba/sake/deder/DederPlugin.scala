@@ -7,14 +7,8 @@ trait DederPlugin {
   def id: String
 
   /** @param coreTasks  Access to built-in server tasks (compile, classes, deps, etc.)
-   *  @param configText The plugin's configuration as a Pkl expression string.
-   *                    Evaluate it with Pkl to get your typed config object:
-   *                    {{{
-   *                    val evaluator = org.pkl.config.java.ConfigEvaluator.preconfigured
-   *                    val config = evaluator.evaluate(
-   *                      org.pkl.core.ModuleSource.text(configText)
-   *                    ).as(classOf[MyConfig])
-   *                    }}}
+   *  @param configText The plugin's evaluated Pkl configuration serialized as JSON.
+   *                    Parse it with any JSON library (e.g. jawn, tupson) to get your typed config.
    */
   def tasks(coreTasks: CoreTasksApi, configText: String): Seq[AbstractTask[?]]
 }
