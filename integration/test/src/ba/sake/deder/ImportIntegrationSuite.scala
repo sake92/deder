@@ -1,6 +1,7 @@
 package ba.sake.deder
 
 import scala.concurrent.duration.*
+import ba.sake.deder.importing.sbt.DederSbtExporter
 
 class ImportIntegrationSuite extends BaseIntegrationSuite {
 
