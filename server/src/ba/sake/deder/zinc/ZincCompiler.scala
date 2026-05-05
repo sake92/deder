@@ -221,6 +221,33 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
     val sourcesVFs = sources.map(s => converter.toVirtualFile(s.toNIO)).toArray
     val classpathVFs = compileClasspath.map(f => converter.toVirtualFile(f.toNIO)).toArray
 
+    // Build classpath analysis map for inter-module incremental compilation.
+    // When compiling module B that depends on A, Zinc needs A's CompileAnalysis
+    // to track cross-module dependencies and avoid unnecessary recompilation.
+    // A's classesDir is on B's compileClasspath; A's zinc cache is at
+    // classesDir.parent/compile/inc_compile.zip (Deder's output layout).
+    val classpathAnalysisMap: Map[Path, CompileAnalysis] =
+      compileClasspath.flatMap { entryPath =>
+        val entryNio = entryPath.toNIO
+        val inferredZincCacheNio =
+          entryNio.getParent.resolve("compile").resolve("inc_compile.zip")
+        val inferredZincCache = os.Path(inferredZincCacheNio)
+        val contentsOpt = analysisCache.getIfPresent(inferredZincCache).orElse {
+          if os.exists(inferredZincCache) then
+            val store = ConsistentFileAnalysisStore.binary(
+              file = inferredZincCache.toIO,
+              mappers = ReadWriteMappers.getEmptyMappers,
+              reproducible = true,
+              parallelism = math.min(Runtime.getRuntime.availableProcessors(), 8)
+            )
+            val loaded = Option(store.get().orElse(null))
+            loaded.foreach(c => analysisCache.put(inferredZincCache, c))
+            loaded
+          else None
+        }
+        contentsOpt.map(ac => entryNio -> ac.getAnalysis)
+      }.toMap
+
     val compileOptions = CompileOptions.of(
       /*_classpath =*/ classpathVFs,
       /*_sources =*/ sourcesVFs,
@@ -257,7 +284,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
     }
 
     val reporter = new DederZincReporter(moduleId, notifications, zincLogger)
-    val setup = getSetup(zincCacheFile.toNIO, reporter, moduleId, notifications)
+    val setup = getSetup(zincCacheFile.toNIO, reporter, moduleId, notifications, converter, classpathAnalysisMap)
     val inputs = xsbti.compile.Inputs.of(compilers, compileOptions, setup, previousResult)
 
     logger.debug(
@@ -314,12 +341,15 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       cacheFile: Path,
       reporter: xsbti.Reporter,
       moduleId: String,
-      notifications: ServerNotificationsLogger
+      notifications: ServerNotificationsLogger,
+      converter: MappedFileConverter,
+      classpathAnalysis: Map[Path, CompileAnalysis]
   ): Setup = {
     val perClasspathEntryLookup: PerClasspathEntryLookup = new PerClasspathEntryLookup {
       override def analysis(classpathEntry: xsbti.VirtualFile): Optional[CompileAnalysis] =
-        // TODO
-        Optional.empty[CompileAnalysis]
+        classpathAnalysis.get(converter.toPath(classpathEntry))
+          .map(Optional.of(_))
+          .getOrElse(Optional.empty[CompileAnalysis])
 
       override def definesClass(classpathEntry: xsbti.VirtualFile): DefinesClass = (className: String) =>
         Locate.definesClass(classpathEntry).apply(className)
