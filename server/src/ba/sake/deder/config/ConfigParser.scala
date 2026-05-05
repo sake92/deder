@@ -6,6 +6,7 @@ import org.pkl.config.java.ConfigEvaluator
 import org.pkl.core.{EvaluatorBuilder, ModuleSource, OutputFormat, PklException}
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.DederGlobals
+import org.pkl.config.java.ConfigEvaluatorBuilder
 
 class ConfigParser(writeJson: Boolean) {
 
