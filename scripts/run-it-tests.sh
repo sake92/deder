@@ -2,7 +2,7 @@
 rm -rf ./tmp
 
 # Clean up any lingering server artifacts in sample projects
-#find integration/test/resources/sample-projects -name ".deder" -type d -exec rm -rf {} + 2>/dev/null || true
+find integration/test/resources/sample-projects -name ".deder" -type d -exec rm -rf {} + 2>/dev/null || true
 
 ./scripts/gen-config-bindings.sh
 
@@ -16,20 +16,19 @@ export DEDER_TEST_RUNNER_PATH=$(realpath .deder/out/test-runner/assembly/out.jar
 # Plugin artifacts are published here and consumers resolve from here.
 mkdir -p tmp/m2
 export DEDER_TMP_M2_REPO=$(realpath tmp/m2)
+echo "Using shared M2 repo: $DEDER_TMP_M2_REPO"
 
-# Publish plugin-api with a fixed version so the hello-plugin integration test can resolve it
+export DEDER_PLUGIN_API_VERSION="it-test-version"
+echo "Using plugin API version: $DEDER_PLUGIN_API_VERSION"
+
+# Publish plugin-api + config with a fixed version so the hello-plugin integration test can resolve them
 # (publishes to DEDER_TMP_M2_REPO when set, otherwise to ~/.m2)
 # Shut down the build-jars server first so VERSION env var takes effect
-deder shutdown 2>/dev/null || true
-VERSION=0.1.0-SNAPSHOT deder exec -t publishLocal -m plugin-api
-
-export DEDER_PLUGIN_API_VERSION=0.1.0-SNAPSHOT
-echo "Plugin API version: $DEDER_PLUGIN_API_VERSION"
-echo "Shared M2 repo: $DEDER_TMP_M2_REPO"
+deder shutdown 2>/dev/null && sleep 1 || true
+VERSION="$DEDER_PLUGIN_API_VERSION" deder exec -t publishLocal -m config -m plugin-api
 
 if [ $# -eq 0 ]; then
     deder exec -t test -m integration-test 
 else
     deder exec -t test -m integration-test $1
 fi
-
