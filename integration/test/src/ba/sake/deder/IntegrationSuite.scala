@@ -63,6 +63,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
           dederOutput,
           """|Stage #0:
              |  common.classes
+             |  common.compileOnlyDeps
              |  common.deps
              |  common.generatedSources
              |  common.javaHome
@@ -78,6 +79,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
              |  common.sources
              |Stage #1:
              |  common.allClassesDirs
+             |  common.compileOnlyDependencies
              |  common.compilerDeps
              |  common.dependencies
              |  common.javacAnnotationProcessors
