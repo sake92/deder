@@ -11,6 +11,7 @@ repositories {
 modules {
   new ScalaModule {
     id = "app"
+    root = "."
     scalaVersion = "3.7.4"
     mainClass = "Main"
     plugins {
