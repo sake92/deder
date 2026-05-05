@@ -10,14 +10,13 @@ class HelloPluginImpl extends DederPlugin {
 
   def tasks(coreTasks: CoreTasksApi, configText: String): Seq[AbstractTask[?]] = {
     val config = Using.resource(ConfigEvaluator.preconfigured) { evaluator =>
-      val indented = configText.linesIterator.map("            " + _).mkString("\n")
-      evaluator.evaluate(ModuleSource.text(s"""
-        output {
-          value = new {
-$indented
-          }
-        }
-      """)).as(classOf[HelloPlugin])
+      val configTrimmed = configText.trim
+      val moduleText = s"""$configTrimmed
+
+output {
+  value = this
+}"""
+      evaluator.evaluate(ModuleSource.text(moduleText)).as(classOf[HelloPlugin])
     }
 
     val greeting = Option(config.getGreeting()).getOrElse("Hello!")
