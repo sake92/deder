@@ -1,7 +1,7 @@
 package ba.sake.deder
 
 import scala.concurrent.duration.*
-import ba.sake.deder.importing.sbt.DederSbtExporter
+import ba.sake.deder.importing.sbt.SbtProjectAnalyzer
 
 class ImportIntegrationSuite extends BaseIntegrationSuite {
 
@@ -63,7 +63,7 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
       // Tweak amends to use local config (so we don't need network)
       val dederPklContent = os.read(tempDir / "deder.pkl")
       val tweakedContent = dederPklContent.replaceFirst(
-        s"amends \"https://sake92.github.io/deder/config/${DederSbtExporter.DederVersion}/DederProject.pkl\"",
+        s"amends \"https://sake92.github.io/deder/config/${SbtProjectAnalyzer.DederVersion}/DederProject.pkl\"",
         "amends \"../../config/DederProject.pkl\""
       )
       os.write.over(tempDir / "deder.pkl", tweakedContent)
