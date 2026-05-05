@@ -5,6 +5,9 @@
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
 - add limits on plan/modules graphing, up/down
+- color instead of quotes for "Executing 'mytask'"
+- hide some internal tasks like deps resolving etc, helper assemblyDeps.. (rebind edges when displaying)
+- 
 
 # Docs
 - run pkldoc on each tag, and publish to ghpages
