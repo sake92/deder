@@ -2,6 +2,8 @@ package ba.sake.deder.hello;
 
 import ba.sake.deder.config.DederProject;
 import java.util.Collections;
+import java.util.List;
+import org.pkl.config.java.mapper.Named;
 
 /**
  * Generated Java binding for HelloConfig.pkl.
@@ -10,9 +12,17 @@ import java.util.Collections;
 public class HelloConfig extends DederProject.Plugin {
     public String greeting;
 
-    /** Required for Java compilation. Pkl populates fields via its own mechanism. */
+    /** Constructor used by Pkl's ConfigEvaluator to map values via @Named parameters. */
+    public HelloConfig(@Named("id") String id,
+                       @Named("deps") List<String> deps,
+                       @Named("greeting") String greeting) {
+        super(id, deps);
+        this.greeting = greeting;
+    }
+
+    /** No-arg constructor for Java compilation. */
     public HelloConfig() {
-        super("", Collections.emptyList());
+        this("", Collections.emptyList(), "Hello!");
     }
 
     public String getGreeting() {
