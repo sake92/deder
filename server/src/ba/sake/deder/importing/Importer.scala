@@ -8,7 +8,7 @@ class Importer(
     serverNotificationsLogger: ServerNotificationsLogger
 ) {
 
-  def doImport(from: ImportBuildTool): Boolean = {
+  def doImport(from: ImportBuildTool): Unit = {
     serverNotificationsLogger.add(ServerNotification.logInfo(s"Starting build import from '${from}'..."))
     from match {
       case ImportBuildTool.sbt =>
@@ -16,6 +16,5 @@ class Importer(
         sbtImporter.doImport()
     }
     serverNotificationsLogger.add(ServerNotification.logInfo(s"Build import from '${from}' succeeded."))
-    true
   }
 }
