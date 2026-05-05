@@ -35,6 +35,7 @@ class PluginLoaderSuite extends munit.FunSuite {
       emptyMap,
       null, // mainClass
       emptyStrings,
+      emptyStrings, // compileOnlyDeps
       emptyStrings,
       "", // javaSemanticdbVersion
       false, // semanticdbEnabled
