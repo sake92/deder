@@ -43,6 +43,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
         Seq(
           Set(
             "common.classes",
+            "common.compileOnlyDeps",
             "common.deps",
             "common.javaHome",
             "common.javaVersion",
@@ -65,7 +66,8 @@ class ExecutionPlannerSuite extends munit.FunSuite {
             "common.javacAnnotationProcessors",
             "common.scalacPlugins",
             "common.sourceFiles",
-            "common.scalaSemanticdbVersion"
+            "common.scalaSemanticdbVersion",
+            "common.compileOnlyDependencies"
           ),
           Set("common.allDependencies", "common.compilerJars"),
           Set("common.compileClasspath"),
@@ -129,16 +131,6 @@ class ExecutionPlannerSuite extends munit.FunSuite {
       assertEquals(
         taskIds,
         Set(
-          "common.deps",
-          "common.javaHome",
-          "common.javaVersion",
-          "common.javacAnnotationProcessorDeps",
-          "common.javacOptions",
-          "common.scalacOptions",
-          "common.scalacPluginDeps",
-          "common.scalaVersion",
-          "common.javaSemanticdbVersion",
-          "common.semanticdbEnabled",
           "backend.deps",
           "backend.javaHome",
           "backend.javaVersion",
@@ -148,7 +140,19 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "backend.scalacPluginDeps",
           "backend.scalaVersion",
           "backend.javaSemanticdbVersion",
+          "backend.compileOnlyDeps",
           "backend.semanticdbEnabled",
+          "common.deps",
+          "common.javaHome",
+          "common.javaVersion",
+          "common.javacAnnotationProcessorDeps",
+          "common.javacOptions",
+          "common.scalacOptions",
+          "common.scalacPluginDeps",
+          "common.scalaVersion",
+          "common.javaSemanticdbVersion",
+          "common.compileOnlyDeps",
+          "common.semanticdbEnabled",
           "frontend.deps",
           "frontend.javaHome",
           "frontend.javaVersion",
@@ -159,6 +163,7 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "frontend.scalaVersion",
           "frontend.javaSemanticdbVersion",
           "frontend.semanticdbEnabled",
+          "frontend.compileOnlyDeps",
           "uber.deps",
           "uber.javaHome",
           "uber.javaVersion",
@@ -168,7 +173,8 @@ class ExecutionPlannerSuite extends munit.FunSuite {
           "uber.scalacPluginDeps",
           "uber.scalaVersion",
           "uber.javaSemanticdbVersion",
-          "uber.semanticdbEnabled"
+          "uber.semanticdbEnabled",
+          "uber.compileOnlyDeps"
         )
       )
     }

@@ -42,7 +42,8 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
   val nativeLinkTask = CachedTaskBuilder
     .make[String](
       name = "nativeLink",
-      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST)
+      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST),
+      category = "Scala Native"
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
@@ -71,7 +72,8 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
   val testNativeTask = TaskBuilder
     .make[DederTestResults](
       name = "test",
-      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE_TEST)
+      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE_TEST),
+      category = "Scala Native"
     )
     .dependsOn(fastNativeLinkTask)
     .dependsOn(coreTasks.testClassesTask)

@@ -316,7 +316,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
         analysisCache.put(zincCacheFile, contents)
       } finally storeSpan.end()
       // trigger just in case, for BSP
-      if !newResult.hasModified then notifications.add(ServerNotification.CompileFinished(moduleId, 0, 0))
+      //if !newResult.hasModified then notifications.add(ServerNotification.CompileFinished(moduleId, 0, 0))
     } catch {
       case e: xsbti.CompileFailed =>
         val problems = reporter.problems()

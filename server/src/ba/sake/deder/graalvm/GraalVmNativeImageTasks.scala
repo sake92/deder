@@ -19,6 +19,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
   val graalvmHomeTask = ConfigValueTask[Option[os.Path]](
     name = "graalvmHome",
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+    category = "GraalVM",
     execute = { ctx =>
       ctx.module match {
         case m: JavaModule if m.graalvm != null =>
@@ -33,6 +34,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
   val nativeImageOptionsTask = ConfigValueTask[Seq[String]](
     name = "nativeImageOptions",
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+    category = "GraalVM",
     execute = { ctx =>
       ctx.module match {
         case m: JavaModule if m.graalvm != null => m.graalvm.nativeImageOptions.asScala.toSeq
@@ -44,7 +46,8 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
   val nativeIncludedResourcesOptionsTask = CachedTaskBuilder
     .make[Seq[String]](
       name = "nativeIncludedResourcesOptions",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+      category = "GraalVM"
     )
     .dependsOn(coreTasks.resourcesTask)
     .build { ctx =>
@@ -71,7 +74,8 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
   val graalvmReachabilityMetadataOptionsTask = CachedTaskBuilder
     .make[Seq[String]](
       name = "graalvmReachabilityMetadataOptions",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+      category = "GraalVM"
     )
     .dependsOn(coreTasks.allDependenciesTask)
     .build { ctx =>
@@ -155,7 +159,8 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
   val graalvmNativeImageTask = CachedTaskBuilder
     .make[os.Path](
       name = "graalvmNativeImage",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+      category = "GraalVM"
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)

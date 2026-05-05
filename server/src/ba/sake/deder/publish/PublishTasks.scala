@@ -16,7 +16,7 @@ import javax.tools.ToolProvider
 class PublishTasks(coreTasks: CoreTasks) {
 
   val versionTask = TaskBuilder
-    .make[String](name = "version")
+    .make[String](name = "version", category = "Publishing")
     .build { ctx =>
       ctx.module match {
         case jm: JavaModule =>
@@ -75,7 +75,7 @@ class PublishTasks(coreTasks: CoreTasks) {
   )
 
   val finalManifestSettingsTask = CachedTaskBuilder
-    .make[ManifestEntries](name = "finalManifest")
+    .make[ManifestEntries](name = "finalManifest", category = "Publishing")
     .dependsOn(manifestSettingsTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(pomSettingsTask)
@@ -108,7 +108,7 @@ class PublishTasks(coreTasks: CoreTasks) {
     }
 
   val jarTask = CachedTaskBuilder
-    .make[os.Path](name = "jar")
+    .make[os.Path](name = "jar", category = "Publishing")
     .dependsOn(coreTasks.compileTask)
     .dependsOn(coreTasks.resourcesTask)
     .dependsOn(finalManifestSettingsTask)
@@ -127,7 +127,8 @@ class PublishTasks(coreTasks: CoreTasks) {
   val allJarsTask = CachedTaskBuilder
     .make[Seq[os.Path]](
       name = "allJars",
-      transitive = true
+      transitive = true,
+      category = "Publishing"
     )
     .dependsOn(jarTask)
     .build { ctx =>
@@ -145,7 +146,8 @@ class PublishTasks(coreTasks: CoreTasks) {
   val assemblyDepsTask = CachedTaskBuilder
     .make[os.Path](
       name = "assemblyDeps",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST),
+      category = "Publishing"
     )
     .dependsOn(coreTasks.scalaVersionTask)
     .dependsOn(coreTasks.mandatoryDependenciesTask)
@@ -162,7 +164,8 @@ class PublishTasks(coreTasks: CoreTasks) {
   val assemblyTask = CachedTaskBuilder
     .make[os.Path](
       name = "assembly",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST)
+      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST),
+      category = "Publishing"
     )
     .dependsOn(finalManifestSettingsTask)
     .dependsOn(assemblyDepsTask)
@@ -185,7 +188,8 @@ class PublishTasks(coreTasks: CoreTasks) {
   val moduleDepsPomSettingsTask = CachedTaskBuilder
     .make[Seq[Seq[PomSettings]]](
       name = "moduleDepsPomSettings",
-      transitive = true
+      transitive = true,
+      category = "Publishing"
     )
     .dependsOn(pomSettingsTask)
     .build { ctx =>
@@ -200,7 +204,7 @@ class PublishTasks(coreTasks: CoreTasks) {
     }
 
   val sourcesJarTask = CachedTaskBuilder
-    .make[Option[os.Path]](name = "sourcesJar")
+    .make[Option[os.Path]](name = "sourcesJar", category = "Publishing")
     .dependsOn(pomSettingsTask)
     .dependsOn(coreTasks.sourcesTask)
     .build { ctx =>
@@ -215,7 +219,7 @@ class PublishTasks(coreTasks: CoreTasks) {
     }
 
   val javadocJarTask = CachedTaskBuilder
-    .make[Option[os.Path]](name = "javadocJar")
+    .make[Option[os.Path]](name = "javadocJar", category = "Publishing")
     .dependsOn(coreTasks.scalaVersionTask)
     .dependsOn(pomSettingsTask)
     .dependsOn(coreTasks.sourcesTask)
@@ -318,7 +322,8 @@ class PublishTasks(coreTasks: CoreTasks) {
 
   val publishArtifactsTask = CachedTaskBuilder
     .make[Option[PublishArtifactsRes]](
-      name = "publishArtifacts"
+      name = "publishArtifacts",
+      category = "Publishing"
     )
     .dependsOn(coreTasks.scalaVersionTask)
     .dependsOn(pomSettingsTask)
@@ -370,7 +375,8 @@ class PublishTasks(coreTasks: CoreTasks) {
 
   val publishLocalTask = TaskBuilder
     .make[Option[os.Path]](
-      name = "publishLocal"
+      name = "publishLocal",
+      category = "Publishing"
     )
     .dependsOn(publishArtifactsTask)
     .build { ctx =>
@@ -418,7 +424,8 @@ class PublishTasks(coreTasks: CoreTasks) {
 
   val publishTask = TaskBuilder
     .make[String](
-      name = "publish"
+      name = "publish",
+      category = "Publishing"
     )
     .dependsOn(publishArtifactsTask)
     .build { ctx =>

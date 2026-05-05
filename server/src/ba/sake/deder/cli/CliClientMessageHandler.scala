@@ -165,10 +165,20 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                         state.tasksResolver.allModules
                     }
                     val sortedModules = modules.sortBy(_.id)
+                    val categoryOrder = Seq(
+                      "Build", "Configuration", "Dependencies", "Verification",
+                      "Run", "Publishing", "REPL", "Scala.js", "Scala Native", "GraalVM"
+                    )
                     val modulesWithTasks = sortedModules.map { module =>
-                      val moduleTaskNames =
-                        state.tasksResolver.taskInstancesPerModule(module.id).map(t => s"  ${t.task.name}")
-                      s"${module.id}:\n${moduleTaskNames.mkString("\n")}"
+                      val moduleTasks = state.tasksResolver.taskInstancesPerModule(module.id).map(_.task)
+                      val grouped = moduleTasks.groupBy(t => if t.category.isEmpty then "Other" else t.category)
+                      val sortedCategories = categoryOrder.filter(grouped.contains) ++
+                        grouped.keys.filterNot(categoryOrder.contains).toSeq.sorted
+                      val categoryLines = sortedCategories.flatMap { cat =>
+                        val taskNames = grouped(cat).map(_.name).sorted
+                        Seq(s"  ${cat}:") ++ taskNames.map(t => s"    ${t}")
+                      }
+                      s"${module.id}:\n${categoryLines.mkString("\n")}"
                     }
                     serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
                     serverMessages.put(CliServerMessage.Exit(0))

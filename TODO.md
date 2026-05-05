@@ -1,12 +1,10 @@
 
 
 # Misc
-- support negation tests/modules filter like !mytests%
 - group tasks by category like in gradle, when printing them
-- Console/REPL
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
-
+- add limits on plan/modules graphing, up/down
 
 # Docs
 - run pkldoc on each tag, and publish to ghpages
@@ -15,7 +13,6 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 # Client
 
 # Compilers
-- fix moduleId and level
 - add compileOnly deps
 
 # Caching
@@ -34,9 +31,6 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 ## GraalVM native image
 
 ## Scala.js
-- run
-- fullopt
-- configuration..
 
 ## Scala Native
 - run

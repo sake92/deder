@@ -107,7 +107,7 @@ class TabCompleterSuite extends munit.FunSuite {
     }
     assertEquals(
       completer.complete("deder plan -m frontend -t compile", 33).toSet,
-      Set("compile", "compilerDeps", "compilerJars", "compileClasspath")
+      Set("compile", "compileOnlyDeps", "compileOnlyDependencies", "compilerDeps", "compilerJars", "compileClasspath")
     )
   }
 

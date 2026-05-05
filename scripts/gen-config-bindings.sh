@@ -1,4 +1,5 @@
 
+echo "Generating Java config bindings from PKL files..."
 
 rm -rf config/src
 rm -rf config/resources

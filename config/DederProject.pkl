@@ -198,6 +198,9 @@ open class JavaModule extends DederModule {
   mainClass: String?
   /// Dependencies to include when compiling/running the app
   deps: Listing<String> = new Listing {}
+  /// Dependencies used only during compilation, excluded from the runtime classpath.
+  /// Follows the same format as `deps` (Coursier dependency strings).
+  compileOnlyDeps: Listing<String> = new Listing {}
   javacAnnotationProcessorDeps: Listing<String> = new Listing {}
   javaSemanticdbVersion: String = "0.11.1"
   /// Whether to generate SemanticDB during compilation (used by BSP/IDE features and scalafix).

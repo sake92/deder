@@ -105,3 +105,19 @@ repositories {
 ```
 
 See [Repositories](/reference/repositories.html) for details.
+
+## Dependency Exclusions
+
+Exclude transitive dependencies at declaration time using Coursier's `,exclude=` syntax:
+
+```pkl
+deps {
+  "org.example:lib:1.0"
+  // exclude a specific transitive dependency:
+  "org.other:lib:2.0,exclude=org.example%%transitive-dep"
+  // multiple exclusions are comma-separated:
+  "org.another:lib:3.0,exclude=org.foo%foo-lib,exclude=org.bar%%bar-lib"
+}
+```
+
+Use `%%` for Scala cross-versioned modules and `%` for plain Java modules in the exclusion coordinates.

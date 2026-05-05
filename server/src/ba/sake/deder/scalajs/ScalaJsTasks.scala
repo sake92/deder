@@ -9,7 +9,8 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
   val fastLinkJsTask = CachedTaskBuilder
     .make[String](
       name = "fastLinkJs",
-      supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST)
+      supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST),
+      category = "Scala.js"
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
@@ -43,7 +44,8 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
   val fullLinkJsTask = CachedTaskBuilder
     .make[String](
       name = "fullLinkJs",
-      supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST)
+      supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST),
+      category = "Scala.js"
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
@@ -75,7 +77,8 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
   val linkJsTask = CachedTaskBuilder
     .make[String](
       name = "linkJs",
-      supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST)
+      supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST),
+      category = "Scala.js"
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
@@ -109,7 +112,8 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
     .make[Seq[String]](
       name = "runJs",
       singleton = true,
-      supportedModuleTypes = Set(ModuleType.SCALA_JS)
+      supportedModuleTypes = Set(ModuleType.SCALA_JS),
+      category = "Scala.js"
     )
     .dependsOn(fastLinkJsTask)
     .dependsOn(coreTasks.finalMainClassTask)
@@ -130,7 +134,8 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
   val testJsTask = TaskBuilder
     .make[DederTestResults](
       name = "test",
-      supportedModuleTypes = Set(ModuleType.SCALA_JS_TEST)
+      supportedModuleTypes = Set(ModuleType.SCALA_JS_TEST),
+      category = "Scala.js"
     )
     .dependsOn(fastLinkJsTask)
     .dependsOn(coreTasks.testClassesTask)
