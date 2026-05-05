@@ -1,14 +1,18 @@
 package ba.sake.deder.hello
 
 import ba.sake.deder.*
-import ba.sake.deder.config.DederProject.Plugin
 
 class HelloPluginImpl extends DederPlugin {
   def id: String = "hello"
 
-  def tasks(coreTasks: CoreTasksApi, config: Plugin): Seq[AbstractTask[?]] = {
-    val helloConfig = config.asInstanceOf[HelloConfig]
-    val greeting = Option(helloConfig.getGreeting()).getOrElse("Hello!")
+  def tasks(coreTasks: CoreTasksApi, configText: String): Seq[AbstractTask[?]] = {
+    // Parse the Pkl config expression to get a typed HelloConfig object
+    val evaluator = org.pkl.config.java.ConfigEvaluator.preconfigured
+    val config = evaluator.evaluate(
+      org.pkl.core.ModuleSource.text(configText)
+    ).as(classOf[HelloConfig])
+
+    val greeting = Option(config.getGreeting()).getOrElse("Hello!")
 
     val helloTask = TaskBuilder
       .make[String](name = "hello")
