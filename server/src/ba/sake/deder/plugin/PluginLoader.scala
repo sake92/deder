@@ -33,17 +33,22 @@ class PluginLoader(
       Left(s"Phase 1 evaluation failed: ${e.getMessage}")
   }
 
-  /** Phase 2: Full evaluation with plugin JARs on classpath.
-   *  Uses thread context classloader to make plugin JAR classes visible to Pkl.
+  /** Phase 2 + 3 combined: evaluate Pkl with plugin JARs on classpath AND load plugins via ServiceLoader,
+   *  all using the SAME URLClassLoader so typed config subclasses (e.g. HelloConfig) are compatible.
    */
-  def evaluatePhase2(pklFile: os.Path, pluginJarPaths: Seq[os.Path]): Either[String, DederProject] = try {
+  def evaluateAndLoadPlugins(
+      pklFile: os.Path,
+      pluginJarPaths: Seq[os.Path]
+  ): Either[String, Seq[AbstractTask[?]]] = try {
     val pluginUrls = pluginJarPaths.map(_.toIO.toURI.toURL).toArray
+    // SINGLE classloader instance used for both Pkl evaluation and ServiceLoader
     val pluginClassLoader = new URLClassLoader(pluginUrls, getClass.getClassLoader)
 
     val originalTCCL = Thread.currentThread().getContextClassLoader
     try {
       Thread.currentThread().setContextClassLoader(pluginClassLoader)
 
+      // Phase 2: Full Pkl evaluation with plugin JARs available (typed Plugin subclasses resolved)
       val builder = org.pkl.config.java.ConfigEvaluatorBuilder.preconfigured()
       builder.getEvaluatorBuilder()
         .addModuleKeyFactory(org.pkl.core.module.ModuleKeyFactories.classPath(pluginClassLoader))
@@ -51,56 +56,41 @@ class PluginLoader(
       val evaluator = builder.build()
       val moduleSource = org.pkl.core.ModuleSource.file(pklFile.toIO)
       val project = evaluator.evaluate(moduleSource).as(classOf[DederProject])
-      Right(project)
+
+      // Phase 3: ServiceLoader (same classloader → same HelloConfig class → no ClassCastException)
+      val dederPluginClass = classOf[DederPlugin]
+      val tasks = project.modules.asScala.toSeq.flatMap { module =>
+        Option(module.plugins).toSeq.flatMap(_.asScala).flatMap { pluginConfig =>
+          val serviceLoader = java.util.ServiceLoader.load(dederPluginClass, pluginClassLoader)
+          val impls = serviceLoader.iterator().asScala.toSeq
+          val matchingImpl = impls.find(_.id == pluginConfig.id)
+
+          matchingImpl match {
+            case Some(plugin) =>
+              logger.info(s"Loaded plugin '${plugin.id}' for module '${module.id}'")
+              val ts = plugin.tasks(coreTasksApi, pluginConfig)
+              logger.debug(s"Plugin '${plugin.id}' contributed ${ts.size} tasks")
+              ts
+            case None =>
+              logger.warn(
+                s"No DederPlugin implementation found for id='${pluginConfig.id}' " +
+                s"in module '${module.id}'. Available implementations: ${impls.map(_.id).mkString(", ")}"
+              )
+              Seq.empty
+          }
+        }
+      }
+      Right(tasks)
     } finally {
       Thread.currentThread().setContextClassLoader(originalTCCL)
     }
   } catch {
     case e: Exception =>
-      logger.warn(s"Phase 2 evaluation failed: ${e.getMessage}", e)
-      Left(s"Phase 2 evaluation failed: ${e.getMessage}")
+      logger.warn(s"Plugin evaluation/loading failed: ${e.getMessage}", e)
+      Left(s"Plugin evaluation/loading failed: ${e.getMessage}")
   }
 
-  /** Phase 3: Load all plugin implementations via ServiceLoader and collect their tasks. */
-  def loadPlugins(
-      project: DederProject,
-      pluginJarPaths: Seq[os.Path]
-  ): Seq[AbstractTask[?]] = try {
-    val pluginUrls = pluginJarPaths.map(_.toIO.toURI.toURL).toArray
-    val pluginClassLoader = new URLClassLoader(pluginUrls, getClass.getClassLoader)
-
-    val dederPluginClass = classOf[DederPlugin]
-
-    project.modules.asScala.toSeq.flatMap { module =>
-      Option(module.plugins).toSeq.flatMap(_.asScala).flatMap { pluginConfig =>
-        val serviceLoader = java.util.ServiceLoader.load(dederPluginClass, pluginClassLoader)
-        val impls = serviceLoader.iterator().asScala.toSeq
-        val matchingImpl = impls.find(_.id == pluginConfig.id)
-
-        matchingImpl match {
-          case Some(plugin) =>
-            logger.info(s"Loaded plugin '${plugin.id}' for module '${module.id}'")
-            val tasks = plugin.tasks(coreTasksApi, pluginConfig)
-            logger.debug(s"Plugin '${plugin.id}' contributed ${tasks.size} tasks")
-            tasks
-          case None =>
-            logger.warn(
-              s"No DederPlugin implementation found for id='${pluginConfig.id}' " +
-              s"in module '${module.id}'. Available implementations: ${impls.map(_.id).mkString(", ")}"
-            )
-            Seq.empty
-        }
-      }
-    }
-  } catch {
-    case e: Exception =>
-      logger.error(s"Failed to load plugins: ${e.getMessage}", e)
-      Seq.empty
-  }
-
-  /** Full load pipeline: phase 1 -> resolve deps -> phase 2 -> load plugins.
-   *  Returns all plugin-contributed tasks.
-   */
+  /** Full load pipeline: phase 1 -> resolve deps -> phase 2+3. */
   def load(pklFile: os.Path): Either[String, Seq[AbstractTask[?]]] = {
     evaluatePhase1(pklFile) match {
       case Left(err) => Left(err)
@@ -111,7 +101,6 @@ class PluginLoader(
         val allDepStrings = depsWithScalaVer.map(_._1)
         logger.info(s"Discovered plugin dependencies: ${allDepStrings.mkString(", ")}")
 
-        // Create Dependency objects using the module's actual scalaVersion for `::` resolution
         val dependencies = depsWithScalaVer.map { case (depStr, scalaVer) =>
           Dependency.make(depStr, scalaVer)
         }
@@ -125,19 +114,12 @@ class PluginLoader(
 
         logger.debug(s"Resolved plugin JARs: ${pluginJarPaths.map(_.last).mkString(", ")}")
 
-        // Phase 2: full evaluation with plugin JARs on classpath
-        evaluatePhase2(pklFile, pluginJarPaths) match {
-          case Left(err) => Left(err)
-          case Right(project2) =>
-            // Phase 3: load plugins and collect tasks
-            Right(loadPlugins(project2, pluginJarPaths))
-        }
+        evaluateAndLoadPlugins(pklFile, pluginJarPaths)
     }
   }
 }
 
 object PluginLoader {
-  /** Extract plugin deps with their module's Scala version. */
   def extractPluginDeps(project: DederProject): Seq[(String, String)] = {
     import scala.jdk.CollectionConverters.*
     for {
@@ -153,7 +135,6 @@ object PluginLoader {
     }
   }
 
-  /** Convenience: extract flat deps list for tests. */
   def extractDeps(project: DederProject): Seq[String] =
     extractPluginDeps(project).map(_._1)
 }
