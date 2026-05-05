@@ -16,7 +16,8 @@ class PluginLoader(
 
   def extractPluginDeps(project: DederProject): Seq[(String, String)] = PluginLoader.extractPluginDeps(project)
 
-  /** Phase 1: Evaluate deder.pkl minimally (no plugin JARs) to get project config. */
+  /** Phase 1: Evaluate deder.pkl minimally (no plugin JARs) to get project config.
+   *  Returns Plugin objects with correct id/deps for each module. */
   def evaluatePhase1(pklFile: os.Path): Either[String, DederProject] = try {
     val moduleSource = org.pkl.core.ModuleSource.file(pklFile.toIO)
     val project = Using.resource(org.pkl.config.java.ConfigEvaluator.preconfigured) { evaluator =>
@@ -29,24 +30,14 @@ class PluginLoader(
       Left(s"Phase 1 evaluation failed: ${e.getMessage}")
   }
 
-  /** Extract plugin config as Pkl source text from the raw Pkl file.
-   *  Each entry is a valid Pkl expression like: new hc.HelloConfig {\n  greeting = "Hi"\n}
-   */
-  def extractPluginConfigPkl(pklText: String): Seq[(String, String)] = {
-    // Returns (pluginId, pklConfigText) — matched by scanning for plugin id inside the config text
-    val results = Seq.newBuilder[(String, String)]
-
-    // Find all "plugins {" blocks in the text
+  /** Extract plugin config expressions as Pkl source text from the raw file.
+   *  Returns config texts in module/plugin declaration order. */
+  def extractPluginConfigPkl(pklText: String): Seq[String] = {
+    val results = Seq.newBuilder[String]
     val pluginBlocks = extractBlocks(pklText, "plugins")
     for block <- pluginBlocks do
-      // Inside each plugins block, find "new ... { ... }" entries
-      val newExprs = extractNewExprs(block)
-      for expr <- newExprs do
-        // Extract id from the config: look for "id = \"...\"" or pick from the type name
-        val id = extractId(expr)
-        results += (id -> expr.trim)
-
-    results.result()
+      results ++= extractNewExprs(block)
+    results.result().map(_.trim)
   }
 
   /** Extract top-level blocks like "plugins { ... }". Returns content between outermost braces. */
@@ -57,7 +48,6 @@ class PluginLoader(
       val kw = text.indexOf(keyword, i)
       if kw < 0 then i = text.length
       else
-        // Find the opening brace after the keyword
         val open = text.indexOf('{', kw + keyword.length)
         if open < 0 then i = text.length
         else
@@ -74,14 +64,10 @@ class PluginLoader(
     val exprs = Seq.newBuilder[String]
     var i = 0
     while i < text.length do
-      // Look for "new " followed by a type name and opening brace
       val newKw = findKeyword(text, "new", i)
       if newKw < 0 then i = text.length
       else
-        // Skip "new " and find the opening brace
-        val afterNew = newKw + 3
-        // Skip whitespace and type name to find {
-        var j = afterNew
+        var j = newKw + 3
         while j < text.length && text(j) != '{' && text(j) != '}' do j += 1
         if j < text.length && text(j) == '{' then
           val close = findMatchingBrace(text, j)
@@ -93,21 +79,10 @@ class PluginLoader(
     exprs.result()
   }
 
-  /** Extract plugin id from config text. Looks for "id = \"...\"" or uses the class name. */
-  private def extractId(expr: String): String = {
-    val idPattern = """id\s*=\s*"([^"]*)"""".r
-    idPattern.findFirstMatchIn(expr).map(_.group(1)).getOrElse {
-      // Fallback: extract class name after "new "
-      val clsPattern = """new\s+(\S+Config)\s*\{""".r
-      clsPattern.findFirstMatchIn(expr).map(_.group(1)).getOrElse("unknown")
-    }
-  }
-
   private def findKeyword(text: String, keyword: String, from: Int): Int = {
     var i = from
     while i < text.length - keyword.length do
       if text.substring(i, i + keyword.length) == keyword then
-        // Must be at a word boundary
         val before = if i == 0 then ' ' else text(i - 1)
         val after = if i + keyword.length >= text.length then ' ' else text(i + keyword.length)
         if !before.isLetterOrDigit && (after == ' ' || after == '\n' || after == '\t' || after == '.' || after == '{') then
@@ -116,9 +91,7 @@ class PluginLoader(
     -1
   }
 
-  /** Find the matching closing brace for the opening brace at position `open`. */
   private def findMatchingBrace(text: String, open: Int): Int = {
-    // skip strings to avoid matching braces inside strings
     var depth = 0
     var inString = false
     var inSingleLineComment = false
@@ -142,18 +115,27 @@ class PluginLoader(
     -1
   }
 
-  /** Load all plugin implementations via ServiceLoader and collect their tasks.
-   *  Passes Pkl config text to each plugin; the plugin uses its own Pkl evaluator to parse it.
-   */
+  /** Build (pluginId, configText) pairs by matching Phase 1 Plugin objects with Pkl text extracts. */
+  def buildPluginConfigs(project: DederProject, configTexts: Seq[String]): Seq[(String, String)] = {
+    val plugins = for {
+      module <- project.modules.asScala.toSeq
+      plugin <- Option(module.plugins).toSeq.flatMap(_.asScala)
+    } yield plugin.id
+
+    // Match by position — Phase 1 plugins are in same order as Pkl text extracts
+    plugins.zipAll(configTexts, "", "").filter(_._2.nonEmpty)
+  }
+
+  /** Load all plugin implementations via ServiceLoader and collect their tasks. */
   def loadPlugins(
-      pluginConfigTexts: Seq[(String, String)],
+      pluginConfigs: Seq[(String, String)],
       pluginJarPaths: Seq[os.Path]
   ): Seq[AbstractTask[?]] = try {
     val pluginUrls = pluginJarPaths.map(_.toIO.toURI.toURL).toArray
     val pluginClassLoader = new URLClassLoader(pluginUrls, getClass.getClassLoader)
     val dederPluginClass = classOf[DederPlugin]
 
-    pluginConfigTexts.flatMap { case (pluginId, configText) =>
+    pluginConfigs.flatMap { case (pluginId, configText) =>
       val serviceLoader = java.util.ServiceLoader.load(dederPluginClass, pluginClassLoader)
       val impls = serviceLoader.iterator().asScala.toSeq
       val matchingImpl = impls.find(_.id == pluginId)
@@ -201,12 +183,13 @@ class PluginLoader(
         }
         logger.debug(s"Resolved plugin JARs: ${pluginJarPaths.map(_.last).mkString(", ")}")
 
-        // Extract plugin config as Pkl text
+        // Extract config texts from raw Pkl, match with Phase 1 Plugin ids
         val pklText = os.read(pklFile)
-        val pluginConfigTexts = extractPluginConfigPkl(pklText)
-        logger.debug(s"Extracted ${pluginConfigTexts.size} plugin config(s) as Pkl text")
+        val configTexts = extractPluginConfigPkl(pklText)
+        val pluginConfigs = buildPluginConfigs(project, configTexts)
+        logger.debug(s"Extracted ${pluginConfigs.size} plugin config(s) as Pkl text")
 
-        Right(loadPlugins(pluginConfigTexts, pluginJarPaths))
+        Right(loadPlugins(pluginConfigs, pluginJarPaths))
     }
   }
 }
