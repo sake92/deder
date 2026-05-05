@@ -153,7 +153,7 @@ class DederSbtExporter(
       generateModuleGroup(gi, globalIdMap)
     }
 
-    s"""amends "https://sake92.github.io/deder/config/v0.7.4/DederProject.pkl"
+    s"""amends "https://sake92.github.io/deder/config/${DederSbtExporter.DederVersion}/DederProject.pkl"
        |
        |${builderDefs.mkString("\n")}
        |
@@ -409,6 +409,8 @@ class DederSbtExporter(
 }
 
 object DederSbtExporter {
+
+  val DederVersion = "v0.7.4"
 
   /** Checks if a dependency is a compiler plugin based on its configurations field */
   def isPluginDependency(dep: DependencyExport): Boolean = {

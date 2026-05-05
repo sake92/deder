@@ -50,7 +50,7 @@ class DederSbtExporterSuite extends FunSuite {
     val mod = baseModule("core", os.pwd.toString, "core")
     val exporter = new DederSbtExporter(IndexedSeq(mod), noopLogger)
     val result = exporter.generateBuild()
-    assert(result.contains("""amends "https://sake92.github.io/deder/config/v0.7.3/DederProject.pkl""""))
+    assert(result.contains(s"""amends "https://sake92.github.io/deder/config/${DederSbtExporter.DederVersion}/DederProject.pkl""""))
   }
 
   test("single Scala module generates CreateScalaModules builder and modules block") {
