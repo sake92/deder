@@ -7,7 +7,7 @@
 - add limits on plan/modules graphing, up/down
 - color instead of quotes for "Executing 'mytask'"
 - hide some internal tasks like deps resolving etc, helper assemblyDeps.. (rebind edges when displaying)
-- 
+- color stages in plan
 
 # Docs
 - run pkldoc on each tag, and publish to ghpages
@@ -42,7 +42,7 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 
 ## Tests
 - stdout not captured when fork
-
+- periodic flush, every 1s?
 
 
 ## CLI
