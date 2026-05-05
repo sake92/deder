@@ -6,10 +6,11 @@ local const scalaVer = "3.7.4"
 
 local const config = new JavaModule {
   id = "config"
-  publish = false
   deps {
     "org.pkl-lang:pkl-config-java:0.30.2"
   }
+  pomSettings = pom("deder-config")
+  publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
 }
 
 local const function pom(artId: String) = new PomSettings {
