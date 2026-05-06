@@ -1,8 +1,11 @@
 package ba.sake.deder.examples.plugins
 
+import scala.jdk.CollectionConverters.*
 import scala.util.Using
-import org.pkl.config.java.ConfigEvaluator
+import org.pkl.config.java.ConfigEvaluatorBuilder
 import org.pkl.core.ModuleSource
+import org.pkl.core.module.ModuleKeyFactories
+import org.pkl.core.resource.ResourceReaders
 import ba.sake.deder.*
 
 class HelloPluginImpl extends DederPluginApi {
@@ -11,12 +14,21 @@ class HelloPluginImpl extends DederPluginApi {
   def tasks(coreTasks: CoreTasksApi, pcfText: String): Seq[AbstractTask[?]] = {
     val moduleText =
       s"""|amends "modulepath:/HelloPlugin.pkl"
-          |
-          |$pcfText
-          |
-          |""".stripMargin
+           |
+           |$pcfText
+           |
+           |""".stripMargin
 
-    val pluginModule = Using.resource(ConfigEvaluator.preconfigured) { evaluator =>
+    val evaluatorBuilder = ConfigEvaluatorBuilder.preconfigured()
+    val underlyingBuilder = evaluatorBuilder.getEvaluatorBuilder()
+    val moduleKeyFactories =
+      (ModuleKeyFactories.classPath(getClass.getClassLoader) +: underlyingBuilder.getModuleKeyFactories().asScala.toSeq).distinct
+    underlyingBuilder.setModuleKeyFactories(moduleKeyFactories.asJava)
+    val resourceReaders =
+      (ResourceReaders.classPath(getClass.getClassLoader) +: underlyingBuilder.getResourceReaders().asScala.toSeq).distinct
+    underlyingBuilder.setResourceReaders(resourceReaders.asJava)
+
+    val pluginModule = Using.resource(evaluatorBuilder.build()) { evaluator =>
       evaluator.evaluate(ModuleSource.text(moduleText)).as(classOf[Hello])
     }
 
