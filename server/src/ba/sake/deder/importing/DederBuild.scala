@@ -76,4 +76,4 @@ case class RepositoryDef(url: String)
 
 /** Warnings collected during analysis about things that couldn't be fully mapped. */
 enum ImportWarning:
-    // Reserved for future warning types
+    case Reserved extends ImportWarning
