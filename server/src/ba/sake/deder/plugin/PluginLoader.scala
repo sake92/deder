@@ -39,7 +39,7 @@ class PluginLoader(
          |import "${pklFile.toIO.toURI}" as cfg
          |
          |output {
-         |  value = (cfg.plugins.toList() + cfg.modules.toList().flatMap((it) -> it.plugins.toList()))
+         |  value = cfg.plugins.toList()
          |            .filter((it) -> it.id == "$pluginId")
          |            .first
          |}
@@ -112,13 +112,8 @@ class PluginLoader(
         }
         logger.info(s"Resolved plugin JARs: ${pluginJarPaths.map(_.last).mkString(", ")}")
 
-        // Collect plugin ids from both project-level and module-level plugins
-        val projectPlugins = Option(project.plugins).toSeq.flatMap(_.asScala)
-        val modulePlugins = for {
-          module <- project.modules.asScala.toSeq
-          plugin <- Option(module.plugins).toSeq.flatMap(_.asScala)
-        } yield plugin
-        val pluginIds = (projectPlugins ++ modulePlugins).map(_.id)
+        // Collect plugin ids from project-level plugins
+        val pluginIds = Option(project.plugins).toSeq.flatMap(_.asScala).map(_.id)
 
         val pluginConfigs = pluginIds.flatMap { id =>
           serializePluginConfig(pklFile, id).map(text => id -> text)
@@ -133,26 +128,10 @@ class PluginLoader(
 object PluginLoader {
   def extractPluginDeps(project: DederProject): Seq[(String, String)] = {
     import scala.jdk.CollectionConverters.*
-    // Project-level plugins (no scala version context)
-    val projectDeps = for {
+    for {
       plugin <- Option(project.plugins).toSeq.flatMap(_.asScala)
       dep <- Option(plugin.deps).toSeq.flatMap(_.asScala)
     } yield (dep, "")
-
-    // Module-level plugins (scala version from the module)
-    val moduleDeps = for {
-      module <- project.modules.asScala.toSeq
-      plugin <- Option(module.plugins).toSeq.flatMap(_.asScala)
-      dep <- Option(plugin.deps).toSeq.flatMap(_.asScala)
-    } yield {
-      val scalaVer = module match {
-        case sm: ScalaModule => sm.scalaVersion
-        case _               => ""
-      }
-      (dep, scalaVer)
-    }
-
-    projectDeps ++ moduleDeps
   }
 
   def extractDeps(project: DederProject): Seq[String] =

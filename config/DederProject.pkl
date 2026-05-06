@@ -87,9 +87,6 @@ abstract class DederModule {
   /// Module dependencies
   moduleDeps: Listing<DederModule>
 
-  /// Build tool plugins applied to this module.
-  plugins: Listing<Plugin>(pluginsValidation) = new Listing {}
-
   type: ModuleType
 
   hidden idValidation = (value: String) ->
@@ -101,14 +98,6 @@ abstract class DederModule {
   hidden rootValidation = (value: String) ->
     if (!value.matches(Regex("^[.a-zA-Z0-9/_-]+$")))
       throw("Root must be alphanumeric and can contain '_', '-', and '/' but got: " + value)
-    else
-      true
-
-  hidden pluginsValidation = (value: Listing<Plugin>) ->
-    let (ids = value.toList().map((p) -> p.id))
-    let (dups = ids.filter((id) -> ids.count((it) -> it == id) > 1).distinct)
-    if (!dups.isEmpty)
-      throw("Duplicate plugin ids in module: \(dups.join(", ")). Plugin ids must be unique within a module.")
     else
       true
 }
