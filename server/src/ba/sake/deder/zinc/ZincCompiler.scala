@@ -332,6 +332,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
           notifications.add(
             ServerNotification.CompileFailed(moduleId, errorsCount, warningsCount)
           )
+          reporter.printSummaryCalled = true
         }
         throw e
     } finally {

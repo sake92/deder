@@ -27,12 +27,12 @@ class DederZincReporter(
   override def hasWarnings(): Boolean = synchronized { _hasWarnings }
 
   override def printSummary(): Unit = synchronized {
-    printSummaryCalled = true
     val errorsCount = _problems.count(_.severity == Severity.Error)
     val warningsCount = _problems.count(_.severity == Severity.Warn)
     notifications.add(
       ServerNotification.CompileFinished(moduleId, errorsCount, warningsCount)
     )
+    printSummaryCalled = true
   }
 
   override def problems(): Array[Problem] = synchronized { _problems.toArray }
