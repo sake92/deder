@@ -1,10 +1,20 @@
-amends "modulepath:/ba/sake/deder/config/DederProject.pkl"
+amends "../../config/DederProject.pkl"
 
-import "../hello-plugin/HelloPlugin.pkl"
+//amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+
+import "../hello-plugin/HelloPlugin.pkl" as HP
 
 plugins {
-  new HelloPlugin {
-    greeting = "Hello from hello-plugin-usage!"
+  new HP.HelloPlugin {
+    config = new HP.HelloPluginConfig {
+      greeting = "Hello from hello-plugin-usage!"
+    }
+  }
+}
+
+repositories {
+  new MavenRepository {
+    url = "file:///home/sake/.m2/repository"
   }
 }
 

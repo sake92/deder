@@ -6,7 +6,7 @@ import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
-import ba.sake.deder.config.DederProject.{Plugin, ScalaModule}
+import ba.sake.deder.config.DederProject.{DederPlugin, ScalaModule}
 import ba.sake.deder.deps.{Dependency, DependencyResolverApi}
 
 class PluginLoader(
@@ -62,10 +62,10 @@ class PluginLoader(
   ): Seq[AbstractTask[?]] = try {
     val pluginUrls = pluginJarPaths.map(_.toIO.toURI.toURL).toArray
     val pluginClassLoader = new URLClassLoader(pluginUrls, getClass.getClassLoader)
-    val dederPluginClass = classOf[DederPlugin]
+    
 
     pluginConfigs.flatMap { case (pluginId, configText) =>
-      val serviceLoader = java.util.ServiceLoader.load(dederPluginClass, pluginClassLoader)
+      val serviceLoader = java.util.ServiceLoader.load(PluginLoader.DederPluginApiClass, pluginClassLoader)
       val impls = serviceLoader.iterator().asScala.toSeq
       val matchingImpl = impls.find(_.id == pluginId)
 
@@ -78,7 +78,7 @@ class PluginLoader(
           ts
         case None =>
           logger.warn(
-            s"No DederPlugin implementation found for id='$pluginId'. " +
+            s"No DederPluginApi implementation found for id='$pluginId'. " +
             s"Available: ${impls.map(_.id).mkString(", ")}"
           )
           Seq.empty
@@ -126,6 +126,8 @@ class PluginLoader(
 }
 
 object PluginLoader {
+  val DederPluginApiClass = classOf[DederPluginApi]
+
   def extractPluginDeps(project: DederProject): Seq[(String, String)] = {
     import scala.jdk.CollectionConverters.*
     val scalaVer = project.modules.asScala.toSeq.collectFirst {

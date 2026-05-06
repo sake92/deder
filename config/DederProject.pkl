@@ -15,7 +15,7 @@ hidden modulesValidation = (value: Listing<DederModule>) ->
 
 /// Base class for build tool plugin configurations.
 /// Plugin authors extend this with typed fields for plugin-specific settings.
-open class Plugin {
+abstract class DederPlugin {
   /// Unique identifier. Must match the `id` returned by the
   /// DederPlugin implementation in the plugin JAR.
   id: String(!isEmpty)
@@ -26,9 +26,9 @@ open class Plugin {
 }
 
 /// Build tool plugins applied to this project.
-plugins: Listing<Plugin>(pluginsValidation) = new Listing {}
+plugins: Listing<DederPlugin> = new Listing {}
 
-hidden pluginsValidation = (value: Listing<Plugin>) ->
+hidden pluginsValidation = (value: Listing<DederPlugin>) ->
   let (ids = value.toList().map((p) -> p.id))
   let (dups = ids.filter((id) -> ids.count((it) -> it == id) > 1).distinct)
     if (!dups.isEmpty)

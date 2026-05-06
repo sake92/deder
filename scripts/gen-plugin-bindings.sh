@@ -31,25 +31,18 @@ fi
 
 echo "Generating Java bindings from $PKL_FILE..."
 
-# Download pkl-codegen-java if needed (shared with gen-config-bindings.sh)
-if [ ! -f pkl-codegen-java ]; then
-    echo "Downloading pkl-codegen-java..."
-    curl -L -o pkl-codegen-java https://github.com/apple/pkl/releases/download/0.30.2/pkl-codegen-java
-    chmod +x pkl-codegen-java
-fi
+pkl-codegen-java "$PKL_FILE" -o "$OUTPUT_DIR"
 
-# Run codegen
-./pkl-codegen-java "$PKL_FILE" -o "$OUTPUT_DIR"
+# TODO Revisit and polish this script !!!
+shopt -s globstar
+#for file in $OUTPUT_DIR/java/**/*.java; do
+  #  mv "$file" "$OUTPUT_DIR"
+#done
+#rm -rf "$OUTPUT_DIR/java"
 
-# Flatten nested java directory if pkl-codegen-java created one
-if [ -d "$OUTPUT_DIR/java" ]; then
-    mv "$OUTPUT_DIR/java"/* "$OUTPUT_DIR/" 2>/dev/null || true
-    rmdir "$OUTPUT_DIR/java" 2>/dev/null || true
-fi
-
-# Move generated resources if any
-if [ -d "$OUTPUT_DIR/resources" ]; then
-    echo "Note: generated resources/ directory created at $OUTPUT_DIR/resources"
-fi
+#for file in $OUTPUT_DIR/resources/**; do
+    #mv "$file" "$OUTPUT_DIR/.."
+#done
+#rm -rf "$OUTPUT_DIR/resources"
 
 echo "Done! Generated Java bindings in $OUTPUT_DIR"

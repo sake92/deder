@@ -3,7 +3,7 @@ package ba.sake.deder
 import ba.sake.deder.deps.Dependency
 
 /** Trait that plugins implement to register additional tasks. */
-trait DederPlugin {
+trait DederPluginApi {
   def id: String
 
   /** @param coreTasks  Access to built-in server tasks (compile, classes, deps, etc.)
