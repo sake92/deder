@@ -6,7 +6,7 @@ import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
-import ba.sake.deder.config.DederProject.{DederModule, Plugin, ScalaModule}
+import ba.sake.deder.config.DederProject.{Plugin, ScalaModule}
 import ba.sake.deder.deps.{Dependency, DependencyResolverApi}
 
 class PluginLoader(
@@ -128,10 +128,13 @@ class PluginLoader(
 object PluginLoader {
   def extractPluginDeps(project: DederProject): Seq[(String, String)] = {
     import scala.jdk.CollectionConverters.*
+    val scalaVer = project.modules.asScala.toSeq.collectFirst {
+      case sm: ScalaModule => sm.scalaVersion
+    }.getOrElse("")
     for {
       plugin <- Option(project.plugins).toSeq.flatMap(_.asScala)
       dep <- Option(plugin.deps).toSeq.flatMap(_.asScala)
-    } yield (dep, "")
+    } yield (dep, scalaVer)
   }
 
   def extractDeps(project: DederProject): Seq[String] =
