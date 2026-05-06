@@ -6,16 +6,37 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
 
   override def munitTimeout = 5.minute
 
+  private def stageConfigSupport(parentDir: os.Path): Unit = {
+    os.copy(os.pwd / "config", parentDir / "config", createFolders = true, replaceExisting = true)
+  }
+
+  private def stageSiblingProject(parentDir: os.Path, projectName: String): os.Path = {
+    val stagedPath = parentDir / projectName
+    os.copy(testResourceDir / "sample-projects" / projectName, stagedPath, createFolders = true, replaceExisting = true)
+    val originalLines = os.read.lines(stagedPath / "deder.pkl")
+    val tweakedLines = Seq("""amends "../config/DederProject.pkl"""") ++ originalLines.tail
+    os.write.over(stagedPath / "deder.pkl", tweakedLines.mkString("\n"))
+    os.write.over(
+      stagedPath / ".deder/server.properties",
+      s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+      createFolders = true
+    )
+    stagedPath
+  }
+
   test("deder should publish hello-plugin to ./tmp/m2 and load its typed task in consumer") {
-    withTestProject("sample-projects/hello-plugin") { pluginPath =>
-      // Step 1: publish hello-plugin to the shared tmp-m2 repo
+    val tempParent = os.pwd / "tmp" / s"hello-plugin-sync-${System.currentTimeMillis()}"
+    stageConfigSupport(tempParent)
+    val pluginPath = stageSiblingProject(tempParent, "hello-plugin")
+    val consumerPath = stageSiblingProject(tempParent, "hello-plugin-consumer")
+
+    try {
       val publishRes = executeDederCommand(pluginPath, "exec", "-m", "hello-plugin", "-t", "publishLocal")
       assert(
         publishRes.exitCode == 0,
         s"publishLocal failed: exit=${publishRes.exitCode}\nstderr=${publishRes.err.text()}\nstdout=${publishRes.out.text()}"
       )
 
-      // Step 2: verify the artifact was published to the shared repo
       val localRepoDir = os.Path(sys.env("DEDER_TMP_M2_REPO"))
       val publishedDir = localRepoDir / "ba" / "sake" / "deder-hello-plugin_3" / "it-test-version"
       assert(os.exists(publishedDir), s"Published artifact directory not found at $publishedDir")
@@ -24,22 +45,16 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
         s"No JAR found in $publishedDir"
       )
 
-      // Step 3: run hello task in consumer project with typed config
-      // Inject the import path to the typed plugin config Pkl module
-      val helloConfigImport = s"""import "file://${pluginPath}/resources/hello-config.pkl" as hc"""
-      withTestProject("sample-projects/hello-plugin-consumer") { consumerPath =>
-        val pkl = os.read(consumerPath / "deder.pkl")
-        val rewritten = pkl.replace("__HELLO_CONFIG_IMPORT__", helloConfigImport)
-        os.write.over(consumerPath / "deder.pkl", rewritten)
-
-        val res = executeDederCommand(consumerPath, "exec", "-m", "app", "-t", "hello")
-        assert(
-          res.exitCode == 0,
-          s"hello task failed: exit=${res.exitCode}\nstderr=${res.err.text()}\nstdout=${res.out.text()}"
-        )
-        val out = res.out.text() + res.err.text()
-        assert(out.contains("Hello from typed config!"), s"Expected typed greeting in output, got: $out")
-      }
+      val res = executeDederCommand(consumerPath, "exec", "-m", "app", "-t", "hello")
+      assert(
+        res.exitCode == 0,
+        s"hello task failed: exit=${res.exitCode}\nstderr=${res.err.text()}\nstdout=${res.out.text()}"
+      )
+      val out = res.out.text() + res.err.text()
+      assert(out.contains("Hello from typed config!"), s"Expected typed greeting in output, got: $out")
+    } finally {
+      executeDederCommand(pluginPath, "shutdown")
+      executeDederCommand(consumerPath, "shutdown")
     }
   }
 }

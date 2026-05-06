@@ -1,7 +1,6 @@
-amends "modulepath:/ba/sake/deder/config/DederProject.pkl"
+amends "../../../config/DederProject.pkl"
 
-// __HELLO_CONFIG_IMPORT__ is injected by the test to import the typed plugin config class
-__HELLO_CONFIG_IMPORT__
+import "../hello-plugin/HelloPlugin.pkl" as HP
 
 // Shared local Maven repository (set by run-it-tests.sh via DEDER_TMP_M2_REPO env var)
 repositories {
@@ -9,8 +8,10 @@ repositories {
 }
 
 plugins {
-  new hc.HelloConfig {
-    greeting = "Hello from typed config!"
+  new HP.HelloPlugin {
+    config = new HP.HelloPluginConfig {
+      greeting = "Hello from typed config!"
+    }
   }
 }
 
