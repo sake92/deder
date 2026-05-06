@@ -5,10 +5,10 @@ title: Custom Repositories
 
 # {{page.title}}
 
-By default, Deder resolves dependencies from Maven Central plus the local
-Ivy2 cache. To pull artifacts from an internal Nexus/Artifactory, a public
-mirror, JitPack, Sonatype snapshots, or an on-disk Maven layout, declare
-them in your `deder.pkl`:
+By default, Deder resolves dependencies from Maven Central, the local Maven
+repository (`~/.m2/repository`), and the local Ivy2 cache. To pull artifacts
+from an internal Nexus/Artifactory, a public mirror, JitPack, Sonatype
+snapshots, or an on-disk Maven layout, declare them in your `deder.pkl`:
 
 ```pkl
 repositories {
@@ -22,8 +22,11 @@ repositories {
 Repositories are tried in this order:
 
 1. Your declared `repositories`, in the order they appear in `deder.pkl`.
-2. Maven Central.
-3. The local Ivy2 cache (`~/.ivy2/local`).
+2. The local Maven repository (`~/.m2/repository`). This means artifacts
+   installed via `publishLocal` are immediately available without extra
+   configuration.
+3. Maven Central.
+4. The local Ivy2 cache (`~/.ivy2/local`).
 
 "Custom first" means lookups for internal artifacts resolve against your
 Nexus before Deder hits Maven Central — faster on a LAN, no 404 noise, no

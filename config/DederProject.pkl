@@ -44,7 +44,7 @@ hidden pluginsValidation = (value: Listing<Plugin>) ->
 /// Tried in declared order, before default repositories.
 repositories: Listing<MavenRepository> = new Listing {}
 
-/// Include Maven Central and the Ivy2 local cache. Set to false for
+/// Include Maven Central, the local Maven repository (~/.m2/repository), and the Ivy2 local cache. Set to false for
 /// air-gapped / internal-only resolution (e.g. via a corporate Nexus).
 /// If false, `repositories` must be non-empty.
 includeDefaultRepos: Boolean = true

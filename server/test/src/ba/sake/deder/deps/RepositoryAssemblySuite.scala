@@ -5,9 +5,16 @@ import coursierapi.{MavenRepository as CsMavenRepository, Repository as CsReposi
 
 class RepositoryAssemblySuite extends munit.FunSuite {
 
-  test("no user repos, defaults on → returns empty (Coursier applies defaults)") {
+  test("no user repos, defaults on → ~/.m2 then Coursier defaults") {
     val out = DependencyResolver.assembleRepositories(Seq.empty, includeDefaultRepos = true)
-    assertEquals(out, Seq.empty)
+    val defaults = CsRepository.defaults().asScala.toSeq
+    assertEquals(out.size, 1 + defaults.size)
+    out.head match {
+      case m: CsMavenRepository =>
+        assertEquals(m.getBase, s"file://${os.home}/.m2/repository")
+      case _ => fail("expected MavenRepository")
+    }
+    assertEquals(out.drop(1), defaults)
   }
 
   test("user repos prepended to defaults in declared order") {
@@ -16,10 +23,15 @@ class RepositoryAssemblySuite extends munit.FunSuite {
       includeDefaultRepos = true
     )
     val defaults = CsRepository.defaults().asScala.toSeq
-    assertEquals(out.size, 2 + defaults.size)
+    assertEquals(out.size, 2 + 1 + defaults.size)
     val first2 = out.take(2).collect { case m: CsMavenRepository => m.getBase }
     assertEquals(first2, Seq("https://nexus.example.com/a/", "https://nexus.example.com/b/"))
-    assertEquals(out.drop(2), defaults)
+    out(2) match {
+      case m: CsMavenRepository =>
+        assertEquals(m.getBase, s"file://${os.home}/.m2/repository")
+      case _ => fail("expected MavenRepository")
+    }
+    assertEquals(out.drop(3), defaults)
   }
 
   test("defaults off, user repos present → only user repos") {

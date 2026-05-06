@@ -2,7 +2,9 @@
 
 # Misc
 - autodetect sbt/maven for import
-- some sbt deps should only be in scala2, e.g. kind-projector --> when (sv.startsWith("2.")) {
+- some sbt deps should only be in scala2, e.g. kind-projector 
+  -- when (sv.startsWith("2.")) {
+  -- or with ...?myValue
 - add local m2 by default..
 - group tasks by category like in gradle, when printing them
 - maybe use https://github.com/encalmo/graphs coz zero deps?
@@ -11,7 +13,7 @@
 - color instead of quotes for "Executing 'mytask'"
 - hide some internal tasks like deps resolving etc, helper assemblyDeps.. (rebind edges when displaying)
 - color stages in plan
-
+- source generator task type for plugins??
 
 # Docs
 - run pkldoc on each tag, and publish to ghpages
