@@ -2,11 +2,10 @@
 mkdir -p docs/static/config
 
 # Always include early-access config from main
+shopt -s extglob
 mkdir -p docs/static/config/early-access
-git show main:config/DederProject.pkl > docs/static/config/early-access/DederProject.pkl
-if git cat-file -e main:config/DederInternals.pkl 2>/dev/null; then
-  git show main:config/DederInternals.pkl > docs/static/config/early-access/DederInternals.pkl
-fi
+# copy one level of config files, excluding test files
+cp config/!(*Test.pkl) docs/static/config/early-access
 
 for tag in $(git tag --sort=-creatordate); do
   echo "Processing version: $tag"
@@ -15,6 +14,9 @@ for tag in $(git tag --sort=-creatordate); do
   # Copy DederInternals if it exists in this tag
   if git cat-file -e $tag:config/DederInternals.pkl 2>/dev/null; then
     git show $tag:config/DederInternals.pkl > docs/static/config/$tag/DederInternals.pkl
+  fi
+  if git cat-file -e $tag:config/DederCredentials.pkl 2>/dev/null; then
+    git show $tag:config/DederCredentials.pkl > docs/static/config/$tag/DederCredentials.pkl
   fi
 done
 
