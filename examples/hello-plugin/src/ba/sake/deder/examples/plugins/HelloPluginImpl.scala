@@ -10,7 +10,7 @@ class HelloPluginImpl extends DederPluginApi {
 
   def tasks(coreTasks: CoreTasksApi, pcfText: String): Seq[AbstractTask[?]] = {
     val moduleText =
-      s"""|amends "file:///home/sake/projects/sake92/deder/.worktrees/add-plugins-support/examples/hello-plugin/HelloPlugin.pkl"
+      s"""|amends "modulepath:/hello-plugin/HelloPlugin.pkl"
           |
           |$pcfText
           |

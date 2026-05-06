@@ -26,7 +26,7 @@ open class DederPlugin {
 }
 
 /// Build tool plugins applied to this project.
-plugins: Listing<DederPlugin> = new Listing {}
+plugins: Listing<DederPlugin>(pluginsValidation) = new Listing {}
 
 hidden pluginsValidation = (value: Listing<DederPlugin>) ->
   let (ids = value.toList().map((p) -> p.id))
