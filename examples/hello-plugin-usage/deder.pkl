@@ -7,14 +7,8 @@ import "../hello-plugin/HelloPlugin.pkl" as HP
 plugins {
   new HP.HelloPlugin {
     config = new HP.HelloPluginConfig {
-      greeting = "Hello from hello-plugin-usage aaaaaaaaaaaaaaaaaa!"
+      greeting = "Hello from hello-plugin-usage!"
     }
-  }
-}
-
-repositories {
-  new MavenRepository {
-    url = "file:///home/sake/.m2/repository"
   }
 }
 
