@@ -1,4 +1,4 @@
-import "../../../config/DederProject.pkl"
+import "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 class HelloConfig extends DederProject.Plugin {
   id = "hello"

@@ -45,7 +45,7 @@ class PluginLoader(
          |}
          |""".stripMargin
     val evaluator = org.pkl.core.EvaluatorBuilder.preconfigured()
-      .setOutputFormat(org.pkl.core.OutputFormat.JSON)
+      .setOutputFormat(org.pkl.core.OutputFormat.PCF)
       .build()
       val res = evaluator.evaluateOutputText(org.pkl.core.ModuleSource.text(snippet))
     Some(res)
