@@ -14,11 +14,8 @@ hidden modulesValidation = (value: Listing<DederModule>) ->
     true
 
 /// Find modules in a listing whose `id` matches exactly.
-const function moduleById(
-    listing: Listing<DederModule>,
-    id: String
-): Listing<DederModule> =
-    listing.filter((m) -> m.id == id)
+const function moduleById(listing: List<DederModule>, id: String): DederModule =
+  listing.find((m) -> m.id == id)
 
 /// Base class for build tool plugin configurations.
 /// Plugin authors extend this with typed fields for plugin-specific settings.
