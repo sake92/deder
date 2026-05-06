@@ -7,7 +7,8 @@ mkdir -p docs/static/config/early-access
 # copy one level of config files, excluding test files
 cp config/!(*Test.pkl) docs/static/config/early-access
 
-for tag in $(git tag --sort=-creatordate); do
+# skip early-access tags, as they are already included from main, see above
+for tag in $(git tag --sort=-creatordate | grep -v 'early-access'); do
   echo "Processing version: $tag"
   mkdir -p docs/static/config/$tag
   git show $tag:config/DederProject.pkl > docs/static/config/$tag/DederProject.pkl
