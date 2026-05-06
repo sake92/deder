@@ -15,7 +15,7 @@ hidden modulesValidation = (value: Listing<DederModule>) ->
 
 /// Base class for build tool plugin configurations.
 /// Plugin authors extend this with typed fields for plugin-specific settings.
-abstract class DederPlugin {
+open class DederPlugin {
   /// Unique identifier. Must match the `id` returned by the
   /// DederPlugin implementation in the plugin JAR.
   id: String(!isEmpty)

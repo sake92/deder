@@ -42,6 +42,10 @@ class PluginLoader(
          |  value = cfg.plugins.toList()
          |            .filter((it) -> it.id == "$pluginId")
          |            .first
+         |            .toMap()
+         |  .remove("id")
+         |  .remove("deps")
+         |  .toDynamic()
          |}
          |""".stripMargin
     val evaluator = org.pkl.core.EvaluatorBuilder.preconfigured()

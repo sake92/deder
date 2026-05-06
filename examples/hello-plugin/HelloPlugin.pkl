@@ -13,4 +13,4 @@ class HelloPluginConfig {
 }
 
 // only used for parsing on the plugin side!
-config: HelloPluginConfig
+config: HelloPluginConfig = new {}

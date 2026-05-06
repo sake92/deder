@@ -7,7 +7,7 @@ import "../hello-plugin/HelloPlugin.pkl" as HP
 plugins {
   new HP.HelloPlugin {
     config = new HP.HelloPluginConfig {
-      greeting = "Hello from hello-plugin-usage!"
+      greeting = "Hello from hello-plugin-usage aaaaaaaaaaaaaaaaaa!"
     }
   }
 }

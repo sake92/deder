@@ -12,17 +12,15 @@ class HelloPluginImpl extends DederPluginApi {
     val moduleText =
       s"""|amends "file:///home/sake/projects/sake92/deder/.worktrees/add-plugins-support/examples/hello-plugin/HelloPlugin.pkl"
           |
-          |config = new HelloPluginConfig {
-          |  $pcfText
-          |}
+          |$pcfText
           |
           |""".stripMargin
 
-    val config = Using.resource(ConfigEvaluator.preconfigured) { evaluator =>
-      evaluator.evaluate(ModuleSource.text(moduleText)).as(classOf[Hello.HelloPluginConfig])
+    val pluginModule = Using.resource(ConfigEvaluator.preconfigured) { evaluator =>
+      evaluator.evaluate(ModuleSource.text(moduleText)).as(classOf[Hello])
     }
 
-    val greeting = config.greeting
+    val greeting = pluginModule.config.greeting
 
     val helloTask = TaskBuilder.make[String](name = "hello")
       .build { ctx =>
