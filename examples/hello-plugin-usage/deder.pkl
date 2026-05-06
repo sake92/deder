@@ -1,8 +1,8 @@
-amends "../../config/DederProject.pkl"
+//amends "../../config/DederProject.pkl"
 
-//amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
-import "../hello-plugin/HelloPlugin.pkl" as HP
+import "../hello-plugin/resources/HelloPlugin.pkl" as HP
 
 plugins {
   new HP.HelloPlugin {
