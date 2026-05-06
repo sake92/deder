@@ -275,6 +275,89 @@ class BspResilienceSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("rapid successive buildTargetCompile requests both complete without hanging") {
+    val testDir = os.pwd / "tmp" / s"bsp-rapid-compile-${System.currentTimeMillis()}"
+    try {
+      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+      val lines = os.read.lines(testDir / "deder.pkl")
+      os.write.over(
+        testDir / "deder.pkl",
+        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+      )
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
+      executeDederCommand(testDir, "bsp", "install")
+
+      withBspSession(testDir) { (buildServer, capturingClient, _) =>
+        capturingClient.clear()
+
+        val params1 = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params1.setOriginId("test-rapid-1")
+        val params2 = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params2.setOriginId("test-rapid-2")
+
+        val future1 = buildServer.buildTargetCompile(params1)
+        val future2 = buildServer.buildTargetCompile(params2)
+
+        val result1 = future1.get(2, TimeUnit.MINUTES)
+        val result2 = future2.get(2, TimeUnit.MINUTES)
+
+        assertEquals(result1.getStatusCode, StatusCode.OK)
+        assertEquals(result2.getStatusCode, StatusCode.OK)
+
+        val starts = capturingClient.awaitTaskStarts(2)
+        assertEquals(starts.size, 2, "should have 2 task start notifications (one per originId)")
+
+        val finishes = capturingClient.awaitTaskFinishes(2)
+        assertEquals(finishes.size, 2, "should have 2 task finish notifications (one per originId)")
+      }
+    } finally {
+      executeDederCommand(testDir, "shutdown")
+    }
+  }
+
+  test("compile finish notification is sent even when compilation fails with errors") {
+    val testDir = os.pwd / "tmp" / s"bsp-finish-guarantee-${System.currentTimeMillis()}"
+    try {
+      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+      val lines = os.read.lines(testDir / "deder.pkl")
+      os.write.over(
+        testDir / "deder.pkl",
+        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+      )
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
+      executeDederCommand(testDir, "bsp", "install")
+
+      withBspSession(testDir) { (buildServer, capturingClient, _) =>
+        val badFile = testDir / "common/src/bad.scala"
+        os.write(badFile, "package common\nval notValid: Int = \"wrong type\"")
+        capturingClient.clear()
+
+        val params = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params.setOriginId("test-compile-error-guarantee")
+        val result = buildServer.buildTargetCompile(params).get(2, TimeUnit.MINUTES)
+
+        val taskStart = capturingClient.awaitTaskStart()
+        assert(taskStart.isDefined, "should have compile start notification even on failure")
+
+        val taskFinish = capturingClient.awaitTaskFinish()
+        assert(taskFinish.isDefined, "should have compile finish notification even on failure")
+        assertEquals(taskFinish.get.getStatus, StatusCode.ERROR)
+
+        assertEquals(result.getStatusCode, StatusCode.ERROR)
+      }
+    } finally {
+      executeDederCommand(testDir, "shutdown")
+    }
+  }
+
   private def baseUri(testDir: os.Path) = testDir.toNIO.toUri.toString
 
   private def targetId(testDir: os.Path, module: String) =

@@ -26,11 +26,29 @@ class CapturingBuildClient extends BuildClient {
   ): Option[TaskStartParams] =
     pollUntil(timeout)(taskStarts.asScala.find(predicate))
 
+  def awaitTaskStarts(count: Int, timeout: FiniteDuration = 15.seconds): Seq[TaskStartParams] =
+    val buffer = Seq.newBuilder[TaskStartParams]
+    val deadline = System.currentTimeMillis() + timeout.toMillis
+    while buffer.knownSize < count && System.currentTimeMillis() < deadline do
+      val item = taskStarts.poll()
+      if item != null then buffer += item
+      else Thread.sleep(50)
+    buffer.result()
+
   def awaitTaskFinish(
       timeout: FiniteDuration = 15.seconds,
       predicate: TaskFinishParams => Boolean = _ => true
   ): Option[TaskFinishParams] =
     pollUntil(timeout)(taskFinishes.asScala.find(predicate))
+
+  def awaitTaskFinishes(count: Int, timeout: FiniteDuration = 15.seconds): Seq[TaskFinishParams] =
+    val buffer = Seq.newBuilder[TaskFinishParams]
+    val deadline = System.currentTimeMillis() + timeout.toMillis
+    while buffer.knownSize < count && System.currentTimeMillis() < deadline do
+      val item = taskFinishes.poll()
+      if item != null then buffer += item
+      else Thread.sleep(50)
+    buffer.result()
 
   def awaitDiagnostic(
       timeout: FiniteDuration = 15.seconds,
