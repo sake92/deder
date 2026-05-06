@@ -16,3 +16,8 @@ mv config/src/resources config/resources
 
 mv config/src/java/* config/src
 rmdir config/src/java
+
+# Bundle Pkl schema files as resources so they are available via modulepath: imports
+mkdir -p config/resources/ba/sake/deder/config
+cp config/DederProject.pkl config/resources/ba/sake/deder/config/
+cp config/DederInternals.pkl config/resources/ba/sake/deder/config/

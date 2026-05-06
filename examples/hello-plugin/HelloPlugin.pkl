@@ -1,7 +1,7 @@
 /// Typed configuration for the hello plugin.
 /// Extends Deder's base Plugin class with a custom greeting field.
 
-import "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+import "modulepath:/ba/sake/deder/config/DederProject.pkl"
 
 class HelloPlugin extends DederProject.Plugin {
   id = "hello"
