@@ -320,76 +320,67 @@ class DederBspServer(
 
   override def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] = {
     // Debounce: if an identical compile request is already in flight, join it
-    // instead of starting a redundant compilation.
+    // instead of starting a redundant compilation, using atomic computeIfAbsent.
     if !params.getTargets.isEmpty then {
       val targetsKey = params.getTargets.asScala.map(_.moduleId).sorted.mkString(",")
-      val existing = activeCompilations.get(targetsKey)
-      if existing != null then {
-        logger.debug(s"buildTargetCompile: joining existing compilation for targets: $targetsKey")
-        return existing
-      }
+      return activeCompilations.computeIfAbsent(targetsKey, _ => {
+        val future = javaFuture("buildTargetCompile", Option(params.getOriginId)) {
+          logger.debug(s"buildTargetCompile for params: ${params}")
+          ensureRunning()
+          val taskId = TaskId(s"compile-${UUID.randomUUID}")
+          val taskStartParams = TaskStartParams(taskId)
+          taskStartParams.setEventTime(System.currentTimeMillis())
+          taskStartParams.setOriginId(params.getOriginId)
+          taskStartParams.setMessage(s"Compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}")
+          client.onBuildTaskStart(taskStartParams)
+          var allCompileSucceeded = true
+          withLastGoodState(_ => allCompileSucceeded = false) { projectStateData =>
+            params.getTargets.asScala.foreach { targetId =>
+              val moduleId = targetId.moduleId
+              val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
+              subtaskId.setParents(List(taskId.getId).asJava)
+              logger.debug(s"buildTargetCompile subtaskId ${subtaskId}")
+              val serverNotificationsLogger = makeServerNotificationsLogger(
+                originId = Option(params.getOriginId),
+                taskId = Some(subtaskId),
+                moduleId = Some(moduleId),
+                isCompileTask = true
+              )
+
+              tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty, originId = params.getOriginId) { _ =>
+                allCompileSucceeded = false
+              }
+            }
+          }
+
+          val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
+          val taskFinishParams = TaskFinishParams(taskId, status)
+          taskFinishParams.setEventTime(System.currentTimeMillis())
+          taskFinishParams.setOriginId(params.getOriginId)
+          taskFinishParams.setMessage(
+            s"Finished compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}"
+          )
+          client.onBuildTaskFinish(taskFinishParams)
+          val result = new CompileResult(status)
+          result.setOriginId(params.getOriginId)
+          logger.debug(s"buildTargetCompile for params ${params} return: ${result}")
+          result
+        }
+        future.whenComplete { (_, _) =>
+          activeCompilations.remove(targetsKey, future)
+        }
+        future
+      })
     }
 
     val future = javaFuture("buildTargetCompile", Option(params.getOriginId)) {
       logger.debug(s"buildTargetCompile for params: ${params}")
       ensureRunning()
-      if (params.getTargets.isEmpty) {
-        // no need to start a task, it would confuse IDE
-        val compileResult = new CompileResult(StatusCode.OK)
-        compileResult.setOriginId(params.getOriginId)
-        compileResult
-      } else {
-        val taskId = TaskId(s"compile-${UUID.randomUUID}")
-        val taskStartParams = TaskStartParams(taskId)
-        taskStartParams.setEventTime(System.currentTimeMillis())
-        taskStartParams.setOriginId(params.getOriginId)
-        taskStartParams.setMessage(s"Compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}")
-        client.onBuildTaskStart(taskStartParams)
-        var allCompileSucceeded = true
-        withLastGoodState(_ => allCompileSucceeded = false) { projectStateData =>
-          params.getTargets.asScala.foreach { targetId =>
-            val moduleId = targetId.moduleId
-            val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
-            subtaskId.setParents(List(taskId.getId).asJava)
-            logger.debug(s"buildTargetCompile subtaskId ${subtaskId}")
-            val serverNotificationsLogger = makeServerNotificationsLogger(
-              originId = Option(params.getOriginId),
-              taskId = Some(subtaskId),
-              moduleId = Some(moduleId),
-              isCompileTask = true
-            )
-
-            tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty, originId = params.getOriginId) { _ =>
-              allCompileSucceeded = false
-            }
-          }
-        }
-
-        val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
-        val taskFinishParams = TaskFinishParams(taskId, status)
-        taskFinishParams.setEventTime(System.currentTimeMillis())
-        taskFinishParams.setOriginId(params.getOriginId)
-        taskFinishParams.setMessage(
-          s"Finished compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}"
-        )
-        client.onBuildTaskFinish(taskFinishParams)
-        val result = new CompileResult(status)
-        result.setOriginId(params.getOriginId)
-        logger.debug(s"buildTargetCompile for params ${params} return: ${result}")
-        result
-      }
+      // no need to start a task, it would confuse IDE
+      val compileResult = new CompileResult(StatusCode.OK)
+      compileResult.setOriginId(params.getOriginId)
+      compileResult
     }
-
-    // Register the future so duplicate requests can join it.
-    // Remove from map when done (success or failure).
-    if !params.getTargets.isEmpty then {
-      val targetsKey = params.getTargets.asScala.map(_.moduleId).sorted.mkString(",")
-      activeCompilations.put(targetsKey, future)
-      future.whenComplete { (_, _) =>
-        activeCompilations.remove(targetsKey, future)
-      }
-    }
-
     future
   }
 
