@@ -35,8 +35,5 @@ case class ImportSummary(
         }
     }
 
-    private def formatWarning(w: ImportWarning): String = w match {
-        case ImportWarning.CrossScalaVersionsNotSupported(name, versions, selected) =>
-            s"$name: crossScalaVersions ${versions.mkString("[", ", ", "]")} not supported, using $selected"
-    }
+    private def formatWarning(w: ImportWarning): String = ""
 }
