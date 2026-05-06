@@ -7,10 +7,24 @@ object DederPklRenderer {
     def render(build: DederBuild): String = {
         val header = s"""amends "https://sake92.github.io/deder/config/${build.dederVersion}/DederProject.pkl""""
         val repos = renderRepositories(build.repositories)
-        val builders = build.moduleGroups.map(renderGroup).mkString("\n\n")
+        val groupLookup = build.moduleGroups.map(g => g.builderVarName -> g).toMap
+
+        val crossGroups = build.moduleGroups.filter(_.crossScalaVersions.nonEmpty)
+        val sharedVersionListName: Option[String] =
+            if (crossGroups.map(_.crossScalaVersions).distinct.size == 1 && crossGroups.size > 1) Some("projectScalaVersions")
+            else None
+
+        val sharedVersionsDecl = sharedVersionListName.flatMap { _ =>
+            crossGroups.headOption.map { g =>
+                val vs = g.crossScalaVersions.map(v => s""""$v"""").mkString("List(", ", ", ")")
+                s"local const projectScalaVersions = $vs"
+            }
+        }
+
+        val builders = build.moduleGroups.map(g => renderGroup(g, groupLookup, sharedVersionListName)).mkString("\n\n")
         val modulesBlock = renderModulesBlock(build.moduleGroups)
 
-        List(Some(header), if (repos.nonEmpty) Some(repos) else None, Some(builders), Some(modulesBlock))
+        List(Some(header), sharedVersionsDecl, if (repos.nonEmpty) Some(repos) else None, Some(builders), Some(modulesBlock))
             .flatten.mkString("\n\n")
     }
 
@@ -30,34 +44,46 @@ object DederPklRenderer {
 
     private def moduleRefs(g: ModuleGroup): Seq[String] = {
         val name = g.builderVarName
-        if (g.hasJsModule || g.hasNativeModule) {
-            // Cross-project (even partial)
+        if (g.crossScalaVersions.nonEmpty) Seq(s"...${name}Modules")
+        else if (g.hasJsModule || g.hasNativeModule) {
             if (g.hasJsModule && g.hasNativeModule) Seq(s"...$name.all")
             else Seq(
-                Some(s"$name.jvm"),
-                Some(s"$name.jvm_test"),
+                Some(s"$name.jvm"), Some(s"$name.jvm_test"),
                 if (g.hasJsModule) Some(s"$name.js") else None,
                 if (g.hasJsModule) Some(s"$name.js_test") else None,
                 if (g.hasNativeModule) Some(s"$name.native") else None,
                 if (g.hasNativeModule) Some(s"$name.native_test") else None,
             ).flatten
-        } else {
-            Seq(s"...$name.all")
-        }
+        } else Seq(s"...$name.all")
     }
 
     // ---- group rendering ----
 
-    private def renderGroup(g: ModuleGroup): String = {
+    private def renderGroup(g: ModuleGroup, groupLookup: Map[String, ModuleGroup], sharedVersionListName: Option[String]): String = {
         val builderType = builderTypeFor(g)
-        val body = renderGroupBody(g)
-        s"""local const ${g.builderVarName} = new $builderType {
-           |  root = "${g.root}"
-           |  id = "${g.builderVarName}"
-           |  layout = "${g.layout.toString.toLowerCase.replace("_","-")}"
-           |$body
-           |}
-           |.get""".stripMargin
+        val body = renderGroupBody(g, groupLookup)
+        if (g.crossScalaVersions.nonEmpty) {
+            val versionsListName = sharedVersionListName.getOrElse(s"${g.builderVarName}ScalaVersions")
+            val versionsDecl = if (sharedVersionListName.isEmpty)
+                s"local const $versionsListName = ${g.crossScalaVersions.map(v => s""""$v"""").mkString("List(", ", ", ")")}\n\n"
+            else ""
+            s"""${versionsDecl}local const ${g.builderVarName}Modules = $versionsListName
+               |  .map((sv) ->
+               |    new $builderType {
+               |      root = "${g.root}"
+               |      id = "${crossVersionId(g, builderType)}"
+               |      layout = "${g.layout.toString.toLowerCase.replace("_","-")}"
+               |$body
+               |    }.get.all
+               |  ).flatten()""".stripMargin
+        } else {
+            s"""local const ${g.builderVarName} = new $builderType {
+               |  root = "${g.root}"
+               |  id = "${g.builderVarName}"
+               |  layout = "${g.layout.toString.toLowerCase.replace("_","-")}"
+               |$body
+               |}.get""".stripMargin
+        }
     }
 
     private def builderTypeFor(g: ModuleGroup): String = {
@@ -67,11 +93,16 @@ object DederPklRenderer {
         else "CreateScalaModules"
     }
 
-    private def renderGroupBody(g: ModuleGroup): String = {
+    private def crossVersionId(g: ModuleGroup, builderType: String): String =
+        if (builderType == "CreateCrossModules") s"${g.builderVarName}"
+        else s"${g.builderVarName}-\\(sv)"
+
+    private def renderGroupBody(g: ModuleGroup, groupLookup: Map[String, ModuleGroup]): String = {
+        val useVP = g.crossScalaVersions.nonEmpty
         val isCross = g.hasJsModule || g.hasNativeModule
 
-        val jvmBody = renderTemplateBody(g.jvmModule, "ScalaModule", None)
-        val testTmpl = renderTestTemplate(g)
+        val jvmBody = renderTemplateBody(g.jvmModule, "ScalaModule", None, useVP, groupLookup)
+        val testTmpl = renderTestTemplate(g, groupLookup)
 
         if (isCross) {
             val jsTmpl = g.jsModule.map { m =>
@@ -109,16 +140,17 @@ object DederPklRenderer {
         }
     }
 
-    private def renderTemplateBody(m: ModuleDef, moduleType: String, extraProps: Option[String]): String = {
+    private def renderTemplateBody(
+        m: ModuleDef, moduleType: String, extraProps: Option[String],
+        useVersionPlaceholder: Boolean = false,
+        groupLookup: Map[String, ModuleGroup] = Map.empty
+    ): String = {
         val extra = extraProps.map(e => s"    $e\n").getOrElse("")
-        val crossScalaVersionsComment = if (m.crossScalaVersions.nonEmpty) {
-            Some(s"""    /// original crossScalaVersions = ${m.crossScalaVersions.map(v => s""""$v"""").mkString("[", ", ", "]")}""")
-        } else None
+        val versionLine = if (useVersionPlaceholder) Some("    scalaVersion = sv")
+            else if (moduleType != "ScalaJsModule" && moduleType != "ScalaNativeModule") Some(s"""    scalaVersion = "${m.scalaVersion}"""")
+            else None
         val props = Seq(
-            crossScalaVersionsComment,
-            if (moduleType != "ScalaJsModule" && moduleType != "ScalaNativeModule")
-                Some(s"""    scalaVersion = "${m.scalaVersion}"""")
-            else None,
+            versionLine,
             Some(extra.trim).filter(_.nonEmpty),
             Some(renderScalacOptions(m.scalacOptions, indent = 4)).filter(_.nonEmpty),
             Some(renderJavacOptions(m.javacOptions, indent = 4)).filter(_.nonEmpty),
@@ -126,10 +158,9 @@ object DederPklRenderer {
             Some(renderResourceDirs(m.resources, indent = 4)).filter(_.nonEmpty),
             Some(renderDeps(m.deps, indent = 4)).filter(_.nonEmpty),
             Some(renderPluginDeps(m.scalacPluginDeps, indent = 4)).filter(_.nonEmpty),
-            Some(renderModuleDepsPkl(m.moduleDeps, indent = 4)).filter(_.nonEmpty),
+            Some(renderModuleDepsPkl(m.moduleDeps, indent = 4, useVersionPlaceholder, groupLookup)).filter(_.nonEmpty),
             m.publish.map(p => renderPublishInfo(p, indent = 4)).filter(_.nonEmpty),
         ).flatten.mkString("\n")
-
         s"""  template = new $moduleType {
            |$props
            |  }""".stripMargin
@@ -158,15 +189,11 @@ object DederPklRenderer {
         }
     }
 
-    private def renderTestTemplate(g: ModuleGroup): String = {
-        val testModuleDepsStr = renderModuleDepsPkl(g.jvmModule.testModuleDeps, indent = 6)
-
-        val testDepsStr = if (g.jvmModule.testDeps.nonEmpty) {
-            renderDeps(g.jvmModule.testDeps, indent = 6)
-        } else {
-            """    deps { "org.scalameta::munit:1.2.1" }"""
-        }
-
+    private def renderTestTemplate(g: ModuleGroup, groupLookup: Map[String, ModuleGroup]): String = {
+        val useVP = g.crossScalaVersions.nonEmpty
+        val testModuleDepsStr = renderModuleDepsPkl(g.jvmModule.testModuleDeps, indent = 6, useVP, groupLookup)
+        val testDepsStr = if (g.jvmModule.testDeps.nonEmpty) renderDeps(g.jvmModule.testDeps, indent = 6)
+                          else """    deps { "org.scalameta::munit:1.2.1" }"""
         s"""  testTemplate = (template.asTest()) {
            |$testModuleDepsStr
            |$testDepsStr
@@ -215,10 +242,15 @@ object DederPklRenderer {
         }
     }
 
-    private def renderModuleDepsPkl(refs: Seq[ModuleDepRef], indent: Int): String = {
+    private def renderModuleDepsPkl(
+        refs: Seq[ModuleDepRef], indent: Int,
+        useVersionPlaceholder: Boolean = false,
+        groupLookup: Map[String, ModuleGroup] = Map.empty
+    ): String = {
         if (refs.isEmpty) ""
         else {
-            val entries = refs.map(r => refString(r)).mkString("\n")
+            val entries = if (useVersionPlaceholder) refs.map(r => crossDepFilter(r, groupLookup)).mkString("\n")
+                          else refs.map(refString).mkString("\n")
             val spaces = " " * indent
             val inner = " " * (indent + 2)
             s"""${spaces}moduleDeps {\n${entries.split("\n").map(l => inner + l).mkString("\n")}\n$spaces}"""
@@ -299,5 +331,18 @@ object DederPklRenderer {
             case _ => s".${r.targetPlatform}"
         }
         s"${r.targetGroup}$suffix"
+    }
+
+    private def crossDepFilter(ref: ModuleDepRef, groupLookup: Map[String, ModuleGroup]): String = {
+        val name = ref.targetGroup
+        val targetGroup = groupLookup.getOrElse(name, null)
+        val builderType = if (targetGroup != null) builderTypeFor(targetGroup) else "CreateScalaModules"
+        val plat = if (ref.targetPlatform == "main") "" else s"-${ref.targetPlatform}"
+        val testSuffix = if (ref.isTest) "-test" else ""
+        val idWithoutVersion = builderType match {
+            case "CreateCrossModules" => s"$name$plat$testSuffix"
+            case _                    => s"$name$testSuffix"
+        }
+        s"""moduleById(${name}Modules, "$idWithoutVersion-\\(sv)")"""
     }
 }

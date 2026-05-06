@@ -105,15 +105,12 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         assertEquals(opts, Seq("-Xlint:unchecked"))
     }
 
-    test("generates CrossScalaVersionsWarning when crossScalaVersions is non-empty") {
-        val mod = baseModule("app", os.pwd.toString, "app", crossScalaVersions = Seq("2.13.15"))
+    test("surfaces crossScalaVersions on ModuleGroup") {
+        val mod = baseModule("app", os.pwd.toString, "app", crossScalaVersions = Seq("2.13.15", "3.3.5"))
         val analyzer = new SbtProjectAnalyzer(noopLogger)
         val build = analyzer.analyze(IndexedSeq(mod))
-        assert(build.warnings.nonEmpty)
-        assert(build.warnings.exists {
-            case ImportWarning.CrossScalaVersionsNotSupported(name, _, _) => name == "app"
-            case _ => false
-        })
+        val group = build.moduleGroups.head
+        assertEquals(group.crossScalaVersions, Seq("2.13.15", "3.3.5"))
     }
 
     test("maps custom repositories") {

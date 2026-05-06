@@ -22,7 +22,6 @@ class DederPklRendererSuite extends FunSuite {
         scalaVersion = scalaVersion,
         scalacOptions = scalacOptions,
         javacOptions = javacOptions,
-        crossScalaVersions = Seq.empty,
         deps = deps,
         scalacPluginDeps = scalacPluginDeps,
         testDeps = testDeps,
@@ -43,6 +42,7 @@ class DederPklRendererSuite extends FunSuite {
         jsMod: Option[ModuleDef] = None,
         nativeMod: Option[ModuleDef] = None,
         layout: DederProject.DirLayout = DederProject.DirLayout.SBT,
+        crossScalaVersions: Seq[String] = Seq.empty,
         dederVersion: String = "v0.7.4",
     ): DederBuild = DederBuild(
         dederVersion = dederVersion,
@@ -50,6 +50,7 @@ class DederPklRendererSuite extends FunSuite {
             builderVarName = name,
             root = ".",
             layout = layout,
+            crossScalaVersions = crossScalaVersions,
             jvmModule = jvmMod,
             jsModule = jsMod,
             nativeModule = nativeMod,
@@ -221,6 +222,7 @@ class DederPklRendererSuite extends FunSuite {
                 builderVarName = "core",
                 root = ".",
                 layout = DederProject.DirLayout.SBT_CROSS_PURE,
+                crossScalaVersions = Seq.empty,
                 jvmModule = jvmMod,
                 jsModule = Some(jsMod),
                 nativeModule = None,
@@ -237,5 +239,43 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("scalaJsVersion = \"1.18.2\""))
         assert(result.contains("core.jvm"))
         assert(result.contains("core.js"))
+    }
+
+    test("cross-version single module renders map/flatten with Modules suffix") {
+        val build = singleModuleBuild(name = "lib", crossScalaVersions = Seq("2.12.21", "2.13.18"))
+        val result = DederPklRenderer.render(build)
+        assert(result.contains("local const libScalaVersions = List(\"2.12.21\", \"2.13.18\")"))
+        assert(result.contains("local const libModules = libScalaVersions"))
+        assert(result.contains(".map((sv) ->"))
+        assert(result.contains("scalaVersion = sv"))
+        assert(result.contains("...libModules"))
+    }
+
+    test("cross-version multi-module generates moduleById filter for deps") {
+        val libMod = emptyModule()
+        val rootMod = emptyModule(moduleDeps = Seq(ModuleDepRef("lib", "main", isTest = false)))
+        val groups = Seq(
+            ModuleGroup("lib", "lib", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), libMod, None, None, false, false),
+            ModuleGroup("root", "root", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), rootMod, None, None, false, false),
+        )
+        val build = DederBuild("v0.7.4", groups, Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+        assert(result.contains("moduleById(libModules, \"lib-\\(sv)\")"))
+        assert(result.contains("local const projectScalaVersions"))
+    }
+
+    test("cross-version cross-platform uses id without version in CreateCrossModules") {
+        val coreMod = emptyModule()
+        val jsMod = emptyModule(scalaJsVersion = Some("1.18.2"))
+        val appMod = emptyModule(moduleDeps = Seq(ModuleDepRef("core", "jvm", isTest = false)))
+        val groups = Seq(
+            ModuleGroup("core", "core", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), coreMod, Some(jsMod), None, true, false),
+            ModuleGroup("app", "app", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), appMod, None, None, false, false),
+        )
+        val build = DederBuild("v0.7.4", groups, Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+        assert(result.contains("id = \"core\""))
+        assert(result.contains("moduleById(coreModules, \"core-jvm-\\(sv)\")"))
+        assert(result.contains("new CreateCrossModules"))
     }
 }

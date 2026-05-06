@@ -16,6 +16,7 @@ case class ModuleGroup(
     builderVarName:  String,
     root:            String,
     layout:          DederProject.DirLayout,
+    crossScalaVersions: Seq[String],
     jvmModule:       ModuleDef,
     jsModule:        Option[ModuleDef],
     nativeModule:    Option[ModuleDef],
@@ -28,7 +29,6 @@ case class ModuleDef(
     scalaVersion:       String,
     scalacOptions:      Seq[String],
     javacOptions:       Seq[String],
-    crossScalaVersions: Seq[String],
     deps:               Seq[DepDef],
     scalacPluginDeps:   Seq[DepDef],
     testDeps:           Seq[DepDef],
@@ -76,8 +76,4 @@ case class RepositoryDef(url: String)
 
 /** Warnings collected during analysis about things that couldn't be fully mapped. */
 enum ImportWarning:
-    case CrossScalaVersionsNotSupported(
-        moduleName:      String,
-        versions:        Seq[String],
-        selectedVersion: String
-    )
+    case Reserved extends ImportWarning

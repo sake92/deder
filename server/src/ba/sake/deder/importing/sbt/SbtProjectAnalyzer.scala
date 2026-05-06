@@ -60,6 +60,7 @@ class SbtProjectAnalyzer(
                 builderVarName = gi.builderVarName,
                 root = gi.root,
                 layout = gi.layout,
+                crossScalaVersions = gi.crossScalaVersions,
                 jvmModule = jvmModule,
                 jsModule = jsModule,
                 nativeModule = nativeModule,
@@ -96,6 +97,7 @@ class SbtProjectAnalyzer(
         hasJsModule: Boolean,
         hasNativeModule: Boolean,
         scalaVersion: String,
+        crossScalaVersions: Seq[String],
         sbtIdToRef: Map[String, String],
         mainModule: ProjectExport,
         allModules: Seq[ProjectExport],
@@ -118,6 +120,7 @@ class SbtProjectAnalyzer(
             layout == DederProject.DirLayout.SBT_CROSS_DUMMY
 
         val scalaVersion = mainModule.scalaVersion
+        val crossScalaVersions = mainModule.crossScalaVersions
 
         val rawName = ImportingUtils.sanitizeId(mainModule.name)
         val baseName = if (isCross) rawName.replaceFirst("(?i)jvm$", "") else rawName
@@ -137,7 +140,7 @@ class SbtProjectAnalyzer(
         GroupInfo(
             builderVarName, root, layout, isCross,
             hasJsModule, hasNativeModule,
-            scalaVersion, sbtIdToRef, mainModule, rg.modules,
+            scalaVersion, crossScalaVersions, sbtIdToRef, mainModule, rg.modules,
         )
     }
 
@@ -175,20 +178,10 @@ class SbtProjectAnalyzer(
             ))
         } else None
 
-        // Warnings
-        if (pe.crossScalaVersions.nonEmpty) {
-            warnings += ImportWarning.CrossScalaVersionsNotSupported(
-                moduleName = pe.name,
-                versions = pe.crossScalaVersions,
-                selectedVersion = pe.scalaVersion,
-            )
-        }
-
         val moduleDef = ModuleDef(
             scalaVersion = pe.scalaVersion,
             scalacOptions = pe.scalacOptions,
             javacOptions = pe.javacOptions,
-            crossScalaVersions = pe.crossScalaVersions,
             deps = compileDeps,
             scalacPluginDeps = pluginDeps,
             testDeps = testDeps,
@@ -249,7 +242,13 @@ class SbtProjectAnalyzer(
         warnings: Seq[ImportWarning],
         filteredDepCount: Int,
     ): ImportSummary = {
-        val concreteModules = groups.size * 2 + groups.count(_.hasJsModule) * 2 + groups.count(_.hasNativeModule) * 2
+        val concreteModules = groups.map { g =>
+            val versionCount = if (g.crossScalaVersions.nonEmpty) g.crossScalaVersions.size else 1
+            val baseModules = 2  // main + test
+            val jsModules = if (g.hasJsModule) 2 else 0
+            val nativeModules = if (g.hasNativeModule) 2 else 0
+            (baseModules + jsModules + nativeModules) * versionCount
+        }.sum
         val allDeps = groups.flatMap(g =>
             g.jvmModule.deps ++ g.jvmModule.scalacPluginDeps ++ g.jvmModule.testDeps
         )

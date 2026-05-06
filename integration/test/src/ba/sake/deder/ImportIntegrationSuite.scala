@@ -101,7 +101,7 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
   }
 
   test("import jawn v1.6.0") {
-    testImport("https://github.com/typelevel/jawn.git", "v1.6.0", expectedMinModules = 10)
+    testImport("https://github.com/typelevel/jawn.git", "v1.6.0", expectedMinModules = 30)
   }
 
   // TODO: enable once importer handles ScalaJsModule/ScalaNativeModule template types correctly

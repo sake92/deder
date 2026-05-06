@@ -96,9 +96,8 @@ object DependencyResolver {
   /** Assemble the final ordered repo list from user-declared repos + the
     * `includeDefaultRepos` flag.
     *
-    *   - `includeDefaultRepos = true`, user repos empty  → `Seq.empty`
-    *     (Coursier applies its own defaults).
-    *   - `includeDefaultRepos = true`, user repos non-empty → `user ++ defaults`.
+    *   - `includeDefaultRepos = true`, user repos empty or not →
+    *     `user ++ [~/.m2/repository] ++ Coursier defaults`.
     *   - `includeDefaultRepos = false`, user repos non-empty → `user`.
     *   - `includeDefaultRepos = false`, user repos empty → throws
     *     `IllegalArgumentException`.
@@ -119,8 +118,8 @@ object DependencyResolver {
       CsMavenRepository.of(url)
     }
     if includeDefaultRepos then
-      if userRepos.isEmpty then Seq.empty
-      else userRepos ++ CsRepository.defaults().asScala.toSeq
+      val m2local = CsMavenRepository.of(s"file://${os.home}/.m2/repository")
+      userRepos ++ Seq(m2local) ++ CsRepository.defaults().asScala.toSeq
     else userRepos
   }
 }

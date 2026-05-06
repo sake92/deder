@@ -13,6 +13,10 @@ hidden modulesValidation = (value: Listing<DederModule>) ->
   else
     true
 
+/// Find modules in a listing whose `id` matches exactly.
+const function moduleById(listing: List<DederModule>, id: String): DederModule =
+  listing.find((m) -> m.id == id)
+
 /// Base class for build tool plugin configurations.
 /// Plugin authors extend this with typed fields for plugin-specific settings.
 open class DederPlugin {
@@ -40,7 +44,7 @@ hidden pluginsValidation = (value: Listing<DederPlugin>) ->
 /// Tried in declared order, before default repositories.
 repositories: Listing<MavenRepository> = new Listing {}
 
-/// Include Maven Central and the Ivy2 local cache. Set to false for
+/// Include Maven Central, the local Maven repository (~/.m2/repository), and the Ivy2 local cache. Set to false for
 /// air-gapped / internal-only resolution (e.g. via a corporate Nexus).
 /// If false, `repositories` must be non-empty.
 includeDefaultRepos: Boolean = true
