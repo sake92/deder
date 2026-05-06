@@ -1,15 +1,9 @@
 package ba.sake.deder.plugin
 
 import java.net.URLClassLoader
-import scala.jdk.CollectionConverters.*
-import scala.util.Using
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.*
-import org.pkl.config.java.ConfigEvaluatorBuilder
-import org.pkl.core.ModuleSource
-import org.pkl.core.module.ModuleKeyFactories
-import org.pkl.core.resource.ResourceReaders
 
 class PluginLoaderSuite extends munit.FunSuite {
 
@@ -56,26 +50,19 @@ class PluginLoaderSuite extends munit.FunSuite {
     )
 
     val pluginClassLoader = new URLClassLoader(Array(pluginDir.toIO.toURI.toURL), getClass.getClassLoader)
-    val moduleText =
-      """amends "modulepath:/HelloPlugin.pkl"
-        |
-        |config {
-        |  greeting = "Hello from test!"
-        |}
-        |""".stripMargin
-
-    val evaluatorBuilder = ConfigEvaluatorBuilder.preconfigured()
-    val underlyingBuilder = evaluatorBuilder.getEvaluatorBuilder()
-    val moduleKeyFactories =
-      (ModuleKeyFactories.classPath(pluginClassLoader) +: underlyingBuilder.getModuleKeyFactories().asScala.toSeq).distinct
-    underlyingBuilder.setModuleKeyFactories(moduleKeyFactories.asJava)
-    val resourceReaders =
-      (ResourceReaders.classPath(pluginClassLoader) +: underlyingBuilder.getResourceReaders().asScala.toSeq).distinct
-    underlyingBuilder.setResourceReaders(resourceReaders.asJava)
-
-    val greeting = Using.resource(evaluatorBuilder.build()) { evaluator =>
-      evaluator.evaluate(ModuleSource.text(moduleText)).get("config").get("greeting").as(classOf[String])
-    }
+    val greeting = PluginConfigEvaluators
+      .evaluateModulePathConfig(
+        pluginClassLoader,
+        modulePath = "HelloPlugin.pkl",
+        configText =
+          """config {
+            |  greeting = "Hello from test!"
+            |}
+            |""".stripMargin
+      )
+      .get("config")
+      .get("greeting")
+      .as(classOf[String])
 
     assertEquals(greeting, "Hello from test!")
   }
