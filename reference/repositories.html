@@ -57,7 +57,7 @@
     <div></div>
    </div>
    <h1 id="custom-repositories">Custom Repositories<a href="#custom-repositories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <p>By default, Deder resolves dependencies from Maven Central plus the local Ivy2 cache. To pull artifacts from an internal Nexus/Artifactory, a public mirror, JitPack, Sonatype snapshots, or an on-disk Maven layout, declare them in your <code>deder.pkl</code>:</p>
+   <p>By default, Deder resolves dependencies from Maven Central, the local Maven repository (<code>~/.m2/repository</code>), and the local Ivy2 cache. To pull artifacts from an internal Nexus/Artifactory, a public mirror, JitPack, Sonatype snapshots, or an on-disk Maven layout, declare them in your <code>deder.pkl</code>:</p>
    <pre><code class="language-pkl">repositories {
   new MavenRepository { url = "https://nexus.mycompany.com/repository/maven-releases/" }
   new MavenRepository { url = "https://jitpack.io" }
@@ -67,6 +67,7 @@
    <p>Repositories are tried in this order:</p>
    <ol>
     <li>Your declared <code>repositories</code>, in the order they appear in <code>deder.pkl</code>.</li>
+    <li>The local Maven repository (<code>~/.m2/repository</code>). This means artifacts installed via <code>publishLocal</code> are immediately available without extra configuration.</li>
     <li>Maven Central.</li>
     <li>The local Ivy2 cache (<code>~/.ivy2/local</code>).</li>
    </ol>
