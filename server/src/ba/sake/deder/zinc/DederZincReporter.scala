@@ -14,6 +14,7 @@ class DederZincReporter(
   private var _problems = Vector.empty[Problem]
   private var _hasErrors = false
   private var _hasWarnings = false
+  var printSummaryCalled = false
 
   override def reset(): Unit = synchronized {
     _problems = Vector.empty
@@ -26,6 +27,7 @@ class DederZincReporter(
   override def hasWarnings(): Boolean = synchronized { _hasWarnings }
 
   override def printSummary(): Unit = synchronized {
+    printSummaryCalled = true
     val errorsCount = _problems.count(_.severity == Severity.Error)
     val warningsCount = _problems.count(_.severity == Severity.Warn)
     notifications.add(
