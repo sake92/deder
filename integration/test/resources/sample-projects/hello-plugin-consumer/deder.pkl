@@ -1,4 +1,4 @@
-amends "../../../../../config/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 // __HELLO_CONFIG_IMPORT__ is injected by the test to import the typed plugin config class
 __HELLO_CONFIG_IMPORT__
