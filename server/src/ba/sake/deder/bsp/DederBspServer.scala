@@ -39,6 +39,11 @@ class DederBspServer(
 
   private val running = AtomicBoolean(true)
 
+  // Track in-progress compilations keyed by sorted target IDs.
+  // When a duplicate request arrives for the same targets while one is in flight,
+  // we return the existing future instead of starting a redundant compilation.
+  private val activeCompilations = new ConcurrentHashMap[String, CompletableFuture[CompileResult]]
+
   override def cancelRequest(params: CancelRequestParams): Unit = {
     val originId: String = params.getId match {
       case e if e.isLeft  => e.getLeft
@@ -313,8 +318,19 @@ class DederBspServer(
       result
     }
 
-  override def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] =
-    javaFuture("buildTargetCompile", Option(params.getOriginId)) {
+  override def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] = {
+    // Debounce: if an identical compile request is already in flight, join it
+    // instead of starting a redundant compilation.
+    if !params.getTargets.isEmpty then {
+      val targetsKey = params.getTargets.asScala.map(_.moduleId).sorted.mkString(",")
+      val existing = activeCompilations.get(targetsKey)
+      if existing != null then {
+        logger.debug(s"buildTargetCompile: joining existing compilation for targets: $targetsKey")
+        return existing
+      }
+    }
+
+    val future = javaFuture("buildTargetCompile", Option(params.getOriginId)) {
       logger.debug(s"buildTargetCompile for params: ${params}")
       ensureRunning()
       if (params.getTargets.isEmpty) {
@@ -363,6 +379,19 @@ class DederBspServer(
         result
       }
     }
+
+    // Register the future so duplicate requests can join it.
+    // Remove from map when done (success or failure).
+    if !params.getTargets.isEmpty then {
+      val targetsKey = params.getTargets.asScala.map(_.moduleId).sorted.mkString(",")
+      activeCompilations.put(targetsKey, future)
+      future.whenComplete { (_, _) =>
+        activeCompilations.remove(targetsKey, future)
+      }
+    }
+
+    future
+  }
 
   override def buildTargetCleanCache(params: CleanCacheParams): CompletableFuture[CleanCacheResult] =
     javaFuture("buildTargetCleanCache") {
