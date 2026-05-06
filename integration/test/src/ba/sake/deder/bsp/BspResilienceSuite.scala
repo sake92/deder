@@ -308,11 +308,13 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         assertEquals(result1.getStatusCode, StatusCode.OK)
         assertEquals(result2.getStatusCode, StatusCode.OK)
 
-        val starts = capturingClient.awaitTaskStarts(2)
-        assertEquals(starts.size, 2, "should have 2 task start notifications (one per originId)")
+        // With debouncing, only one compilation runs for identical targets.
+        // Both futures complete with the same result.
+        val starts = capturingClient.awaitTaskStarts(1)
+        assertEquals(starts.size, 1, "should have at least 1 task start notification")
 
-        val finishes = capturingClient.awaitTaskFinishes(2)
-        assertEquals(finishes.size, 2, "should have 2 task finish notifications (one per originId)")
+        val finishes = capturingClient.awaitTaskFinishes(1)
+        assertEquals(finishes.size, 1, "should have at least 1 task finish notification")
       }
     } finally {
       executeDederCommand(testDir, "shutdown")
