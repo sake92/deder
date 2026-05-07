@@ -646,6 +646,7 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(sourceFilesTask)
     .dependsOn(generatedSourcesTask)
+    .dependsOn(allGeneratedSourceFilesTask)
     .dependsOn(javaHomeTask)
     .dependsOn(javaVersionTask)
     .dependsOn(javacOptionsTask)
@@ -664,6 +665,7 @@ class CoreTasks() extends StrictLogging {
       val (
         sourceFiles,
         generatedSourcesDir,
+        allGeneratedSourceFiles,
         javaHome,
         javaVersion,
         javacOptions,
@@ -774,7 +776,7 @@ class CoreTasks() extends StrictLogging {
           compilerJars = compilerJars,
           compileClasspath = fullCompileClasspath,
           zincCacheFile = zincCacheFile,
-          sources = sourceFiles.map(_.absPath),
+          sources = (sourceFiles ++ allGeneratedSourceFiles).distinct.map(_.absPath),
           classesDir = classesDir,
           scalacOptions = finalScalacOptions,
           javacOptions = finalJavacOptions,

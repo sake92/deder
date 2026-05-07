@@ -230,6 +230,7 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.allGeneratedSourceFiles", s"${moduleId}.allGeneratedSources"),
       (s"${moduleId}.compile", s"${moduleId}.sourceFiles"),
       (s"${moduleId}.compile", s"${moduleId}.generatedSources"),
+      (s"${moduleId}.compile", s"${moduleId}.allGeneratedSourceFiles"),
       (s"${moduleId}.compile", s"${moduleId}.javaHome"),
       (s"${moduleId}.compile", s"${moduleId}.javaVersion"),
       (s"${moduleId}.compile", s"${moduleId}.javacOptions"),
