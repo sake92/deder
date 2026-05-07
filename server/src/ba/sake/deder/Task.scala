@@ -360,6 +360,50 @@ class ConfigValueTask[T: JsonRW: Hashable](
   override def toString(): String = s"ConfigValueTask($name)"
 }
 
+/** Aggregator task: at DAG-build time, depends on every registered task with
+ *  matching `collectKind` for the current module's type. Result is the Seq of
+ *  contributors' results. Empty Seq if no contributors.
+ */
+class FanInTask[T: JsonRW: Hashable](
+    val name: String,
+    val collectKind: TaskKind,
+    val supportedModuleTypes: Set[ModuleType] = Set.empty,
+    val description: String = "",
+    val category: String = ""
+) extends Task[Seq[T], EmptyTuple] {
+  val taskDeps: EmptyTuple = EmptyTuple
+  val transitive: Boolean = false
+  val singleton: Boolean = false
+  val kind: TaskKind = TaskKind.Standard
+  val execute: TaskExecContext[Seq[T], EmptyTuple] => Seq[T] = _ => Seq.empty
+  val summarize: (Seq[(DederModule, Seq[T])], ServerNotificationsLogger) => Unit =
+    (_, _) => ()
+
+  override def dynamicDeps(siblingTasks: Seq[Task[?, ?]], moduleType: ModuleType): Seq[Task[?, ?]] =
+    siblingTasks.filter { t =>
+      t.kind == collectKind &&
+      (t.supportedModuleTypes.isEmpty || t.supportedModuleTypes.contains(moduleType))
+    }
+
+  override private[deder] def executeUnsafe(
+      project: DederProject,
+      module: DederModule,
+      depResults: Seq[TaskResult[?]],
+      transitiveResults: Seq[Seq[TaskResult[?]]],
+      args: Seq[String],
+      watch: Boolean,
+      serverNotificationsLogger: ServerNotificationsLogger,
+      dependencyResolver: DependencyResolver
+  ): (res: TaskResult[Seq[T]], changed: Boolean) = {
+    serverNotificationsLogger.add(ServerNotification.logDebug(s"Executing ${name}", Some(module.id)))
+    val collected = depResults.map(_.value.asInstanceOf[T])
+    val outputHash = Hashable[Seq[T]].hashStr(collected)
+    (TaskResult(collected, "", outputHash), true)
+  }
+
+  override def toString(): String = s"FanInTask($name, kind=$collectKind)"
+}
+
 // dynamic, for each module
 class TaskInstance(
     val module: DederModule,
