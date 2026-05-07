@@ -55,6 +55,7 @@ class TasksResolver(
         taskInstance.task.dynamicDeps(siblingTasks, module.`type`).foreach { dynDep =>
           val depId = s"${module.id}.${dynDep.name}"
           tasksMap.get(depId).foreach { depInstance =>
+            graph.addVertex(depInstance) // add if not already a vertex
             graph.addEdge(taskInstance, depInstance)
           }
         }
