@@ -116,6 +116,7 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
   def name: String
   def description: String
   def category: String
+  def kind: TaskKind
   def supportedModuleTypes: Set[ModuleType]
   def transitive: Boolean
   def singleton: Boolean // e.g. you can only "run" ONE MODULE!
@@ -156,6 +157,7 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple](
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
     val description: String = "",
     val category: String = "",
+    val kind: TaskKind = TaskKind.Standard,
     override val isResultSuccessful: T => Boolean = (_: T) => true,
     val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
       (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => ()
@@ -211,6 +213,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
     val description: String = "",
     val category: String = "",
+    val kind: TaskKind = TaskKind.Standard,
     val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
       (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => ()
 )(using ev: TaskDeps[Deps] =:= true)
