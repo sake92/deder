@@ -128,6 +128,11 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
   def transitive: Boolean
   def singleton: Boolean // e.g. you can only "run" ONE MODULE!
   def taskDeps: Deps
+  /** Tasks whose results should be appended to depResults at execution time, computed
+   *  from the registry rather than statically declared via `dependsOn`. Default: empty.
+   *  Used by FanInTask to collect all tasks of a given kind for the current module.
+   */
+  def dynamicDeps(siblingTasks: Seq[Task[?, ?]], moduleType: ModuleType): Seq[Task[?, ?]] = Seq.empty
   def execute: TaskExecContext[T, Deps] => T
   def summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit
   def isResultSuccessful: T => Boolean = _ => true
