@@ -22,13 +22,14 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     transitive: Boolean,
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType],
-    category: String
+    category: String,
+    kind: TaskKind
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: Task[T2, ?]): TaskBuilder[T, Deps :* Task[T2, ?]] =
-    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category)
+    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
-    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category)
+    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category, kind = kind)
 
   def buildWithSummary(
       execute: TaskExecContext[T, Deps] => T,
@@ -42,9 +43,10 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
       transitive,
       singleton,
       supportedModuleTypes,
+      category = category,
+      kind = kind,
       isResultSuccessful = isResultSuccessful,
-      summarize = summarize,
-      category = category
+      summarize = summarize
     )
 }
 
@@ -55,8 +57,10 @@ object TaskBuilder {
       transitive: Boolean = false,
       singleton: Boolean = false,
       supportedModuleTypes: Set[ModuleType] = Set.empty,
-      category: String = ""
-  ): TaskBuilder[T, EmptyTuple] = TaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category)
+      category: String = "",
+      kind: TaskKind = TaskKind.Standard
+  ): TaskBuilder[T, EmptyTuple] =
+    TaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind)
 }
 
 case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
@@ -66,13 +70,14 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     transitive: Boolean,
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType],
-    category: String
+    category: String,
+    kind: TaskKind
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: Task[T2, ?]): CachedTaskBuilder[T, Deps :* Task[T2, ?]] =
-    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category)
+    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind)
 
   def build(execute: TaskExecContext[T, Deps] => T)(using Deps <:< NonEmptyTuple): Task[T, Deps] =
-    CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category)
+    CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category, kind = kind)
 }
 
 object CachedTaskBuilder {
@@ -82,8 +87,10 @@ object CachedTaskBuilder {
       transitive: Boolean = false,
       singleton: Boolean = false,
       supportedModuleTypes: Set[ModuleType] = Set.empty,
-      category: String = ""
-  ): CachedTaskBuilder[T, EmptyTuple] = CachedTaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category)
+      category: String = "",
+      kind: TaskKind = TaskKind.Standard
+  ): CachedTaskBuilder[T, EmptyTuple] =
+    CachedTaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind)
 }
 
 // this is to make sure that Deps are Task-s and not arbitrary types
