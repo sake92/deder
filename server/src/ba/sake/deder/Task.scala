@@ -11,6 +11,10 @@ import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import os.write.over
 
+enum TaskKind {
+  case Standard, SourceGenerator, ResourceGenerator
+}
+
 case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     name: String,
     taskDeps: Deps,
