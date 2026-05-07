@@ -808,10 +808,12 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(compileTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(resourcesTask)
+    .dependsOn(allGeneratedResourcesTask)
     .build { ctx =>
-      val (_, compileClasspath, resourceDirs) = ctx.depResults
+      val (_, compileClasspath, resourceDirs, generatedResourceDirs) = ctx.depResults
       val resources = resourceDirs.map(_.absPath).filter(p => os.exists(p))
-      val localRunClasspath = compileClasspath ++ resources
+      val generatedResources = generatedResourceDirs.filter(p => os.exists(p))
+      val localRunClasspath = compileClasspath ++ resources ++ generatedResources
       (localRunClasspath ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
     }
 
