@@ -1,5 +1,6 @@
 package ba.sake.deder
 
+import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.DederProject.ModuleType
 
 class SourceGeneratorsSuite extends munit.FunSuite {
@@ -46,5 +47,39 @@ class SourceGeneratorsSuite extends munit.FunSuite {
 
     val resolvedJava = fanIn.dynamicDeps(Seq(javaOnly, anyType), ModuleType.JAVA)
     assertEquals(resolvedJava.map(_.name).toSet, Set("javaOnlyGen", "anyTypeGen"))
+  }
+
+  test("TasksResolver wires FanInTask edges to matching kind contributors") {
+    val genA = TaskBuilder
+      .make[os.Path](name = "genA", kind = TaskKind.SourceGenerator)
+      .build(_.out)
+    val genB = TaskBuilder
+      .make[os.Path](name = "genB", kind = TaskKind.SourceGenerator)
+      .build(_.out)
+    val resGen = TaskBuilder
+      .make[os.Path](name = "resGen", kind = TaskKind.ResourceGenerator)
+      .build(_.out)
+    val fanInSources = FanInTask[os.Path](
+      name = "allGenSources",
+      collectKind = TaskKind.SourceGenerator
+    )
+
+    val coreTasks = CoreTasks()
+    val tasksRegistry = TasksRegistry(coreTasks.all ++ Seq(genA, genB, resGen, fanInSources))
+
+    val configParser = ba.sake.deder.config.ConfigParser(writeJson = false)
+    val testProjectsDir = os.pwd / "server/test/resources/sample-projects"
+    val parsed = configParser.parse(testProjectsDir / "multi" / "deder.pkl").toOption.get
+    val tasksResolver = TasksResolver(parsed, tasksRegistry)
+
+    val graph = tasksResolver.taskInstancesGraph
+    val edges = graph.edgeSet().asScala
+      .map(e => (graph.getEdgeSource(e).id, graph.getEdgeTarget(e).id))
+      .toSet
+    Seq("common", "frontend", "backend", "uber").foreach { m =>
+      assert(edges.contains((s"$m.allGenSources", s"$m.genA")), s"missing $m.allGenSources -> $m.genA")
+      assert(edges.contains((s"$m.allGenSources", s"$m.genB")), s"missing $m.allGenSources -> $m.genB")
+      assert(!edges.contains((s"$m.allGenSources", s"$m.resGen")), s"unexpected $m.allGenSources -> $m.resGen")
+    }
   }
 }

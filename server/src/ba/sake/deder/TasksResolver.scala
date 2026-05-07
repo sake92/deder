@@ -50,6 +50,14 @@ class TasksResolver(
           )
           graph.addEdge(taskInstance, taskDepInstance)
         }
+        // Dynamic deps (e.g. FanInTask aggregating by kind):
+        val siblingTasks = taskInstances.map(_.task)
+        taskInstance.task.dynamicDeps(siblingTasks, module.`type`).foreach { dynDep =>
+          val depId = s"${module.id}.${dynDep.name}"
+          tasksMap.get(depId).foreach { depInstance =>
+            graph.addEdge(taskInstance, depInstance)
+          }
+        }
         // if this task triggers a task in depending module, e.g. compile->compile
         if taskInstance.task.transitive then
           module.moduleDeps.asScala.foreach { moduleDep =>
