@@ -56,7 +56,8 @@ class ExecutionPlannerSuite extends munit.FunSuite {
             "common.sources",
             "common.javaSemanticdbVersion",
             "common.semanticdbEnabled",
-            "common.semanticdb"
+            "common.semanticdb",
+            "common.allGeneratedSources"
           ),
           Set(
             "common.allClassesDirs",
@@ -67,7 +68,8 @@ class ExecutionPlannerSuite extends munit.FunSuite {
             "common.scalacPlugins",
             "common.sourceFiles",
             "common.scalaSemanticdbVersion",
-            "common.compileOnlyDependencies"
+            "common.compileOnlyDependencies",
+            "common.allGeneratedSourceFiles"
           ),
           Set("common.allDependencies", "common.compilerJars"),
           Set("common.compileClasspath"),

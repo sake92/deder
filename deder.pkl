@@ -1,8 +1,14 @@
-amends "https://sake92.github.io/deder/config/v0.7.6/DederProject.pkl"
+//amends "https://sake92.github.io/deder/config/v0.7.7/DederProject.pkl"
 
-//amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 local const scalaVer = "3.7.4"
+
+local const function pom(artId: String) = new PomSettings {
+  groupId = "ba.sake"
+  artifactId = artId
+  version = read?("env:VERSION")
+}
 
 local const config = new JavaModule {
   id = "config"
@@ -11,12 +17,6 @@ local const config = new JavaModule {
   }
   pomSettings = pom("deder-config")
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
-}
-
-local const function pom(artId: String) = new PomSettings {
-  groupId = "ba.sake"
-  artifactId = artId
-  version = read?("env:VERSION")
 }
 
 local const testCommon = new ScalaModule {
@@ -38,6 +38,9 @@ local const testCommonTest = new ScalaTestModule {
   moduleDeps { testCommon }
   deps {
     "org.scalameta::munit:1.2.1"
+  }
+  junitXmlReport {
+    enabled = true
   }
 }
 
@@ -121,6 +124,9 @@ local const serverModules =
       deps {
         "org.scalameta::munit:1.2.1"
       }
+      junitXmlReport {
+        enabled = true
+      }
     }
   }.get
 
@@ -139,15 +145,6 @@ local const client = new JavaModule {
       "-H:+StaticExecutableWithDynamicLibC"
     }
   }
-  /*
-  // TODO generate in CI, or a script..
-  def versionFile = Task {
-    val dest = Task.dest / "ba/sake/deder/client"
-    os.makeDir.all(dest)
-    os.write(dest / "version.properties", s"version=${version()}\n")
-    PathRef(Task.dest)
-  }
-  */
 }
 
 local const integrationTest = new ScalaTestModule {
@@ -159,6 +156,9 @@ local const integrationTest = new ScalaTestModule {
     "org.scalameta::munit:1.2.1"
     "com.lihaoyi::os-lib:0.11.6"
     "ba.sake::tupson:0.18.0"
+  }
+  junitXmlReport {
+    enabled = true
   }
 }
 

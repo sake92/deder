@@ -91,6 +91,10 @@ abstract class DederModule {
   /// Module dependencies
   moduleDeps: Listing<DederModule>
 
+  /// Whether this module should be exposed as a BSP build target.
+  /// When unset, Deder uses IDE-friendly defaults for generated cross/versioned families.
+  bspVisible: Boolean?
+
   type: ModuleType
 
   hidden idValidation = (value: String) ->

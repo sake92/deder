@@ -6,6 +6,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import ch.epfl.scala.bsp4j.*
 import org.eclipse.lsp4j.jsonrpc.Launcher
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import ba.sake.deder.BaseIntegrationSuite
 
 class BspResilienceSuite extends BaseIntegrationSuite {
@@ -118,7 +119,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
     }
   }
 
-  test("unknown build target returns empty result without crashing") {
+  test("unknown build target request is rejected with BSP error but server stays alive") {
     val testDir = os.pwd / "tmp" / s"bsp-unknown-target-${System.currentTimeMillis()}"
     try {
       os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
@@ -135,11 +136,28 @@ class BspResilienceSuite extends BaseIntegrationSuite {
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, _, _) =>
+        // Request for an unknown target must fail with a BSP error
         val unknownUri = s"${baseUri(testDir)}#nonexistent"
         val params = new SourcesParams(List(new BuildTargetIdentifier(unknownUri)).asJava)
-        val result = buildServer.buildTargetSources(params).get(30, TimeUnit.SECONDS)
-        // Request is fulfilled even for unknown targets; just verify it doesn't crash
-        assert(result.getItems != null, "should return a result even for unknown target")
+        val ex = intercept[ExecutionException] {
+          buildServer.buildTargetSources(params).get(30, TimeUnit.SECONDS)
+        }
+        val errorDetail = ex.getCause match {
+          case ree: ResponseErrorException =>
+            Option(ree.getResponseError.getData).map(_.toString).getOrElse(ree.getMessage)
+          case other => other.getMessage
+        }
+        assert(
+          errorDetail.contains("Unknown BSP target") && errorDetail.contains("nonexistent"),
+          s"expected rejection for unknown target 'nonexistent', got error detail: $errorDetail"
+        )
+
+        // Server must remain usable after the rejected request
+        val targetsResult = buildServer.workspaceBuildTargets().get(30, TimeUnit.SECONDS)
+        assert(
+          targetsResult.getTargets.asScala.nonEmpty,
+          "server should still be reachable and return targets after rejecting an unknown target"
+        )
       }
     } finally {
       executeDederCommand(testDir, "shutdown")
@@ -269,6 +287,91 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         // Verify we got finish notification with error
         val taskFinish = capturingClient.awaitTaskFinish()
         assert(taskFinish.isDefined, "should have compile finish notification")
+      }
+    } finally {
+      executeDederCommand(testDir, "shutdown")
+    }
+  }
+
+  test("rapid successive buildTargetCompile requests both complete without hanging") {
+    val testDir = os.pwd / "tmp" / s"bsp-rapid-compile-${System.currentTimeMillis()}"
+    try {
+      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+      val lines = os.read.lines(testDir / "deder.pkl")
+      os.write.over(
+        testDir / "deder.pkl",
+        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+      )
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
+      executeDederCommand(testDir, "bsp", "install")
+
+      withBspSession(testDir) { (buildServer, capturingClient, _) =>
+        capturingClient.clear()
+
+        val params1 = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params1.setOriginId("test-rapid-1")
+        val params2 = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params2.setOriginId("test-rapid-2")
+
+        val future1 = buildServer.buildTargetCompile(params1)
+        val future2 = buildServer.buildTargetCompile(params2)
+
+        val result1 = future1.get(2, TimeUnit.MINUTES)
+        val result2 = future2.get(2, TimeUnit.MINUTES)
+
+        assertEquals(result1.getStatusCode, StatusCode.OK)
+        assertEquals(result2.getStatusCode, StatusCode.OK)
+
+        // With debouncing, only one compilation runs for identical targets.
+        // Both futures complete with the same result.
+        val starts = capturingClient.awaitTaskStarts(1)
+        assertEquals(starts.size, 1, "should have at least 1 task start notification")
+
+        val finishes = capturingClient.awaitTaskFinishes(1)
+        assertEquals(finishes.size, 1, "should have at least 1 task finish notification")
+      }
+    } finally {
+      executeDederCommand(testDir, "shutdown")
+    }
+  }
+
+  test("compile finish notification is sent even when compilation fails with errors") {
+    val testDir = os.pwd / "tmp" / s"bsp-finish-guarantee-${System.currentTimeMillis()}"
+    try {
+      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+      val lines = os.read.lines(testDir / "deder.pkl")
+      os.write.over(
+        testDir / "deder.pkl",
+        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+      )
+      os.write.over(
+        testDir / ".deder/server.properties",
+        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+        createFolders = true
+      )
+      executeDederCommand(testDir, "bsp", "install")
+
+      withBspSession(testDir) { (buildServer, capturingClient, _) =>
+        val badFile = testDir / "common/src/bad.scala"
+        os.write(badFile, "package common\nval notValid: Int = \"wrong type\"")
+        capturingClient.clear()
+
+        val params = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params.setOriginId("test-compile-error-guarantee")
+        val result = buildServer.buildTargetCompile(params).get(2, TimeUnit.MINUTES)
+
+        val taskStart = capturingClient.awaitTaskStart()
+        assert(taskStart.isDefined, "should have compile start notification even on failure")
+
+        val taskFinish = capturingClient.awaitTaskFinish()
+        assert(taskFinish.isDefined, "should have compile finish notification even on failure")
+        assertEquals(taskFinish.get.getStatus, StatusCode.ERROR)
+
+        assertEquals(result.getStatusCode, StatusCode.ERROR)
       }
     } finally {
       executeDederCommand(testDir, "shutdown")

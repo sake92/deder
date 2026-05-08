@@ -77,6 +77,43 @@ class CoreTasks() extends StrictLogging {
     )
     .build { ctx => ctx.out }
 
+  /** Aggregates per-module source-generator output dirs (TaskKind.SourceGenerator).
+   *  Plugin-contributed source generators are picked up automatically.
+   */
+  val allGeneratedSourcesTask = FanInTask[os.Path](
+    name = "allGeneratedSources",
+    collectKind = TaskKind.SourceGenerator,
+    description = "All generated source dirs aggregated from SourceGenerator tasks",
+    category = "Build"
+  )
+
+  /** Walks every dir from `allGeneratedSourcesTask` into a flat list of .java/.scala files. */
+  val allGeneratedSourceFilesTask = CachedTaskBuilder
+    .make[Seq[DederPath]](
+      name = "allGeneratedSourceFiles",
+      category = "Build"
+    )
+    .dependsOn(allGeneratedSourcesTask)
+    .build { ctx =>
+      val dirs = ctx.depResults._1
+      dirs.flatMap { d =>
+        if os.exists(d) then
+          os.walk(
+            d,
+            skip = p => os.isFile(p) && !(p.ext == "scala" || p.ext == "java")
+          ).filter(os.isFile)
+        else Seq.empty
+      }.map(DederPath(_)).sortBy(_.path.toString)
+    }
+
+  /** Aggregates per-module resource-generator output dirs (TaskKind.ResourceGenerator). */
+  val allGeneratedResourcesTask = FanInTask[os.Path](
+    name = "allGeneratedResources",
+    collectKind = TaskKind.ResourceGenerator,
+    description = "All generated resource dirs aggregated from ResourceGenerator tasks",
+    category = "Build"
+  )
+
   /** resource folders */
   val resourcesTask = SourceFilesTask(
     name = "resources",
@@ -609,6 +646,7 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(sourceFilesTask)
     .dependsOn(generatedSourcesTask)
+    .dependsOn(allGeneratedSourceFilesTask)
     .dependsOn(javaHomeTask)
     .dependsOn(javaVersionTask)
     .dependsOn(javacOptionsTask)
@@ -627,6 +665,7 @@ class CoreTasks() extends StrictLogging {
       val (
         sourceFiles,
         generatedSourcesDir,
+        allGeneratedSourceFiles,
         javaHome,
         javaVersion,
         javacOptions,
@@ -737,7 +776,7 @@ class CoreTasks() extends StrictLogging {
           compilerJars = compilerJars,
           compileClasspath = fullCompileClasspath,
           zincCacheFile = zincCacheFile,
-          sources = sourceFiles.map(_.absPath),
+          sources = (sourceFiles ++ allGeneratedSourceFiles).distinct.map(_.absPath),
           classesDir = classesDir,
           scalacOptions = finalScalacOptions,
           javacOptions = finalJavacOptions,
@@ -769,10 +808,12 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(compileTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(resourcesTask)
+    .dependsOn(allGeneratedResourcesTask)
     .build { ctx =>
-      val (_, compileClasspath, resourceDirs) = ctx.depResults
+      val (_, compileClasspath, resourceDirs, generatedResourceDirs) = ctx.depResults
       val resources = resourceDirs.map(_.absPath).filter(p => os.exists(p))
-      val localRunClasspath = compileClasspath ++ resources
+      val generatedResources = generatedResourceDirs.filter(p => os.exists(p))
+      val localRunClasspath = compileClasspath ++ resources ++ generatedResources
       (localRunClasspath ++ ctx.transitiveResults.flatten.flatten).reverse.distinct.reverse
     }
 
@@ -1226,6 +1267,9 @@ class CoreTasks() extends StrictLogging {
     sourcesTask,
     sourceFilesTask,
     generatedSourcesTask,
+    allGeneratedSourcesTask,
+    allGeneratedSourceFilesTask,
+    allGeneratedResourcesTask,
     javaHomeTask,
     javaVersionTask,
     scalaVersionTask,

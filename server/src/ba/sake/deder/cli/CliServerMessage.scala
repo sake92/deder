@@ -70,7 +70,7 @@ object CliServerMessage {
     val srcOpt = pos.sourceFile()
     if srcOpt.isPresent then
       val f = srcOpt.get()
-      val abs = os.Path(f.toPath)
+      val abs = os.Path(f.toPath.toAbsolutePath())
       val relPath =
         if abs.startsWith(DederGlobals.projectRootDir) then
           abs.relativeTo(DederGlobals.projectRootDir).toString()
