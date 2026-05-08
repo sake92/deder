@@ -402,7 +402,7 @@ class FanInTask[T: JsonRW: Hashable](
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
-      dependencyResolver: DependencyResolver
+      dependencyResolver: DependencyResolverApi
   ): (res: TaskResult[Seq[T]], changed: Boolean) = {
     serverNotificationsLogger.add(ServerNotification.logDebug(s"Executing ${name}", Some(module.id)))
     val collected = depResults.map(_.value.asInstanceOf[T])
