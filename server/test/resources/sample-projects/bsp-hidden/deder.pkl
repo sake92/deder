@@ -1,0 +1,15 @@
+amends "../../../../../config/DederProject.pkl"
+
+// Minimal fixture for testing explicit bspVisible=false.
+// "hidden-module" would be default-visible (no cross projection), but is explicitly hidden.
+modules {
+  new ScalaModule {
+    id = "app"
+    scalaVersion = "3.0.0"
+  }
+  new ScalaModule {
+    id = "hidden-module"
+    scalaVersion = "3.0.0"
+    bspVisible = false
+  }
+}

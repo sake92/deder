@@ -1,0 +1,18 @@
+amends "../../../../../config/DederProject.pkl"
+
+// Minimal fixture for testing that all modules are visible when there is no cross-projection.
+modules {
+  new ScalaModule {
+    id = "core"
+    scalaVersion = "3.0.0"
+  }
+  new ScalaModule {
+    id = "app"
+    scalaVersion = "3.0.0"
+  }
+  new ScalaTestModule {
+    id = "app-test"
+    root = "app/test"
+    scalaVersion = "3.0.0"
+  }
+}

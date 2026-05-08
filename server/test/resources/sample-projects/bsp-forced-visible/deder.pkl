@@ -1,0 +1,39 @@
+amends "../../../../../config/DederProject.pkl"
+
+// Minimal cross-platform fixture for testing explicit bspVisible=true.
+// "app-jvm-2.0.0" would normally be hidden (older version in a cross family),
+// but is forced visible via bspVisible=true.
+// "app-js-2.0.0" has no override, so it stays hidden (non-latest version).
+local const jvmOld = new ScalaModule {
+  id = "app-jvm-2.0.0"
+  root = "app"
+  scalaVersion = "2.0.0"
+  bspVisible = true
+}
+
+local const jvmNew = new ScalaModule {
+  id = "app-jvm-3.0.0"
+  root = "app"
+  scalaVersion = "3.0.0"
+}
+
+local const jsOld = new ScalaJsModule {
+  id = "app-js-2.0.0"
+  root = "app"
+  scalaVersion = "2.0.0"
+  scalaJsVersion = "1.0.0"
+}
+
+local const jsNew = new ScalaJsModule {
+  id = "app-js-3.0.0"
+  root = "app"
+  scalaVersion = "3.0.0"
+  scalaJsVersion = "1.0.0"
+}
+
+modules {
+  jvmOld
+  jvmNew
+  jsOld
+  jsNew
+}

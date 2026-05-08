@@ -6,6 +6,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import ch.epfl.scala.bsp4j.*
 import org.eclipse.lsp4j.jsonrpc.Launcher
+import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import ba.sake.deder.BaseIntegrationSuite
 
 class BspResilienceSuite extends BaseIntegrationSuite {
@@ -118,7 +119,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
     }
   }
 
-  test("unknown build target returns empty result without crashing") {
+  test("unknown build target request is rejected with BSP error but server stays alive") {
     val testDir = os.pwd / "tmp" / s"bsp-unknown-target-${System.currentTimeMillis()}"
     try {
       os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
@@ -135,11 +136,28 @@ class BspResilienceSuite extends BaseIntegrationSuite {
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, _, _) =>
+        // Request for an unknown target must fail with a BSP error
         val unknownUri = s"${baseUri(testDir)}#nonexistent"
         val params = new SourcesParams(List(new BuildTargetIdentifier(unknownUri)).asJava)
-        val result = buildServer.buildTargetSources(params).get(30, TimeUnit.SECONDS)
-        // Request is fulfilled even for unknown targets; just verify it doesn't crash
-        assert(result.getItems != null, "should return a result even for unknown target")
+        val ex = intercept[ExecutionException] {
+          buildServer.buildTargetSources(params).get(30, TimeUnit.SECONDS)
+        }
+        val errorDetail = ex.getCause match {
+          case ree: ResponseErrorException =>
+            Option(ree.getResponseError.getData).map(_.toString).getOrElse(ree.getMessage)
+          case other => other.getMessage
+        }
+        assert(
+          errorDetail.contains("Unknown BSP target") && errorDetail.contains("nonexistent"),
+          s"expected rejection for unknown target 'nonexistent', got error detail: $errorDetail"
+        )
+
+        // Server must remain usable after the rejected request
+        val targetsResult = buildServer.workspaceBuildTargets().get(30, TimeUnit.SECONDS)
+        assert(
+          targetsResult.getTargets.asScala.nonEmpty,
+          "server should still be reachable and return targets after rejecting an unknown target"
+        )
       }
     } finally {
       executeDederCommand(testDir, "shutdown")

@@ -1,0 +1,100 @@
+amends "../../../../../config/DederProject.pkl"
+
+// Minimal cross-platform / cross-version fixture for BspVisibleTargets unit tests.
+// Uses synthetic version strings ("2.0.0", "3.0.0") so the expected-visible IDs
+// in the tests are stable and will never change due to upstream version bumps.
+
+local const jvmOld = new ScalaModule {
+  id = "common-jvm-2.0.0"
+  root = "common"
+  scalaVersion = "2.0.0"
+}
+
+local const jvmNew = new ScalaModule {
+  id = "common-jvm-3.0.0"
+  root = "common"
+  scalaVersion = "3.0.0"
+}
+
+local const jvmTestOld = new ScalaTestModule {
+  id = "common-jvm-test-2.0.0"
+  root = "common/test"
+  scalaVersion = "2.0.0"
+}
+
+local const jvmTestNew = new ScalaTestModule {
+  id = "common-jvm-test-3.0.0"
+  root = "common/test"
+  scalaVersion = "3.0.0"
+}
+
+local const jsOld = new ScalaJsModule {
+  id = "common-js-2.0.0"
+  root = "common"
+  scalaVersion = "2.0.0"
+  scalaJsVersion = "1.0.0"
+}
+
+local const jsNew = new ScalaJsModule {
+  id = "common-js-3.0.0"
+  root = "common"
+  scalaVersion = "3.0.0"
+  scalaJsVersion = "1.0.0"
+}
+
+local const jsTestOld = new ScalaJsTestModule {
+  id = "common-js-test-2.0.0"
+  root = "common/test"
+  scalaVersion = "2.0.0"
+  scalaJsVersion = "1.0.0"
+}
+
+local const jsTestNew = new ScalaJsTestModule {
+  id = "common-js-test-3.0.0"
+  root = "common/test"
+  scalaVersion = "3.0.0"
+  scalaJsVersion = "1.0.0"
+}
+
+local const nativeOld = new ScalaNativeModule {
+  id = "common-native-2.0.0"
+  root = "common"
+  scalaVersion = "2.0.0"
+  scalaNativeVersion = "0.5.0"
+}
+
+local const nativeNew = new ScalaNativeModule {
+  id = "common-native-3.0.0"
+  root = "common"
+  scalaVersion = "3.0.0"
+  scalaNativeVersion = "0.5.0"
+}
+
+local const nativeTestOld = new ScalaNativeTestModule {
+  id = "common-native-test-2.0.0"
+  root = "common/test"
+  scalaVersion = "2.0.0"
+  scalaNativeVersion = "0.5.0"
+}
+
+local const nativeTestNew = new ScalaNativeTestModule {
+  id = "common-native-test-3.0.0"
+  root = "common/test"
+  scalaVersion = "3.0.0"
+  scalaNativeVersion = "0.5.0"
+}
+
+modules {
+  jvmOld
+  jvmNew
+  jvmTestOld
+  jvmTestNew
+  jsOld
+  jsNew
+  jsTestOld
+  jsTestNew
+  nativeOld
+  nativeNew
+  nativeTestOld
+  nativeTestNew
+}
