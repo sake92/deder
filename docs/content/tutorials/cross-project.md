@@ -49,6 +49,15 @@ The `CreateCrossModules` helper creates 3 modules for each scala version: one fo
 Then the `scalaVersions` list specifies which scala versions you want to support.
 We loop through the `scalaVersions` list and create modules for each version, and then flatten the result to get a single list of modules.
 
+For BSP/IDE import, Deder exposes only the latest Scala version of each platform family by default, so large cross-version builds stay manageable in Metals and IntelliJ. If you want to override that projection, set `bspVisible` on a module or helper template:
+
+```pkl
+template = new {
+  scalaVersion = sv
+  bspVisible = sv == "2.13.18"
+}
+```
+
 Finally, we add all the created modules to the `modules` section:
 ```pkl
 modules {
@@ -79,5 +88,4 @@ modules {
   ...commonModules.filter((m) -> !m.id.endsWith("-native-3.7.4"))
 }
 ```
-
 
