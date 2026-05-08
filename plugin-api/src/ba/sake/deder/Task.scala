@@ -130,9 +130,7 @@ trait AbstractTask[T] {
   def supportedModuleTypes: Set[ModuleType]
   def transitive: Boolean
   def singleton: Boolean
-  def supportedModuleTypes: Set[ModuleType]
   def isResultSuccessful: T => Boolean
-  def category: String
 }
 
 sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] =:= true)
