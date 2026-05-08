@@ -25,6 +25,7 @@ import xsbti.compile.{
   PreviousResult,
   Setup
 }
+import scala.util.control.NonFatal
 import com.typesafe.scalalogging.StrictLogging
 import sbt.internal.inc.ScalaInstance
 import ba.sake.deder.{DederGlobals, OTEL, RequestContext, ServerNotification, ServerNotificationsLogger}
@@ -299,7 +300,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
     )
 
     try {
-      notifications.add(ServerNotification.CompileStarted(moduleId, sources)) // so we can reset BSP diagnostics
+      notifications.add(ServerNotification.CompileStarted(moduleId, sources))
       val compileSpan = OTEL.TRACER.spanBuilder("ZincCompiler.incrementalCompile")
         .setAttribute("moduleId", moduleId)
         .setAttribute("sources.count", sources.size.toLong)
@@ -315,25 +316,35 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
         analysisStore.set(contents)
         analysisCache.put(zincCacheFile, contents)
       } finally storeSpan.end()
-      // trigger just in case, for BSP
-      if !newResult.hasModified then notifications.add(ServerNotification.CompileFinished(moduleId, 0, 0))
     } catch {
-      case e: xsbti.CompileFailed =>
-        val problems = reporter.problems()
-        if problems.isEmpty then
-          notifications.add(
-            ServerNotification.logError(
-              "Compilation failed but no diagnostic messages were reported by the compiler. This may indicate a compiler crash or configuration issue.",
-              Some(moduleId)
+      case NonFatal(e) =>
+        if !reporter.printSummaryCalled then {
+          val problems = reporter.problems()
+          if problems.isEmpty then
+            notifications.add(
+              ServerNotification.logError(
+                "Compilation failed but no diagnostic messages were reported by the compiler.",
+                Some(moduleId)
+              )
             )
+          val errorsCount = problems.count(_.severity == xsbti.Severity.Error)
+          val warningsCount = problems.count(_.severity == xsbti.Severity.Warn)
+          notifications.add(
+            ServerNotification.CompileFailed(moduleId, errorsCount, warningsCount)
           )
-        // Per-problem diagnostics are already sent by DederZincReporter.log() during compilation
+          reporter.printSummaryCalled = true
+        }
+        throw e
+    } finally {
+      if !reporter.printSummaryCalled then {
+        val problems = reporter.problems()
         val errorsCount = problems.count(_.severity == xsbti.Severity.Error)
         val warningsCount = problems.count(_.severity == xsbti.Severity.Warn)
-        notifications.add(
-          ServerNotification.CompileFailed(moduleId, errorsCount, warningsCount)
-        )
-        throw e
+        if errorsCount > 0 then
+          notifications.add(ServerNotification.CompileFailed(moduleId, errorsCount, warningsCount))
+        else
+          notifications.add(ServerNotification.CompileFinished(moduleId, 0, 0))
+      }
     }
   }
 

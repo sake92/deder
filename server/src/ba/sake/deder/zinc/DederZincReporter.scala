@@ -14,6 +14,7 @@ class DederZincReporter(
   private var _problems = Vector.empty[Problem]
   private var _hasErrors = false
   private var _hasWarnings = false
+  var printSummaryCalled = false
 
   override def reset(): Unit = synchronized {
     _problems = Vector.empty
@@ -31,6 +32,7 @@ class DederZincReporter(
     notifications.add(
       ServerNotification.CompileFinished(moduleId, errorsCount, warningsCount)
     )
+    printSummaryCalled = true
   }
 
   override def problems(): Array[Problem] = synchronized { _problems.toArray }
