@@ -1,0 +1,27 @@
+amends "../../../../../config/DederProject.pkl"
+
+// Shared local Maven repository (set by run-it-tests.sh via DEDER_TMP_M2_REPO env var)
+repositories {
+  new MavenRepository { url = "file://\(read("env:DEDER_TMP_M2_REPO"))" }
+}
+
+modules {
+  new ScalaModule {
+    root = "."
+    id = "hello-plugin"
+    scalaVersion = "3.7.4"
+    resources { "resources" }
+    deps {
+      "ba.sake::deder-plugin-api:\(read("env:DEDER_PLUGIN_API_VERSION"))"
+    }
+    pomSettings {
+      groupId = "ba.sake"
+      artifactId = "deder-hello-plugin"
+      version = "it-test-version"
+      name = "Deder Hello Plugin"
+      description = "Example Deder plugin that adds a hello task"
+    }
+    publish = true
+    publishLocalTo = read("env:DEDER_TMP_M2_REPO")
+  }
+}

@@ -13,7 +13,7 @@ import dependency.api.ops.*
 import ba.sake.deder.{OTEL, ServerNotificationsLogger}
 import ba.sake.deder.ServerNotification
 
-class DependencyResolver(val repositories: Seq[CsRepository]) {
+class DependencyResolver(val repositories: Seq[CsRepository]) extends DependencyResolverApi {
 
   // In-process cache for resolved file paths, keyed by sorted dependency
   // coordinates. Scoped to this resolver instance, so repos implicitly key
@@ -72,6 +72,19 @@ class DependencyResolver(val repositories: Seq[CsRepository]) {
 
   def fetchFile(dependency: Dependency): os.Path =
     fetchFiles(Seq(dependency)).head
+
+  def resolveTransitiveCoordinates(
+      dependencies: Seq[Dependency],
+      notifications: Option[ServerNotificationsLogger] = None
+  ): Seq[(String, String, String)] = {
+    if dependencies.isEmpty then Seq.empty
+    else
+      fetch(dependencies, notifications)
+        .getDependencies()
+        .asScala
+        .toSeq
+        .map(d => (d.getModule.getOrganization, d.getModule.getName, d.getVersion))
+  }
 }
 
 object DependencyResolver {

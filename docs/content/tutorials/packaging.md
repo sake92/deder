@@ -70,7 +70,7 @@ deder exec -t jar -m myapp --json
 
 then if you try to run it you will get an error (expected):
 ```shell
-(base) sake@pop-os:~/projects/sake92/tmp/deder_tmp/myapp$ java -jar /home/sake/projects/sake92/tmp/deder_tmp/myapp/.deder/out/myapp/jar/myapp.jar
+(base) sake@pop-os:~/projects/myapp$ java -jar .deder/out/myapp/jar/myapp.jar
 Error: Unable to initialize main class myapp.Main
 Caused by: java.lang.NoClassDefFoundError: scala/util/CommandLineParser$ParseError
 ```
