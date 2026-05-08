@@ -5,52 +5,61 @@ import ba.sake.deder.config.DederProject.DederModule
 
 private object BspVisibleTargets {
 
+  /** Determines which modules should be visible to BSP clients. If a module has `bspVisible` explicitly set, that value
+    * is used. Otherwise, if a root has multiple modules with different platforms or Scala versions, only the module
+    * with the latest Scala version is visible. Also, one module platform per root is visible (e.g. one jvm, one js and
+    * one native).
+    * @param modules
+    *   modules to filter
+    * @return
+    *   IDs of modules that should be visible to BSP clients
+    */
+  def visibleModuleIds(modules: Seq[DederModule]): Set[String] = {
+    val defaultVisibleModuleIds = computeDefaultVisibleModuleIds(modules)
+    modules
+      .filter { module =>
+        Option(module.bspVisible)
+          .map(_.booleanValue())
+          .getOrElse(defaultVisibleModuleIds.contains(module.id))
+      }
+      .map(_.id)
+      .toSet
+  }
+
   private given Ordering[Seq[Int]] with
     override def compare(left: Seq[Int], right: Seq[Int]): Int = {
       val paddedLeft = left.padTo(math.max(left.size, right.size), 0)
       val paddedRight = right.padTo(math.max(left.size, right.size), 0)
-      paddedLeft.zip(paddedRight).collectFirst {
-        case (l, r) if l != r => l.compare(r)
-      }.getOrElse(0)
+      paddedLeft
+        .zip(paddedRight)
+        .collectFirst {
+          case (l, r) if l != r => l.compare(r)
+        }
+        .getOrElse(0)
     }
-
-  private enum Platform {
-    case JVM, JS, NATIVE, JAVA
-  }
-
-  private case class ModuleMeta(
-      module: DederModule,
-      baseRoot: String,
-      platform: Platform,
-      isTest: Boolean,
-      scalaVersion: Option[String]
-  )
-
-  private case class FamilyKey(baseRoot: String, platform: Platform, isTest: Boolean)
-
-  def visibleModuleIds(modules: Seq[DederModule]): Set[String] = {
-    val defaultVisibleModuleIds = computeDefaultVisibleModuleIds(modules)
-    modules.collect {
-      case module
-          if Option(module.bspVisible).map(_.booleanValue()).getOrElse(defaultVisibleModuleIds.contains(module.id)) =>
-        module.id
-    }.toSet
-  }
 
   private def computeDefaultVisibleModuleIds(modules: Seq[DederModule]): Set[String] = {
     val metas = modules.map(moduleMeta)
-    val scalaCrossRoots = metas.collect {
-      case meta if meta.platform != Platform.JAVA => meta
-    }.groupBy(_.baseRoot).collect {
-      case (baseRoot, family) if family.map(_.platform).toSet.size > 1 => baseRoot
-    }.toSet
+    val scalaCrossRoots = metas
+      .collect {
+        case meta if meta.platform != Platform.JAVA => meta
+      }
+      .groupBy(_.baseRoot)
+      .collect {
+        case (baseRoot, family) if family.map(_.platform).toSet.size > 1 => baseRoot
+      }
+      .toSet
 
-    metas.groupBy(meta => FamilyKey(meta.baseRoot, meta.platform, meta.isTest)).values.flatMap { family =>
-      val distinctScalaVersions = family.flatMap(_.scalaVersion).distinct
-      val requiresProjection = scalaCrossRoots.contains(family.head.baseRoot) || distinctScalaVersions.size > 1
-      if requiresProjection then Seq(selectLatestScalaVersion(family).module.id)
-      else family.map(_.module.id)
-    }.toSet
+    metas
+      .groupBy(meta => FamilyKey(meta.baseRoot, meta.platform, meta.isTest))
+      .values
+      .flatMap { family =>
+        val distinctScalaVersions = family.flatMap(_.scalaVersion).distinct
+        val requiresProjection = scalaCrossRoots.contains(family.head.baseRoot) || distinctScalaVersions.size > 1
+        if requiresProjection then Seq(selectLatestScalaVersion(family).module.id)
+        else family.map(_.module.id)
+      }
+      .toSet
   }
 
   private def moduleMeta(module: DederModule): ModuleMeta =
@@ -72,9 +81,9 @@ private object BspVisibleTargets {
     case _: DederProject.ScalaNativeTestModule =>
       Platform.NATIVE
     case _: DederProject.ScalaNativeModule => Platform.NATIVE
-    case _: DederProject.ScalaTestModule => Platform.JVM
-    case _: DederProject.ScalaModule     => Platform.JVM
-    case _                               => Platform.JAVA
+    case _: DederProject.ScalaTestModule   => Platform.JVM
+    case _: DederProject.ScalaModule       => Platform.JVM
+    case _                                 => Platform.JAVA
   }
 
   private def scalaVersionOf(module: DederModule): Option[String] = module match {
@@ -99,4 +108,18 @@ private object BspVisibleTargets {
       .split('.')
       .toSeq
       .map(_.toIntOption.getOrElse(0))
+
+  private enum Platform {
+    case JVM, JS, NATIVE, JAVA
+  }
+
+  private case class ModuleMeta(
+      module: DederModule,
+      baseRoot: String,
+      platform: Platform,
+      isTest: Boolean,
+      scalaVersion: Option[String]
+  )
+
+  private case class FamilyKey(baseRoot: String, platform: Platform, isTest: Boolean)
 }
