@@ -5,17 +5,14 @@
 - some sbt deps should only be in scala2, e.g. kind-projector 
   -- when (sv.startsWith("2.")) {
   -- or with ...?myValue
-- add local m2 by default..
-- group tasks by category like in gradle, when printing them
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
 - add limits on plan/modules graphing, up/down
 - color instead of quotes for "Executing 'mytask'"
 - hide some internal tasks like deps resolving etc, helper assemblyDeps.. (rebind edges when displaying)
 - color stages in plan
-- source generator task type for plugins??
-- any way to throttle spurious file changes in BSP/watcher when working with AI agent??
-- isolate scaladoc claspath better
+- shade test-runner to avoid classpath issues.. but first make shading work good
+
 
 # Docs
 - run pkldoc on each tag, and publish to ghpages
@@ -24,15 +21,13 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 # Client
 
 # Compilers
-- add compileOnly deps
+
 
 # Caching
 - harden the abstraction
 - polish the docs
 
 # Deps
-- expose repositories task
-- document exclude
 
 # CI
 - more package managers?
@@ -46,9 +41,6 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 ## Scala.js
 
 ## Scala Native
-- run
-- fullopt
-- configuration..
 
 ## Tests
 - stdout not captured when fork
