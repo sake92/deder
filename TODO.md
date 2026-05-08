@@ -2,9 +2,6 @@
 
 # Misc
 - autodetect sbt/maven for import
-- some sbt deps should only be in scala2, e.g. kind-projector 
-  -- when (sv.startsWith("2.")) {
-  -- or with ...?myValue
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
 - add limits on plan/modules graphing, up/down
@@ -76,7 +73,6 @@ Locally would be interesting to have a dashboard with nice overview:
 # Add more commands
 
 - init like giter8
-- handle crossScalaVersions in sbt import
 - import from other build tools... maven effective POM etc
 
 
