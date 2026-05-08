@@ -14,6 +14,8 @@
 - hide some internal tasks like deps resolving etc, helper assemblyDeps.. (rebind edges when displaying)
 - color stages in plan
 - source generator task type for plugins??
+- any way to throttle spurious file changes in BSP/watcher when working with AI agent??
+- isolate scaladoc claspath better
 
 # Docs
 - run pkldoc on each tag, and publish to ghpages
