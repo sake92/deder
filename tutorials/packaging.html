@@ -105,7 +105,7 @@ modules {
 <span class="hljs-meta prompt_"># </span><span class="language-bash">will <span class="hljs-built_in">print</span> {<span class="hljs-string">"myapp"</span>:<span class="hljs-string">"/&lt;your_path&gt;/myapp/.deder/out/myapp/jar/myapp.jar"</span>}</span>
 </code></pre>
    <p>then if you try to run it you will get an error (expected):</p>
-   <pre><code class="language-shell hljs" data-highlighted="yes">(base) sake@pop-os:~/projects/sake92/tmp/deder_tmp/myapp$ java -jar /home/sake/projects/sake92/tmp/deder_tmp/myapp/.deder/out/myapp/jar/myapp.jar
+   <pre><code class="language-shell hljs" data-highlighted="yes">(base) sake@pop-os:~/projects/myapp$ java -jar .deder/out/myapp/jar/myapp.jar
 Error: Unable to initialize main class myapp.Main
 Caused by: java.lang.NoClassDefFoundError: scala/util/CommandLineParser$ParseError
 </code></pre>
