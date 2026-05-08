@@ -11,6 +11,10 @@ import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import os.write.over
 
+enum TaskKind {
+  case Standard, SourceGenerator, ResourceGenerator
+}
+
 case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     name: String,
     taskDeps: Deps,
@@ -18,13 +22,14 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     transitive: Boolean,
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType],
-    category: String
+    category: String,
+    kind: TaskKind
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: Task[T2, ?]): TaskBuilder[T, Deps :* Task[T2, ?]] =
-    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category)
+    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
-    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category)
+    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category, kind = kind)
 
   def buildWithSummary(
       execute: TaskExecContext[T, Deps] => T,
@@ -38,9 +43,10 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
       transitive,
       singleton,
       supportedModuleTypes,
+      category = category,
+      kind = kind,
       isResultSuccessful = isResultSuccessful,
-      summarize = summarize,
-      category = category
+      summarize = summarize
     )
 }
 
@@ -51,8 +57,10 @@ object TaskBuilder {
       transitive: Boolean = false,
       singleton: Boolean = false,
       supportedModuleTypes: Set[ModuleType] = Set.empty,
-      category: String = ""
-  ): TaskBuilder[T, EmptyTuple] = TaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category)
+      category: String = "",
+      kind: TaskKind = TaskKind.Standard
+  ): TaskBuilder[T, EmptyTuple] =
+    TaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind)
 }
 
 case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
@@ -62,13 +70,14 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     transitive: Boolean,
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType],
-    category: String
+    category: String,
+    kind: TaskKind
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: Task[T2, ?]): CachedTaskBuilder[T, Deps :* Task[T2, ?]] =
-    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category)
+    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind)
 
   def build(execute: TaskExecContext[T, Deps] => T)(using Deps <:< NonEmptyTuple): Task[T, Deps] =
-    CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category)
+    CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category, kind = kind)
 }
 
 object CachedTaskBuilder {
@@ -78,8 +87,10 @@ object CachedTaskBuilder {
       transitive: Boolean = false,
       singleton: Boolean = false,
       supportedModuleTypes: Set[ModuleType] = Set.empty,
-      category: String = ""
-  ): CachedTaskBuilder[T, EmptyTuple] = CachedTaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category)
+      category: String = "",
+      kind: TaskKind = TaskKind.Standard
+  ): CachedTaskBuilder[T, EmptyTuple] =
+    CachedTaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind)
 }
 
 // this is to make sure that Deps are Task-s and not arbitrary types
@@ -112,10 +123,16 @@ sealed trait Task[T, Deps <: Tuple](using val rw: JsonRW[T], ev: TaskDeps[Deps] 
   def name: String
   def description: String
   def category: String
+  def kind: TaskKind
   def supportedModuleTypes: Set[ModuleType]
   def transitive: Boolean
   def singleton: Boolean // e.g. you can only "run" ONE MODULE!
   def taskDeps: Deps
+  /** Tasks whose results should be appended to depResults at execution time, computed
+   *  from the registry rather than statically declared via `dependsOn`. Default: empty.
+   *  Used by FanInTask to collect all tasks of a given kind for the current module.
+   */
+  def dynamicDeps(siblingTasks: Seq[Task[?, ?]], moduleType: ModuleType): Seq[Task[?, ?]] = Seq.empty
   def execute: TaskExecContext[T, Deps] => T
   def summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit
   def isResultSuccessful: T => Boolean = _ => true
@@ -152,6 +169,7 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple](
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
     val description: String = "",
     val category: String = "",
+    val kind: TaskKind = TaskKind.Standard,
     override val isResultSuccessful: T => Boolean = (_: T) => true,
     val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
       (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => ()
@@ -207,6 +225,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
     val description: String = "",
     val category: String = "",
+    val kind: TaskKind = TaskKind.Standard,
     val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
       (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => ()
 )(using ev: TaskDeps[Deps] =:= true)
@@ -339,6 +358,50 @@ class ConfigValueTask[T: JsonRW: Hashable](
       category
     ) {
   override def toString(): String = s"ConfigValueTask($name)"
+}
+
+/** Aggregator task: at DAG-build time, depends on every registered task with
+ *  matching `collectKind` for the current module's type. Result is the Seq of
+ *  contributors' results. Empty Seq if no contributors.
+ */
+class FanInTask[T: JsonRW: Hashable](
+    val name: String,
+    val collectKind: TaskKind,
+    val supportedModuleTypes: Set[ModuleType] = Set.empty,
+    val description: String = "",
+    val category: String = ""
+) extends Task[Seq[T], EmptyTuple] {
+  val taskDeps: EmptyTuple = EmptyTuple
+  val transitive: Boolean = false
+  val singleton: Boolean = false
+  val kind: TaskKind = TaskKind.Standard
+  val execute: TaskExecContext[Seq[T], EmptyTuple] => Seq[T] = _ => Seq.empty
+  val summarize: (Seq[(DederModule, Seq[T])], ServerNotificationsLogger) => Unit =
+    (_, _) => ()
+
+  override def dynamicDeps(siblingTasks: Seq[Task[?, ?]], moduleType: ModuleType): Seq[Task[?, ?]] =
+    siblingTasks.filter { t =>
+      t.kind == collectKind &&
+      (t.supportedModuleTypes.isEmpty || t.supportedModuleTypes.contains(moduleType))
+    }
+
+  override private[deder] def executeUnsafe(
+      project: DederProject,
+      module: DederModule,
+      depResults: Seq[TaskResult[?]],
+      transitiveResults: Seq[Seq[TaskResult[?]]],
+      args: Seq[String],
+      watch: Boolean,
+      serverNotificationsLogger: ServerNotificationsLogger,
+      dependencyResolver: DependencyResolver
+  ): (res: TaskResult[Seq[T]], changed: Boolean) = {
+    serverNotificationsLogger.add(ServerNotification.logDebug(s"Executing ${name}", Some(module.id)))
+    val collected = depResults.map(_.value.asInstanceOf[T])
+    val outputHash = Hashable[Seq[T]].hashStr(collected)
+    (TaskResult(collected, "", outputHash), true)
+  }
+
+  override def toString(): String = s"FanInTask($name, kind=$collectKind)"
 }
 
 // dynamic, for each module

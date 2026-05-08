@@ -62,6 +62,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
         assertEquals(
           dederOutput,
           """|Stage #0:
+             |  common.allGeneratedSources
              |  common.classes
              |  common.compileOnlyDeps
              |  common.deps
@@ -79,6 +80,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
              |  common.sources
              |Stage #1:
              |  common.allClassesDirs
+             |  common.allGeneratedSourceFiles
              |  common.compileOnlyDependencies
              |  common.compilerDeps
              |  common.dependencies
