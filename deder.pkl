@@ -126,15 +126,6 @@ local const client = new JavaModule {
       "-H:+StaticExecutableWithDynamicLibC"
     }
   }
-  /*
-  // TODO generate in CI, or a script..
-  def versionFile = Task {
-    val dest = Task.dest / "ba/sake/deder/client"
-    os.makeDir.all(dest)
-    os.write(dest / "version.properties", s"version=${version()}\n")
-    PathRef(Task.dest)
-  }
-  */
 }
 
 local const integrationTest = new ScalaTestModule {
