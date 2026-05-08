@@ -38,6 +38,9 @@ local const testCommonTest = new ScalaTestModule {
   deps {
     "org.scalameta::munit:1.2.1"
   }
+  junitXmlReport {
+    enabled = true
+  }
 }
 
 local const testRunner = new ScalaModule {
@@ -102,6 +105,9 @@ local const serverModules =
       deps {
         "org.scalameta::munit:1.2.1"
       }
+      junitXmlReport {
+        enabled = true
+      }
     }
   }.get
 
@@ -140,6 +146,9 @@ local const integrationTest = new ScalaTestModule {
     "org.scalameta::munit:1.2.1"
     "com.lihaoyi::os-lib:0.11.6"
     "ba.sake::tupson:0.18.0"
+  }
+  junitXmlReport {
+    enabled = true
   }
 }
 
