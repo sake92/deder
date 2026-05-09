@@ -66,7 +66,7 @@ object GraphUtils {
       vertexIdProvider: V => String,
       vertexLabel: V => String,
       extraLines: Seq[String] = Seq.empty,
-      vertexCssClassProvider: V => Option[String] = _ => None,
+      vertexCssClassProvider: V => Option[String] = (_: V) => None,
       classDefs: Map[String, String] = Map.empty
   ): String = {
     val sanitize = (s: String) => s.replaceAll("[^a-zA-Z0-9_]", "_")
