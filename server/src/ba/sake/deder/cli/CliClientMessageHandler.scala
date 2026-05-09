@@ -99,6 +99,10 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                   serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                   serverMessages.put(CliServerMessage.Exit(1))
                 case Right(state) =>
+                  if cliOptions.depthDown < 0 || cliOptions.depthUp < 0 then {
+                    serverMessages.put(CliServerMessage.Log("--depth-down and --depth-up must be non-negative", LogLevel.ERROR))
+                    serverMessages.put(CliServerMessage.Exit(1))
+                  } else {
                   val fullGraph = state.tasksResolver.modulesGraph
                   val graphToRender =
                     if cliOptions.modules.isEmpty && cliOptions.depthDown == Int.MaxValue && cliOptions.depthUp == Int.MaxValue
@@ -119,6 +123,7 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                                   s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
                               Left(msg)
                             case Right(ids) =>
+                              // ids come from allModules, so modulesMap always contains them
                               Right(ids.flatMap(id => state.tasksResolver.modulesMap.get(id)))
                           }
                       focalResult.map { focalModules =>
@@ -148,6 +153,7 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                         serverMessages.put(CliServerMessage.Output(filteredModules.map(_.id).mkString("\n")))
                       }
                       serverMessages.put(CliServerMessage.Exit(0))
+                  }
                   }
               }
           }

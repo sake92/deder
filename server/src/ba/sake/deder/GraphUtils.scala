@@ -30,21 +30,26 @@ object GraphUtils {
       depthDown: Int,
       depthUp: Int
   ): Graph[V, E] = {
+    require(depthDown >= 0, s"depthDown must be non-negative, got: $depthDown")
+    require(depthUp >= 0, s"depthUp must be non-negative, got: $depthUp")
+
     val collected = scala.collection.mutable.Set[V]()
     collected.addAll(focalVertices)
 
     // BFS downstream: follow edges (focal → dependencies)
-    val down = if depthDown == Int.MaxValue then Double.MaxValue else depthDown.toDouble
     focalVertices.foreach { v =>
-      val bfs = new BreadthFirstIterator(g, v, down)
+      val bfs =
+        if depthDown == Int.MaxValue then new BreadthFirstIterator(g, v)
+        else new BreadthFirstIterator(g, v, depthDown.toDouble)
       while bfs.hasNext do collected.add(bfs.next())
     }
 
     // BFS upstream: follow reversed edges (focal → dependents)
-    val up = if depthUp == Int.MaxValue then Double.MaxValue else depthUp.toDouble
     val reversed = new EdgeReversedGraph(g)
     focalVertices.foreach { v =>
-      val bfs = new BreadthFirstIterator(reversed, v, up)
+      val bfs =
+        if depthUp == Int.MaxValue then new BreadthFirstIterator(reversed, v)
+        else new BreadthFirstIterator(reversed, v, depthUp.toDouble)
       while bfs.hasNext do collected.add(bfs.next())
     }
 
