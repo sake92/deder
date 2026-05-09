@@ -6,8 +6,11 @@ import scala.jdk.FunctionConverters.*
 import scala.jdk.CollectionConverters.*
 import org.jgrapht.Graph
 import org.jgrapht.alg.cycle.CycleDetector
+import org.jgrapht.graph.AsSubgraph
+import org.jgrapht.graph.EdgeReversedGraph
 import org.jgrapht.nio.DefaultAttribute
 import org.jgrapht.nio.dot.DOTExporter
+import org.jgrapht.traverse.BreadthFirstIterator
 
 object GraphUtils {
 
@@ -15,6 +18,37 @@ object GraphUtils {
     val cycleDetector = new CycleDetector[V, E](g)
     val cycles = cycleDetector.findCycles().asScala
     if cycles.nonEmpty then throw DederException(s"Cycle detected: ${cycles.map(getName).mkString("->")}")
+  }
+
+  /** Returns a subgraph containing only vertices reachable from any focal vertex
+    * within `depthDown` hops (following edges) and `depthUp` hops (following reversed edges).
+    * Focal vertices are always included. `Int.MaxValue` means unlimited.
+    */
+  def subgraphAround[V, E](
+      g: Graph[V, E],
+      focalVertices: Set[V],
+      depthDown: Int,
+      depthUp: Int
+  ): Graph[V, E] = {
+    val collected = scala.collection.mutable.Set[V]()
+    collected.addAll(focalVertices)
+
+    // BFS downstream: follow edges (focal → dependencies)
+    val down = if depthDown == Int.MaxValue then Double.MaxValue else depthDown.toDouble
+    focalVertices.foreach { v =>
+      val bfs = new BreadthFirstIterator(g, v, down)
+      while bfs.hasNext do collected.add(bfs.next())
+    }
+
+    // BFS upstream: follow reversed edges (focal → dependents)
+    val up = if depthUp == Int.MaxValue then Double.MaxValue else depthUp.toDouble
+    val reversed = new EdgeReversedGraph(g)
+    focalVertices.foreach { v =>
+      val bfs = new BreadthFirstIterator(reversed, v, up)
+      while bfs.hasNext do collected.add(bfs.next())
+    }
+
+    new AsSubgraph(g, collected.asJava)
   }
 
   def generateDOT[V, E](

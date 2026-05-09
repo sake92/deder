@@ -99,22 +99,56 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                   serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                   serverMessages.put(CliServerMessage.Exit(1))
                 case Right(state) =>
-                  if cliOptions.json.value then {
-                    val allModules = state.tasksResolver.allModules.sortBy(_.id)
-                    serverMessages.put(CliServerMessage.Output(allModules.map(_.id).toJson))
-                  } else if cliOptions.dot.value then {
-                    val dot =
-                      GraphUtils.generateDOT(state.tasksResolver.modulesGraph, v => v.id, v => Map("label" -> v.id))
-                    serverMessages.put(CliServerMessage.Output(dot))
-                  } else if cliOptions.mermaid.value then {
-                    val mermaid =
-                      GraphUtils.generateMermaid(state.tasksResolver.modulesGraph, v => v.id, v => v.id)
-                    serverMessages.put(CliServerMessage.Output(mermaid))
-                  } else {
-                    val allModules = state.tasksResolver.allModules.sortBy(_.id)
-                    serverMessages.put(CliServerMessage.Output(allModules.map(_.id).mkString("\n")))
+                  val fullGraph = state.tasksResolver.modulesGraph
+                  val graphToRender =
+                    if cliOptions.modules.isEmpty && cliOptions.depthDown == Int.MaxValue && cliOptions.depthUp == Int.MaxValue
+                    then Right(fullGraph)
+                    else {
+                      val focalResult =
+                        if cliOptions.modules.isEmpty then Right(state.tasksResolver.allModules.toSeq)
+                        else
+                          WildcardUtils.getMatchesOrRecommendations(
+                            state.tasksResolver.allModules.map(_.id),
+                            cliOptions.modules
+                          ) match {
+                            case Left(recommendations) =>
+                              val msg =
+                                if recommendations.isEmpty then
+                                  s"No modules found for selectors: ${cliOptions.modules.mkString(", ")}"
+                                else
+                                  s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
+                              Left(msg)
+                            case Right(ids) =>
+                              Right(ids.flatMap(id => state.tasksResolver.modulesMap.get(id)))
+                          }
+                      focalResult.map { focalModules =>
+                        GraphUtils.subgraphAround(
+                          fullGraph,
+                          focalModules.toSet,
+                          cliOptions.depthDown,
+                          cliOptions.depthUp
+                        )
+                      }
+                    }
+                  graphToRender match {
+                    case Left(errorMsg) =>
+                      serverMessages.put(CliServerMessage.Log(errorMsg, LogLevel.ERROR))
+                      serverMessages.put(CliServerMessage.Exit(1))
+                    case Right(graph) =>
+                      val filteredModules = graph.vertexSet().asScala.toSeq.sortBy(_.id)
+                      if cliOptions.json.value then {
+                        serverMessages.put(CliServerMessage.Output(filteredModules.map(_.id).toJson))
+                      } else if cliOptions.dot.value then {
+                        val dot = GraphUtils.generateDOT(graph, v => v.id, v => Map("label" -> v.id))
+                        serverMessages.put(CliServerMessage.Output(dot))
+                      } else if cliOptions.mermaid.value then {
+                        val mermaid = GraphUtils.generateMermaid(graph, v => v.id, v => v.id)
+                        serverMessages.put(CliServerMessage.Output(mermaid))
+                      } else {
+                        serverMessages.put(CliServerMessage.Output(filteredModules.map(_.id).mkString("\n")))
+                      }
+                      serverMessages.put(CliServerMessage.Exit(0))
                   }
-                  serverMessages.put(CliServerMessage.Exit(0))
               }
           }
       case m: CliClientMessage.Tasks =>
