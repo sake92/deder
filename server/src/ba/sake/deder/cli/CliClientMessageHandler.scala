@@ -236,7 +236,7 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                             stage.map(_ -> stageIdx)
                           }
                           .toMap
-                        val stageClassDefs = stageByTask.values.toSeq.distinct.sorted
+                        val stageClassDefs = stageByTask.values.toSet.toSeq.sorted
                           .map { stageIdx =>
                             s"stage$stageIdx" -> CliClientMessageHandler.planMermaidStagePalette(
                               stageIdx % CliClientMessageHandler.planMermaidStagePalette.length
