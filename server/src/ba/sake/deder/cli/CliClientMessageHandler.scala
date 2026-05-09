@@ -230,13 +230,29 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                         val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
                         serverMessages.put(CliServerMessage.Output(dot))
                       } else if cliOptions.mermaid.value then {
+                        val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
+                        val stageByTask = tasksExecStages.zipWithIndex
+                          .flatMap { case (stage, stageIdx) =>
+                            stage.map(_ -> stageIdx)
+                          }
+                          .toMap
+                        val stageClassDefs = stageByTask.values.toSet.toSeq.sorted
+                          .map { stageIdx =>
+                            s"stage$stageIdx" -> CliClientMessageHandler.planMermaidStagePalette(
+                              stageIdx % CliClientMessageHandler.planMermaidStagePalette.length
+                            )
+                          }
+                          .toMap
                         val groups = tasksExecSubgraph.vertexSet().asScala.toSeq.groupBy(_.moduleId)
                         val mermaid =
                           GraphUtils.generateMermaidWithSubgraphs(
                             tasksExecSubgraph,
                             groups,
                             v => v.id,
-                            v => v.task.name
+                            v => s"${v.task.name} (#${stageByTask(v)})",
+                            extraLines = Seq("%% #0 = evaluated first stage"),
+                            vertexCssClassProvider = v => Some(s"stage${stageByTask(v)}"),
+                            classDefs = stageClassDefs
                           )
                         serverMessages.put(CliServerMessage.Output(mermaid))
                       } else {
@@ -360,4 +376,15 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
         projectState.shutdown()
     }
   }
+}
+
+object CliClientMessageHandler {
+  val planMermaidStagePalette: Seq[String] = Seq(
+    "fill:#e8f0fe,stroke:#1a73e8,color:#0b1f44",
+    "fill:#e6f4ea,stroke:#137333,color:#0d2e1a",
+    "fill:#fef7e0,stroke:#ea8600,color:#3a2500",
+    "fill:#fce8e6,stroke:#c5221f,color:#3a0d0c",
+    "fill:#f3e8fd,stroke:#9334e6,color:#2c0b4a",
+    "fill:#e8eaed,stroke:#5f6368,color:#202124"
+  )
 }
