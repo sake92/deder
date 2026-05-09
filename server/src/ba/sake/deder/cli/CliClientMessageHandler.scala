@@ -173,7 +173,7 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                   serverMessages.put(CliServerMessage.Exit(1))
                 case Right(state) =>
                   if cliOptions.json.value then {
-                    val taskNamesPerModule = state.tasksResolver.taskInstancesPerModule.map { case (moduleId, tasks) =>
+                    val taskNamesPerModule = state.tasksResolver.publicTaskInstancesPerModule.map { case (moduleId, tasks) =>
                       moduleId -> tasks.map(_.task.name)
                     }
                     serverMessages.put(CliServerMessage.Output(taskNamesPerModule.toJson))
@@ -181,7 +181,7 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                   } else if cliOptions.dot.value then {
                     val dot =
                       GraphUtils.generateDOT(
-                        state.tasksResolver.taskInstancesGraph,
+                        state.tasksResolver.publicTaskInstancesGraph,
                         v => v.id,
                         v => Map("label" -> v.id)
                       )
@@ -190,8 +190,8 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                   } else if cliOptions.mermaid.value then {
                     val mermaid =
                       GraphUtils.generateMermaidWithSubgraphs(
-                        state.tasksResolver.taskInstancesGraph,
-                        state.tasksResolver.taskInstancesPerModule,
+                        state.tasksResolver.publicTaskInstancesGraph,
+                        state.tasksResolver.publicTaskInstancesPerModule,
                         v => v.id,
                         v => v.task.name
                       )
@@ -210,7 +210,7 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                       "Run", "Publishing", "REPL", "Scala.js", "Scala Native", "GraalVM"
                     )
                     val modulesWithTasks = sortedModules.map { module =>
-                      val moduleTasks = state.tasksResolver.taskInstancesPerModule(module.id).map(_.task)
+                      val moduleTasks = state.tasksResolver.publicTaskInstancesPerModule(module.id).map(_.task)
                       val grouped = moduleTasks.groupBy(t => if t.category.isEmpty then "Other" else t.category)
                       val sortedCategories = categoryOrder.filter(grouped.contains) ++
                         grouped.keys.filterNot(categoryOrder.contains).toSeq.sorted
@@ -263,11 +263,15 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                     case Right(validModuleTasks) =>
                       val validModuleIds = validModuleTasks.map(_._1)
                       val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(validModuleIds, cliOptions.task)
+                      // projectPublic produces a subset of tasksExecSubgraph (public tasks only),
+                      // so all its vertices are guaranteed to be in stageByTask below.
+                      val publicSubgraph = GraphUtils.projectPublic(tasksExecSubgraph, !_.task.internal)
                       if cliOptions.json.value then {
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
-                        serverMessages.put(CliServerMessage.Output(tasksExecStages.map(_.map(_.id)).toJson))
+                        val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
+                        serverMessages.put(CliServerMessage.Output(publicStages.map(_.map(_.id)).toJson))
                       } else if cliOptions.dot.value then {
-                        val dot = GraphUtils.generateDOT(tasksExecSubgraph, v => v.id, v => Map("label" -> v.id))
+                        val dot = GraphUtils.generateDOT(publicSubgraph, v => v.id, v => Map("label" -> v.id))
                         serverMessages.put(CliServerMessage.Output(dot))
                       } else if cliOptions.mermaid.value then {
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
@@ -276,17 +280,17 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                             stage.map(_ -> stageIdx)
                           }
                           .toMap
-                        val stageClassDefs = stageByTask.values.toSet.toSeq.sorted
+                        val stageClassDefs = publicSubgraph.vertexSet().asScala.map(stageByTask).toSet.toSeq.sorted
                           .map { stageIdx =>
                             s"stage$stageIdx" -> CliClientMessageHandler.planMermaidStagePalette(
                               stageIdx % CliClientMessageHandler.planMermaidStagePalette.length
                             )
                           }
                           .toMap
-                        val groups = tasksExecSubgraph.vertexSet().asScala.toSeq.groupBy(_.moduleId)
+                        val groups = publicSubgraph.vertexSet().asScala.toSeq.groupBy(_.moduleId)
                         val mermaid =
                           GraphUtils.generateMermaidWithSubgraphs(
-                            tasksExecSubgraph,
+                            publicSubgraph,
                             groups,
                             v => v.id,
                             v => s"${v.task.name} (#${stageByTask(v)})",
@@ -298,8 +302,11 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                       } else {
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                         val stagesStr = tasksExecStages.zipWithIndex
-                          .map { case (stage, idx) =>
-                            s"Stage #${idx}:\n" + stage.map(ti => s"  ${ti.id}").mkString("\n")
+                          .flatMap { case (stage, idx) =>
+                            val publicStage = stage.filter(!_.task.internal)
+                            Option.when(publicStage.nonEmpty)(
+                              s"Stage #${idx}:\n" + publicStage.map(ti => s"  ${ti.id}").mkString("\n")
+                            )
                           }
                           .mkString("\n")
                         serverMessages.put(CliServerMessage.Output(stagesStr))
