@@ -94,10 +94,10 @@ class InternalTaskSuite extends munit.FunSuite {
 
     // publicA should have a bridged edge to scalaVersion
     val publicAVertex = publicGraph.vertexSet().asScala
-      .find(_.task.name == "publicA" && _.moduleId == "common")
+      .find(ti => ti.task.name == "publicA" && ti.moduleId == "common")
       .getOrElse(fail("publicA vertex not found in public graph for module 'common'"))
     val scalaVersionVertex = publicGraph.vertexSet().asScala
-      .find(_.task.name == "scalaVersion" && _.moduleId == "common")
+      .find(ti => ti.task.name == "scalaVersion" && ti.moduleId == "common")
       .getOrElse(fail("scalaVersion vertex not found in public graph for module 'common'"))
     val edgeExists = publicGraph.containsEdge(publicAVertex, scalaVersionVertex)
     assert(edgeExists, "publicA should have a bridged edge to scalaVersion in the public graph")
