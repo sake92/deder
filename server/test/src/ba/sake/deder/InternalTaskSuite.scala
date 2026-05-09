@@ -21,7 +21,8 @@ class InternalTaskSuite extends munit.FunSuite {
    */
   private def buildWithInternalTask(): (TasksResolver, Task[?, ?]) = {
     val configParser = ConfigParser(writeJson = false)
-    val projectConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl").toOption.get
+    val projectConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
+      .getOrElse(fail("Failed to parse deder.pkl config"))
     val coreTasks = CoreTasks()
 
     // An internal task that depends on scalaVersion
@@ -66,7 +67,8 @@ class InternalTaskSuite extends munit.FunSuite {
 
   test("publicTaskInstancesGraph bridges public->internal->public edge correctly") {
     val configParser = ConfigParser(writeJson = false)
-    val projectConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl").toOption.get
+    val projectConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
+      .getOrElse(fail("Failed to parse deder.pkl config"))
     val coreTasks = CoreTasks()
 
     // Chain: publicA -> internalBridge -> scalaVersion (public)
@@ -91,15 +93,20 @@ class InternalTaskSuite extends munit.FunSuite {
     assert(publicVertexNames.contains("scalaVersion"), "scalaVersion should be in public graph")
 
     // publicA should have a bridged edge to scalaVersion
-    val publicAVertex = publicGraph.vertexSet().asScala.find(_.task.name == "publicA" && _.moduleId == "common").get
-    val scalaVersionVertex = publicGraph.vertexSet().asScala.find(_.task.name == "scalaVersion" && _.moduleId == "common").get
+    val publicAVertex = publicGraph.vertexSet().asScala
+      .find(_.task.name == "publicA" && _.moduleId == "common")
+      .getOrElse(fail("publicA vertex not found in public graph for module 'common'"))
+    val scalaVersionVertex = publicGraph.vertexSet().asScala
+      .find(_.task.name == "scalaVersion" && _.moduleId == "common")
+      .getOrElse(fail("scalaVersion vertex not found in public graph for module 'common'"))
     val edgeExists = publicGraph.containsEdge(publicAVertex, scalaVersionVertex)
     assert(edgeExists, "publicA should have a bridged edge to scalaVersion in the public graph")
   }
 
   test("tab completer hides internal tasks") {
     val configParser = ConfigParser(writeJson = false)
-    val projectConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl").toOption.get
+    val projectConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
+      .getOrElse(fail("Failed to parse deder.pkl config"))
     val coreTasks = CoreTasks()
 
     val internalTask = TaskBuilder

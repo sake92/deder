@@ -263,6 +263,8 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                     case Right(validModuleTasks) =>
                       val validModuleIds = validModuleTasks.map(_._1)
                       val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(validModuleIds, cliOptions.task)
+                      // projectPublic produces a subset of tasksExecSubgraph (public tasks only),
+                      // so all its vertices are guaranteed to be in stageByTask below.
                       val publicSubgraph = GraphUtils.projectPublic(tasksExecSubgraph, !_.task.internal)
                       if cliOptions.json.value then {
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
