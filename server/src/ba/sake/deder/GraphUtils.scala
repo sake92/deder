@@ -66,7 +66,7 @@ object GraphUtils {
       vertexIdProvider: V => String,
       vertexLabel: V => String,
       extraLines: Seq[String] = Seq.empty,
-      vertexClassProvider: V => Option[String] = _ => None,
+      vertexCssClassProvider: V => Option[String] = _ => None,
       classDefs: Map[String, String] = Map.empty
   ): String = {
     val sanitize = (s: String) => s.replaceAll("[^a-zA-Z0-9_]", "_")
@@ -74,7 +74,7 @@ object GraphUtils {
       .sortBy(_._1)
       .flatMap((_, vertices) => vertices.sortBy(vertexIdProvider))
     val classVertexIds = orderedVertices
-      .flatMap(v => vertexClassProvider(v).map(_ -> sanitize(vertexIdProvider(v))))
+      .flatMap(v => vertexCssClassProvider(v).map(_ -> sanitize(vertexIdProvider(v))))
       .groupMap(_._1)(_._2)
 
     val sb = new StringBuilder

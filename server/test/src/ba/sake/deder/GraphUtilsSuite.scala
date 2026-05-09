@@ -29,7 +29,7 @@ class GraphUtilsSuite extends munit.FunSuite {
       vertexIdProvider = identity,
       vertexLabel = v => s"${v.split("\\.").last} (#${stageByVertex(v)})",
       extraLines = Seq("%% #0 = evaluated first stage"),
-      vertexClassProvider = v => Some(s"stage${stageByVertex(v)}"),
+      vertexCssClassProvider = v => Some(s"stage${stageByVertex(v)}"),
       classDefs = Map(
         "stage0" -> "fill:#e8f0fe,stroke:#1a73e8,color:#0b1f44",
         "stage1" -> "fill:#e6f4ea,stroke:#137333,color:#0d2e1a"
