@@ -72,7 +72,7 @@ object GraphUtils {
     val sanitize = (s: String) => s.replaceAll("[^a-zA-Z0-9_]", "_")
     val classVertexIds = groups.toSeq
       .sortBy(_._1)
-      .flatMap((_, vertices) => vertices.sortBy(vertexIdProvider))
+      .flatMap { case (_, vertices) => vertices.sortBy(vertexIdProvider) }
       .flatMap(v => vertexCssClassProvider(v).map(_ -> sanitize(vertexIdProvider(v))))
       .groupMap(_._1)(_._2)
 
