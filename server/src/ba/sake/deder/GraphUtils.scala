@@ -7,7 +7,9 @@ import scala.jdk.CollectionConverters.*
 import org.jgrapht.Graph
 import org.jgrapht.alg.cycle.CycleDetector
 import org.jgrapht.graph.AsSubgraph
+import org.jgrapht.graph.DefaultEdge
 import org.jgrapht.graph.EdgeReversedGraph
+import org.jgrapht.graph.SimpleDirectedGraph
 import org.jgrapht.nio.DefaultAttribute
 import org.jgrapht.nio.dot.DOTExporter
 
@@ -17,6 +19,54 @@ object GraphUtils {
     val cycleDetector = new CycleDetector[V, E](g)
     val cycles = cycleDetector.findCycles().asScala
     if cycles.nonEmpty then throw DederException(s"Cycle detected: ${cycles.map(getName).mkString("->")}")
+  }
+
+  /** Projects a graph to only the vertices satisfying `isPublic`, bridging edges
+   *  over internal (non-public) vertices. For each public vertex `u`, follows its
+   *  outgoing edges: if a neighbor is public it is included directly; if internal
+   *  it is skipped and the BFS continues until the first public descendants are
+   *  found. The result is a new `SimpleDirectedGraph` with only public vertices
+   *  and the bridged edges.
+   */
+  def projectPublic[V](
+      g: Graph[V, DefaultEdge],
+      isPublic: V => Boolean
+  ): SimpleDirectedGraph[V, DefaultEdge] = {
+    val projected = new SimpleDirectedGraph[V, DefaultEdge](classOf[DefaultEdge])
+    g.vertexSet().asScala.filter(isPublic).foreach(projected.addVertex)
+    g.vertexSet().asScala.filter(isPublic).foreach { u =>
+      firstPublicReachable(g, u, isPublic).foreach { v =>
+        projected.addEdge(u, v)
+      }
+    }
+    projected
+  }
+
+  /** From a public vertex `u`, find all "first reachable" public vertices by
+   *  following outgoing edges and skipping internal vertices.
+   */
+  private def firstPublicReachable[V](
+      g: Graph[V, DefaultEdge],
+      u: V,
+      isPublic: V => Boolean
+  ): Set[V] = {
+    val result = scala.collection.mutable.Set[V]()
+    val visited = scala.collection.mutable.Set[V]()
+    val queue = scala.collection.mutable.Queue[V]()
+    g.outgoingEdgesOf(u).asScala.foreach { e =>
+      val neighbor = g.getEdgeTarget(e)
+      if isPublic(neighbor) then result.add(neighbor)
+      else if visited.add(neighbor) then queue.enqueue(neighbor)
+    }
+    while queue.nonEmpty do {
+      val current = queue.dequeue()
+      g.outgoingEdgesOf(current).asScala.foreach { e =>
+        val neighbor = g.getEdgeTarget(e)
+        if isPublic(neighbor) then result.add(neighbor)
+        else if visited.add(neighbor) then queue.enqueue(neighbor)
+      }
+    }
+    result.toSet
   }
 
   /** Returns a subgraph containing only vertices reachable from any focal vertex

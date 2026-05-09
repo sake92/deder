@@ -20,7 +20,7 @@ class TabCompleter(tasksResolver: TasksResolver) {
 
   // TODO extract as param for easier testing
   private val allModuleIds = tasksResolver.allModules.map(_.id)
-  private val allTaskIds = tasksResolver.taskInstancesPerModule.values.flatten.map(_.task.name).toSeq.distinct
+  private val allTaskIds = tasksResolver.publicTaskInstancesPerModule.values.flatten.map(_.task.name).toSeq.distinct
 
   def complete(commandLine: String, cursorPos: Int): Seq[String] = {
     val (args, wordPos) = TabCompleter.shellSplit(commandLine, cursorPos)

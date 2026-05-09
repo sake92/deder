@@ -73,4 +73,12 @@ class TasksResolver(
     graph
   }
 
+  lazy val publicTaskInstancesPerModule: Map[String, Seq[TaskInstance]] =
+    taskInstancesPerModule.map { case (moduleId, tasks) =>
+      moduleId -> tasks.filter(!_.task.internal)
+    }
+
+  lazy val publicTaskInstancesGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge] =
+    GraphUtils.projectPublic(taskInstancesGraph, !_.task.internal)
+
 }

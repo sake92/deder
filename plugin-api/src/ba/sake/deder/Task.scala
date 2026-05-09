@@ -23,13 +23,14 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType],
     category: String,
-    kind: TaskKind
+    kind: TaskKind,
+    internal: Boolean
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: AbstractTask[T2]): TaskBuilder[T, Deps :* AbstractTask[T2]] =
-    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind)
+    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind, internal)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps] =
-    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category, kind = kind)
+    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category, kind = kind, internal = internal)
 
   def buildWithSummary(
       execute: TaskExecContext[T, Deps] => T,
@@ -46,7 +47,8 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
       category = category,
       kind = kind,
       isResultSuccessful = isResultSuccessful,
-      summarize = summarize
+      summarize = summarize,
+      internal = internal
     )
 }
 
@@ -58,9 +60,10 @@ object TaskBuilder {
       singleton: Boolean = false,
       supportedModuleTypes: Set[ModuleType] = Set.empty,
       category: String = "",
-      kind: TaskKind = TaskKind.Standard
+      kind: TaskKind = TaskKind.Standard,
+      internal: Boolean = false
   ): TaskBuilder[T, EmptyTuple] =
-    TaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind)
+    TaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind, internal)
 }
 
 case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
@@ -71,13 +74,14 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple] private (
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType],
     category: String,
-    kind: TaskKind
+    kind: TaskKind,
+    internal: Boolean
 )(using ev: TaskDeps[Deps] =:= true) {
   def dependsOn[T2](t: AbstractTask[T2]): CachedTaskBuilder[T, Deps :* AbstractTask[T2]] =
-    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind)
+    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind, internal)
 
   def build(execute: TaskExecContext[T, Deps] => T)(using Deps <:< NonEmptyTuple): Task[T, Deps] =
-    CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category, kind = kind)
+    CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category, kind = kind, internal = internal)
 }
 
 object CachedTaskBuilder {
@@ -88,9 +92,10 @@ object CachedTaskBuilder {
       singleton: Boolean = false,
       supportedModuleTypes: Set[ModuleType] = Set.empty,
       category: String = "",
-      kind: TaskKind = TaskKind.Standard
+      kind: TaskKind = TaskKind.Standard,
+      internal: Boolean = false
   ): CachedTaskBuilder[T, EmptyTuple] =
-    CachedTaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind)
+    CachedTaskBuilder(name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind, internal)
 }
 
 // this is to make sure that Deps are AbstractTask-s and not arbitrary types
@@ -130,6 +135,10 @@ trait AbstractTask[T] {
   def supportedModuleTypes: Set[ModuleType]
   def transitive: Boolean
   def singleton: Boolean
+  /** When true, this task is hidden from listing/completion/plan output but
+   *  can still be executed directly by name.
+   */
+  def internal: Boolean = false
   def isResultSuccessful: T => Boolean
 }
 
@@ -181,7 +190,8 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple](
     val kind: TaskKind = TaskKind.Standard,
     override val isResultSuccessful: T => Boolean = (_: T) => true,
     val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
-      (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => ()
+      (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => (),
+    override val internal: Boolean = false
 )(using ev: TaskDeps[Deps] =:= true)
     extends Task[T, Deps] {
   override private[deder] def executeUnsafe(
@@ -236,7 +246,8 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple](
     val category: String = "",
     val kind: TaskKind = TaskKind.Standard,
     val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
-      (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => ()
+      (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => (),
+    override val internal: Boolean = false
 )(using ev: TaskDeps[Deps] =:= true)
     extends Task[T, Deps] {
 
@@ -317,7 +328,8 @@ class SourceFileTask(
     supportedModuleTypes: Set[ModuleType] = Set.empty,
     execute: TaskExecContext[DederPath, EmptyTuple] => DederPath,
     description: String = "",
-    category: String = ""
+    category: String = "",
+    override val internal: Boolean = false
 ) extends TaskImpl[DederPath, EmptyTuple](
       name,
       execute,
@@ -326,7 +338,8 @@ class SourceFileTask(
       singleton = false,
       supportedModuleTypes,
       description,
-      category
+      category,
+      internal = internal
     ) {
   override def toString(): String = s"SourceFileTask($name)"
 }
@@ -336,7 +349,8 @@ class SourceFilesTask(
     execute: TaskExecContext[Seq[DederPath], EmptyTuple] => Seq[DederPath],
     supportedModuleTypes: Set[ModuleType] = Set.empty,
     description: String = "",
-    category: String = ""
+    category: String = "",
+    override val internal: Boolean = false
 ) extends TaskImpl[Seq[DederPath], EmptyTuple](
       name,
       execute,
@@ -345,7 +359,8 @@ class SourceFilesTask(
       singleton = false,
       supportedModuleTypes,
       description,
-      category
+      category,
+      internal = internal
     ) {
   override def toString(): String = s"SourceFilesTask($name)"
 }
@@ -355,7 +370,8 @@ class ConfigValueTask[T: JsonRW: Hashable](
     execute: TaskExecContext[T, EmptyTuple] => T,
     supportedModuleTypes: Set[ModuleType] = Set.empty,
     description: String = "",
-    category: String = ""
+    category: String = "",
+    override val internal: Boolean = false
 ) extends TaskImpl[T, EmptyTuple](
       name,
       execute,
@@ -364,7 +380,8 @@ class ConfigValueTask[T: JsonRW: Hashable](
       singleton = false,
       supportedModuleTypes,
       description,
-      category
+      category,
+      internal = internal
     ) {
   override def toString(): String = s"ConfigValueTask($name)"
 }
@@ -378,7 +395,8 @@ class FanInTask[T: JsonRW: Hashable](
     val collectKind: TaskKind,
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
     val description: String = "",
-    val category: String = ""
+    val category: String = "",
+    override val internal: Boolean = false
 ) extends Task[Seq[T], EmptyTuple] {
   val taskDeps: EmptyTuple = EmptyTuple
   val transitive: Boolean = false
