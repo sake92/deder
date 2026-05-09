@@ -64,11 +64,16 @@ object GraphUtils {
       g: Graph[V, E],
       groups: Map[String, Seq[V]],
       vertexIdProvider: V => String,
-      vertexLabel: V => String
+      vertexLabel: V => String,
+      extraLines: Seq[String] = Seq.empty,
+      vertexClassProvider: V => Option[String] = _ => None,
+      classDefs: Map[String, String] = Map.empty
   ): String = {
     val sanitize = (s: String) => s.replaceAll("[^a-zA-Z0-9_]", "_")
     val sb = new StringBuilder
     sb.append("flowchart TD\n")
+    extraLines.foreach(line => sb.append(s"  $line\n"))
+    val classVertexIds = scala.collection.mutable.Map.empty[String, scala.collection.mutable.ArrayBuffer[String]]
     groups.toSeq.sortBy(_._1).foreach { case (groupId, vertices) =>
       val sgId = sanitize(groupId)
       sb.append(s"""  subgraph $sgId["$groupId"]\n""")
@@ -76,6 +81,10 @@ object GraphUtils {
         val id = sanitize(vertexIdProvider(v))
         val label = vertexLabel(v)
         sb.append(s"""    $id["$label"]\n""")
+        vertexClassProvider(v).foreach { cls =>
+          val clsVertexIds = classVertexIds.getOrElseUpdate(cls, scala.collection.mutable.ArrayBuffer.empty)
+          clsVertexIds += id
+        }
       }
       sb.append("  end\n")
     }
@@ -83,6 +92,12 @@ object GraphUtils {
       val src = sanitize(vertexIdProvider(g.getEdgeSource(e)))
       val tgt = sanitize(vertexIdProvider(g.getEdgeTarget(e)))
       sb.append(s"  $src --> $tgt\n")
+    }
+    classDefs.toSeq.sortBy(_._1).foreach { case (cls, style) =>
+      sb.append(s"  classDef $cls $style\n")
+    }
+    classVertexIds.toSeq.sortBy(_._1).foreach { case (cls, vertexIds) =>
+      sb.append(s"  class ${vertexIds.mkString(",")} $cls\n")
     }
     sb.toString
   }
