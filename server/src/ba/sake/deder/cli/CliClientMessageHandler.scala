@@ -244,7 +244,7 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                           "fill:#f3e8fd,stroke:#9334e6,color:#2c0b4a",
                           "fill:#e8eaed,stroke:#5f6368,color:#202124"
                         )
-                        val stageClassDefs = stageByTask.values.toSet.toSeq.sorted
+                        val stageClassDefs = stageByTask.values.toSeq.distinct.sorted
                           .map { stageIdx =>
                             s"stage$stageIdx" -> stagePalette(stageIdx % stagePalette.length)
                           }

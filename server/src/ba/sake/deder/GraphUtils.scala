@@ -70,10 +70,16 @@ object GraphUtils {
       classDefs: Map[String, String] = Map.empty
   ): String = {
     val sanitize = (s: String) => s.replaceAll("[^a-zA-Z0-9_]", "_")
+    val orderedVertices = groups.toSeq
+      .sortBy(_._1)
+      .flatMap((_, vertices) => vertices.sortBy(vertexIdProvider))
+    val classVertexIds = orderedVertices
+      .flatMap(v => vertexClassProvider(v).map(_ -> sanitize(vertexIdProvider(v))))
+      .groupMap(_._1)(_._2)
+
     val sb = new StringBuilder
     sb.append("flowchart TD\n")
     extraLines.foreach(line => sb.append(s"  $line\n"))
-    val classVertexIds = scala.collection.mutable.Map.empty[String, scala.collection.mutable.ArrayBuffer[String]]
     groups.toSeq.sortBy(_._1).foreach { case (groupId, vertices) =>
       val sgId = sanitize(groupId)
       sb.append(s"""  subgraph $sgId["$groupId"]\n""")
@@ -81,10 +87,6 @@ object GraphUtils {
         val id = sanitize(vertexIdProvider(v))
         val label = vertexLabel(v)
         sb.append(s"""    $id["$label"]\n""")
-        vertexClassProvider(v).foreach { cls =>
-          val clsVertexIds = classVertexIds.getOrElseUpdate(cls, scala.collection.mutable.ArrayBuffer.empty)
-          clsVertexIds += id
-        }
       }
       sb.append("  end\n")
     }
