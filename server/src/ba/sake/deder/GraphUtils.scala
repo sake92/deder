@@ -10,7 +10,6 @@ import org.jgrapht.graph.AsSubgraph
 import org.jgrapht.graph.EdgeReversedGraph
 import org.jgrapht.nio.DefaultAttribute
 import org.jgrapht.nio.dot.DOTExporter
-import org.jgrapht.traverse.BreadthFirstIterator
 
 object GraphUtils {
 
@@ -37,23 +36,34 @@ object GraphUtils {
     collected.addAll(focalVertices)
 
     // BFS downstream: follow edges (focal → dependencies)
-    focalVertices.foreach { v =>
-      val bfs =
-        if depthDown == Int.MaxValue then new BreadthFirstIterator(g, v)
-        else new BreadthFirstIterator(g, v, depthDown.toDouble)
-      while bfs.hasNext do collected.add(bfs.next())
-    }
+    collected.addAll(collectReachableVertices(g, focalVertices, depthDown))
 
     // BFS upstream: follow reversed edges (focal → dependents)
-    val reversed = new EdgeReversedGraph(g)
-    focalVertices.foreach { v =>
-      val bfs =
-        if depthUp == Int.MaxValue then new BreadthFirstIterator(reversed, v)
-        else new BreadthFirstIterator(reversed, v, depthUp.toDouble)
-      while bfs.hasNext do collected.add(bfs.next())
-    }
+    val reversed = new EdgeReversedGraph[V, E](g)
+    collected.addAll(collectReachableVertices(reversed, focalVertices, depthUp))
 
     new AsSubgraph(g, collected.asJava)
+  }
+
+  private def collectReachableVertices[V, E](
+      g: Graph[V, E],
+      startVertices: Set[V],
+      maxDepth: Int
+  ): Set[V] = {
+    val visited = scala.collection.mutable.Set[V]()
+    val queue = scala.collection.mutable.Queue[(V, Int)]()
+    startVertices.foreach { v =>
+      visited.add(v)
+      queue.enqueue((v, 0))
+    }
+    while queue.nonEmpty do
+      val (current, depth) = queue.dequeue()
+      if depth < maxDepth then
+        g.outgoingEdgesOf(current).asScala.foreach { e =>
+          val next = g.getEdgeTarget(e)
+          if visited.add(next) then queue.enqueue((next, depth + 1))
+        }
+    visited.toSet
   }
 
   def generateDOT[V, E](
