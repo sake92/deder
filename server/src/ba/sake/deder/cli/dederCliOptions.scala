@@ -16,6 +16,12 @@ case class DederCliHelpOptions(
 
 @main("modules command", "List modules and their dependencies")
 case class DederCliModulesOptions(
+    @arg(doc = "Filter by Module ID(s) (focal nodes for depth filtering)", short = 'm')
+    modules: Seq[String],
+    @arg(doc = "Max hops following dependency edges (downstream). Default: unlimited")
+    depthDown: Int = Int.MaxValue,
+    @arg(doc = "Max hops following reverse-dependency edges (upstream). Default: unlimited")
+    depthUp: Int = Int.MaxValue,
     @arg(doc = "Output result as JSON")
     json: Flag,
     @arg(doc = "Output result as DOT graph")
