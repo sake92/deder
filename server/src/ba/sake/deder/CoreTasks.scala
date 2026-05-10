@@ -23,6 +23,7 @@ import ba.sake.deder.config.DederProject.{
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.deps.{
   Dependency,
+  DependencyResolver,
   DependencyGraphBuilder,
   DependencyGraphData,
   DependencyReportOptions,
@@ -286,7 +287,12 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(dependenciesTask)
     .build { ctx =>
       val directDeps = ctx.depResults._1
-      val fetchResult = ctx.dependencyResolver.fetch(directDeps, Some(ctx.notifications))
+      val fetchResult = ctx.dependencyResolver match {
+        case resolver: DependencyResolver =>
+          resolver.fetch(directDeps, Some(ctx.notifications))
+        case _ =>
+          throw IllegalStateException("Dependency graph rendering requires DependencyResolver implementation")
+      }
       DependencyGraphBuilder.build(ctx.module.id, directDeps, fetchResult)
     }
 

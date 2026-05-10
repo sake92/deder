@@ -3,6 +3,7 @@ package ba.sake.deder.deps
 import scala.jdk.CollectionConverters.*
 import ba.sake.tupson.{JsonRW, toJson}
 import coursierapi.FetchResult
+import dependency.api.ops.*
 import org.jgrapht.graph.DefaultEdge
 import org.jgrapht.graph.SimpleDirectedGraph
 import ba.sake.deder.GraphUtils
@@ -130,11 +131,11 @@ object DependencyReportOptions {
 object DependencyGraphBuilder {
 
   def build(moduleId: String, directDependencies: Seq[Dependency], fetchResult: FetchResult): DependencyGraphData = {
-    val requested = directDependencies.map(_.applied)
+    val requested = directDependencies.map(_.applied.toCs)
     val requestedByKey = requested
-      .groupMap(r => (r.getModule.getOrganization, r.getModule.getName))(_.getVersion)
+      .groupMap(r => (r.getModule.getOrganization.toString, r.getModule.getName.toString))(_.getVersion)
       .view
-      .mapValues(_.distinct.sorted)
+      .mapValues(_.map(_.toString).distinct.sorted)
       .toMap
 
     val resolvedDeps = fetchResult.getDependencies.asScala.toSeq
@@ -149,9 +150,9 @@ object DependencyGraphBuilder {
       }
 
     val selectedByKey = resolvedDeps
-      .groupMap(d => (d.getModule.getOrganization, d.getModule.getName))(_.getVersion)
+      .groupMap(d => (d.getModule.getOrganization.toString, d.getModule.getName.toString))(_.getVersion)
       .view
-      .mapValues(_.distinct.sorted)
+      .mapValues(_.map(_.toString).distinct.sorted)
       .toMap
 
     val conflictByKey: Map[(String, String), DepConflict] =
@@ -177,9 +178,9 @@ object DependencyGraphBuilder {
 
     val nodes = resolvedWithArtifacts
       .map { case (dep, fileOpt) =>
-        val org = dep.getModule.getOrganization
-        val name = dep.getModule.getName
-        val ver = dep.getVersion
+        val org = dep.getModule.getOrganization.toString
+        val name = dep.getModule.getName.toString
+        val ver = dep.getVersion.toString
         val key = (org, name)
         val size = fileOpt.map(_.length()).getOrElse(0L)
         val reqVers = requestedByKey.getOrElse(key, Seq.empty)
