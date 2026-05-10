@@ -10,6 +10,7 @@ import ba.sake.deder.plugin.{PluginLoader, PluginLoaderApi}
 class DederProjectStatePluginReloadSuite extends munit.FunSuite {
 
   private val sourceProjectDir = os.pwd / "server/test/resources/sample-projects/multi"
+  private val TestWorkerThreads = 2
 
   private class CloseTrackingClassLoader extends URLClassLoader(Array.empty, getClass.getClassLoader) {
     @volatile var wasClosed = false
@@ -50,7 +51,7 @@ class DederProjectStatePluginReloadSuite extends munit.FunSuite {
     os.copy(sourceProjectDir, tempProjectDir, replaceExisting = true, createFolders = true)
     val oldRoot = System.getProperty("DEDER_PROJECT_ROOT_DIR")
     System.setProperty("DEDER_PROJECT_ROOT_DIR", tempProjectDir.toString)
-    val pool = Executors.newFixedThreadPool(2)
+    val pool = Executors.newFixedThreadPool(TestWorkerThreads)
     val state = DederProjectState(
       TasksRegistry(CoreTasks().all),
       Int.MaxValue,

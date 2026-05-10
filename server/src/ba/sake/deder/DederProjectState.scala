@@ -25,7 +25,7 @@ class DederProjectState(
     tasksExecutorService: ExecutorService,
     onShutdown: () => Unit,
     pluginLoaderFactory: (CoreTasksApi, DependencyResolverApi) => PluginLoaderApi =
-      (coreTasksApi, dependencyResolver) => PluginLoader(coreTasksApi, dependencyResolver)
+      (coreTasksApi, dependencyResolver) => (PluginLoader(coreTasksApi, dependencyResolver): PluginLoaderApi)
 ) extends StrictLogging {
 
   private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)

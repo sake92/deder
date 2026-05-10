@@ -70,7 +70,10 @@ class PluginLoader(
   def fingerprint(project: DederProject, pklFile: os.Path): Either[String, String] = {
     val depsWithScalaVer = extractPluginDeps(project)
     val pluginIds = Option(project.plugins).toSeq.flatMap(_.asScala).map(_.id)
-    PluginLoader.sequence(pluginIds.map(id => serializePluginConfig(pklFile, id).map(id -> _))).map { pluginConfigs =>
+    val serializedConfigs = PluginLoader.sequence(pluginIds.map { id =>
+      serializePluginConfig(pklFile, id).map(configText => (id, configText))
+    })
+    serializedConfigs.map { pluginConfigs =>
       // Keep the fingerprint input deterministic: serialized deps + serialized plugin config text.
       // Separators are intentionally uncommon to reduce accidental boundary ambiguity.
       val serializedDeps = depsWithScalaVer.map { case (dep, scalaVer) => s"$dep::$scalaVer" }.mkString("\n")
@@ -196,6 +199,10 @@ object PluginLoader {
 
   private[plugin] def sha256(value: String): String = {
     val digest = MessageDigest.getInstance("SHA-256")
-    digest.digest(value.getBytes("UTF-8")).map("%02x".format(_)).mkString
+    val hex = new StringBuilder(64)
+    digest.digest(value.getBytes("UTF-8")).foreach { b =>
+      hex.append(f"${b & 0xff}%02x")
+    }
+    hex.toString()
   }
 }
