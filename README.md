@@ -96,6 +96,16 @@ deder tasks
 # supports flags: --json, --dot, --mermaid
 deder plan -m common -t compileClasspath
 
+################
+# dependency reports
+# reports: tree (default), list, why, stats, dot, mermaid, html
+deder deps -m uber
+deder deps -m uber -r stats
+deder deps -m uber -r why --why org.scala-lang:scala-library
+deder deps -m uber --dot
+deder deps -m uber --max-depth 1 --direct-only
+deder deps -m uber --exclude org.scala-lang:% --output-file .deder/out/uber/deps.txt
+
 
 ################ run tasks
 # by default executes compile on all modules

@@ -22,7 +22,7 @@ class TabCompleterSuite extends munit.FunSuite {
 
     assertEquals(
       completer.complete("deder ", 6).toSet,
-      Set("version", "clean", "complete", "modules", "tasks", "plan", "exec", "shutdown", "import", "bsp", "help")
+      Set("version", "clean", "complete", "modules", "tasks", "plan", "deps", "exec", "shutdown", "import", "bsp", "help")
     )
 
     assertEquals(completer.complete("deder c", 7).toSet, Set("clean", "complete"))
@@ -45,6 +45,24 @@ class TabCompleterSuite extends munit.FunSuite {
     assertEquals(
       completer.complete("deder plan --", 13).toSet,
       Set("--module", "--task", "--json", "--dot", "--mermaid")
+    )
+    assertEquals(
+      completer.complete("deder deps --", 13).toSet,
+      Set(
+        "--module",
+        "--report",
+        "--dot",
+        "--mermaid",
+        "--html",
+        "--json",
+        "--max-depth",
+        "--direct-only",
+        "--no-transitive",
+        "--include",
+        "--exclude",
+        "--why",
+        "--output-file"
+      )
     )
 
     assertEquals(

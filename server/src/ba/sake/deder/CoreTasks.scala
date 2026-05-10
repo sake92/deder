@@ -21,7 +21,13 @@ import ba.sake.deder.config.DederProject.{
   ScalaTestModule
 }
 import ba.sake.deder.config.DederProject
-import ba.sake.deder.deps.Dependency
+import ba.sake.deder.deps.{
+  Dependency,
+  DependencyGraphBuilder,
+  DependencyGraphData,
+  DependencyReportOptions,
+  DependencyReportRenderers
+}
 import ba.sake.deder.deps.given
 import ba.sake.deder.testing.*
 import ba.sake.deder.testing.forked.ForkedTestOrchestrator
@@ -270,6 +276,135 @@ class CoreTasks() extends StrictLogging {
       val deps = ctx.depResults._1
       (deps ++ ctx.transitiveResults.flatten.flatten).distinct
     }
+
+  val depGraphTask = TaskBuilder
+    .make[DependencyGraphData](
+      name = "depGraph",
+      category = "Dependencies",
+      internal = true
+    )
+    .dependsOn(dependenciesTask)
+    .build { ctx =>
+      val directDeps = ctx.depResults._1
+      val fetchResult = ctx.dependencyResolver.fetch(directDeps, Some(ctx.notifications))
+      DependencyGraphBuilder.build(ctx.module.id, directDeps, fetchResult)
+    }
+
+  private def parseDepReportOptions(args: Seq[String]): DependencyReportOptions =
+    DependencyReportOptions.fromTaskArgs(args) match {
+      case Right(value) => value
+      case Left(error)  => throw IllegalArgumentException(error)
+    }
+
+  private def summarizeDepReports(moduleReports: Seq[(DederProject.DederModule, String)], notifications: ServerNotificationsLogger): Unit = {
+    val sorted = moduleReports.sortBy(_._1.id)
+    if sorted.size == 1 then
+      notifications.add(ServerNotification.Output(sorted.head._2))
+    else {
+      val report = sorted.map { case (module, content) =>
+        s"==== ${module.id} ====\n${content}"
+      }.mkString("\n")
+      notifications.add(ServerNotification.Output(report))
+    }
+  }
+
+  val depTreeTask = TaskBuilder
+    .make[String](
+      name = "depTree",
+      category = "Dependencies"
+    )
+    .dependsOn(depGraphTask)
+    .buildWithSummary(
+      execute = { ctx =>
+        val options = parseDepReportOptions(ctx.args)
+        DependencyReportRenderers.renderTree(ctx.depResults._1, options)
+      },
+      summarize = summarizeDepReports
+    )
+
+  val depListTask = TaskBuilder
+    .make[String](
+      name = "depList",
+      category = "Dependencies"
+    )
+    .dependsOn(depGraphTask)
+    .buildWithSummary(
+      execute = { ctx =>
+        val options = parseDepReportOptions(ctx.args)
+        DependencyReportRenderers.renderList(ctx.depResults._1, options)
+      },
+      summarize = summarizeDepReports
+    )
+
+  val depWhyTask = TaskBuilder
+    .make[String](
+      name = "depWhy",
+      category = "Dependencies"
+    )
+    .dependsOn(depGraphTask)
+    .buildWithSummary(
+      execute = { ctx =>
+        val options = parseDepReportOptions(ctx.args)
+        DependencyReportRenderers.renderWhy(ctx.depResults._1, options)
+      },
+      summarize = summarizeDepReports
+    )
+
+  val depStatsTask = TaskBuilder
+    .make[String](
+      name = "depStats",
+      category = "Dependencies"
+    )
+    .dependsOn(depGraphTask)
+    .buildWithSummary(
+      execute = { ctx =>
+        val options = parseDepReportOptions(ctx.args)
+        DependencyReportRenderers.renderStats(ctx.depResults._1, options)
+      },
+      summarize = summarizeDepReports
+    )
+
+  val depDotTask = TaskBuilder
+    .make[String](
+      name = "depDot",
+      category = "Dependencies"
+    )
+    .dependsOn(depGraphTask)
+    .buildWithSummary(
+      execute = { ctx =>
+        val options = parseDepReportOptions(ctx.args)
+        DependencyReportRenderers.renderDot(ctx.depResults._1, options)
+      },
+      summarize = summarizeDepReports
+    )
+
+  val depMermaidTask = TaskBuilder
+    .make[String](
+      name = "depMermaid",
+      category = "Dependencies"
+    )
+    .dependsOn(depGraphTask)
+    .buildWithSummary(
+      execute = { ctx =>
+        val options = parseDepReportOptions(ctx.args)
+        DependencyReportRenderers.renderMermaid(ctx.depResults._1, options)
+      },
+      summarize = summarizeDepReports
+    )
+
+  val depHtmlTask = TaskBuilder
+    .make[String](
+      name = "depHtml",
+      category = "Dependencies"
+    )
+    .dependsOn(depGraphTask)
+    .buildWithSummary(
+      execute = { ctx =>
+        val options = parseDepReportOptions(ctx.args)
+        DependencyReportRenderers.renderHtml(ctx.depResults._1, options)
+      },
+      summarize = summarizeDepReports
+    )
 
   val mandatoryDependenciesTask = CachedTaskBuilder
     .make[Seq[deps.Dependency]](
@@ -1287,9 +1422,17 @@ class CoreTasks() extends StrictLogging {
     repositoriesTask,
     compileOnlyDepsTask,
     compileOnlyDependenciesTask,
-    mandatoryDependenciesTask,
     dependenciesTask,
     allDependenciesTask,
+    depGraphTask,
+    depTreeTask,
+    depListTask,
+    depWhyTask,
+    depStatsTask,
+    depDotTask,
+    depMermaidTask,
+    depHtmlTask,
+    mandatoryDependenciesTask,
     classesTask,
     semanticdbDirTask,
     allClassesDirsTask,

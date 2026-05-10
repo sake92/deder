@@ -10,6 +10,7 @@ enum CliClientMessage derives JsonRW {
   case Modules(args: Seq[String])
   case Tasks(args: Seq[String])
   case Plan(args: Seq[String])
+  case Deps(args: Seq[String])
   case Exec(requestId: String, args: Seq[String], envVars: Map[String, String] = Map.empty)
   case Cancel(requestId: String)
   case Clean(args: Seq[String])

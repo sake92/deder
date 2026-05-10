@@ -56,6 +56,36 @@ case class DederCliPlanOptions(
     mermaid: Flag
 )
 
+@main("deps command", "Show dependency reports for module dependencies")
+case class DederCliDepsOptions(
+    @arg(doc = "Module IDs to inspect", short = 'm')
+    modules: Seq[String],
+    @arg(doc = "Report type: tree, list, why, stats, html", short = 'r')
+    report: String = "tree",
+    @arg(doc = "Alias for --report dot")
+    dot: Flag,
+    @arg(doc = "Alias for --report mermaid")
+    mermaid: Flag,
+    @arg(doc = "Alias for --report html")
+    html: Flag,
+    @arg(doc = "Output depGraph JSON (internal model)")
+    json: Flag,
+    @arg(doc = "Max depth (0 = module only, 1 = direct only, 2+ = include transitive)")
+    maxDepth: Int = Int.MaxValue,
+    @arg(doc = "Show only direct dependencies")
+    directOnly: Flag,
+    @arg(doc = "Exclude transitive dependencies (same as --direct-only)")
+    noTransitive: Flag,
+    @arg(doc = "Include dependency pattern (supports % wildcard). Repeatable.")
+    include: Seq[String],
+    @arg(doc = "Exclude dependency pattern (supports % wildcard). Repeatable.")
+    exclude: Seq[String],
+    @arg(doc = "Reverse lookup selector for why report: org:name or org:name:version")
+    why: Option[String],
+    @arg(doc = "Write output to file")
+    outputFile: Option[String]
+)
+
 @main("clean command", "Clean build artifacts for module(s)")
 case class DederCliCleanOptions(
     @arg(doc = "Module IDs to clean", short = 'm')
