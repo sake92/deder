@@ -9,7 +9,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
         @JsonSubTypes.Type(value = ClientMessage.Modules.class, name = "Modules"),
         @JsonSubTypes.Type(value = ClientMessage.Tasks.class, name = "Tasks"),
         @JsonSubTypes.Type(value = ClientMessage.Plan.class, name = "Plan"),
-        @JsonSubTypes.Type(value = ClientMessage.Deps.class, name = "Deps"),
         @JsonSubTypes.Type(value = ClientMessage.Exec.class, name = "Exec"),
         @JsonSubTypes.Type(value = ClientMessage.Cancel.class, name = "Cancel"),
         @JsonSubTypes.Type(value = ClientMessage.Clean.class, name = "Clean"),
@@ -31,9 +30,6 @@ public sealed interface ClientMessage {
     }
 
     record Plan(String[] args) implements ClientMessage {
-    }
-
-    record Deps(String[] args) implements ClientMessage {
     }
 
     record Exec(String requestId, String[] args, java.util.Map<String, String> envVars) implements ClientMessage {

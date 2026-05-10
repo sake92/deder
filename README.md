@@ -97,14 +97,14 @@ deder tasks
 deder plan -m common -t compileClasspath
 
 ################
-# dependency reports
-# reports: tree (default), list, why, stats, dot, mermaid, html
-deder deps -m uber
-deder deps -m uber -r stats
-deder deps -m uber -r why --why org.scala-lang:scala-library
-deder deps -m uber --dot
-deder deps -m uber --max-depth 1 --direct-only
-deder deps -m uber --exclude org.scala-lang:% --output-file .deder/out/uber/deps.txt
+# dependency reports (run as normal tasks via exec)
+# task names: depTree (default), depList, depWhy, depStats, depDot, depMermaid, depHtml
+deder exec -t depTree -m uber
+deder exec -t depStats -m uber
+deder exec -t depWhy -m uber -- --why org.scala-lang:scala-library
+deder exec -t depDot -m uber
+deder exec -t depTree -m uber -- --max-depth 1 --direct-only
+deder exec -t depTree -m uber -- --exclude org.scala-lang:%
 
 
 ################ run tasks

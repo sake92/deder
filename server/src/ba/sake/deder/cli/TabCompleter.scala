@@ -10,7 +10,6 @@ class TabCompleter(tasksResolver: TasksResolver) {
     "modules",
     "tasks",
     "plan",
-    "deps",
     "exec",
     "shutdown",
     "import",
@@ -46,26 +45,6 @@ class TabCompleter(tasksResolver: TasksResolver) {
               .getOrElse(
                 Seq("-m", "--module", "-t", "--task", "--json", "--dot", "--mermaid").filter(_.startsWith(currentWord))
               )
-          case Seq("deps", _*) =>
-            completeModule(prevWord, currentWord).getOrElse(
-              Seq(
-                "-m",
-                "--module",
-                "-r",
-                "--report",
-                "--dot",
-                "--mermaid",
-                "--html",
-                "--json",
-                "--max-depth",
-                "--direct-only",
-                "--no-transitive",
-                "--include",
-                "--exclude",
-                "--why",
-                "--output-file"
-              ).filter(_.startsWith(currentWord))
-            )
           case Seq("exec", _*) =>
             completeModule(prevWord, currentWord)
               .orElse(completeTask(prevWord, currentWord))

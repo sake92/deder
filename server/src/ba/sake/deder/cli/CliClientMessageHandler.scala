@@ -28,7 +28,6 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
             |  modules [options]       List modules
             |  tasks [options]         List tasks
             |  plan [options]          Show execution plan for a task
-            |  deps [options]          Show dependency reports
             |  exec [options]          Execute a task
             |  clean [options]         Clean modules
             |  bsp install             Generate BSP configuration for this project
@@ -58,10 +57,6 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
               case "plan" =>
                 serverMessages.put(
                   CliServerMessage.Output(mainargs.Parser[DederCliPlanOptions].helpText())
-                )
-              case "deps" =>
-                serverMessages.put(
-                  CliServerMessage.Output(mainargs.Parser[DederCliDepsOptions].helpText())
                 )
               case "exec" =>
                 serverMessages.put(
@@ -318,131 +313,6 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
                       }
                       serverMessages.put(CliServerMessage.Exit(0))
                   }
-              }
-          }
-      case m: CliClientMessage.Deps =>
-        if m.args == Seq("--help") || m.args == Seq("-h") then
-          serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliDepsOptions].helpText()))
-          serverMessages.put(CliServerMessage.Exit(0))
-        else
-          mainargs.Parser[DederCliDepsOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-            case Left(error) =>
-              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-              serverMessages.put(CliServerMessage.Exit(1))
-            case Right(cliOptions) =>
-              val reportTask = {
-                val reportFromAliases =
-                  if cliOptions.json.value then Some("depGraph")
-                  else if cliOptions.dot.value then Some("depDot")
-                  else if cliOptions.mermaid.value then Some("depMermaid")
-                  else if cliOptions.html.value then Some("depHtml")
-                  else None
-                reportFromAliases.getOrElse(
-                  cliOptions.report.toLowerCase match {
-                    case "tree"    => "depTree"
-                    case "list"    => "depList"
-                    case "why"     => "depWhy"
-                    case "stats"   => "depStats"
-                    case "dot"     => "depDot"
-                    case "mermaid" => "depMermaid"
-                    case "html"    => "depHtml"
-                    case other     => other
-                  }
-                )
-              }
-              val allowedTasks = Set("depGraph", "depTree", "depList", "depWhy", "depStats", "depDot", "depMermaid", "depHtml")
-              if !allowedTasks.contains(reportTask) then {
-                serverMessages.put(
-                  CliServerMessage.Log(
-                    s"Unknown deps report '${cliOptions.report}'. Supported: tree, list, why, stats, dot, mermaid, html (or --json).",
-                    LogLevel.ERROR
-                  )
-                )
-                serverMessages.put(CliServerMessage.Exit(1))
-              } else if cliOptions.maxDepth < 0 then {
-                serverMessages.put(CliServerMessage.Log("--max-depth must be non-negative", LogLevel.ERROR))
-                serverMessages.put(CliServerMessage.Exit(1))
-              } else if cliOptions.outputFile.nonEmpty && reportTask == "depGraph" then {
-                serverMessages.put(CliServerMessage.Log("--output-file is not supported together with --json", LogLevel.ERROR))
-                serverMessages.put(CliServerMessage.Exit(1))
-              } else {
-                val depArgs = {
-                  val args = scala.collection.mutable.ArrayBuffer.empty[String]
-                  if cliOptions.maxDepth != Int.MaxValue then args ++= Seq("--max-depth", cliOptions.maxDepth.toString)
-                  if cliOptions.directOnly.value || cliOptions.noTransitive.value then args += "--direct-only"
-                  cliOptions.include.foreach(p => args ++= Seq("--include", p))
-                  cliOptions.exclude.foreach(p => args ++= Seq("--exclude", p))
-                  cliOptions.why.foreach(v => args ++= Seq("--why", v))
-                  args.toSeq
-                }
-                cliOptions.outputFile match {
-                  case None =>
-                    val notificationCallback: ServerNotification => Unit = {
-                      case sn =>
-                        CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
-                    }
-                    val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
-                    projectState.executeCLI(
-                      clientId,
-                      requestId,
-                      cliOptions.modules,
-                      reportTask,
-                      args = depArgs,
-                      serverNotificationsLogger,
-                      json = reportTask == "depGraph",
-                      startWatch = false,
-                      exitOnEnd = true,
-                      clientParams = CliClientParams(Map.empty)
-                    )
-                  case Some(outputFile) =>
-                    projectState.readState(useLastGood = true) match {
-                      case Left(error) =>
-                        serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-                        serverMessages.put(CliServerMessage.Exit(1))
-                      case Right(state) =>
-                        val allModuleIds = state.tasksResolver.allModules.map(_.id)
-                        val selectedModuleIds =
-                          if cliOptions.modules.isEmpty then Right(allModuleIds)
-                          else WildcardUtils.getMatchesOrRecommendations(allModuleIds, cliOptions.modules)
-                        selectedModuleIds match {
-                          case Left(recommendations) =>
-                            val msg =
-                              if recommendations.isEmpty then s"No modules found for selectors: ${cliOptions.modules.mkString(", ")}"
-                              else s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
-                            serverMessages.put(CliServerMessage.Log(msg, LogLevel.ERROR))
-                            serverMessages.put(CliServerMessage.Exit(1))
-                          case Right(moduleIds) =>
-                            val quietNotifications = ServerNotificationsLogger(_ => ())
-                            val moduleReports = moduleIds.map { moduleId =>
-                              val taskOpt = state.tasksResolver.taskInstancesPerModule
-                                .getOrElse(moduleId, Seq.empty)
-                                .find(_.task.name == reportTask)
-                                .map(_.task)
-                              val task = taskOpt.getOrElse(
-                                throw IllegalArgumentException(s"Task '${reportTask}' is not available for module '${moduleId}'")
-                              )
-                              val report = projectState.executeTask(
-                                moduleId,
-                                task.asInstanceOf[Task[String, ?]],
-                                args = depArgs,
-                                serverNotificationsLogger = quietNotifications,
-                                watch = false,
-                                useLastGood = true
-                              )._1
-                              moduleId -> report
-                            }
-                            val content =
-                              if moduleReports.size == 1 then moduleReports.head._2
-                              else moduleReports.map { case (moduleId, report) =>
-                                s"==== ${moduleId} ====\n${report}"
-                              }.mkString("\n")
-                            val outputPath = os.Path(outputFile, DederGlobals.projectRootDir)
-                            os.write.over(outputPath, content, createFolders = true)
-                            serverMessages.put(CliServerMessage.Output(s"Wrote dependency report to ${outputPath}"))
-                            serverMessages.put(CliServerMessage.Exit(0))
-                        }
-                    }
-                }
               }
           }
       case m: CliClientMessage.Exec =>
