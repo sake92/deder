@@ -291,7 +291,7 @@ class CoreTasks() extends StrictLogging {
         case resolver: DependencyResolver =>
           resolver.fetch(directDeps, Some(ctx.notifications))
         case _ =>
-          throw IllegalStateException("Dependency graph rendering requires DependencyResolver implementation")
+          throw new IllegalStateException("Dependency graph rendering requires DependencyResolver implementation")
       }
       DependencyGraphBuilder.build(ctx.module.id, directDeps, fetchResult)
     }
@@ -299,7 +299,7 @@ class CoreTasks() extends StrictLogging {
   private def parseDepReportOptions(args: Seq[String]): DependencyReportOptions =
     DependencyReportOptions.fromTaskArgs(args) match {
       case Right(value) => value
-      case Left(error)  => throw IllegalArgumentException(error)
+      case Left(error)  => throw new IllegalArgumentException(error)
     }
 
   private def summarizeDepReports(moduleReports: Seq[(DederProject.DederModule, String)], notifications: ServerNotificationsLogger): Unit = {
