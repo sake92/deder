@@ -1,5 +1,6 @@
 package ba.sake.deder
 
+import java.net.URLClassLoader
 import java.time.{Duration, Instant}
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
@@ -15,14 +16,16 @@ import ba.sake.tupson.toJson
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
-import ba.sake.deder.deps.DependencyResolver
-import ba.sake.deder.plugin.PluginLoader
+import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
+import ba.sake.deder.plugin.{PluginLoader, PluginLoaderApi}
 
 class DederProjectState(
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
     tasksExecutorService: ExecutorService,
-    onShutdown: () => Unit
+    onShutdown: () => Unit,
+    pluginLoaderFactory: (CoreTasksApi, DependencyResolverApi) => PluginLoaderApi =
+      (coreTasksApi, dependencyResolver) => PluginLoader(coreTasksApi, dependencyResolver)
 ) extends StrictLogging {
 
   private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)
@@ -31,6 +34,7 @@ class DederProjectState(
 
   private val configParser = ConfigParser(writeJson = true)
   private val configFile = DederGlobals.projectRootDir / "deder.pkl"
+  private val baseTasks = tasksRegistry.all
 
   private val stateLock = new AnyRef
   private var current: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
@@ -41,6 +45,7 @@ class DederProjectState(
 
   private val watchedTasksLock = new AnyRef
   private var watchedTasks = Seq.empty[WatchedTaskData]
+  private var loadedPlugins = LoadedPluginsData.empty
 
   reloadProject()
 
@@ -84,22 +89,37 @@ class DederProjectState(
                   return
             val dependencyResolver = new DependencyResolver(assembledRepos)
 
-            // Load plugin tasks before TasksResolver so they are included in the execution graph
+            // Load plugin tasks before TasksResolver so they are included in the execution graph.
+            // Plugin tasks are kept separately and the effective registry is rebuilt per reload.
             val coreTasksApi = CoreTasksApiAdapter(new CoreTasks())
-            val pluginLoader = PluginLoader(coreTasksApi, dependencyResolver)
-            pluginLoader.load(configFile) match {
+            val pluginLoader = pluginLoaderFactory(coreTasksApi, dependencyResolver)
+            val pluginTasks: Seq[Task[?, ?]] = pluginLoader.fingerprint(newConfig, configFile) match {
               case Left(err) =>
-                logger.warn(s"Failed to reload plugins: $err")
-              case Right(tasks) =>
-                tasks.foreach(t => tasksRegistry.add(t.asInstanceOf[Task[?, ?]]))
+                logger.warn(s"Failed to compute plugin fingerprint: $err. Reusing previously loaded plugin tasks.")
+                loadedPlugins.tasks
+              case Right(fingerprint) if loadedPlugins.fingerprint.contains(fingerprint) =>
+                loadedPlugins.tasks
+              case Right(fingerprint) =>
+                pluginLoader.load(configFile) match {
+                  case Left(err) =>
+                    logger.warn(s"Failed to reload plugins: $err. Reusing previously loaded plugin tasks.")
+                    loadedPlugins.tasks
+                  case Right(result) =>
+                    val oldClassLoader = loadedPlugins.classLoader
+                    val newTasks = result.tasks.map(_.asInstanceOf[Task[?, ?]])
+                    loadedPlugins = LoadedPluginsData(Some(fingerprint), newTasks, result.classLoader)
+                    closeStaleClassLoader(oldClassLoader, result.classLoader)
+                    newTasks
+                }
             }
 
-            val tasksResolver = TasksResolver(newConfig, tasksRegistry)
+            val effectiveRegistry = TasksRegistry(baseTasks ++ pluginTasks)
+            val tasksResolver = TasksResolver(newConfig, effectiveRegistry)
             val executionPlanner =
               ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
 
             val goodProjectStateData =
-              DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner, dependencyResolver)
+              DederProjectStateData(newConfig, effectiveRegistry, tasksResolver, executionPlanner, dependencyResolver)
             lastGood = Right(goodProjectStateData)
             current = Right(goodProjectStateData)
             triggerConfigWatchedTasks()
@@ -556,8 +576,23 @@ class DederProjectState(
 
   def shutdown(): Unit = {
     shutdownStarted = true
+    loadedPlugins.classLoader.foreach(closeClassLoader)
     onShutdown()
   }
+
+  private def closeStaleClassLoader(previous: Option[URLClassLoader], current: Option[URLClassLoader]): Unit =
+    previous.foreach { old =>
+      // Compare by reference: if the same classloader instance is still active, keep it open.
+      val shouldClose = current.forall(_ ne old)
+      if shouldClose then closeClassLoader(old)
+    }
+
+  private def closeClassLoader(classLoader: URLClassLoader): Unit =
+    try classLoader.close()
+    catch {
+      case NonFatal(e) =>
+        logger.warn(s"Failed to close old plugin classloader: ${e.getMessage}")
+    }
 }
 
 case class DederProjectStateData(
@@ -579,3 +614,13 @@ case class WatchedTaskData(
     affectingConfigValueTasks: Set[TaskInstance],
     clientParams: CliClientParams
 )
+
+case class LoadedPluginsData(
+    fingerprint: Option[String],
+    tasks: Seq[Task[?, ?]],
+    classLoader: Option[URLClassLoader]
+)
+
+object LoadedPluginsData {
+  val empty = LoadedPluginsData(None, Seq.empty, None)
+}
