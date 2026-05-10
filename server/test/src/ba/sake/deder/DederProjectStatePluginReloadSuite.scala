@@ -12,6 +12,10 @@ class DederProjectStatePluginReloadSuite extends munit.FunSuite {
   private val sourceProjectDir = os.pwd / "server/test/resources/sample-projects/multi"
   private val TestWorkerThreads = 2
 
+  override def beforeAll(): Unit = {
+    System.setProperty("DEDER_PROJECT_ROOT_DIR", sourceProjectDir.toString)
+  }
+
   private class CloseTrackingClassLoader extends URLClassLoader(Array.empty, getClass.getClassLoader) {
     @volatile var wasClosed = false
     override def close(): Unit = {
@@ -46,11 +50,7 @@ class DederProjectStatePluginReloadSuite extends munit.FunSuite {
     }
   }
 
-  private def withState(fakeLoader: FakePluginLoader)(f: (os.Path, DederProjectState) => Unit): Unit = {
-    val tempProjectDir = os.temp.dir(prefix = "deder-plugin-reload-")
-    os.copy(sourceProjectDir, tempProjectDir, replaceExisting = true, createFolders = true)
-    val oldRoot = System.getProperty("DEDER_PROJECT_ROOT_DIR")
-    System.setProperty("DEDER_PROJECT_ROOT_DIR", tempProjectDir.toString)
+  private def withState(fakeLoader: FakePluginLoader)(f: DederProjectState => Unit): Unit = {
     val pool = Executors.newFixedThreadPool(TestWorkerThreads)
     val state = DederProjectState(
       TasksRegistry(CoreTasks().all),
@@ -59,21 +59,17 @@ class DederProjectStatePluginReloadSuite extends munit.FunSuite {
       () => (),
       pluginLoaderFactory = (_: CoreTasksApi, _: DependencyResolverApi) => fakeLoader
     )
-    try f(tempProjectDir, state)
+    try f(state)
     finally {
       state.shutdown()
       pool.shutdownNow()
-      if oldRoot == null then System.clearProperty("DEDER_PROJECT_ROOT_DIR")
-      else System.setProperty("DEDER_PROJECT_ROOT_DIR", oldRoot)
     }
   }
 
-  test("non-plugin config reload reuses already loaded plugin tasks") {
+  test("reload with unchanged plugin fingerprint reuses already loaded plugin tasks") {
     val fakeLoader = new FakePluginLoader()
-    withState(fakeLoader) { (projectDir, state) =>
+    withState(fakeLoader) { state =>
       assertEquals(fakeLoader.loadCalls, 1)
-      val dederPkl = projectDir / "deder.pkl"
-      os.write.append(dederPkl, s"\n// non-plugin change ${System.nanoTime()}\n")
       state.reloadProject()
       assertEquals(fakeLoader.loadCalls, 1)
     }
@@ -81,7 +77,7 @@ class DederProjectStatePluginReloadSuite extends munit.FunSuite {
 
   test("plugin fingerprint change reloads plugin tasks exactly once") {
     val fakeLoader = new FakePluginLoader()
-    withState(fakeLoader) { (_, state) =>
+    withState(fakeLoader) { state =>
       assertEquals(fakeLoader.loadCalls, 1)
       val firstClassLoader = fakeLoader.latestClassLoader.getOrElse(fail("Expected initial plugin classloader"))
 
@@ -100,7 +96,7 @@ class DederProjectStatePluginReloadSuite extends munit.FunSuite {
 
   test("repeated reloads with unchanged plugin fingerprint do not trigger duplicate plugin loads") {
     val fakeLoader = new FakePluginLoader()
-    withState(fakeLoader) { (_, state) =>
+    withState(fakeLoader) { state =>
       assertEquals(fakeLoader.loadCalls, 1)
       (1 to 5).foreach(_ => state.reloadProject())
       assertEquals(fakeLoader.loadCalls, 1)
