@@ -291,7 +291,7 @@ class CoreTasks() extends StrictLogging {
         case resolver: DependencyResolver =>
           resolver.fetch(directDeps, Some(ctx.notifications))
         case _ =>
-          throw new IllegalStateException("Dependency graph rendering requires DependencyResolver implementation")
+          throw new IllegalStateException("Dependency graph task requires concrete DependencyResolver implementation")
       }
       DependencyGraphBuilder.build(ctx.module.id, directDeps, fetchResult)
     }
