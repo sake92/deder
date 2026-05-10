@@ -12,10 +12,6 @@ class DederProjectStatePluginReloadSuite extends munit.FunSuite {
   private val sourceProjectDir = os.pwd / "server/test/resources/sample-projects/multi"
   private val TestWorkerThreads = 2
 
-  override def beforeAll(): Unit = {
-    System.setProperty("DEDER_PROJECT_ROOT_DIR", sourceProjectDir.toString)
-  }
-
   private class CloseTrackingClassLoader extends URLClassLoader(Array.empty, getClass.getClassLoader) {
     @volatile var wasClosed = false
     override def close(): Unit = {
@@ -57,7 +53,8 @@ class DederProjectStatePluginReloadSuite extends munit.FunSuite {
       Int.MaxValue,
       pool,
       () => (),
-      pluginLoaderFactory = (_: CoreTasksApi, _: DependencyResolverApi) => fakeLoader
+      pluginLoaderFactory = (_: CoreTasksApi, _: DependencyResolverApi) => fakeLoader,
+      configFilePath = sourceProjectDir / "deder.pkl"
     )
     try f(state)
     finally {

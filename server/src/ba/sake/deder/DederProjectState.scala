@@ -25,7 +25,8 @@ class DederProjectState(
     tasksExecutorService: ExecutorService,
     onShutdown: () => Unit,
     pluginLoaderFactory: (CoreTasksApi, DependencyResolverApi) => PluginLoaderApi =
-      (coreTasksApi, dependencyResolver) => (PluginLoader(coreTasksApi, dependencyResolver): PluginLoaderApi)
+      (coreTasksApi, dependencyResolver) => (PluginLoader(coreTasksApi, dependencyResolver): PluginLoaderApi),
+    configFilePath: os.Path = DederGlobals.projectRootDir / "deder.pkl"
 ) extends StrictLogging {
 
   private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)
@@ -33,7 +34,7 @@ class DederProjectState(
   @volatile private var shutdownStarted = false
 
   private val configParser = ConfigParser(writeJson = true)
-  private val configFile = DederGlobals.projectRootDir / "deder.pkl"
+  private val configFile = configFilePath
   private val baseTasks = tasksRegistry.all
 
   private val stateLock = new AnyRef
