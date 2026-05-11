@@ -1,15 +1,18 @@
 package ba.sake.deder.importing.sbt
 
-import ba.sake.tupson.parseJson
 import ba.sake.deder.ServerNotification
 import ba.sake.deder.ServerNotificationsLogger
 import ba.sake.deder.importing.DederPklRenderer
 
 class SbtImporter(
-    serverNotificationsLogger: ServerNotificationsLogger
+    serverNotificationsLogger: ServerNotificationsLogger,
+    private[sbt] val runSbtExportCommand: String => Int
 ) {
 
-  private val sbtExportBuildVersion = "0.0.4"
+  def this(serverNotificationsLogger: ServerNotificationsLogger) =
+    this(serverNotificationsLogger, SbtImporter.runSbtExportCommand(serverNotificationsLogger))
+
+  private val sbtExportBuildVersion = "0.0.5"
 
   def doImport() = {
     dumpSbtBuild()
@@ -28,6 +31,10 @@ class SbtImporter(
   }
 
   private def dumpSbtBuild() = {
+    val exportDir = os.pwd / "target/build-export"
+    if os.exists(exportDir) then os.remove.all(exportDir)
+    os.makeDir.all(exportDir)
+
     val sbtCmd = if (scala.util.Properties.isWin) "sbt.bat" else "sbt"
     val exportBuildStructurePluginSource =
       s"""addSbtPlugin("ba.sake" % "sbt-build-extract" % "$sbtExportBuildVersion")
@@ -35,6 +42,29 @@ class SbtImporter(
          |""".stripMargin
     val exportBuildStructurePluginPath = os.pwd / "project/exportBuildStructure.sbt"
     os.write.over(exportBuildStructurePluginPath, exportBuildStructurePluginSource)
+    try {
+      val exitCode = runSbtExportCommand(sbtCmd)
+      if exitCode != 0 then
+        throw new IllegalStateException(s"'$sbtCmd exportAllBuildStructures' failed with exit code $exitCode.")
+    } finally {
+      if os.exists(exportBuildStructurePluginPath) then os.remove(exportBuildStructurePluginPath)
+    }
+  }
+
+  private def readAndParseExportedModules(): IndexedSeq[ExportedProjectExportFile] = {
+    val exportDir = os.pwd / "target/build-export"
+    val exportedSbtModuleFiles = os.list(exportDir).filter(_.ext == "json")
+    exportedSbtModuleFiles
+      .map(mf => ExportedProjectExportFile.parse(mf, os.read(mf)))
+  }
+
+}
+
+object SbtImporter {
+
+  private[sbt] def runSbtExportCommand(
+      serverNotificationsLogger: ServerNotificationsLogger
+  ): String => Int = { sbtCmd =>
     val sbtProc = os.spawn((sbtCmd, "exportAllBuildStructures"), mergeErrIntoOut = true)
     try {
       var line = ""
@@ -44,24 +74,14 @@ class SbtImporter(
       } do {
         serverNotificationsLogger.add(ServerNotification.logInfo(line))
       }
-      sbtProc.waitFor()
+      sbtProc.wrapped.waitFor()
     } finally {
       // Ensure sbt process is destroyed even if we're interrupted
-      if sbtProc.isAlive() then
-        sbtProc.destroy()
-        sbtProc.waitFor(5000L)
-        if sbtProc.isAlive() then sbtProc.destroyForcibly()
-      os.remove(exportBuildStructurePluginPath)
+      if sbtProc.wrapped.isAlive() then
+        sbtProc.wrapped.destroy()
+        sbtProc.wrapped.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+        if sbtProc.wrapped.isAlive() then sbtProc.wrapped.destroyForcibly()
     }
-  }
-
-  private def readAndParseExportedModules(): IndexedSeq[ProjectExport] = {
-    val exportDir = os.pwd / "target/build-export"
-    val exportedSbtModuleFiles = os.list(exportDir).filter(_.ext == "json")
-    val allModules = exportedSbtModuleFiles
-      .map(mf => os.read(mf).parseJson[ProjectExport])
-    // skip root aggregating project
-    if (allModules.length > 1) allModules.filterNot(_.base == os.pwd.toString) else allModules
   }
 
 }
