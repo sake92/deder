@@ -242,6 +242,9 @@ open class JavaModule extends DederModule {
   semanticdbEnabled: Boolean = read?("env:CI") == null
   /// JAR manifest entries. Overrides defaults set by Deder.
   manifest: ManifestSettings = new ManifestSettings {}
+  /// Optional JarJar shading rules file for assembly shading configuration.
+  /// Relative paths resolve from the module root; absolute paths are used as-is.
+  shadeRulesFile: String?
   publish: Boolean = true
   pomSettings: PomSettings?
   /// The repository to publish artifacts to.
