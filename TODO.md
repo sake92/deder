@@ -9,7 +9,7 @@
 - hide some internal tasks like deps resolving etc, helper assemblyDeps.. (rebind edges when displaying)
 - color stages in plan
 - shade test-runner to avoid classpath issues.. but first make shading work good
-
+- quick shutdown and start causes issues
 
 # Docs
 - run pkldoc on each tag, and publish to ghpages

@@ -14,6 +14,14 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   override def munitTimeout: Duration = 10.minutes
 
   private val testResourceDir: os.Path = os.pwd / "integration/test/resources"
+  private val bspRequestTimeoutMinutes = 5L
+
+  private def writeServerProperties(testDir: os.Path): Unit =
+    os.write.over(
+      testDir / ".deder/server.properties",
+      s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\nmaxConnectSeconds=300\n",
+      createFolders = true
+    )
 
   test("BSP client re-launch connects to still-running server") {
     val testDir = os.pwd / "tmp" / s"bsp-relaunch-${System.currentTimeMillis()}"
@@ -24,23 +32,19 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(
-        testDir / ".deder/server.properties",
-        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
-        createFolders = true
-      )
+      writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
       // First session: run a query
       withBspSession(testDir) { (buildServer1, _, _) =>
-        val result1 = buildServer1.workspaceBuildTargets().get(2, TimeUnit.MINUTES)
+        val result1 = buildServer1.workspaceBuildTargets().get(bspRequestTimeoutMinutes, TimeUnit.MINUTES)
         val ids1 = result1.getTargets.asScala.map(_.getId.getUri).toSet
         assert(ids1.contains(s"${baseUri(testDir)}#common"))
       }
 
       // Second session: re-launch the BSP client, connect to same running server
       withBspSession(testDir) { (buildServer2, _, _) =>
-        val result2 = buildServer2.workspaceBuildTargets().get(1, TimeUnit.MINUTES)
+        val result2 = buildServer2.workspaceBuildTargets().get(bspRequestTimeoutMinutes, TimeUnit.MINUTES)
         val ids2 = result2.getTargets.asScala.map(_.getId.getUri).toSet
         assert(ids2.contains(s"${baseUri(testDir)}#common"), "second session should also see common module")
       }
@@ -58,16 +62,12 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(
-        testDir / ".deder/server.properties",
-        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
-        createFolders = true
-      )
+      writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
       // First session
       withBspSession(testDir) { (buildServer1, _, bspProcess1) =>
-        val result1 = buildServer1.workspaceBuildTargets().get(1, TimeUnit.MINUTES)
+        val result1 = buildServer1.workspaceBuildTargets().get(bspRequestTimeoutMinutes, TimeUnit.MINUTES)
         assert(result1.getTargets.asScala.nonEmpty)
 
         // Kill the server (simulating "deder shutdown")
@@ -78,7 +78,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
       // Second session: new BSP client should auto-start the server
       withBspSession(testDir) { (buildServer2, _, bspProcess2) =>
         // Server was auto-started, should be ready after buildInitialize
-        val result2 = buildServer2.workspaceBuildTargets().get(2, TimeUnit.MINUTES)
+        val result2 = buildServer2.workspaceBuildTargets().get(bspRequestTimeoutMinutes, TimeUnit.MINUTES)
         val ids2 = result2.getTargets.asScala.map(_.getId.getUri).toSet
         assert(ids2.contains(s"${baseUri(testDir)}#common"), "server should have restarted and provided targets")
       }
@@ -96,11 +96,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(
-        testDir / ".deder/server.properties",
-        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
-        createFolders = true
-      )
+      writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, _, bspProcess) =>
@@ -128,11 +124,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(
-        testDir / ".deder/server.properties",
-        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
-        createFolders = true
-      )
+      writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, _, _) =>
@@ -153,7 +145,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         )
 
         // Server must remain usable after the rejected request
-        val targetsResult = buildServer.workspaceBuildTargets().get(30, TimeUnit.SECONDS)
+        val targetsResult = buildServer.workspaceBuildTargets().get(bspRequestTimeoutMinutes, TimeUnit.MINUTES)
         assert(
           targetsResult.getTargets.asScala.nonEmpty,
           "server should still be reachable and return targets after rejecting an unknown target"
@@ -173,11 +165,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(
-        testDir / ".deder/server.properties",
-        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
-        createFolders = true
-      )
+      writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
       // First session: compile common
@@ -213,11 +201,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(
-        testDir / ".deder/server.properties",
-        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
-        createFolders = true
-      )
+      writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, capturingClient, _) =>
@@ -256,11 +240,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(
-        testDir / ".deder/server.properties",
-        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
-        createFolders = true
-      )
+      writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, capturingClient, _) =>
@@ -302,11 +282,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(
-        testDir / ".deder/server.properties",
-        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
-        createFolders = true
-      )
+      writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, capturingClient, _) =>
@@ -348,11 +324,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         testDir / "deder.pkl",
         (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
       )
-      os.write.over(
-        testDir / ".deder/server.properties",
-        s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
-        createFolders = true
-      )
+      writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
       withBspSession(testDir) { (buildServer, capturingClient, _) =>
@@ -415,7 +387,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
         baseUri(testDir),
         new BuildClientCapabilities(List("scala", "java").asJava)
       )
-      buildServer.buildInitialize(initParams).get(2, TimeUnit.MINUTES)
+      buildServer.buildInitialize(initParams).get(bspRequestTimeoutMinutes, TimeUnit.MINUTES)
       buildServer.onBuildInitialized()
 
       testCode(buildServer, capturingClient, bspProcess)

@@ -181,7 +181,20 @@ class PublishTasks(coreTasks: CoreTasks) {
         skipAssemblyEntry
       )
       val resultJarPath = ctx.out / "out.jar"
-      JarUtils.createAssemblyJar(resultJarPath, mergedJar)
+      
+      val shadeRulesOpt = ctx.module match {
+        case jm: JavaModule =>
+          val shadeRulesFile = jm.shadeRulesFile
+          if (shadeRulesFile != null) {
+            val moduleRoot = DederGlobals.projectRootDir / jm.root
+            Some(JarUtils.resolveShadeRules(Some(shadeRulesFile), moduleRoot))
+          } else {
+            None
+          }
+        case _ => None
+      }
+      
+      JarUtils.createAssemblyJar(resultJarPath, mergedJar, shadeRulesOpt)
       resultJarPath
     }
 
