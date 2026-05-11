@@ -10,6 +10,7 @@ import ba.sake.deder.BaseIntegrationSuite
 class BspVisibilityIntegrationSuite extends BaseIntegrationSuite {
 
   override def munitTimeout: Duration = 10.minutes
+  private val bspRequestTimeoutMinutes = 5L
 
   private def targetId(baseUri: String, moduleId: String) = new BuildTargetIdentifier(s"$baseUri#$moduleId")
 
@@ -43,7 +44,7 @@ class BspVisibilityIntegrationSuite extends BaseIntegrationSuite {
       )
 
       try {
-        buildServer.buildInitialize(initParams).get(1, TimeUnit.MINUTES)
+        buildServer.buildInitialize(initParams).get(bspRequestTimeoutMinutes, TimeUnit.MINUTES)
         buildServer.onBuildInitialized()
         testCode(projectPath, buildServer)
       } finally {
@@ -55,7 +56,7 @@ class BspVisibilityIntegrationSuite extends BaseIntegrationSuite {
   test("workspaceBuildTargets exposes only latest cross-platform variants by default") {
     withBspServer("sample-projects/cross") { (projectPath, buildServer) =>
       val baseUri = projectPath.toNIO.toUri.toString
-      val result = buildServer.workspaceBuildTargets().get(2, TimeUnit.MINUTES)
+      val result = buildServer.workspaceBuildTargets().get(bspRequestTimeoutMinutes, TimeUnit.MINUTES)
       val ids = result.getTargets.asScala.map(_.getId.getUri).toSet
 
       assertEquals(
@@ -82,7 +83,7 @@ class BspVisibilityIntegrationSuite extends BaseIntegrationSuite {
       )
     ) { (projectPath, buildServer) =>
       val baseUri = projectPath.toNIO.toUri.toString
-      val result = buildServer.workspaceBuildTargets().get(2, TimeUnit.MINUTES)
+      val result = buildServer.workspaceBuildTargets().get(bspRequestTimeoutMinutes, TimeUnit.MINUTES)
       val targets = result.getTargets.asScala
       val ids = targets.map(_.getId.getUri).toSet
 

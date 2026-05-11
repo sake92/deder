@@ -53,7 +53,8 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
 
       val serverProps =
         s"localPath=$dederServerPath\n" +
-          s"testRunnerLocalPath=$dederTestRunnerPath\n"
+          s"testRunnerLocalPath=$dederTestRunnerPath\n" +
+          s"maxConnectSeconds=300\n"
       os.write.over(tempDir / ".deder/server.properties", serverProps, createFolders = true)
 
       val importRes = executeDederCommand(tempDir, "import", "--from", "sbt")

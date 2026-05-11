@@ -4,6 +4,8 @@ import java.io.*;
 import java.net.StandardProtocolFamily;
 import java.net.UnixDomainSocketAddress;
 import java.nio.channels.Channels;
+import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
@@ -33,6 +35,10 @@ public class DederBspProxyClient implements DederClient {
 					var os = Channels.newOutputStream(channel);
 					System.in.transferTo(os);
 				} catch (IOException e) {
+					if (isExpectedShutdown(e)) {
+						log("BSP client write thread interrupted during shutdown.");
+						return;
+					}
 					log("Error occurred while writing to server: " + e.getMessage());
 					throw new UncheckedIOException(e);
 				}
@@ -43,6 +49,10 @@ public class DederBspProxyClient implements DederClient {
 					var is = Channels.newInputStream(channel);
 					is.transferTo(System.out);
 				} catch (IOException e) {
+					if (isExpectedShutdown(e)) {
+						log("BSP client read thread interrupted during shutdown.");
+						return;
+					}
 					log("Error occurred while reading from server: " + e.getMessage());
 					throw new UncheckedIOException(e);
 				}
@@ -77,6 +87,13 @@ public class DederBspProxyClient implements DederClient {
 		} catch (IOException e) {
 			throw new UncheckedIOException(e);
 		}
+	}
+
+	private boolean isExpectedShutdown(IOException e) {
+		return e instanceof ClosedByInterruptException
+				|| e instanceof AsynchronousCloseException
+				|| e.getCause() instanceof ClosedByInterruptException
+				|| e.getCause() instanceof AsynchronousCloseException;
 	}
 
 }
