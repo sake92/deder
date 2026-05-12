@@ -180,6 +180,20 @@ class PluginLoaderSuite extends munit.FunSuite {
     }
   }
 
+  test("PluginLoadResult does not expose the legacy single-loader accessor") {
+    val pluginClassLoader = new URLClassLoader(Array.empty, getClass.getClassLoader)
+    val loadResult = PluginLoader.PluginLoadResult(
+      Seq(PluginLoader.LoadedPlugin("plugin-a", Seq.empty, pluginClassLoader))
+    )
+
+    try {
+      assert(
+        !loadResult.getClass.getMethods.exists(method => method.getName == "classLoader" && method.getParameterCount == 0),
+        clues(loadResult.getClass.getMethods.map(_.getName).sorted.mkString(", "))
+      )
+    } finally pluginClassLoader.close()
+  }
+
   private def newPluginLoader(): PluginLoader =
     new PluginLoader(noopCoreTasksApi, noopDependencyResolver)
 
@@ -343,13 +357,6 @@ class PluginLoaderSuite extends munit.FunSuite {
       .flatMap(accessorValue(loadResult, _).toSeq)
       .headOption
       .map(toSeq(_).collect { case loader: URLClassLoader => loader })
-      .orElse {
-        accessorValue(loadResult, "classLoader").map {
-          case opt: Option[?] => opt.toSeq.collect { case loader: URLClassLoader => loader }
-          case loader: URLClassLoader => Seq(loader)
-          case _ => Seq.empty
-        }
-      }
       .getOrElse(Seq.empty)
 
   private def looksLikeLoadedPlugin(value: Any): Boolean =

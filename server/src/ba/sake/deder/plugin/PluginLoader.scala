@@ -322,51 +322,17 @@ object PluginLoader {
   )
 
   final class PluginLoadResult private (
-      val loadedPlugins: Seq[LoadedPlugin],
-      compatTasksOverride: Option[Seq[AbstractTask[?]]],
-      compatClassLoaderOverride: Option[Option[URLClassLoader]]
+      val loadedPlugins: Seq[LoadedPlugin]
   ) {
     lazy val tasks: Seq[AbstractTask[?]] =
-      compatTasksOverride.getOrElse(loadedPlugins.flatMap(_.tasks))
-    /** Preferred retained-loader view.
-      * Legacy single-loader callers should use [[classLoader]] until Task 3 removes that shim.
-      */
+      loadedPlugins.flatMap(_.tasks)
     lazy val classLoaders: Seq[URLClassLoader] =
-      compatClassLoaderOverride match {
-        case Some(Some(classLoader)) => Seq(classLoader)
-        case Some(None) => Seq.empty
-        case None => loadedPlugins.map(_.classLoader)
-      }
-    // TODO Task 3: remove this single-loader compatibility shim.
-    private lazy val compatibilityClassLoader: Option[URLClassLoader] =
-      compatClassLoaderOverride.getOrElse {
-        classLoaders match {
-          case Seq() => None
-          case Seq(classLoader) => Some(classLoader)
-          case classLoaders => Some(PluginLoader.CompatibilityClassLoader(classLoaders))
-        }
-      }
-    /** Transitional single-loader view for legacy consumers.
-      * When multiple plugin classloaders are present, the returned aggregate loader temporarily
-      * owns delegate closure; close it instead of closing delegates separately.
-      */
-    def classLoader: Option[URLClassLoader] = compatibilityClassLoader
+      loadedPlugins.map(_.classLoader)
   }
 
   object PluginLoadResult {
     def apply(loadedPlugins: Seq[LoadedPlugin]): PluginLoadResult =
-      new PluginLoadResult(loadedPlugins, None, None)
-
-    def apply(
-        compatTasks: Seq[AbstractTask[?]],
-        compatClassLoader: Option[URLClassLoader]
-    ): PluginLoadResult =
-      new PluginLoadResult(
-        loadedPlugins = compatClassLoader.toSeq.map(loader => LoadedPlugin("__compat__", compatTasks, loader)),
-        compatTasksOverride =
-          Option.when(compatClassLoader.isEmpty && compatTasks.nonEmpty)(compatTasks),
-        compatClassLoaderOverride = Some(compatClassLoader)
-      )
+      new PluginLoadResult(loadedPlugins)
   }
 
   val DederPluginApiClass = classOf[DederPluginApi]
@@ -400,41 +366,5 @@ object PluginLoader {
       hex.append(f"${b & 0xff}%02x")
     }
     hex.toString()
-  }
-
-  /** Transitional adapter for legacy single-loader consumers.
-    * This loader owns its delegate plugin loaders and closes them when closed.
-    */
-  private final class CompatibilityClassLoader private (
-      delegateClassLoaders: Seq[URLClassLoader]
-  ) extends URLClassLoader(
-        delegateClassLoaders.flatMap(_.getURLs).distinct.toArray,
-        delegateClassLoaders.headOption.map(_.getParent).orNull
-      ) {
-
-    override def close(): Unit = {
-      var closeError: Option[Exception] = None
-      try super.close()
-      catch {
-        case e: Exception =>
-          closeError = Some(e)
-      }
-      delegateClassLoaders.distinct.foreach { classLoader =>
-        try classLoader.close()
-        catch {
-          case e: Exception =>
-            closeError match {
-              case Some(existing) => existing.addSuppressed(e)
-              case None => closeError = Some(e)
-            }
-        }
-      }
-      closeError.foreach(throw _)
-    }
-  }
-
-  private object CompatibilityClassLoader {
-    def apply(delegateClassLoaders: Seq[URLClassLoader]): URLClassLoader =
-      new CompatibilityClassLoader(delegateClassLoaders)
   }
 }

@@ -124,22 +124,15 @@ class DederProjectStatePluginReloadSuite extends munit.FunSuite {
     }
 
   private def retainedClassLoaders(state: DederProjectState): Seq[URLClassLoader] = {
-    // Temporary transition scaffolding while the state model supports both the legacy
-    // single-loader shape and the new per-plugin classLoader(s) migration target.
     val field = classOf[DederProjectState].getDeclaredFields.find { field =>
       field.getName == "loadedPlugins" || field.getName.endsWith("loadedPlugins")
     }.getOrElse(fail("Could not find DederProjectState.loadedPlugins field"))
     field.setAccessible(true)
     val loadedPlugins = field.get(state)
-    val methods = loadedPlugins.getClass.getMethods.filter(_.getParameterCount == 0)
-    methods.find(_.getName == "classLoaders") match {
-      case Some(method) => method.invoke(loadedPlugins).asInstanceOf[Seq[URLClassLoader]]
-      case None =>
-        methods
-          .find(_.getName == "classLoader")
-          .map(_.invoke(loadedPlugins).asInstanceOf[Option[URLClassLoader]].toSeq)
-          .getOrElse(fail("Loaded plugins state does not expose classLoader(s)"))
-    }
+    loadedPlugins.getClass.getMethods
+      .find(method => method.getName == "classLoaders" && method.getParameterCount == 0)
+      .map(_.invoke(loadedPlugins).asInstanceOf[Seq[URLClassLoader]])
+      .getOrElse(fail("Loaded plugins state does not expose classLoaders"))
   }
 
   private def assertRetainedClassLoaders(state: DederProjectState, expected: Seq[CloseTrackingClassLoader]): Unit = {
