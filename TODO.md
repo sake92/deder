@@ -11,6 +11,10 @@
 - shade test-runner to avoid classpath issues.. but first make shading work good
 - quick shutdown and start causes issues
 
+# Import
+- cross scala modules are wack..
+- relativize imported folders to repo root or module root..
+
 # Docs
 - run pkldoc on each tag, and publish to ghpages
 https://pkl-lang.org/main/current/pkl-doc/index.html
@@ -50,6 +54,7 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 - temp override of settings, say scalacOptions when running BSP request??? hmmm
 
 ## BSP
+- check if futures caching logic is ok with Metals..?
 - still lingering compilations.. maybe I broke it in recent refactors?
 - more interactive / resiliency tests
 - java main classes cant be run..??
