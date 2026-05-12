@@ -106,10 +106,10 @@ class DederProjectState(
                     logger.warn(s"Failed to reload plugins: $err. Reusing previously loaded plugin tasks.")
                     loadedPlugins.tasks
                   case Right(result) =>
-                    val oldClassLoader = loadedPlugins.classLoader
+                    val oldClassLoaders = loadedPlugins.classLoaders
                     val newTasks = result.tasks.map(_.asInstanceOf[Task[?, ?]])
-                    loadedPlugins = LoadedPluginsData(Some(fingerprint), newTasks, result.classLoader)
-                    closeStaleClassLoader(oldClassLoader, result.classLoader)
+                    loadedPlugins = LoadedPluginsData(Some(fingerprint), newTasks, result.classLoaders)
+                    closeStaleClassLoaders(oldClassLoaders, result.classLoaders)
                     newTasks
                 }
             }
@@ -577,12 +577,12 @@ class DederProjectState(
 
   def shutdown(): Unit = {
     shutdownStarted = true
-    loadedPlugins.classLoader.foreach(closeClassLoader)
+    loadedPlugins.classLoaders.foreach(closeClassLoader)
     onShutdown()
   }
 
-  private def closeStaleClassLoader(previous: Option[URLClassLoader], current: Option[URLClassLoader]): Unit =
-    previous.foreach { old =>
+  private def closeStaleClassLoaders(previous: Seq[URLClassLoader], current: Seq[URLClassLoader]): Unit =
+    previous.distinct.foreach { old =>
       // Compare by reference: if the same classloader instance is still active, keep it open.
       val shouldClose = current.forall(_ ne old)
       if shouldClose then closeClassLoader(old)
@@ -619,9 +619,9 @@ case class WatchedTaskData(
 case class LoadedPluginsData(
     fingerprint: Option[String],
     tasks: Seq[Task[?, ?]],
-    classLoader: Option[URLClassLoader]
+    classLoaders: Seq[URLClassLoader]
 )
 
 object LoadedPluginsData {
-  val empty = LoadedPluginsData(None, Seq.empty, None)
+  val empty = LoadedPluginsData(None, Seq.empty, Seq.empty)
 }

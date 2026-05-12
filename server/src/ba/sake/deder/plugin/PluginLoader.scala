@@ -2,6 +2,7 @@ package ba.sake.deder.plugin
 
 import java.net.URLClassLoader
 import java.security.MessageDigest
+import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
@@ -87,41 +88,11 @@ class PluginLoader(
       pluginConfigs: Seq[(String, String)],
       pluginJarPaths: Seq[os.Path]
   ): Either[String, PluginLoader.PluginLoadResult] = try {
-    if pluginConfigs.isEmpty then return Right(PluginLoader.PluginLoadResult(Seq.empty, None))
-    val pluginUrls = pluginJarPaths.map(_.toIO.toURI.toURL).toArray
-    val pluginClassLoader = new URLClassLoader(pluginUrls, getClass.getClassLoader)
-
-    try {
-      val tasks = pluginConfigs.flatMap { case (pluginId, configText) =>
-        val serviceLoader = java.util.ServiceLoader.load(PluginLoader.DederPluginApiClass, pluginClassLoader)
-        val impls = serviceLoader.iterator().asScala.toSeq
-        val matchingImpl = impls.find(_.id == pluginId)
-
-        matchingImpl match {
-          case Some(plugin) =>
-            logger.info(s"Loaded plugin '$pluginId'")
-            logger.info(s"Plugin config Pkl text: $configText")
-            val ts = plugin.tasks(coreTasksApi, configText)
-            logger.info(s"Plugin '$pluginId' contributed ${ts.size} tasks")
-            ts
-          case None =>
-            logger.warn(
-              s"No DederPluginApi implementation found for id='$pluginId'. " +
-              s"Available: ${impls.map(_.id).mkString(", ")}"
-            )
-            Seq.empty
-        }
-      }
-      Right(PluginLoader.PluginLoadResult(tasks, Some(pluginClassLoader)))
-    } catch {
-      case e: Exception =>
-        try pluginClassLoader.close()
-        catch {
-          case _: Exception =>
-        }
-        val msg = s"Failed to load plugins: ${e.getMessage}"
-        logger.error(msg, e)
-        Left(msg)
+    if pluginConfigs.isEmpty then return Right(PluginLoader.PluginLoadResult(Seq.empty))
+    inspectPluginJarPathInfos(pluginJarPaths) match {
+      case Left(err) => Left(err)
+      case Right(pluginJarPathInfos) =>
+        loadPluginsIndividually(pluginConfigs.toList, pluginJarPathInfos, Vector.empty)
     }
   } catch {
     case e: Exception =>
@@ -134,44 +105,269 @@ class PluginLoader(
     evaluatePhase1(pklFile) match {
       case Left(err) => Left(err)
       case Right(project) =>
-        val depsWithScalaVer = extractPluginDeps(project)
-        if depsWithScalaVer.isEmpty then return Right(PluginLoader.PluginLoadResult(Seq.empty, None))
+        val projectPlugins = Option(project.plugins).toSeq.flatMap(_.asScala)
+        if projectPlugins.isEmpty then return Right(PluginLoader.PluginLoadResult(Seq.empty))
 
-        val allDepStrings = depsWithScalaVer.map(_._1)
-        logger.info(s"Discovered plugin dependencies: ${allDepStrings.mkString(", ")}")
-
-        val dependencies = depsWithScalaVer.map { case (depStr, scalaVer) =>
-          Dependency.make(depStr, scalaVer)
-        }
-        val pluginJarPaths = try {
-          dependencyResolver.fetchFiles(dependencies, None)
-        } catch {
-          case e: Exception =>
-            logger.warn(s"Failed to resolve plugin dependencies: ${e.getMessage}", e)
-            return Left(s"Failed to resolve plugin dependencies: ${e.getMessage}")
-        }
-        logger.info(s"Resolved plugin JARs: ${pluginJarPaths.map(_.last).mkString(", ")}")
-
-        // Collect plugin ids from project-level plugins
-        val pluginIds = Option(project.plugins).toSeq.flatMap(_.asScala).map(_.id)
-
-        val pluginConfigs =
-          PluginLoader.sequence(pluginIds.map(id => serializePluginConfig(pklFile, id).map(text => id -> text))) match {
-            case Left(err) => return Left(err)
-            case Right(values) => values
-          }
-        logger.debug(s"Serialized ${pluginConfigs.size} plugin config(s) as Pkl text")
-
-        loadPlugins(pluginConfigs, pluginJarPaths)
+        val scalaVer = project.modules.asScala.toSeq.collectFirst {
+          case sm: ScalaModule => sm.scalaVersion
+        }.getOrElse("")
+        loadConfiguredPlugins(projectPlugins.toList, scalaVer, pklFile, Vector.empty)
     }
   }
+
+  @tailrec
+  private def loadPluginsIndividually(
+      remainingPluginConfigs: List[(String, String)],
+      pluginJarPathInfos: Seq[PluginLoader.PluginJarPathInfo],
+      loadedPlugins: Vector[PluginLoader.LoadedPlugin]
+  ): Either[String, PluginLoader.PluginLoadResult] =
+    remainingPluginConfigs match {
+      case Nil =>
+        Right(PluginLoader.PluginLoadResult(loadedPlugins))
+      case (pluginId, configText) :: tail =>
+        findPluginJarPaths(pluginId, pluginJarPathInfos) match {
+          case Left(err) =>
+            closeLoadedPlugins(loadedPlugins)
+            Left(err)
+          case Right(None) =>
+            loadPluginsIndividually(tail, pluginJarPathInfos, loadedPlugins)
+          case Right(Some(paths)) =>
+            loadPluginFromPaths(pluginId, configText, paths) match {
+              case Left(err) =>
+                closeLoadedPlugins(loadedPlugins)
+                Left(err)
+              case Right(None) =>
+                loadPluginsIndividually(tail, pluginJarPathInfos, loadedPlugins)
+              case Right(Some(loadedPlugin)) =>
+                loadPluginsIndividually(tail, pluginJarPathInfos, loadedPlugins :+ loadedPlugin)
+            }
+        }
+    }
+
+  @tailrec
+  private def loadConfiguredPlugins(
+      remainingPlugins: List[DederPlugin],
+      scalaVer: String,
+      pklFile: os.Path,
+      loadedPlugins: Vector[PluginLoader.LoadedPlugin]
+  ): Either[String, PluginLoader.PluginLoadResult] =
+    remainingPlugins match {
+      case Nil =>
+        Right(PluginLoader.PluginLoadResult(loadedPlugins))
+      case plugin :: tail =>
+        val pluginId = plugin.id
+        serializePluginConfig(pklFile, pluginId) match {
+          case Left(err) =>
+            closeLoadedPlugins(loadedPlugins)
+            Left(err)
+          case Right(configText) =>
+            logger.debug(s"Serialized plugin config for '$pluginId' as Pkl text")
+            val depStrings = Option(plugin.deps).toSeq.flatMap(_.asScala)
+            logger.info(s"Discovered plugin dependencies for '$pluginId': ${depStrings.mkString(", ")}")
+            val dependencies = depStrings.map(depStr => Dependency.make(depStr, scalaVer))
+            resolvePluginJarPaths(pluginId, dependencies) match {
+              case Left(err) =>
+                closeLoadedPlugins(loadedPlugins)
+                Left(err)
+              case Right(pluginJarPaths) =>
+                logger.info(s"Resolved plugin JARs for '$pluginId': ${pluginJarPaths.map(_.last).mkString(", ")}")
+                loadPluginFromPaths(pluginId, configText, pluginJarPaths) match {
+                  case Left(err) =>
+                    closeLoadedPlugins(loadedPlugins)
+                    Left(err)
+                  case Right(None) =>
+                    loadConfiguredPlugins(tail, scalaVer, pklFile, loadedPlugins)
+                  case Right(Some(loadedPlugin)) =>
+                    loadConfiguredPlugins(tail, scalaVer, pklFile, loadedPlugins :+ loadedPlugin)
+                }
+            }
+        }
+    }
+
+  private def resolvePluginJarPaths(
+      pluginId: String,
+      dependencies: Seq[Dependency]
+  ): Either[String, Seq[os.Path]] = try {
+    Right(dependencyResolver.fetchFiles(dependencies, None))
+  } catch {
+    case e: Exception =>
+      logger.warn(s"Failed to resolve plugin dependencies for '$pluginId': ${e.getMessage}", e)
+      Left(s"Failed to resolve plugin dependencies for '$pluginId': ${e.getMessage}")
+  }
+
+  private def findPluginJarPaths(
+      pluginId: String,
+      pluginJarPathInfos: Seq[PluginLoader.PluginJarPathInfo]
+  ): Either[String, Option[Seq[os.Path]]] =
+    val availablePluginIds = pluginJarPathInfos.flatMap(_.pluginIds).distinct
+    val matchingPluginJarPaths = pluginJarPathInfos.collect {
+      case pluginJarPathInfo if
+            pluginJarPathInfo.pluginIds.isEmpty || pluginJarPathInfo.pluginIds.contains(pluginId) =>
+        pluginJarPathInfo.path
+    }
+    if pluginJarPathInfos.exists(_.pluginIds.contains(pluginId)) then
+      Right(Some(matchingPluginJarPaths))
+    else
+      logger.warn(
+        s"No DederPluginApi implementation found for id='$pluginId'. " +
+        s"Available: ${availablePluginIds.mkString(", ")}"
+      )
+      Right(None)
+
+  private def inspectPluginJarPathInfos(
+      pluginJarPaths: Seq[os.Path]
+  ): Either[String, Seq[PluginLoader.PluginJarPathInfo]] =
+    PluginLoader.sequence(pluginJarPaths.map(inspectPluginJarPathInfo))
+
+  private def inspectPluginJarPathInfo(
+      pluginJarPath: os.Path
+  ): Either[String, PluginLoader.PluginJarPathInfo] =
+    inspectPluginIds(Seq(pluginJarPath), pluginJarPath.last)
+      .map(pluginIds => PluginLoader.PluginJarPathInfo(pluginJarPath, pluginIds))
+
+  private def inspectPluginIds(
+      pluginJarPaths: Seq[os.Path],
+      inspectionLabel: String
+  ): Either[String, Seq[String]] = {
+    val pluginUrls = pluginJarPaths.map(_.toIO.toURI.toURL).toArray
+    val pluginClassLoader = new URLClassLoader(pluginUrls, getClass.getClassLoader)
+    try {
+      val serviceLoader = java.util.ServiceLoader.load(PluginLoader.DederPluginApiClass, pluginClassLoader)
+      Right(serviceLoader.iterator().asScala.toSeq.map(_.id).distinct)
+    } catch {
+      case e: Exception =>
+        val msg = s"Failed to inspect plugin '$inspectionLabel': ${e.getMessage}"
+        logger.error(msg, e)
+        Left(msg)
+      case e: java.util.ServiceConfigurationError =>
+        val msg = s"Failed to inspect plugin '$inspectionLabel': ${e.getMessage}"
+        logger.error(msg, e)
+        Left(msg)
+      case e: LinkageError =>
+        val msg = s"Failed to inspect plugin '$inspectionLabel': ${e.getMessage}"
+        logger.error(msg, e)
+        Left(msg)
+    } finally {
+      closeClassLoaderQuietly(pluginClassLoader)
+    }
+  }
+
+  private def loadPluginFromPaths(
+      pluginId: String,
+      configText: String,
+      pluginJarPaths: Seq[os.Path]
+  ): Either[String, Option[PluginLoader.LoadedPlugin]] = {
+    val pluginUrls = pluginJarPaths.map(_.toIO.toURI.toURL).toArray
+    val pluginClassLoader = new URLClassLoader(pluginUrls, getClass.getClassLoader)
+
+    try {
+      val serviceLoader = java.util.ServiceLoader.load(PluginLoader.DederPluginApiClass, pluginClassLoader)
+      val impls = serviceLoader.iterator().asScala.toSeq
+      val matchingImpl = impls.find(_.id == pluginId)
+
+      matchingImpl match {
+        case Some(plugin) =>
+          logger.info(s"Loaded plugin '$pluginId'")
+          logger.info(s"Plugin config Pkl text: $configText")
+          val tasks = plugin.tasks(coreTasksApi, configText)
+          logger.info(s"Plugin '$pluginId' contributed ${tasks.size} tasks")
+          Right(Some(PluginLoader.LoadedPlugin(pluginId, tasks, pluginClassLoader)))
+        case None =>
+          logger.warn(
+            s"No DederPluginApi implementation found for id='$pluginId'. " +
+            s"Available: ${impls.map(_.id).mkString(", ")}"
+          )
+          closeClassLoaderQuietly(pluginClassLoader)
+          Right(None)
+      }
+    } catch {
+      case e: Exception =>
+        closeClassLoaderQuietly(pluginClassLoader)
+        val msg = s"Failed to load plugin '$pluginId': ${e.getMessage}"
+        logger.error(msg, e)
+        Left(msg)
+      case e: java.util.ServiceConfigurationError =>
+        closeClassLoaderQuietly(pluginClassLoader)
+        val msg = s"Failed to load plugin '$pluginId': ${e.getMessage}"
+        logger.error(msg, e)
+        Left(msg)
+      case e: LinkageError =>
+        closeClassLoaderQuietly(pluginClassLoader)
+        val msg = s"Failed to load plugin '$pluginId': ${e.getMessage}"
+        logger.error(msg, e)
+        Left(msg)
+    }
+  }
+
+  private def closeLoadedPlugins(loadedPlugins: Seq[PluginLoader.LoadedPlugin]): Unit =
+    loadedPlugins.foreach(loadedPlugin => closeClassLoaderQuietly(loadedPlugin.classLoader))
+
+  private def closeClassLoaderQuietly(pluginClassLoader: URLClassLoader): Unit =
+    try pluginClassLoader.close()
+    catch {
+      case _: Exception =>
+    }
 }
 
 object PluginLoader {
-  case class PluginLoadResult(
-      tasks: Seq[AbstractTask[?]],
-      classLoader: Option[URLClassLoader]
+  case class PluginJarPathInfo(
+      path: os.Path,
+      pluginIds: Seq[String]
   )
+
+  case class LoadedPlugin(
+      pluginId: String,
+      tasks: Seq[AbstractTask[?]],
+      classLoader: URLClassLoader
+  )
+
+  final class PluginLoadResult private (
+      val loadedPlugins: Seq[LoadedPlugin],
+      compatTasksOverride: Option[Seq[AbstractTask[?]]],
+      compatClassLoaderOverride: Option[Option[URLClassLoader]]
+  ) {
+    lazy val tasks: Seq[AbstractTask[?]] =
+      compatTasksOverride.getOrElse(loadedPlugins.flatMap(_.tasks))
+    /** Preferred retained-loader view.
+      * Legacy single-loader callers should use [[classLoader]] until Task 3 removes that shim.
+      */
+    lazy val classLoaders: Seq[URLClassLoader] =
+      compatClassLoaderOverride match {
+        case Some(Some(classLoader)) => Seq(classLoader)
+        case Some(None) => Seq.empty
+        case None => loadedPlugins.map(_.classLoader)
+      }
+    // TODO Task 3: remove this single-loader compatibility shim.
+    private lazy val compatibilityClassLoader: Option[URLClassLoader] =
+      compatClassLoaderOverride.getOrElse {
+        classLoaders match {
+          case Seq() => None
+          case Seq(classLoader) => Some(classLoader)
+          case classLoaders => Some(PluginLoader.CompatibilityClassLoader(classLoaders))
+        }
+      }
+    /** Transitional single-loader view for legacy consumers.
+      * When multiple plugin classloaders are present, the returned aggregate loader temporarily
+      * owns delegate closure; close it instead of closing delegates separately.
+      */
+    def classLoader: Option[URLClassLoader] = compatibilityClassLoader
+  }
+
+  object PluginLoadResult {
+    def apply(loadedPlugins: Seq[LoadedPlugin]): PluginLoadResult =
+      new PluginLoadResult(loadedPlugins, None, None)
+
+    def apply(
+        compatTasks: Seq[AbstractTask[?]],
+        compatClassLoader: Option[URLClassLoader]
+    ): PluginLoadResult =
+      new PluginLoadResult(
+        loadedPlugins = compatClassLoader.toSeq.map(loader => LoadedPlugin("__compat__", compatTasks, loader)),
+        compatTasksOverride =
+          Option.when(compatClassLoader.isEmpty && compatTasks.nonEmpty)(compatTasks),
+        compatClassLoaderOverride = Some(compatClassLoader)
+      )
+  }
 
   val DederPluginApiClass = classOf[DederPluginApi]
 
@@ -204,5 +400,41 @@ object PluginLoader {
       hex.append(f"${b & 0xff}%02x")
     }
     hex.toString()
+  }
+
+  /** Transitional adapter for legacy single-loader consumers.
+    * This loader owns its delegate plugin loaders and closes them when closed.
+    */
+  private final class CompatibilityClassLoader private (
+      delegateClassLoaders: Seq[URLClassLoader]
+  ) extends URLClassLoader(
+        delegateClassLoaders.flatMap(_.getURLs).distinct.toArray,
+        delegateClassLoaders.headOption.map(_.getParent).orNull
+      ) {
+
+    override def close(): Unit = {
+      var closeError: Option[Exception] = None
+      try super.close()
+      catch {
+        case e: Exception =>
+          closeError = Some(e)
+      }
+      delegateClassLoaders.distinct.foreach { classLoader =>
+        try classLoader.close()
+        catch {
+          case e: Exception =>
+            closeError match {
+              case Some(existing) => existing.addSuppressed(e)
+              case None => closeError = Some(e)
+            }
+        }
+      }
+      closeError.foreach(throw _)
+    }
+  }
+
+  private object CompatibilityClassLoader {
+    def apply(delegateClassLoaders: Seq[URLClassLoader]): URLClassLoader =
+      new CompatibilityClassLoader(delegateClassLoaders)
   }
 }
