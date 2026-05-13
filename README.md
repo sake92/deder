@@ -94,8 +94,8 @@ deder tasks
 ################
 # print execution plan for a task
 # supports flags: --json, --dot, --mermaid
-deder plan -m common -t compileClasspath
-
+deder plan -t compileClasspath -m common 
+deder plan -t compileClasspath -m uber  --mermaid > uberCompileClasspath.mermaid
 
 ################ run tasks
 # by default executes compile on all modules
