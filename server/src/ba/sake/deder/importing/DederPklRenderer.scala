@@ -94,6 +94,124 @@ object DederPklRenderer {
         }
     }
 
+    /** Computes properties common to ALL versions in a cross-version group.
+      * Returns a ModuleDef where each Seq property is the intersection across all
+      * version slices. moduleDeps are normalized: two refs differing only in
+      * targetScalaVersion are treated as identical. */
+    private def computeCommonProps(slices: Seq[VersionSlice]): ModuleDef = {
+        val allModuleDefs = slices.flatMap { slice =>
+            slice.modulesByPlatform.get("jvm").orElse(slice.modulesByPlatform.get("main"))
+        }
+        if (allModuleDefs.isEmpty) return ModuleDef("", Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, None, None, None, Seq.empty, Seq.empty, Seq.empty, Seq.empty)
+
+        def intersect[T](seqs: Seq[Seq[T]]): Seq[T] =
+            if (seqs.isEmpty) Seq.empty
+            else seqs.tail.foldLeft(seqs.head)((acc, s) => acc.filter(s.contains))
+
+        def intersectDeps(depsSeq: Seq[Seq[DepDef]]): Seq[DepDef] =
+            if (depsSeq.isEmpty) Seq.empty
+            else {
+                val formattedSets = depsSeq.map(_.map(_.formatted).toSet)
+                val commonFormatted = formattedSets.tail.foldLeft(formattedSets.head)(_ & _)
+                depsSeq.head.filter(d => commonFormatted.contains(d.formatted))
+            }
+
+        def intersectModuleDeps(depsSeq: Seq[Seq[ModuleDepRef]]): Seq[ModuleDepRef] =
+            if (depsSeq.isEmpty) Seq.empty
+            else {
+                def normalized(ref: ModuleDepRef): (String, String, Boolean) =
+                    (ref.targetGroup, ref.targetPlatform, ref.isTest)
+                val normalizedSets = depsSeq.map(_.map(normalized).toSet)
+                val common = normalizedSets.tail.foldLeft(normalizedSets.head)(_ & _)
+                depsSeq.head.filter(r => common.contains(normalized(r)))
+                    .map(r => r.copy(targetScalaVersion = None))
+            }
+
+        val base = allModuleDefs.head
+        ModuleDef(
+            scalaVersion = "",
+            scalacOptions = intersect(allModuleDefs.map(_.scalacOptions)),
+            javacOptions = intersect(allModuleDefs.map(_.javacOptions)),
+            deps = intersectDeps(allModuleDefs.map(_.deps)),
+            scalacPluginDeps = intersectDeps(allModuleDefs.map(_.scalacPluginDeps)),
+            testDeps = Seq.empty,
+            moduleDeps = intersectModuleDeps(allModuleDefs.map(_.moduleDeps)),
+            testModuleDeps = Seq.empty,
+            scalaJsVersion = None,
+            scalaNativeVersion = None,
+            publish = if (allModuleDefs.map(_.publish).distinct.size == 1) allModuleDefs.head.publish else None,
+            sources = intersect(allModuleDefs.map(_.sources)),
+            testSources = Seq.empty,
+            resources = intersect(allModuleDefs.map(_.resources)),
+            testResources = Seq.empty,
+        )
+    }
+
+    /** For each version, computes the additions over the common set.
+      * Returns Map[scalaVersion -> ModuleDef with only added properties].
+      * Properties identical to common are empty in the delta. */
+    private def computeVersionDeltas(
+        slices: Seq[VersionSlice],
+        common: ModuleDef,
+    ): Map[String, ModuleDef] = {
+        slices.flatMap { slice =>
+            slice.modulesByPlatform.get("jvm").orElse(slice.modulesByPlatform.get("main")).map { m =>
+                val v = slice.scalaVersion
+                v -> ModuleDef(
+                    scalaVersion = v,
+                    scalacOptions = m.scalacOptions.filterNot(common.scalacOptions.contains),
+                    javacOptions = m.javacOptions.filterNot(common.javacOptions.contains),
+                    deps = m.deps.filterNot(d => common.deps.exists(_.formatted == d.formatted)),
+                    scalacPluginDeps = m.scalacPluginDeps.filterNot(d => common.scalacPluginDeps.exists(_.formatted == d.formatted)),
+                    testDeps = Seq.empty,
+                    moduleDeps = m.moduleDeps.filterNot { ref =>
+                        common.moduleDeps.exists(c =>
+                            c.targetGroup == ref.targetGroup &&
+                            c.targetPlatform == ref.targetPlatform &&
+                            c.isTest == ref.isTest)
+                    },
+                    testModuleDeps = Seq.empty,
+                    scalaJsVersion = common.scalaJsVersion match {
+                        case Some(cv) if m.scalaJsVersion.contains(cv) => None
+                        case _ => m.scalaJsVersion
+                    },
+                    scalaNativeVersion = common.scalaNativeVersion match {
+                        case Some(cv) if m.scalaNativeVersion.contains(cv) => None
+                        case _ => m.scalaNativeVersion
+                    },
+                    publish = if (common.publish == m.publish) None else m.publish,
+                    sources = m.sources.filterNot(common.sources.contains),
+                    testSources = Seq.empty,
+                    resources = m.resources.filterNot(common.resources.contains),
+                    testResources = Seq.empty,
+                )
+            }
+        }.toMap
+    }
+
+    /** Renders when(sv == "version") { ... } blocks for version-specific property additions.
+      * Only emits blocks for versions that have non-empty deltas. */
+    private def renderDeltaWhenBlocks(
+        deltas: Map[String, ModuleDef],
+        groupLookup: Map[String, ModuleGroup],
+        indent: Int = 8,
+    ): String = {
+        val spaces = " " * indent
+        deltas.toSeq.sortBy(_._1).flatMap { case (version, delta) =>
+            val props = Seq(
+                if (delta.scalacOptions.nonEmpty) Some(renderScalacOptions(delta.scalacOptions, indent + 2)) else None,
+                if (delta.javacOptions.nonEmpty) Some(renderJavacOptions(delta.javacOptions, indent + 2)) else None,
+                if (delta.deps.nonEmpty) Some(renderDeps(delta.deps, indent + 2)) else None,
+                if (delta.scalacPluginDeps.nonEmpty) Some(renderPluginDeps(delta.scalacPluginDeps, indent + 2)) else None,
+                if (delta.sources.nonEmpty) Some(renderSourceDirs(delta.sources, indent + 2)) else None,
+                if (delta.resources.nonEmpty) Some(renderResourceDirs(delta.resources, indent + 2)) else None,
+                if (delta.moduleDeps.nonEmpty) Some(renderModuleDepsPkl(delta.moduleDeps, indent + 2, Some(ScalaVersionCtx.Literal(version)), groupLookup)) else None,
+            ).flatten
+            if (props.isEmpty) None
+            else Some(s"${spaces}when (sv == \"$version\") {\n${props.mkString("\n")}\n$spaces}")
+        }.mkString("\n")
+    }
+
     private def canRenderCompactCrossGroup(g: ModuleGroup): Boolean = {
         if (g.crossScalaVersions.isEmpty) false
         else {
