@@ -19,10 +19,7 @@ object DederPklRenderer {
         val repos = renderRepositories(build.repositories)
         val groupLookup = build.moduleGroups.map(g => g.builderVarName -> g).toMap
 
-        val compactByGroup = build.moduleGroups.map(g => g.builderVarName -> canRenderCompactCrossGroup(g)).toMap
-        val crossGroups = build.moduleGroups.filter(g =>
-            g.crossScalaVersions.nonEmpty && compactByGroup.getOrElse(g.builderVarName, false)
-        )
+        val crossGroups = build.moduleGroups.filter(g => g.crossScalaVersions.nonEmpty)
         val sharedVersionListName: Option[String] =
             if (crossGroups.map(_.crossScalaVersions).distinct.size == 1 && crossGroups.size > 1) Some("projectScalaVersions")
             else None
@@ -35,11 +32,12 @@ object DederPklRenderer {
         }
 
         val builders = build.moduleGroups.map { g =>
+            val isCross = g.crossScalaVersions.nonEmpty
             renderGroup(
                 g,
                 groupLookup,
-                if (compactByGroup.getOrElse(g.builderVarName, false)) sharedVersionListName else None,
-                compactByGroup.getOrElse(g.builderVarName, false),
+                if (isCross) sharedVersionListName else None,
+                true,
             )
         }.mkString("\n\n")
         val modulesBlock = renderModulesBlock(build.moduleGroups)
@@ -249,48 +247,84 @@ object DederPklRenderer {
         compactCrossGroup: Boolean,
     ): String = {
         val slices = versionSlices(g)
-        val representativeSlice = slices.find(_.modulesByPlatform.nonEmpty).getOrElse {
-            val fallbackVersion = versionsFor(g).headOption.getOrElse("")
-            VersionSlice(fallbackVersion, Map.empty)
-        }
         val builderType = builderTypeFor(g)
-        if (g.crossScalaVersions.nonEmpty && compactCrossGroup) {
-            val body = renderGroupBody(
-                representativeSlice.modulesByPlatform,
+
+        if (g.crossScalaVersions.nonEmpty) {
+            val common = computeCommonProps(slices)
+            val deltas = computeVersionDeltas(slices, common)
+
+            val commonPropsStr = {
+                val props = Seq(
+                    if (common.scalacOptions.nonEmpty) Some(renderScalacOptions(common.scalacOptions, indent = 8)) else None,
+                    if (common.javacOptions.nonEmpty) Some(renderJavacOptions(common.javacOptions, indent = 8)) else None,
+                    if (common.deps.nonEmpty) Some(renderDeps(common.deps, indent = 8)) else None,
+                    if (common.scalacPluginDeps.nonEmpty) Some(renderPluginDeps(common.scalacPluginDeps, indent = 8)) else None,
+                    if (common.sources.nonEmpty) Some(renderSourceDirs(common.sources, indent = 8)) else None,
+                    if (common.resources.nonEmpty) Some(renderResourceDirs(common.resources, indent = 8)) else None,
+                    if (common.moduleDeps.nonEmpty) Some(renderModuleDepsPkl(common.moduleDeps, indent = 8, Some(ScalaVersionCtx.Placeholder), groupLookup)) else None,
+                    common.publish.map(p => renderPublishInfo(p, indent = 8)),
+                ).flatten.mkString("\n")
+                if (props.nonEmpty) props + "\n" else ""
+            }
+
+            val whenBlocksStr = renderDeltaWhenBlocks(deltas, groupLookup, indent = 8)
+
+            val structuralBody = renderGroupBody(
+                slices.headOption.getOrElse(VersionSlice("", Map.empty)).modulesByPlatform,
                 groupLookup,
                 Some(ScalaVersionCtx.Placeholder),
             )
+
+            val templateMarker = "  template = new"
+            val testMarker = "\n  testTemplate"
+            val jsMarker = "\n  jsTemplate"
+
+            val tIdx = structuralBody.indexOf(templateMarker)
+            val eIdx = {
+                val candidates = Seq(testMarker, jsMarker, "\n  }")
+                candidates.flatMap(m => {
+                    val i = structuralBody.indexOf(m, tIdx)
+                    if (i >= 0) Some(i) else None
+                }).minOption.getOrElse(structuralBody.length)
+            }
+
+            val preTemplate = structuralBody.substring(0, tIdx)
+            val templateSection = structuralBody.substring(tIdx, eIdx)
+            val postTemplate = structuralBody.substring(eIdx)
+
+            val svLine = templateSection.linesIterator.find(l => l.trim.startsWith("scalaVersion"))
+            val modifiedTemplate = svLine match {
+                case Some(sv) =>
+                    val svIdx = templateSection.indexOf(sv.trim)
+                    val afterSvIdx = templateSection.indexOf("\n", svIdx) + 1
+                    val before = templateSection.substring(0, afterSvIdx)
+                    val after = templateSection.substring(afterSvIdx)
+                    before + commonPropsStr + after + (if (whenBlocksStr.nonEmpty) "\n" + whenBlocksStr + "\n" else "")
+                case None =>
+                    commonPropsStr + templateSection + (if (whenBlocksStr.nonEmpty) "\n" + whenBlocksStr + "\n" else "")
+            }
+
+            val finalBody = preTemplate + modifiedTemplate + postTemplate
+
             val versionsListName = sharedVersionListName.getOrElse(s"${g.builderVarName}ScalaVersions")
             val versionsDecl = if (sharedVersionListName.isEmpty)
                 s"local const $versionsListName = ${versionsFor(g).map(v => s""""$v"""").mkString("List(", ", ", ")")}\n\n"
             else ""
+
             s"""${versionsDecl}local const ${g.builderVarName}Modules = $versionsListName
                |  .map((sv) ->
                |    new $builderType {
                |      root = "${g.root}"
                |      id = "${crossVersionIdWithPlaceholder(g, builderType)}"
                |      layout = "${g.layout.toString.toLowerCase.replace("_","-")}"
-               |$body
+               |$finalBody
                |    }.get.all
                |  ).flatten()""".stripMargin
-        } else if (g.crossScalaVersions.nonEmpty) {
-            val renderedBuilders = slices.filter(_.modulesByPlatform.nonEmpty).map { slice =>
-                val body = renderGroupBody(
-                    slice.modulesByPlatform,
-                    groupLookup,
-                    Some(ScalaVersionCtx.Literal(slice.scalaVersion)),
-                )
-                s"""  new $builderType {
-                   |    root = "${g.root}"
-                   |    id = "${crossVersionIdWithLiteral(g, builderType, slice.scalaVersion)}"
-                   |    layout = "${g.layout.toString.toLowerCase.replace("_","-")}"
-                   |$body
-                   |  }.get.all""".stripMargin
-            }.mkString(",\n")
-            s"""local const ${g.builderVarName}Modules = List(
-               |$renderedBuilders
-               |).flatten()""".stripMargin
         } else {
+            val representativeSlice = slices.find(_.modulesByPlatform.nonEmpty).getOrElse {
+                val fallbackVersion = versionsFor(g).headOption.getOrElse("")
+                VersionSlice(fallbackVersion, Map.empty)
+            }
             val body = renderGroupBody(representativeSlice.modulesByPlatform, groupLookup, None)
             s"""local const ${g.builderVarName} = new $builderType {
                |  root = "${g.root}"
