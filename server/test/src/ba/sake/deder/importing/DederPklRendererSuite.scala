@@ -539,4 +539,61 @@ class DederPklRendererSuite extends FunSuite {
         assert(!result.contains("id = \"app-2.12.21\""), clues(result))
         assert(!result.contains("id = \"app-2.13.18\""), clues(result))
     }
+
+    test("emits DederTpolecat.pkl import and shared reference when tpolecat detected") {
+        val mod = emptyModule(scalacOptions = Seq("-deprecation"))
+        val build = DederBuild(
+            dederVersion = "v0.7.4",
+            moduleGroups = Seq(ModuleGroup(
+                builderVarName = "lib", root = ".", layout = DederProject.DirLayout.SBT,
+                crossScalaVersions = Seq("2.13.18"),
+                jvmModule = mod, jsModule = None, nativeModule = None,
+                hasJsModule = false, hasNativeModule = false,
+                usesTpolecat = true, usesTypelevel = false,
+            )),
+            repositories = Seq.empty, warnings = Seq.empty,
+        )
+        val result = DederPklRenderer.render(build)
+        assert(result.contains("""import "DederTpolecat.pkl""""), clues(result))
+        assert(result.contains("scalacOptions = DederTpolecat.forVersion(sv)"), clues(result))
+        assert(!result.contains("scalacOptions {"), clues(result)) // no verbatim options
+    }
+
+    test("emits DederTypelevel.pkl import and shared reference when typelevel detected") {
+        val mod = emptyModule()
+        val build = DederBuild(
+            dederVersion = "v0.7.4",
+            moduleGroups = Seq(ModuleGroup(
+                builderVarName = "lib", root = ".", layout = DederProject.DirLayout.SBT,
+                crossScalaVersions = Seq.empty,
+                jvmModule = mod, jsModule = None, nativeModule = None,
+                hasJsModule = false, hasNativeModule = false,
+                usesTpolecat = false, usesTypelevel = true,
+            )),
+            repositories = Seq.empty, warnings = Seq.empty,
+        )
+        val result = DederPklRenderer.render(build)
+        assert(result.contains("""import "DederTypelevel.pkl""""), clues(result))
+        assert(result.contains("scalacOptions = DederTypelevel.forVersion("), clues(result))
+    }
+
+    test("emits raw scalacOptions when neither tpolecat nor typelevel detected") {
+        val mod = emptyModule(scalacOptions = Seq("-deprecation"))
+        val build = DederBuild(
+            dederVersion = "v0.7.4",
+            moduleGroups = Seq(ModuleGroup(
+                builderVarName = "lib", root = ".", layout = DederProject.DirLayout.SBT,
+                crossScalaVersions = Seq.empty,
+                jvmModule = mod, jsModule = None, nativeModule = None,
+                hasJsModule = false, hasNativeModule = false,
+                usesTpolecat = false, usesTypelevel = false,
+            )),
+            repositories = Seq.empty, warnings = Seq.empty,
+        )
+        val result = DederPklRenderer.render(build)
+        assert(!result.contains("DederTpolecat"), clues(result))
+        assert(!result.contains("DederTypelevel"), clues(result))
+        assert(result.contains("scalacOptions {"), clues(result))
+        assert(result.contains("\"-deprecation\""), clues(result))
+    }
 }
