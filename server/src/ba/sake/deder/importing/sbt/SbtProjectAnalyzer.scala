@@ -69,6 +69,8 @@ class SbtProjectAnalyzer(
                 layout = gi.layout,
                 crossScalaVersions = gi.crossScalaVersions,
                 concreteModules = concreteModules,
+                usesTpolecat = gi.usesTpolecat,
+                usesTypelevel = gi.usesTypelevel,
             )
         }
 
@@ -112,6 +114,8 @@ class SbtProjectAnalyzer(
         crossScalaVersions: Seq[String],
         sbtIdToRef: Map[(String, String), ResolvedModuleRef],
         concreteExports: Seq[ConcreteExport],
+        usesTpolecat: Boolean = false,
+        usesTypelevel: Boolean = false,
     )
 
     private def buildGroupInfo(rg: RawGroup): GroupInfo = {
@@ -125,6 +129,9 @@ class SbtProjectAnalyzer(
         ).getOrElse(rg.modules.head)
 
         val allPlugins = rg.modules.flatMap(_.plugins).distinct
+        val usesTpolecat  = allPlugins.exists(p =>
+            p.contains("sbt-tpolecat") || p.contains("org.typelevel.sbt.tpolecat"))
+        val usesTypelevel = allPlugins.exists(p => p.contains("sbt-typelevel"))
         val layout = SbtProjectAnalyzer.detectLayout(allPlugins, rg.rootPath.toString)
         val isCross = layout == DederProject.DirLayout.SBT_CROSS_FULL ||
             layout == DederProject.DirLayout.SBT_CROSS_PURE ||
@@ -157,6 +164,7 @@ class SbtProjectAnalyzer(
 
         GroupInfo(
             builderVarName, root, layout, crossScalaVersions, sbtIdToRef, concreteExports,
+            usesTpolecat, usesTypelevel,
         )
     }
 

@@ -56,6 +56,8 @@ class DederPklRendererSuite extends FunSuite {
             nativeModule = nativeMod,
             hasJsModule = jsMod.isDefined,
             hasNativeModule = nativeMod.isDefined,
+            usesTpolecat = false,
+            usesTypelevel = false,
         )),
         repositories = Seq.empty,
         warnings = Seq.empty,
@@ -250,6 +252,8 @@ class DederPklRendererSuite extends FunSuite {
                 nativeModule = None,
                 hasJsModule = true,
                 hasNativeModule = false,
+                usesTpolecat = false,
+                usesTypelevel = false,
             )),
             repositories = Seq.empty,
             warnings = Seq.empty,
@@ -277,8 +281,8 @@ class DederPklRendererSuite extends FunSuite {
         val libMod = emptyModule()
         val rootMod = emptyModule(moduleDeps = Seq(ModuleDepRef("lib", "main", isTest = false)))
         val groups = Seq(
-            ModuleGroup("lib", "lib", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), libMod, None, None, false, false),
-            ModuleGroup("root", "root", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), rootMod, None, None, false, false),
+            ModuleGroup("lib", "lib", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), libMod, None, None, false, false, false, false),
+            ModuleGroup("root", "root", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), rootMod, None, None, false, false, false, false),
         )
         val build = DederBuild("v0.7.4", groups, Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
@@ -291,8 +295,8 @@ class DederPklRendererSuite extends FunSuite {
         val jsMod = emptyModule(scalaJsVersion = Some("1.18.2"))
         val appMod = emptyModule(moduleDeps = Seq(ModuleDepRef("core", "jvm", isTest = false)))
         val groups = Seq(
-            ModuleGroup("core", "core", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), coreMod, Some(jsMod), None, true, false),
-            ModuleGroup("app", "app", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), appMod, None, None, false, false),
+            ModuleGroup("core", "core", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), coreMod, Some(jsMod), None, true, false, false, false),
+            ModuleGroup("app", "app", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), appMod, None, None, false, false, false, false),
         )
         val build = DederBuild("v0.7.4", groups, Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
@@ -417,7 +421,7 @@ class DederPklRendererSuite extends FunSuite {
         // The renderer must emit `lib.main` not `libModules.find(...)` for the non-cross target.
         val versions = Seq("2.12.21", "2.13.18")
         val lib = ModuleGroup("lib", "lib", DederProject.DirLayout.SBT, Seq.empty,
-            emptyModule(scalaVersion = "2.12.21"), None, None, false, false)
+            emptyModule(scalaVersion = "2.12.21"), None, None, false, false, false, false)
         val app = concreteCrossGroup(
             name = "app",
             versions = versions,
