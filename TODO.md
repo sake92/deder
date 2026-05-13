@@ -10,7 +10,7 @@
 - color stages in plan
 - shade test-runner to avoid classpath issues.. but first make shading work good
 - quick shutdown and start causes issues, plus race with metals&bsp when manually shutdown
-- print version when downloading
+
 
 # Import
 - cross scala modules are wack..
