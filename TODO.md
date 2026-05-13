@@ -1,18 +1,17 @@
 
 
 # Misc
-- autodetect sbt for import
 - maybe use https://github.com/encalmo/graphs coz zero deps?
-- color instead of quotes for "Executing 'mytask'"?
-- hide some internal tasks like deps resolving etc, helper assemblyDeps.. (rebind edges when displaying)
-- color stages in plan
 - shade test-runner to avoid classpath issues.. but first make shading work good
 - quick shutdown and start causes issues, plus race with metals&bsp when manually shutdown
-
 
 # Import
 - cross scala modules are wack..
 - relativize imported folders to repo root or module root..
+- import from other maven effective POM etc
+- import from other mill
+- import from other gradle
+
 
 # Docs
 - run pkldoc on each tag, and publish to ghpages
@@ -54,13 +53,11 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 
 ## BSP
 - check if futures caching logic is ok with Metals..?
-- still lingering compilations.. maybe I broke it in recent refactors?
-- more interactive / resiliency tests
 - java main classes cant be run..??
 
 
 ## Packaging, publishing
-
+- test if user/pass works for other rpos: nexus etc
 - publish for github packages etc
 
 
@@ -77,20 +74,11 @@ Locally would be interesting to have a dashboard with nice overview:
 # Add more commands
 
 - init like giter8
-- import from other build tools... maven effective POM etc
 
 
 ## Plugins
 
-https://github.com/pf4j/pf4j ? no, too complex
-
-- maybe just use a simple ServiceLoader with start() + configure(): Seq[Task[?]] + stop()
-- just give it CoreTasks so it can make deps
-- add `runsBefore` so that graph can be made properly
-- define its config in Pkl and distribute in its JAR or??
-- reconfigure if its config changes
-- reload if dep changed, force always in dev mode?
-- unload if removed from project
+- more precise reload/unload
 
 
 

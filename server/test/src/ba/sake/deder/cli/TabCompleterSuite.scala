@@ -1,24 +1,61 @@
 package ba.sake.deder.cli
 
-import ba.sake.deder.config.ConfigParser
-import ba.sake.deder.*
-import ba.sake.deder.publish.PublishTasks
-
 class TabCompleterSuite extends munit.FunSuite {
 
-  private val testProjectsDir = os.pwd / "server/test/resources/sample-projects"
+  private val moduleIds = Seq("common", "frontend", "backend", "uber", "uber-test")
+  private val taskIds = Seq(
+    "generatedSources",
+    "mainClasses",
+    "publishLocal",
+    "testClasses",
+    "semanticdb",
+    "runMain",
+    "publish",
+    "deps",
+    "mandatoryDependencies",
+    "jvmOptions",
+    "resources",
+    "scalacPlugins",
+    "sourcesJar",
+    "javaSemanticdbVersion",
+    "pomSettings",
+    "javaVersion",
+    "test",
+    "scalaSemanticdbVersion",
+    "semanticdbEnabled",
+    "runClasspath",
+    "allClassesDirs",
+    "publishArtifacts",
+    "finalMainClass",
+    "scalacPluginDeps",
+    "javacAnnotationProcessors",
+    "classes",
+    "allDependencies",
+    "compilerDeps",
+    "compilerJars",
+    "compile",
+    "run",
+    "assembly",
+    "javacOptions",
+    "javacAnnotationProcessorDeps",
+    "mainClass",
+    "scalaVersion",
+    "scalacOptions",
+    "allJars",
+    "moduleDepsPomSettings",
+    "sources",
+    "sourceFiles",
+    "javadocJar",
+    "jar",
+    "compileClasspath",
+    "javaHome",
+    "dependencies",
+    "compileOnlyDeps",
+    "compileOnlyDependencies"
+  )
 
   test("TabCompleter completes subcommands") {
-    val configParser = ConfigParser(writeJson = false)
-    val parsedConfig = configParser.parse(testProjectsDir / "multi/deder.pkl")
-    assert(parsedConfig.isRight, parsedConfig.left.get)
-    val projectConfig = parsedConfig.toOption.get
-    val coreTasks = CoreTasks()
-
-    val publishTasks = PublishTasks(coreTasks)
-    val tasksRegistry = TasksRegistry(coreTasks.all ++ publishTasks.all)
-    val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
-    val completer = new TabCompleter(tasksResolver)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
 
     assertEquals(
       completer.complete("deder ", 6).toSet,

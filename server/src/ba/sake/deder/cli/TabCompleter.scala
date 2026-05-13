@@ -2,7 +2,7 @@ package ba.sake.deder.cli
 
 import ba.sake.deder.TasksResolver
 
-class TabCompleter(tasksResolver: TasksResolver) {
+class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
 
   private val allSubcommands = Seq(
     "version",
@@ -17,10 +17,6 @@ class TabCompleter(tasksResolver: TasksResolver) {
     "complete",
     "help"
   )
-
-  // TODO extract as param for easier testing
-  private val allModuleIds = tasksResolver.allModules.map(_.id)
-  private val allTaskIds = tasksResolver.publicTaskInstancesPerModule.values.flatten.map(_.task.name).toSeq.distinct
 
   def complete(commandLine: String, cursorPos: Int): Seq[String] = {
     val (args, wordPos) = TabCompleter.shellSplit(commandLine, cursorPos)
@@ -63,13 +59,19 @@ class TabCompleter(tasksResolver: TasksResolver) {
   }
 
   private def completeModule(prevWord: String, currentWord: String): Option[Seq[String]] =
-    Option.when(prevWord == "-m" || prevWord == "--module")(allModuleIds.filter(_.startsWith(currentWord)))
+    Option.when(prevWord == "-m" || prevWord == "--module")(moduleIds.filter(_.startsWith(currentWord)))
 
   private def completeTask(prevWord: String, currentWord: String): Option[Seq[String]] =
-    Option.when(prevWord == "-t" || prevWord == "--task")(allTaskIds.filter(_.startsWith(currentWord)))
+    Option.when(prevWord == "-t" || prevWord == "--task")(taskIds.filter(_.startsWith(currentWord)))
 }
 
 object TabCompleter {
+
+  def apply(tasksResolver: TasksResolver): TabCompleter =
+    new TabCompleter(
+      moduleIds = tasksResolver.allModules.map(_.id),
+      taskIds = tasksResolver.publicTaskInstancesPerModule.values.flatten.map(_.task.name).toSeq.distinct
+    )
 
   val bashScript: String =
     """|_deder_completion() {
