@@ -8,12 +8,12 @@ import "../hello-plugin2/resources/HelloPlugin.pkl" as HP2
 plugins {
   new HP.HelloPlugin {
     config = new HP.HelloPluginConfig {
-      greeting = "Hello from hello-plugin-usage!"
+      greeting = "Hello from plugin consumer!"
     }
   }
   new HP2.HelloPlugin {
     config = new HP2.HelloPluginConfig {
-      greeting = "Hello from hello-plugin2-usage!"
+      greeting = "Hello2 from plugin consumer!"
     }
   }
 }
