@@ -427,7 +427,7 @@ class PublishTasks(coreTasks: CoreTasks) {
             } else {
               ctx.notifications.add(
                 ServerNotification
-                  .logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled", ctx.module.id)
+                  .logInfo(s"Skipping publishing '${ctx.module.id}' because it is disabled", ctx.module.id)
               )
             }
           case _ =>

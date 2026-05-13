@@ -11,6 +11,22 @@ local const function pom(artId: String) = new PomSettings {
   groupId = "ba.sake"
   artifactId = artId
   version = read?("env:VERSION")
+  licenses {
+    new PomLicense {
+      name = "Apache 2.0 License"
+      url = "https://opensource.org/license/apache-2.0"
+    }
+  }
+  developers {
+    new PomDeveloper {
+      id = "sake92"
+      name = "Sakib Hadžiavdić"
+      email = "sake92@sake.ba"
+    }
+  }
+  scm {
+    url = "git@github.com:sake92/deder.git"
+  }
 }
 
 local const config = new JavaModule {

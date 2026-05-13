@@ -4,9 +4,10 @@
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - shade test-runner to avoid classpath issues.. but first make shading work good
 - quick shutdown and start causes issues, plus race with metals&bsp when manually shutdown
+- init like giter8, autoimport from sbt?
 
 # Import
-- cross scala modules are wack..
+- cross scala modules are wack.. no common Pkl code..
 - relativize imported folders to repo root or module root..
 - import from other maven effective POM etc
 - import from other mill
@@ -20,6 +21,11 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 # Client
 
 # Compilers
+
+
+## Plugins
+- more precise reload/unload
+- add starter github repo
 
 
 # Caching
@@ -70,17 +76,5 @@ Locally would be interesting to have a dashboard with nice overview:
 - filtering of modules and tasks
 - execute a task, if not "run" ?
 - HTMX and polling #simple
-
-# Add more commands
-
-- init like giter8
-
-
-## Plugins
-
-- more precise reload/unload
-
-
-
 
 
