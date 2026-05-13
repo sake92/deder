@@ -4,14 +4,13 @@ amends "https://sake92.github.io/deder/config/v0.8.0/DederProject.pkl"
 
 local const scalaVer = "3.7.4"
 
+local const sonatypeRepo = new SonatypeCentralRepo {
+  id = "sonatype"
+}
 local const function pom(artId: String) = new PomSettings {
   groupId = "ba.sake"
   artifactId = artId
   version = read?("env:VERSION")
-}
-
-local const sonatypeRepo = new SonatypeCentralRepo {
-  id = "sonatype"
 }
 
 local const config = new JavaModule {

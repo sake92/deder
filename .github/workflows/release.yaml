@@ -146,6 +146,8 @@ jobs:
   release-maven:
     needs: [ precheck ]
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.precheck.outputs.VERSION }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -167,7 +169,7 @@ jobs:
       - name: Publish to Maven Central
         run: |
           ./scripts/gen-config-bindings.sh
-          deder exec -t publish -m plugin-api
+          deder exec -t publish -m config -m plugin-api
 
   release:
     needs: [ precheck, build-jars, build-client-native-image ]
