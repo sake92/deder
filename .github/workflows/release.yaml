@@ -13,6 +13,10 @@ permissions:
 env:
   JAVA_VERSION: '21'
   JAVA_DISTRO: 'zulu'
+  DEDER_SONATYPE_PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+  DEDER_SONATYPE_PGP_SECRET: ${{ secrets.PGP_SECRET }}
+  DEDER_SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+  DEDER_SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
 
 jobs:
   precheck:
@@ -138,6 +142,27 @@ jobs:
         with:
           name: deder-client-${{ matrix.os.name }}
           path: deder-client-${{ matrix.os.name }}*
+        
+  release-maven:
+    needs: [ precheck ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: ${{ env.JAVA_DISTRO }}
+      - uses: coursier/cache-action@v7
+        with:
+          extraFiles: deder.pkl
+      - name: Publish to Maven Central
+        run: |
+          deder exec -t publish -m plugin-api
 
   release:
     needs: [ precheck, build-jars, build-client-native-image ]
