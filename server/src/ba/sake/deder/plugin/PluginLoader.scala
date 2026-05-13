@@ -5,12 +5,12 @@ import java.security.MessageDigest
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 import scala.util.{Using, Try}
+import scala.util.control.NonFatal
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.{DederPlugin, ScalaModule}
 import ba.sake.deder.deps.{Dependency, DependencyResolverApi}
-import scala.util.control.NonFatal
 
 val DederPluginApiClass = classOf[DederPluginApi]
 
