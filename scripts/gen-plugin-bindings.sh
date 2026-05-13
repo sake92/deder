@@ -15,13 +15,23 @@ if [ $# -lt 1 ]; then
 fi
 
 PLUGIN_DIR="$1"
+# if ends with a slash, remove it
+PLUGIN_DIR="${PLUGIN_DIR%/}"
 
 if [ -z "$PLUGIN_DIR" ]; then
     echo "Error: <myplugin-dir> is required"
     exit 1
 fi
 
-for file in "$PLUGIN_DIR"/resources/*.pkl; do
+shopt -s nullglob
+config_files=("$PLUGIN_DIR"/resources/*.pkl)
+
+if [ ${#config_files[@]} -eq 0 ]; then
+    echo "Error: No .pkl config files found in $PLUGIN_DIR/resources"
+    exit 1
+fi
+
+for file in "${config_files[@]}"; do
     if [ -f "$file" ]; then
         PKL_FILE="$file"
         PLUGIN_DIR_TEMP=$(mktemp -d --suffix=_PKL_JAVA_GEN)
@@ -31,6 +41,7 @@ for file in "$PLUGIN_DIR"/resources/*.pkl; do
 
         cp -r "$PLUGIN_DIR_TEMP/java/." "$PLUGIN_DIR/src"
         cp -r "$PLUGIN_DIR_TEMP/resources/." "$PLUGIN_DIR/resources"
+        rm -rf "$PLUGIN_DIR_TEMP"
     fi
 done
 

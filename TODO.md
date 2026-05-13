@@ -9,7 +9,7 @@
 - hide some internal tasks like deps resolving etc, helper assemblyDeps.. (rebind edges when displaying)
 - color stages in plan
 - shade test-runner to avoid classpath issues.. but first make shading work good
-- quick shutdown and start causes issues
+- quick shutdown and start causes issues, plus race with metals&bsp when manually shutdown
 - print version when downloading
 
 # Import
