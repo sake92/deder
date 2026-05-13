@@ -315,6 +315,152 @@ class BspResilienceSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("rapid buildTargetCompile requests each get correct originId on result") {
+    val testDir = os.pwd / "tmp" / s"bsp-originid-${System.currentTimeMillis()}"
+    try {
+      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+      val lines = os.read.lines(testDir / "deder.pkl")
+      os.write.over(
+        testDir / "deder.pkl",
+        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+      )
+      writeServerProperties(testDir)
+      executeDederCommand(testDir, "bsp", "install")
+
+      withBspSession(testDir) { (buildServer, capturingClient, _) =>
+        capturingClient.clear()
+
+        val params1 = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params1.setOriginId("burst-request-1")
+        val params2 = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params2.setOriginId("burst-request-2")
+        val params3 = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params3.setOriginId("burst-request-3")
+
+        // Fire all three requests as close together as possible
+        val future1 = buildServer.buildTargetCompile(params1)
+        val future2 = buildServer.buildTargetCompile(params2)
+        val future3 = buildServer.buildTargetCompile(params3)
+
+        val result1 = future1.get(2, TimeUnit.MINUTES)
+        val result2 = future2.get(2, TimeUnit.MINUTES)
+        val result3 = future3.get(2, TimeUnit.MINUTES)
+
+        // All results must have their OWN originId
+        assertEquals(result1.getOriginId, "burst-request-1")
+        assertEquals(result2.getOriginId, "burst-request-2")
+        assertEquals(result3.getOriginId, "burst-request-3")
+
+        // All must complete successfully
+        assertEquals(result1.getStatusCode, StatusCode.OK)
+        assertEquals(result2.getStatusCode, StatusCode.OK)
+        assertEquals(result3.getStatusCode, StatusCode.OK)
+
+        // Only one compilation should run (one start + one finish notification)
+        val starts = capturingClient.awaitTaskStarts(1)
+        assertEquals(starts.size, 1)
+
+        val finishes = capturingClient.awaitTaskFinishes(1)
+        assertEquals(finishes.size, 1)
+      }
+    } finally {
+      executeDederCommand(testDir, "shutdown")
+    }
+  }
+
+  test("buildTargetCompile with overlapping target sets completes correctly") {
+    val testDir = os.pwd / "tmp" / s"bsp-overlap-${System.currentTimeMillis()}"
+    try {
+      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+      val lines = os.read.lines(testDir / "deder.pkl")
+      os.write.over(
+        testDir / "deder.pkl",
+        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+      )
+      writeServerProperties(testDir)
+      executeDederCommand(testDir, "bsp", "install")
+
+      withBspSession(testDir) { (buildServer, capturingClient, _) =>
+        capturingClient.clear()
+
+        // First request compiles common + frontend (frontend depends on common)
+        val paramsBoth = new CompileParams(
+          List(targetId(testDir, "common"), targetId(testDir, "frontend")).asJava
+        )
+        paramsBoth.setOriginId("overlap-both")
+
+        // Second request compiles just common (subset of first)
+        val paramsCommon = new CompileParams(List(targetId(testDir, "common")).asJava)
+        paramsCommon.setOriginId("overlap-common")
+
+        val futureBoth = buildServer.buildTargetCompile(paramsBoth)
+        // Small delay to ensure the first future starts executing before second is submitted
+        Thread.sleep(100)
+        val futureCommon = buildServer.buildTargetCompile(paramsCommon)
+
+        val resultBoth = futureBoth.get(3, TimeUnit.MINUTES)
+        val resultCommon = futureCommon.get(3, TimeUnit.MINUTES)
+
+        assertEquals(resultBoth.getOriginId, "overlap-both")
+        assertEquals(resultCommon.getOriginId, "overlap-common")
+        assertEquals(resultBoth.getStatusCode, StatusCode.OK)
+        assertEquals(resultCommon.getStatusCode, StatusCode.OK)
+      }
+    } finally {
+      executeDederCommand(testDir, "shutdown")
+    }
+  }
+
+  test("simulated AI agent burst: many compiles, all originIds correct, server stays alive") {
+    val testDir = os.pwd / "tmp" / s"bsp-aiburst-${System.currentTimeMillis()}"
+    try {
+      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+      val lines = os.read.lines(testDir / "deder.pkl")
+      os.write.over(
+        testDir / "deder.pkl",
+        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+      )
+      writeServerProperties(testDir)
+      executeDederCommand(testDir, "bsp", "install")
+
+      withBspSession(testDir) { (buildServer, capturingClient, _) =>
+        capturingClient.clear()
+
+        val modules = Seq("common", "frontend", "backend", "uber")
+        val requestCount = 10
+
+        // Fire many rapid compile requests for various module combinations
+        val futures = (1 to requestCount).map { i =>
+          val targets = if i % 3 == 0 then modules.take(2)   // [common, frontend]
+                        else if i % 3 == 1 then modules.take(1) // [common]
+                        else modules.take(3)                    // [common, frontend, backend]
+          val params = new CompileParams(targets.map(t => targetId(testDir, t)).asJava)
+          params.setOriginId(s"aiburst-$i")
+          buildServer.buildTargetCompile(params)
+        }
+
+        // All must complete without timeout
+        val results = futures.map(_.get(5, TimeUnit.MINUTES))
+
+        // Each result must have its own originId
+        results.zipWithIndex.foreach { case (result, idx) =>
+          assertEquals(result.getOriginId, s"aiburst-${idx + 1}",
+            s"request ${idx + 1} originId mismatch")
+          assertEquals(
+            Seq(StatusCode.OK, StatusCode.CANCELLED).contains(result.getStatusCode), true,
+            s"request ${idx + 1} status should be OK or CANCELLED, got ${result.getStatusCode}"
+          )
+        }
+
+        // Server must still be usable after burst
+        val targetsResult = buildServer.workspaceBuildTargets().get(1, TimeUnit.MINUTES)
+        assert(targetsResult.getTargets.asScala.nonEmpty, "server should still serve targets after burst")
+      }
+    } finally {
+      executeDederCommand(testDir, "shutdown")
+    }
+  }
+
   test("compile finish notification is sent even when compilation fails with errors") {
     val testDir = os.pwd / "tmp" / s"bsp-finish-guarantee-${System.currentTimeMillis()}"
     try {
