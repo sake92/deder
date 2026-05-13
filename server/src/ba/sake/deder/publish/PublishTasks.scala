@@ -439,7 +439,8 @@ class PublishTasks(coreTasks: CoreTasks) {
   val publishTask = TaskBuilder
     .make[String](
       name = "publish",
-      category = "Publishing"
+      category = "Publishing",
+      transitive = true
     )
     .dependsOn(publishArtifactsTask)
     .build { ctx =>
