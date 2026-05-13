@@ -58,7 +58,7 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder
-        run: brew install sake92/tap/deder
+        run: brew install sake92/tap/deder@0.8.0
       - name: Build JARs
         env:
           VERSION: ${{ needs.precheck.outputs.VERSION }}
@@ -112,7 +112,7 @@ jobs:
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder (brew)
         if: runner.os != 'Windows'
-        run: brew install sake92/tap/deder
+        run: brew install sake92/tap/deder@0.8.0
       - name: Set up Scoop
         if: runner.os == 'Windows'
         uses: MinoruSekine/setup-scoop@v4.0.2
@@ -163,7 +163,7 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder
-        run: brew install sake92/tap/deder
+        run: brew install sake92/tap/deder@0.8.0
       - name: Publish to Maven Central
         run: |
           ./scripts/gen-config-bindings.sh

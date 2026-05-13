@@ -25,7 +25,7 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder
-        run: brew install sake92/tap/deder
+        run: brew install sake92/tap/deder@0.8.0
       - name: Unit Test
         run: |
           ./scripts/gen-config-bindings.sh
@@ -61,7 +61,7 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder
-        run: brew install sake92/tap/deder
+        run: brew install sake92/tap/deder@0.8.0
       # for testing importing from sbt
       - uses: sbt/setup-sbt@v1
       - name: Integration Test Suite
