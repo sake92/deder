@@ -37,7 +37,6 @@ object DederPklRenderer {
                 g,
                 groupLookup,
                 if (isCross) sharedVersionListName else None,
-                true,
             )
         }.mkString("\n\n")
         val modulesBlock = renderModulesBlock(build.moduleGroups)
@@ -203,40 +202,12 @@ object DederPklRenderer {
                 if (delta.scalacPluginDeps.nonEmpty) Some(renderPluginDeps(delta.scalacPluginDeps, indent + 2)) else None,
                 if (delta.sources.nonEmpty) Some(renderSourceDirs(delta.sources, indent + 2)) else None,
                 if (delta.resources.nonEmpty) Some(renderResourceDirs(delta.resources, indent + 2)) else None,
-                if (delta.moduleDeps.nonEmpty) Some(renderModuleDepsPkl(delta.moduleDeps, indent + 2, Some(ScalaVersionCtx.Literal(version)), groupLookup)) else None,
+                if (delta.moduleDeps.nonEmpty) Some(renderModuleDepsPkl(delta.moduleDeps, indent + 2, Some(ScalaVersionCtx.Placeholder), groupLookup)) else None,
             ).flatten
             if (props.isEmpty) None
             else Some(s"${spaces}when (sv == \"$version\") {\n${props.mkString("\n")}\n$spaces}")
         }.mkString("\n")
     }
-
-    private def canRenderCompactCrossGroup(g: ModuleGroup): Boolean = {
-        if (g.crossScalaVersions.isEmpty) false
-        else {
-            val slices = versionSlices(g)
-            if (slices.isEmpty || slices.exists(_.modulesByPlatform.isEmpty)) false
-            else {
-                val base = normalizeSlice(slices.head)
-                slices.tail.forall(s => normalizeSlice(s) == base)
-            }
-        }
-    }
-
-    private def normalizeSlice(slice: VersionSlice): Seq[(String, ModuleDef)] =
-        slice.modulesByPlatform.toSeq.sortBy(_._1).map { (platform, module) =>
-            platform -> normalizeModuleDef(module, slice.scalaVersion)
-        }
-
-    private def normalizeModuleDef(module: ModuleDef, ownerScalaVersion: String): ModuleDef =
-        module.copy(
-            scalaVersion = "",
-            moduleDeps = module.moduleDeps.map(normalizeModuleDep(_, ownerScalaVersion)),
-            testModuleDeps = module.testModuleDeps.map(normalizeModuleDep(_, ownerScalaVersion)),
-        )
-
-    private def normalizeModuleDep(ref: ModuleDepRef, ownerScalaVersion: String): ModuleDepRef =
-        if (ref.targetScalaVersion.contains(ownerScalaVersion)) ref.copy(targetScalaVersion = None)
-        else ref
 
     // ---- group rendering ----
 
@@ -244,7 +215,6 @@ object DederPklRenderer {
         g: ModuleGroup,
         groupLookup: Map[String, ModuleGroup],
         sharedVersionListName: Option[String],
-        compactCrossGroup: Boolean,
     ): String = {
         val slices = versionSlices(g)
         val builderType = builderTypeFor(g)

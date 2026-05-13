@@ -327,7 +327,7 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("libModules.find((m) -> m.id == \"lib-\\(sv)\")"))
     }
 
-    test("renders non-compact per-version builders when dependencies diverge by scala version") {
+    test("renders when clauses for version-specific deps in .map() output") {
         val versions = Seq("2.12.21", "2.13.18")
         val group = concreteCrossGroup(
             name = "lib",
@@ -341,24 +341,24 @@ class DederPklRendererSuite extends FunSuite {
             ),
         )
         val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
-
         val result = DederPklRenderer.render(build)
-        assert(!result.contains("local const libModules = libScalaVersions"), clues(result))
-        assert(result.contains("id = \"lib-2.12.21\""))
-        assert(result.contains("id = \"lib-2.13.18\""))
-        assert(result.contains("\"org.typelevel::cats-core:2.12.0\""))
+
+        assert(result.contains("local const libModules = libScalaVersions"), clues(result))
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
+        assert(result.contains("\"org.typelevel::cats-core:2.12.0\""), clues(result))
+        assert(!result.contains("id = \"lib-2.12.21\""), clues(result))
+        assert(!result.contains("id = \"lib-2.13.18\""), clues(result))
     }
 
-    test("renders non-compact per-version builders when module deps diverge by scala version") {
+    test("renders when clauses for version-specific module deps in .map() output") {
         val versions = Seq("2.12.21", "2.13.18")
         val lib = concreteCrossGroup(
-            name = "lib",
-            versions = versions,
+            name = "lib", versions = versions,
             slices = versions.map(v => (v, "main", emptyModule(scalaVersion = v))),
         )
         val app = concreteCrossGroup(
-            name = "app",
-            versions = versions,
+            name = "app", versions = versions,
             slices = Seq(
                 ("2.12.21", "main", emptyModule(scalaVersion = "2.12.21")),
                 ("2.13.18", "main", emptyModule(
@@ -368,18 +368,17 @@ class DederPklRendererSuite extends FunSuite {
             ),
         )
         val build = DederBuild("v0.7.4", Seq(lib, app), Seq.empty, Seq.empty)
-
         val result = DederPklRenderer.render(build)
-        assert(!result.contains("local const appModules = appScalaVersions"), clues(result))
-        assert(result.contains("libModules.find((m) -> m.id == \"lib-2.13.18\")"))
-        assert(!result.contains("libModules.find((m) -> m.id == \"lib-\\(sv)\")"))
+
+        assert(result.contains("local const appModules = projectScalaVersions"), clues(result))
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
     }
 
-    test("renders non-compact per-version builders when a platform is missing in one scala version") {
+    test("always renders all platforms in .map() output even when platform missing per version") {
         val versions = Seq("2.12.21", "2.13.18")
         val group = concreteCrossGroup(
-            name = "core",
-            versions = versions,
+            name = "core", versions = versions,
             layout = DederProject.DirLayout.SBT_CROSS_FULL,
             slices = Seq(
                 ("2.12.21", "jvm", emptyModule(scalaVersion = "2.12.21")),
@@ -388,19 +387,17 @@ class DederPklRendererSuite extends FunSuite {
             ),
         )
         val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
-
         val result = DederPklRenderer.render(build)
-        assert(!result.contains("local const coreModules = coreScalaVersions"), clues(result))
-        assert(result.contains("scalaVersion = \"2.12.21\""))
-        assert(result.contains("scalaVersion = \"2.13.18\""))
-        assert(result.contains("jsTemplate = (template.asJs())"))
+
+        assert(result.contains("local const coreModules = coreScalaVersions"), clues(result))
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("jsTemplate = (template.asJs())"), clues(result))
     }
 
-    test("renders sparse cross-version slices when one version has only js platform") {
+    test("renders sparse cross-version slices in .map() output") {
         val versions = Seq("2.12.21", "2.13.18")
         val group = concreteCrossGroup(
-            name = "core",
-            versions = versions,
+            name = "core", versions = versions,
             layout = DederProject.DirLayout.SBT_CROSS_FULL,
             slices = Seq(
                 ("2.12.21", "jvm", emptyModule(scalaVersion = "2.12.21")),
@@ -409,11 +406,10 @@ class DederPklRendererSuite extends FunSuite {
             ),
         )
         val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
-
         val result = DederPklRenderer.render(build)
-        assert(result.contains("scalaVersion = \"2.12.21\""))
-        assert(result.contains("scalaVersion = \"2.13.18\""))
-        assert(result.contains("jsTemplate = (template.asJs())"))
+
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("jsTemplate = (template.asJs())"), clues(result))
     }
 
     test("cross-version module dep on non-cross module uses direct accessor, not find filter") {
@@ -436,24 +432,24 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("lib.main"), clues(result))
     }
 
-    test("renders non-compact per-version builders when scalac options diverge by scala version") {
+    test("renders when clauses for version-specific scalacOptions in .map() output") {
         val versions = Seq("2.12.21", "2.13.18")
         val group = concreteCrossGroup(
-            name = "lib",
-            versions = versions,
+            name = "lib", versions = versions,
             slices = Seq(
                 ("2.12.21", "main", emptyModule(scalaVersion = "2.12.21", scalacOptions = Seq("-deprecation"))),
                 ("2.13.18", "main", emptyModule(scalaVersion = "2.13.18", scalacOptions = Seq("-Xfatal-warnings"))),
             ),
         )
         val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
-
         val result = DederPklRenderer.render(build)
-        assert(!result.contains("local const libModules = libScalaVersions"), clues(result))
-        assert(result.contains("id = \"lib-2.12.21\""))
-        assert(result.contains("id = \"lib-2.13.18\""))
-        assert(result.contains("\"-deprecation\""))
-        assert(result.contains("\"-Xfatal-warnings\""))
+
+        assert(result.contains("local const libModules = libScalaVersions"), clues(result))
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("when (sv == \"2.12.21\")"), clues(result))
+        assert(result.contains("\"-deprecation\""), clues(result))
+        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
+        assert(result.contains("\"-Xfatal-warnings\""), clues(result))
     }
 
     test("cross-version with differing scalacOptions uses .map() with when clauses") {
