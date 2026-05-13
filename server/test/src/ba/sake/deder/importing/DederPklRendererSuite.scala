@@ -455,4 +455,88 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("\"-deprecation\""))
         assert(result.contains("\"-Xfatal-warnings\""))
     }
+
+    test("cross-version with differing scalacOptions uses .map() with when clauses") {
+        val versions = Seq("2.12.21", "2.13.18")
+        val group = concreteCrossGroup(
+            name = "lib",
+            versions = versions,
+            slices = Seq(
+                ("2.12.21", "main", emptyModule(
+                    scalaVersion = "2.12.21",
+                    scalacOptions = Seq("-deprecation"),
+                )),
+                ("2.13.18", "main", emptyModule(
+                    scalaVersion = "2.13.18",
+                    scalacOptions = Seq("-deprecation", "-Xsource:3"),
+                )),
+            ),
+        )
+        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+
+        assert(result.contains("local const libScalaVersions = List(\"2.12.21\", \"2.13.18\")"), clues(result))
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("\"-deprecation\""), clues(result))
+        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
+        assert(result.contains("\"-Xsource:3\""), clues(result))
+        assert(!result.contains("id = \"lib-2.12.21\""), clues(result))
+        assert(!result.contains("id = \"lib-2.13.18\""), clues(result))
+    }
+
+    test("cross-version with differing deps uses .map() with when clauses") {
+        val versions = Seq("2.12.21", "2.13.18")
+        val group = concreteCrossGroup(
+            name = "lib",
+            versions = versions,
+            slices = Seq(
+                ("2.12.21", "main", emptyModule(
+                    scalaVersion = "2.12.21",
+                    deps = Seq(dep("org.jsoup", "jsoup", "1.21.1")),
+                )),
+                ("2.13.18", "main", emptyModule(
+                    scalaVersion = "2.13.18",
+                    deps = Seq(
+                        dep("org.jsoup", "jsoup", "1.21.1"),
+                        dep("org.typelevel", "cats-core", "2.12.0", crossVersion = "binary"),
+                    ),
+                )),
+            ),
+        )
+        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("\"org.jsoup:jsoup:1.21.1\""), clues(result))
+        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
+        assert(result.contains("\"org.typelevel::cats-core:2.12.0\""), clues(result))
+    }
+
+    test("cross-version with differing moduleDeps uses .map() with when clauses") {
+        val versions = Seq("2.12.21", "2.13.18")
+        val lib = concreteCrossGroup(
+            name = "lib",
+            versions = versions,
+            slices = versions.map(v => (v, "main", emptyModule(scalaVersion = v))),
+        )
+        val app = concreteCrossGroup(
+            name = "app",
+            versions = versions,
+            slices = Seq(
+                ("2.12.21", "main", emptyModule(scalaVersion = "2.12.21")),
+                ("2.13.18", "main", emptyModule(
+                    scalaVersion = "2.13.18",
+                    moduleDeps = Seq(ModuleDepRef("lib", "main", targetScalaVersion = Some("2.13.18"), isTest = false)),
+                )),
+            ),
+        )
+        val build = DederBuild("v0.7.4", Seq(lib, app), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
+        assert(result.contains("libModules.find((m) -> m.id == \"lib-\\(sv)\")"), clues(result))
+        assert(!result.contains("id = \"app-2.12.21\""), clues(result))
+        assert(!result.contains("id = \"app-2.13.18\""), clues(result))
+    }
 }
