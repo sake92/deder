@@ -42,6 +42,7 @@ class DederBspServer(
   // Track in-progress compilations keyed by sorted target IDs.
   // When a duplicate request arrives for the same targets while one is in flight,
   // we return the existing future instead of starting a redundant compilation.
+  // TODO fix, this logic prolly breaks metals, instead we can buffer the requests and replay just the result..?
   private val activeCompilations = new ConcurrentHashMap[String, CompletableFuture[CompileResult]]
 
   override def cancelRequest(params: CancelRequestParams): Unit = {
