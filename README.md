@@ -14,10 +14,11 @@ Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 - exploring the build with listing modules, tasks, and execution plans (visualized as DOT graphs)
 - packaging module as JAR, uber JAR, Scala.js bundle, Scala Native executable
 - executing tests
+- module REPL
 - watch mode with concurrent execution in multiple terminals
-- import from sbt (experimental, feedback needed)
+- import from sbt
 - OTEL tracing support
-- global artifact cache with checksum verification
+- basic plugins support with automatic reloading
 
 ## Adoption and feedback
 Deder is used in some of my OSS projects:

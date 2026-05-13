@@ -1,11 +1,9 @@
 
 
 # Misc
-- autodetect sbt/maven for import
+- autodetect sbt for import
 - maybe use https://github.com/encalmo/graphs coz zero deps?
-- deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
-- add limits on plan/modules graphing, up/down
-- color instead of quotes for "Executing 'mytask'"
+- color instead of quotes for "Executing 'mytask'"?
 - hide some internal tasks like deps resolving etc, helper assemblyDeps.. (rebind edges when displaying)
 - color stages in plan
 - shade test-runner to avoid classpath issues.. but first make shading work good

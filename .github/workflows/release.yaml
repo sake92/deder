@@ -166,6 +166,7 @@ jobs:
         run: brew install sake92/tap/deder
       - name: Publish to Maven Central
         run: |
+          ./scripts/gen-config-bindings.sh
           deder exec -t publish -m plugin-api
 
   release:
