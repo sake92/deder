@@ -265,7 +265,11 @@ open class JavaModule extends DederModule {
   mvnApps: Mapping<String, MvnApp> = new Mapping {}
   function asTest(): JavaTestModule = (this.toDynamic().toTyped(JavaTestModule)) {
     type = "java-test"
+    deps = new Listing {}
+    moduleDeps = new Listing {}
+    mainClass = null
     publish = false
+    pomSettings = null
   }
 }
 
@@ -298,7 +302,11 @@ open class ScalaModule extends JavaModule {
   scalaSemanticdbVersion: String?
   function asTest(): ScalaTestModule = (this.toDynamic().toTyped(ScalaTestModule)) {
     type = "scala-test"
+    deps = new Listing {}
+    moduleDeps = new Listing {}
+    mainClass = null
     publish = false
+    pomSettings = null
   }
   function asJs(): ScalaJsModule = (this.toDynamic().toTyped(ScalaJsModule)) {
     type = "scala-js"
@@ -409,7 +417,11 @@ open class ScalaJsModule extends ScalaModule {
   linkerConfig: ScalaJsLinkerConfig = new ScalaJsLinkerConfig {}
   function asTest(): ScalaJsTestModule = (this.toDynamic().toTyped(ScalaJsTestModule)) {
     type = "scala-js-test"
+    deps = new Listing {}
+    moduleDeps = new Listing {}
+    mainClass = null
     publish = false
+    pomSettings = null
   }
 }
 
@@ -475,7 +487,11 @@ open class ScalaNativeModule extends ScalaModule {
   resourceExcludePatterns: Listing<String> = new Listing {}
   function asTest(): ScalaNativeTestModule = (this.toDynamic().toTyped(ScalaNativeTestModule)) {
     type = "scala-native-test"
+    deps = new Listing {}
+    moduleDeps = new Listing {}
+    mainClass = null
     publish = false
+    pomSettings = null
   }
 }
 
