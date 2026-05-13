@@ -196,6 +196,18 @@ class SbtProjectAnalyzer(
             ))
         } else None
 
+        val moduleBasePath = os.Path(pe.base)
+
+        val filteredSources      = SbtProjectAnalyzer.filterManagedDirs(pe.sourceDirs)
+        val filteredTestSources   = SbtProjectAnalyzer.filterManagedDirs(pe.testSourceDirs)
+        val filteredResources     = SbtProjectAnalyzer.filterManagedDirs(pe.resourceDirs)
+        val filteredTestResources = SbtProjectAnalyzer.filterManagedDirs(pe.testResourceDirs)
+
+        val relSourceDirs      = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredSources)
+        val relTestSourceDirs   = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredTestSources)
+        val relResourceDirs     = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredResources)
+        val relTestResourceDirs = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredTestResources)
+
         val moduleDef = ModuleDef(
             scalaVersion = pe.scalaVersion,
             scalacOptions = pe.scalacOptions,
@@ -208,10 +220,10 @@ class SbtProjectAnalyzer(
             scalaJsVersion = if (isJs) Some(SbtProjectAnalyzer.DefaultScalaJsVersion) else None,
             scalaNativeVersion = if (isNative) Some(SbtProjectAnalyzer.DefaultScalaNativeVersion) else None,
             publish = publish,
-            sources = pe.sourceDirs,
-            testSources = pe.testSourceDirs,
-            resources = pe.resourceDirs,
-            testResources = pe.testResourceDirs,
+            sources = relSourceDirs,
+            testSources = relTestSourceDirs,
+            resources = relResourceDirs,
+            testResources = relTestResourceDirs,
         )
         (moduleDef, filteredCount)
     }
@@ -375,6 +387,22 @@ object SbtProjectAnalyzer {
         }
         s"${dep.organization}$scalaColon${dep.name}$platformColon${dep.revision}"
     }
+
+    def filterManagedDirs(dirs: Seq[String]): Seq[String] =
+        dirs.filterNot { d =>
+            val segments = d.split("/").toSet
+            segments.contains("src_managed") ||
+            segments.contains("resource_managed") ||
+            d.contains("/target/")
+        }
+
+    def relativizeTo(base: os.Path, paths: Seq[String]): Seq[String] =
+        paths.flatMap { p =>
+            try {
+                val rel = os.Path(p).relativeTo(base).toString
+                if rel.startsWith("..") then None else Some(rel)
+            } catch case _: IllegalArgumentException => None
+        }
 
     def detectLayout(plugins: Seq[String], projectBaseDir: String): DederProject.DirLayout = {
         val hasCrossProject = plugins.exists(p =>

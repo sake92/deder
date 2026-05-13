@@ -256,4 +256,37 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         assertEquals(build.repositories.size, 1)
         assertEquals(build.repositories.head.url, "https://repo.example.com/maven")
     }
+
+    test("filterManagedDirs removes src_managed, resource_managed, and target/ paths") {
+        val input = Seq(
+            "src/main/scala",
+            "src/main/resources",
+            "target/scala-2.13/src_managed/main",
+            "target/resource_managed/main",
+            "some/path/with/target/in/middle/src",
+        )
+        val result = SbtProjectAnalyzer.filterManagedDirs(input)
+        assertEquals(result, Seq("src/main/scala", "src/main/resources"))
+    }
+
+    test("relativizeTo makes paths relative to base") {
+        val base = os.Path("/home/user/project/moduleA")
+        val input = Seq(
+            "/home/user/project/moduleA/src/main/scala",
+            "/home/user/project/moduleA/src/main/resources",
+            "/home/user/project/moduleB/src/main/scala",
+        )
+        val result = SbtProjectAnalyzer.relativizeTo(base, input)
+        assertEquals(result, Seq("src/main/scala", "src/main/resources"))
+    }
+
+    test("filterManagedDirs handles empty input") {
+        val result = SbtProjectAnalyzer.filterManagedDirs(Seq.empty)
+        assertEquals(result, Seq.empty)
+    }
+
+    test("relativizeTo handles empty input") {
+        val result = SbtProjectAnalyzer.relativizeTo(os.pwd, Seq.empty)
+        assertEquals(result, Seq.empty)
+    }
 }
