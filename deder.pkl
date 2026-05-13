@@ -10,45 +10,49 @@ local const function pom(artId: String) = new PomSettings {
   version = read?("env:VERSION")
 }
 
+local const sonatypeRepo = new SonatypeCentralRepo {
+  id = "sonatype"
+}
+
 local const config = new JavaModule {
   id = "config"
   deps {
     "org.pkl-lang:pkl-config-java:0.30.2"
   }
   pomSettings = pom("deder-config")
+  publish = true
+  publishTo = sonatypeRepo
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
 }
 
-local const testCommon = new ScalaModule {
-  id = "test-common"
-  scalaVersion = scalaVer
-  publish = false
-  deps {
-    "ba.sake::tupson:0.18.0"
-    "com.lihaoyi::os-lib:0.11.6"
-    "org.scala-sbt:test-interface:1.0"
-    "com.lihaoyi::fansi:0.5.1"
-  }
-}
-
-local const testCommonTest = new ScalaTestModule {
-  id = "test-common-test"
-  root = "test-common/test"
-  scalaVersion = scalaVer
-  moduleDeps { testCommon }
-  deps {
-    "org.scalameta::munit:1.2.1"
-  }
-  junitXmlReport {
-    enabled = true
-  }
-}
+local const testCommonModules =
+  new CreateScalaModules {
+    root = "test-common"
+    template = new {
+      scalaVersion = scalaVer
+      publish = false
+      deps {
+        "ba.sake::tupson:0.18.0"
+        "com.lihaoyi::os-lib:0.11.6"
+        "org.scala-sbt:test-interface:1.0"
+        "com.lihaoyi::fansi:0.5.1"
+      }
+    }
+    testTemplate = (template.asTest()) {
+      deps {
+        "org.scalameta::munit:1.2.1"
+      }
+      junitXmlReport {
+        enabled = true
+      }
+    }
+  }.get
 
 local const testRunner = new ScalaModule {
   id = "test-runner"
   scalaVersion = scalaVer
   publish = false
-  moduleDeps { testCommon }
+  moduleDeps { testCommonModules.main }
   mainClass = "ba.sake.deder.testing.forked.ForkedTestMain"
 }
 
@@ -58,6 +62,8 @@ local const pluginApi = new ScalaModule {
   scalaVersion = scalaVer
   moduleDeps { config }
   pomSettings = pom("deder-plugin-api")
+  publish = true
+  publishTo = sonatypeRepo
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
   deps {
     "ba.sake::tupson:0.18.0"
@@ -76,7 +82,7 @@ local const serverModules =
     template = new ScalaModule {
       scalaVersion = scalaVer
       publish = false
-      moduleDeps { config; testCommon; pluginApi }
+      moduleDeps { config; testCommonModules.main; pluginApi }
       mainClass = "ba.sake.deder.ServerMain"
       scalacOptions {
         "-Yretain-trees"
@@ -165,8 +171,7 @@ local const integrationTest = new ScalaTestModule {
 modules {
   config
   pluginApi
-  testCommon
-  testCommonTest
+  ...testCommonModules.all
   testRunner
   ...serverModules.all
   client
