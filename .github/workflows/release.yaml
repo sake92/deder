@@ -160,6 +160,10 @@ jobs:
       - uses: coursier/cache-action@v7
         with:
           extraFiles: deder.pkl
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@main
+      - name: Install deder
+        run: brew install sake92/tap/deder
       - name: Publish to Maven Central
         run: |
           deder exec -t publish -m plugin-api

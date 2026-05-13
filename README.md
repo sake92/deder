@@ -21,6 +21,7 @@ Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 
 ## Adoption and feedback
 Deder is used in some of my OSS projects:
+- https://github.com/sake92/deder (yes, it bootstraps itself!)
 - https://github.com/sake92/sharaf
 - https://github.com/sake92/regenesca
 - https://github.com/sake92/squery
