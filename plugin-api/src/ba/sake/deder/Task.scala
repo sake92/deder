@@ -123,11 +123,11 @@ case class TaskExecContext[T, Deps <: Tuple](
     dependencyResolver: DependencyResolverApi
 )(using ev: TaskDeps[Deps] =:= true)
 
-/** Public-facing base for a task, without exposing the `Deps` type parameter.
- *  Use this type in plugin APIs and `CoreTasksApi` so callers don't need to
+/** Public-facing base trait for a task, without exposing the `Deps` type parameter.
+ *  Use this type in plugin APIs so callers don't need to
  *  know (or spell out) the dependency tuple.
  */
-trait AbstractTask[T] {
+sealed trait AbstractTask[T] {
   def name: String
   def description: String
   def category: String

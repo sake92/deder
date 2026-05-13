@@ -57,10 +57,10 @@ class DederProjectStatePluginReloadSuite extends munit.FunSuite {
     def configureFailure(fingerprint: String, errorMessage: String = "Simulated plugin load failure"): Unit =
       loadResults.update(fingerprint, Left(errorMessage))
 
-    override def extractPluginDeps(project: DederProject): Seq[(String, String)] = Seq.empty
+   /* override def extractPluginDeps(project: DederProject): Seq[(String, String)] = Seq.empty
 
     override def fingerprint(project: DederProject, pklFile: os.Path): Either[String, String] =
-      Right(fingerprintValue)
+      Right(fingerprintValue)*/
 
     override def load(pklFile: os.Path): Either[String, PluginLoader.PluginLoadResult] = {
       loadCalls += 1
