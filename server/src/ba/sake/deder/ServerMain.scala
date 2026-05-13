@@ -6,6 +6,7 @@ import java.nio.channels.OverlappingFileLockException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 import java.util as ju
+import scala.compiletime.uninitialized
 import scala.util.control.NonFatal
 import scala.util.Properties
 import scala.util.Using
@@ -23,8 +24,8 @@ import ba.sake.deder.graalvm.GraalVmNativeImageTasks
 
 object ServerMain extends StrictLogging {
 
-  private var serverLockHandle: RandomAccessFile = _
-  private var serverFileLock: FileLock = _
+  private var serverLockHandle: RandomAccessFile = uninitialized
+  private var serverFileLock: FileLock = uninitialized
 
   def main(args: Array[String]): Unit = Parser(this).runOrExit(args)
 
@@ -38,13 +39,14 @@ object ServerMain extends StrictLogging {
     // 21 because unix sockets locking bug, i'd have to use bytebuffers for 17 and 18.. meh
     if !Properties.isJavaAtLeast(21) then throw DederException("Must run with Java 21+")
 
-    val realProjectDir = try {
-      java.nio.file.Path.of(projectRootDir).toRealPath().toString
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Could not resolve canonical path for '$projectRootDir', using as-is: ${e.getMessage}")
-        projectRootDir
-    }
+    val realProjectDir =
+      try {
+        java.nio.file.Path.of(projectRootDir).toRealPath().toString
+      } catch {
+        case e: Exception =>
+          logger.warn(s"Could not resolve canonical path for '$projectRootDir', using as-is: ${e.getMessage}")
+          projectRootDir
+      }
     val projectRoot = os.Path(realProjectDir)
     System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
@@ -154,10 +156,11 @@ object ServerMain extends StrictLogging {
 
     val (handle, lock) = attemptLock()
     if lock == null then {
-      val existingPidOpt = try {
-        val content = os.read(serverLockFile).trim
-        if content.nonEmpty then Some(content.toLong) else None
-      } catch { case _: Exception => None }
+      val existingPidOpt =
+        try {
+          val content = os.read(serverLockFile).trim
+          if content.nonEmpty then Some(content.toLong) else None
+        } catch { case _: Exception => None }
 
       val isStale = existingPidOpt match {
         case Some(pid) =>

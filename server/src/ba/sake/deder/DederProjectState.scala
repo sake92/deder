@@ -17,15 +17,13 @@ import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
 import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
-import ba.sake.deder.plugin.{PluginLoader, PluginLoaderApi}
+import ba.sake.deder.plugin.{LoadedPlugin, PluginLoader, PluginLoaderApi}
 
 class DederProjectState(
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
     tasksExecutorService: ExecutorService,
     onShutdown: () => Unit,
-    pluginLoaderFactory: (CoreTasksApi, DependencyResolverApi) => PluginLoaderApi =
-      (coreTasksApi, dependencyResolver) => (PluginLoader(coreTasksApi, dependencyResolver): PluginLoaderApi),
     configFilePath: os.Path = DederGlobals.projectRootDir / "deder.pkl"
 ) extends StrictLogging {
 
@@ -46,7 +44,7 @@ class DederProjectState(
 
   private val watchedTasksLock = new AnyRef
   private var watchedTasks = Seq.empty[WatchedTaskData]
-  private var loadedPlugins = LoadedPluginsData.empty
+  private var loadedPlugins = Seq.empty[LoadedPlugin]
 
   reloadProject()
 
@@ -54,10 +52,11 @@ class DederProjectState(
 
   def readState(useLastGood: Boolean): Either[String, DederProjectStateData] =
     stateLock.synchronized {
-      if useLastGood then lastGood match {
-        case Left(_) => current // current has latest error message!
-        case Right(value) => Right(value)
-      }
+      if useLastGood then
+        lastGood match {
+          case Left(_)      => current // current has latest error message!
+          case Right(value) => Right(value)
+        }
       else current
     }
 
@@ -93,27 +92,10 @@ class DederProjectState(
             // Load plugin tasks before TasksResolver so they are included in the execution graph.
             // Plugin tasks are kept separately and the effective registry is rebuilt per reload.
             val coreTasksApi = CoreTasksApiAdapter(new CoreTasks())
-            val pluginLoader = pluginLoaderFactory(coreTasksApi, dependencyResolver)
-            val pluginTasks: Seq[Task[?, ?]] = pluginLoader.fingerprint(newConfig, configFile) match {
-              case Left(err) =>
-                logger.warn(s"Failed to compute plugin fingerprint: $err. Reusing previously loaded plugin tasks.")
-                loadedPlugins.tasks
-              case Right(fingerprint) if loadedPlugins.fingerprint.contains(fingerprint) =>
-                loadedPlugins.tasks
-              case Right(fingerprint) =>
-                pluginLoader.load(configFile) match {
-                  case Left(err) =>
-                    logger.warn(s"Failed to reload plugins: $err. Reusing previously loaded plugin tasks.")
-                    loadedPlugins.tasks
-                  case Right(result) =>
-                    val oldClassLoader = loadedPlugins.classLoader
-                    val newTasks = result.tasks.map(_.asInstanceOf[Task[?, ?]])
-                    loadedPlugins = LoadedPluginsData(Some(fingerprint), newTasks, result.classLoader)
-                    closeStaleClassLoader(oldClassLoader, result.classLoader)
-                    newTasks
-                }
-            }
-
+            val pluginLoader = PluginLoader(coreTasksApi, dependencyResolver)
+            loadedPlugins = pluginLoader.load(loadedPlugins, configFile, newConfig).loadedPlugins
+            // TODO prepend plugin id to task name to avoid conflicts?
+            val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?]])
             val effectiveRegistry = TasksRegistry(baseTasks ++ pluginTasks)
             val tasksResolver = TasksResolver(newConfig, effectiveRegistry)
             val executionPlanner =
@@ -173,7 +155,9 @@ class DederProjectState(
             Seq.empty
           case Right(values) =>
             val plural = if values.size > 1 then "s" else ""
-            val modulesString = values.take(5).map(_._1).mkString(", ") + (if values.size > 5 then s", and ${values.size - 5} more" else "")
+            val modulesString =
+              values.take(5).map(_._1).mkString(", ") + (if values.size > 5 then s", and ${values.size - 5} more"
+                                                         else "")
             serverNotificationsLogger.add(
               ServerNotification.logInfo(
                 s"Executing '${taskName}' task on module${plural}: ${modulesString}"
@@ -312,7 +296,16 @@ class DederProjectState(
           taskInstance.lock.lock()
         }
         DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
-        tasksExecutor.execute(requestId, tasksExecStages, moduleIds, taskName, args, watch, serverNotificationsLogger, clientParams)
+        tasksExecutor.execute(
+          requestId,
+          tasksExecStages,
+          moduleIds,
+          taskName,
+          args,
+          watch,
+          serverNotificationsLogger,
+          clientParams
+        )
       } finally {
         allTaskInstances.reverse.foreach { taskInstance =>
           taskInstance.lock.unlock()
@@ -501,7 +494,10 @@ class DederProjectState(
           clientParams = watchedTask.clientParams
         )
         watchedTask.serverNotificationsLogger.add(
-          ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...", watchedTask.taskInstance.moduleId)
+          ServerNotification.logInfo(
+            s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+            watchedTask.taskInstance.moduleId
+          )
         )
       }
     }
@@ -554,7 +550,10 @@ class DederProjectState(
           clientParams = watchedTask.clientParams
         )
         watchedTask.serverNotificationsLogger.add(
-          ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...", watchedTask.taskInstance.moduleId)
+          ServerNotification.logInfo(
+            s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+            watchedTask.taskInstance.moduleId
+          )
         )
       }
     }
@@ -577,12 +576,12 @@ class DederProjectState(
 
   def shutdown(): Unit = {
     shutdownStarted = true
-    loadedPlugins.classLoader.foreach(closeClassLoader)
+    loadedPlugins.foreach(_.closeClassLoaderQuietly())
     onShutdown()
   }
 
-  private def closeStaleClassLoader(previous: Option[URLClassLoader], current: Option[URLClassLoader]): Unit =
-    previous.foreach { old =>
+  private def closeStaleClassLoaders(previous: Seq[URLClassLoader], current: Seq[URLClassLoader]): Unit =
+    previous.distinct.foreach { old =>
       // Compare by reference: if the same classloader instance is still active, keep it open.
       val shouldClose = current.forall(_ ne old)
       if shouldClose then closeClassLoader(old)
@@ -615,13 +614,3 @@ case class WatchedTaskData(
     affectingConfigValueTasks: Set[TaskInstance],
     clientParams: CliClientParams
 )
-
-case class LoadedPluginsData(
-    fingerprint: Option[String],
-    tasks: Seq[Task[?, ?]],
-    classLoader: Option[URLClassLoader]
-)
-
-object LoadedPluginsData {
-  val empty = LoadedPluginsData(None, Seq.empty, None)
-}

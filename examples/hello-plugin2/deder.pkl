@@ -4,17 +4,17 @@ amends "../../config/DederProject.pkl"
 
 modules {
   new ScalaModule {
-    id = "hello-plugin"
+    id = "hello-plugin2"
     root = "."
     scalaVersion = "3.7.4"
     resources { "resources" }
     deps {
       "ba.sake::deder-plugin-api:0.7.8-SNAPSHOT"
-      "com.lihaoyi:os-lib_2.13:0.3.0"
+      "com.lihaoyi::os-lib:0.11.0"
     }
     pomSettings {
       groupId = "ba.sake"
-      artifactId = "deder-hello-plugin"
+      artifactId = "deder-hello-plugin2"
       version = "0.7.8-SNAPSHOT"
       name = "Deder Hello Plugin"
       description = "Example Deder plugin that adds a 'hello' task"

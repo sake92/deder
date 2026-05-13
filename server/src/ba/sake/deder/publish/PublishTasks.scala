@@ -389,7 +389,8 @@ class PublishTasks(coreTasks: CoreTasks) {
   val publishLocalTask = TaskBuilder
     .make[Option[os.Path]](
       name = "publishLocal",
-      category = "Publishing"
+      category = "Publishing",
+      transitive = true
     )
     .dependsOn(publishArtifactsTask)
     .build { ctx =>

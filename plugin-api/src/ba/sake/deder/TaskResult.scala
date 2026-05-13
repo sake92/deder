@@ -3,6 +3,7 @@ package ba.sake.deder
 import ba.sake.tupson.JsonRW
 import org.typelevel.jawn.ast.*
 
+// TODO derives JsonRW after tupson update
 case class TaskResult[T](
     value: T,
     inputsHash: String,

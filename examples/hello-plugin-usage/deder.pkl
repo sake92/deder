@@ -3,6 +3,7 @@
 amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 import "../hello-plugin/resources/HelloPlugin.pkl" as HP
+import "../hello-plugin2/resources/HelloPlugin.pkl" as HP2
 
 plugins {
   new HP.HelloPlugin {
@@ -10,12 +11,17 @@ plugins {
       greeting = "Hello from hello-plugin-usage!"
     }
   }
+  new HP2.HelloPlugin {
+    config = new HP2.HelloPluginConfig {
+      greeting = "Hello from hello-plugin2-usage!"
+    }
+  }
 }
 
 modules {
   new ScalaModule {
     id = "app"
+    root = "."
     scalaVersion = "3.7.4"
-    mainClass = "Main"
   }
 }
