@@ -11,8 +11,7 @@
 - shade test-runner to avoid classpath issues.. but first make shading work good
 - quick shutdown and start causes issues
 - print version when downloading
-- limiting graphs is broken, "deder modules --depth-up 1 -m common --mermaid" shows uber-test depends on common directly.. but doesnt
-  - ohh, so asTest() should remove moduleDeps ??
+
 # Import
 - cross scala modules are wack..
 - relativize imported folders to repo root or module root..
