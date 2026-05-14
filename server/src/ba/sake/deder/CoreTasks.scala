@@ -1254,13 +1254,12 @@ class CoreTasks() extends StrictLogging {
       }
       val cmd = ctx.module match {
         case _: ScalaModule =>
-          val allJars = (replJars ++ runClasspath).map(_.toString)
-          val cp = allJars.mkString(File.pathSeparator)
+          val replCp = replJars.map(_.toString).mkString(File.pathSeparator)
           val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)
           val mainClass =
             if scalaVersion.startsWith("3.") then "dotty.tools.repl.Main"
             else "scala.tools.nsc.MainGenericRunner"
-          Seq("java") ++ jvmOptions ++ Seq("-cp", cp, mainClass, "-classpath", userClasspath) ++ ctx.args
+          Seq("java") ++ jvmOptions ++ Seq("-cp", replCp, mainClass, "-classpath", userClasspath) ++ ctx.args
         case _ =>
           val jshellBin = javaHome.map(h => (h / "bin" / "jshell").toString).getOrElse("jshell")
           val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)

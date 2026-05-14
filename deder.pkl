@@ -181,6 +181,10 @@ local const integrationTest = new ScalaTestModule {
   junitXmlReport {
     enabled = true
   }
+  forkEnv {
+    ["DEDER_TMP_M2_REPO"] = "tmp/m2"
+    ["DEDER_PLUGIN_API_VERSION"] = "it-test-version"
+  }
 }
 
 modules {
