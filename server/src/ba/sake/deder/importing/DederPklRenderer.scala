@@ -262,10 +262,7 @@ object DederPklRenderer {
         val hasCommon = common.nonEmpty
         val hasAnyDelta = deltas.values.exists(_.nonEmpty)
         if (!hasCommon && !hasAnyDelta) return ""
-        if (g.usesTpolecat || g.usesTypelevel) {
-            val dummyModule = ModuleDef("", common, Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, None, None, None, Seq.empty, Seq.empty, Seq.empty, Seq.empty)
-            return renderScalacOptionsSmart(dummyModule, g, indent, Some(ScalaVersionCtx.Placeholder))
-        }
+        if (g.usesTpolecat || g.usesTypelevel) return ""
         val spaces = " " * indent
         val i1 = " " * (indent + 2)
         val i2 = " " * (indent + 4)
@@ -708,21 +705,8 @@ object DederPklRenderer {
         indent: Int,
         scalaVersionCtx: Option[ScalaVersionCtx],
     ): String = {
-        val spaces = " " * indent
-        val versionRef = scalaVersionCtx match {
-            case Some(ScalaVersionCtx.Placeholder) => "sv"
-            case Some(ScalaVersionCtx.Literal(v))  => s""""$v""""
-            case None                              => "\"\""
-        }
-        if (g.usesTypelevel) {
-            s"""${spaces}// Managed by sbt-typelevel. To customize: override scalacOptions directly.
-               |${spaces}scalacOptions = DederTypelevel.forVersion($versionRef)""".stripMargin
-        } else if (g.usesTpolecat) {
-            s"""${spaces}// Managed by sbt-tpolecat. Mode auto-selected: Ci when $$CI is set, Dev otherwise.
-               |${spaces}scalacOptions = DederTpolecat.forVersion($versionRef)""".stripMargin
-        } else {
-            renderScalacOptions(m.scalacOptions, indent)
-        }
+        if (g.usesTpolecat || g.usesTypelevel) ""
+        else renderScalacOptions(m.scalacOptions, indent)
     }
 
     private def renderJavacOptions(opts: Seq[String], indent: Int): String = {
