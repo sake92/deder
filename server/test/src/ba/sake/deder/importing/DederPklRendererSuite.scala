@@ -581,7 +581,8 @@ class DederPklRendererSuite extends FunSuite {
         )
         val result = DederPklRenderer.render(build)
         assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.7.4/DederTpolecat.pkl""""), clues(result))
-        assert(result.contains("(DederTpolecat.tpolecatScala213)"), clues(result))
+        assert(result.contains("if (sv.startsWith(\"3\"))"), clues(result))
+        assert(result.contains("DederTpolecat.tpolecatScala213"), clues(result))
         assert(!result.contains("scalacOptions ="), clues(result)) // no verbatim scalacOptions
         assert(!result.contains("scalacOptions {"), clues(result)) // no raw scalacOptions block
         assert(!result.contains("forVersion"), clues(result)) // forVersion removed
