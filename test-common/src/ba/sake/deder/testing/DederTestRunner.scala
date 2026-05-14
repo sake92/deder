@@ -91,8 +91,15 @@ class DederTestRunner(
       classLoader
     )
     val tasks = testClasses.flatMap { case (className, fingerprint, selector) =>
-      // weaver is wonky, wants class name without $ suffix, even for objects..
-      val tweakedClassName = if framework.name().startsWith("weaver-") then className.stripSuffix("$") else className
+      // Per sbt test interface spec, for module classes the framework expects the
+      // class name WITHOUT trailing "$". The discovery step already strips it, but
+      // this is a safety net in case a framework uses isModule = true.
+      val fpIsModule = fingerprint match {
+        case sub: SubclassFingerprint => sub.isModule
+        case ann: AnnotatedFingerprint => ann.isModule
+        case _ => false
+      }
+      val tweakedClassName = if fpIsModule then className.stripSuffix("$") else className
       val taskDef = new TaskDef(
         tweakedClassName,
         fingerprint,
@@ -140,8 +147,18 @@ val results = handler.results
         h.capture.startSuite()
         h.reporter.emit(ForkedTestEnvelope.SuiteStarted(suiteName, threadId))
       }
-      try task.execute(handler, Array(logger))
-      finally {
+      try {
+        // Execute the initial task and any follow-up tasks it returns.
+        // Some frameworks (e.g. ScalaCheck) return sub-tasks that must
+        // also be executed to collect all test events.
+        var remaining = List(task)
+        while (remaining.nonEmpty && !isCancelled()) {
+          val current = remaining.head
+          remaining = remaining.tail
+          val next = current.execute(handler, Array(logger))
+          remaining = next.toList ::: remaining
+        }
+      } finally {
         forkHooks.foreach { h =>
           val captured = h.capture.finishSuite()
           h.reporter.emit(ForkedTestEnvelope.SuiteCompleted(suiteName, threadId, captured))
