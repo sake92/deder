@@ -182,9 +182,6 @@ local const integrationTest = new ScalaTestModule {
     enabled = true
   }
   forkEnv {
-    ["DEDER_CLIENT_PATH"] = read?("env:DEDER_CLIENT_PATH")
-    ["DEDER_SERVER_PATH"] = read?("env:DEDER_SERVER_PATH")
-    ["DEDER_TEST_RUNNER_PATH"] = read?("env:DEDER_TEST_RUNNER_PATH")
     ["DEDER_TMP_M2_REPO"] = "tmp/m2"
     ["DEDER_PLUGIN_API_VERSION"] = "it-test-version"
   }
