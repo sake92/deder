@@ -1,3 +1,5 @@
+import "DederProject.pkl" as P
+
 /// sbt-typelevel convention templates as reusable ScalaModule templates.
 /// Source: https://github.com/typelevel/sbt-typelevel
 /// Option lists transcribed from TypelevelSettingsPlugin.scala (sbt-typelevel main branch).
@@ -7,7 +9,8 @@
 
 typelevelOpts2_12: Listing<String> = new {
   "-deprecation"
-  "-encoding:utf-8"
+  "-encoding"
+  "utf-8"
   "-feature"
   "-unchecked"
   "-Xlint"
@@ -23,7 +26,8 @@ typelevelOpts2_12: Listing<String> = new {
 
 typelevelOpts2_13: Listing<String> = new {
   "-deprecation"
-  "-encoding:utf-8"
+  "-encoding"
+  "utf-8"
   "-feature"
   "-unchecked"
   "-Wdead-code"
@@ -39,7 +43,8 @@ typelevelOpts2_13: Listing<String> = new {
 
 typelevelOpts3: Listing<String> = new {
   "-deprecation"
-  "-encoding:utf-8"
+  "-encoding"
+  "utf-8"
   "-feature"
   "-unchecked"
   "-Wunused:implicits"
@@ -49,11 +54,11 @@ typelevelOpts3: Listing<String> = new {
   "-Wunused:params"
   "-Wunused:privates"
   "-Wvalue-discard"
-  "-Xkind-projector:underscores"
+  "-Ykind-projector:underscores"
   "-language:implicitConversions"
 }
 
-function mkScalacOptions(version: String, mode: String): Listing<String> =
+function mkScalacOptions(version: String, mode: String): Listing<String> = 
   let (opts =
     if (version == "2.12") typelevelOpts2_12
     else if (version == "2.13") typelevelOpts2_13
@@ -64,10 +69,11 @@ function mkScalacOptions(version: String, mode: String): Listing<String> =
     else if (version == "2.13") "-Werror"
     else "-Xfatal-warnings"
   )
-    if (mode == "ci") (opts.toList() + fatalFlag).toListing()
-    else opts
+  if (mode == "ci") (opts.toList().add(fatalFlag)).toListing()
+  else opts
 
-function mkBaseMain(version: String, mode: String): ScalaModule = new {
+
+function mkBaseMain(version: String, mode: String): P.ScalaModule = new {
   scalacOptions = mkScalacOptions(version, mode)
   compileOrder = "java-then-scala"
   when (version != "3") {
@@ -77,7 +83,7 @@ function mkBaseMain(version: String, mode: String): ScalaModule = new {
   }
   pomSettings {
     licenses {
-      new PomLicense {
+      new P.PomLicense {
         name = "Apache 2.0 License"
         url = "https://opensource.org/license/apache-2.0"
       }
@@ -85,7 +91,7 @@ function mkBaseMain(version: String, mode: String): ScalaModule = new {
   }
 }
 
-function mkBaseTest(version: String, mode: String): ScalaTestModule =
+function mkBaseTest(version: String, mode: String): P.ScalaTestModule =
   (mkBaseMain(version, mode).asTest()) {
     testFrameworks {
       "munit.Framework"
@@ -98,12 +104,12 @@ function mkBaseTest(version: String, mode: String): ScalaTestModule =
     }
   }
 
-function mkBaseJs(version: String, mode: String): ScalaJsModule =
+function mkBaseJs(version: String, mode: String): P.ScalaJsModule =
   (mkBaseMain(version, mode).asJs()) {
     scalaJsVersion = "1.18.2"
   }
 
-function mkBaseJsTest(version: String, mode: String): ScalaJsTestModule =
+function mkBaseJsTest(version: String, mode: String): P.ScalaJsTestModule =
   (mkBaseJs(version, mode).asTest()) {
     testFrameworks {
       "munit.Framework"
@@ -116,12 +122,12 @@ function mkBaseJsTest(version: String, mode: String): ScalaJsTestModule =
     }
   }
 
-function mkBaseNative(version: String, mode: String): ScalaNativeModule =
+function mkBaseNative(version: String, mode: String): P.ScalaNativeModule =
   (mkBaseMain(version, mode).asNative()) {
     scalaNativeVersion = "0.5.7"
   }
 
-function mkBaseNativeTest(version: String, mode: String): ScalaNativeTestModule =
+function mkBaseNativeTest(version: String, mode: String): P.ScalaNativeTestModule =
   (mkBaseNative(version, mode).asTest()) {
     testFrameworks {
       "munit.Framework"

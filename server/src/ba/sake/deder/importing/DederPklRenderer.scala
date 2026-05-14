@@ -503,7 +503,7 @@ object DederPklRenderer {
                     } else ""
                 }.getOrElse("")
 
-                Seq(jsTmpl, nativeTmpl, jsTestTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
+                Seq(jsTmpl, jsTestTmpl, nativeTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
             } else ""
 
             val body = Seq(Some(templateBody), Some(testTmpl), if (crossPlatTmpls.nonEmpty) Some(crossPlatTmpls) else None)
@@ -601,11 +601,12 @@ object DederPklRenderer {
                 } else ""
             }.getOrElse("")
 
-            val tmpls = Seq(jsTmpl, nativeTmpl, jsTestTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
+            val tmpls = Seq(jsTmpl, jsTestTmpl, nativeTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
             val tmplsWithNewline = if (tmpls.nonEmpty) tmpls + "\n" else ""
 
             s"""$jvmBody
-               |$tmplsWithNewline$testTmpl""".stripMargin
+               |$testTmpl
+               |$tmplsWithNewline""".stripMargin
         } else {
             s"""$jvmBody
                |$testTmpl""".stripMargin

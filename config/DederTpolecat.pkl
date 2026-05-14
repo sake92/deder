@@ -1,3 +1,5 @@
+import "DederProject.pkl" as P
+
 /// sbt-tpolecat scalac options as reusable ScalaModule templates.
 /// Source: https://github.com/typelevel/sbt-tpolecat
 /// Option lists transcribed from org.typelevel.scalacoptions.ScalacOptions (tpolecat 0.5.x).
@@ -122,28 +124,28 @@ function mkScalacOptions(version: String, mode: String): Listing<String> =
     if (mode == "ci") (opts.toList() + fatalFlag).toListing()
     else opts
 
-function mkBaseMain(version: String, mode: String): ScalaModule = new {
+function mkBaseMain(version: String, mode: String): P.ScalaModule = new {
   scalacOptions = mkScalacOptions(version, mode)
   compileOrder = "java-then-scala"
 }
 
-function mkBaseTest(version: String, mode: String): ScalaTestModule =
+function mkBaseTest(version: String, mode: String): P.ScalaTestModule =
   (mkBaseMain(version, mode)).asTest()
 
-function mkBaseJs(version: String, mode: String): ScalaJsModule =
+function mkBaseJs(version: String, mode: String): P.ScalaJsModule =
   ((mkBaseMain(version, mode)).asJs()) {
     scalaJsVersion = "1.18.2"
   }
 
-function mkBaseJsTest(version: String, mode: String): ScalaJsTestModule =
+function mkBaseJsTest(version: String, mode: String): P.ScalaJsTestModule =
   (mkBaseJs(version, mode)).asTest()
 
-function mkBaseNative(version: String, mode: String): ScalaNativeModule =
+function mkBaseNative(version: String, mode: String): P.ScalaNativeModule =
   ((mkBaseMain(version, mode)).asNative()) {
     scalaNativeVersion = "0.5.7"
   }
 
-function mkBaseNativeTest(version: String, mode: String): ScalaNativeTestModule =
+function mkBaseNativeTest(version: String, mode: String): P.ScalaNativeTestModule =
   (mkBaseNative(version, mode)).asTest()
 
 // --- Scala 3 exports ---
