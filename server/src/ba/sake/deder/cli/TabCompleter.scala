@@ -18,51 +18,112 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
     "help"
   )
 
+  enum ValueType:
+    case ModuleIds, TaskNames, ShellTypes, ImportFrom, Subcommands
+
+  case class FlagDef(long: String, short: Option[String], valueType: Option[ValueType])
+
+  private val commandFlags: Map[String, Seq[FlagDef]] = Map(
+    "modules" -> Seq(
+      FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
+      FlagDef("--depth-down", None, None),
+      FlagDef("--depth-up", None, None),
+      FlagDef("--json", None, None),
+      FlagDef("--dot", None, None),
+      FlagDef("--mermaid", None, None),
+    ),
+    "tasks" -> Seq(
+      FlagDef("--module", Some("-m"), Some(ValueType.ModuleIds)),
+      FlagDef("--json", None, None),
+      FlagDef("--dot", None, None),
+      FlagDef("--mermaid", None, None),
+    ),
+    "plan" -> Seq(
+      FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
+      FlagDef("--task", Some("-t"), Some(ValueType.TaskNames)),
+      FlagDef("--json", None, None),
+      FlagDef("--dot", None, None),
+      FlagDef("--mermaid", None, None),
+    ),
+    "clean" -> Seq(
+      FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
+      FlagDef("--task", Some("-t"), Some(ValueType.TaskNames)),
+    ),
+    "exec" -> Seq(
+      FlagDef("--task", Some("-t"), Some(ValueType.TaskNames)),
+      FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
+      FlagDef("--log-level", Some("-l"), None),
+      FlagDef("--json", None, None),
+      FlagDef("--watch", Some("-w"), None),
+    ),
+    "import" -> Seq(
+      FlagDef("--from", None, Some(ValueType.ImportFrom)),
+    ),
+    "complete" -> Seq(
+      FlagDef("--shell", Some("-s"), Some(ValueType.ShellTypes)),
+      FlagDef("--command-line", Some("-c"), None),
+      FlagDef("--cursor-pos", Some("-p"), None),
+      FlagDef("--output", Some("-o"), None),
+    ),
+    "help" -> Seq(
+      FlagDef("--command", Some("-c"), Some(ValueType.Subcommands)),
+    ),
+  )
+
   def complete(commandLine: String, cursorPos: Int): Seq[String] = {
     val (args, wordPos) = TabCompleter.shellSplit(commandLine, cursorPos)
-    val currentWord = if (wordPos >= 0 && wordPos < args.length) args(wordPos) else ""
-    val prevWord = if (wordPos >= 1 && wordPos < args.length) args(wordPos - 1) else ""
-    val res = args match {
-      case Seq("deder", rest*) =>
-        rest match {
-          case Seq("version", _*) => Seq.empty
-          case Seq("clean", _*) =>
-            completeModule(prevWord, currentWord)
-              .orElse(completeTask(prevWord, currentWord))
-              .getOrElse(Seq("-m", "--module", "-t", "--task").filter(_.startsWith(currentWord)))
-          case Seq("modules", _*) => Seq("--json", "--dot", "--mermaid").filter(_.startsWith(currentWord))
-          case Seq("tasks", _*) =>
-            completeModule(prevWord, currentWord).getOrElse(
-              Seq("-m", "--module", "--json", "--dot", "--mermaid").filter(_.startsWith(currentWord))
-            )
-          case Seq("plan", _*) =>
-            completeModule(prevWord, currentWord)
-              .orElse(completeTask(prevWord, currentWord))
-              .getOrElse(
-                Seq("-m", "--module", "-t", "--task", "--json", "--dot", "--mermaid").filter(_.startsWith(currentWord))
-              )
-          case Seq("exec", _*) =>
-            completeModule(prevWord, currentWord)
-              .orElse(completeTask(prevWord, currentWord))
-              .getOrElse(Seq("-m", "--module", "-t", "--task", "--json", "-w", "--watch").filter(_.startsWith(currentWord)))
-          case Seq("shutdown", _*) => Seq.empty
-          case Seq("import", _*)   => Seq.empty
-          case Seq("bsp", _*)      => Seq("install")
-          case Seq("complete", _*) => Seq.empty
-          case Seq("help", _*)     => Seq.empty
-          case Seq(first, _*)      => allSubcommands.filter(_.startsWith(first))
-          case _                   => allSubcommands
+    val currentWord = if wordPos >= 0 && wordPos < args.length then args(wordPos) else ""
+    val prevWord = if wordPos >= 1 && wordPos < args.length then args(wordPos - 1) else ""
+
+    args match {
+      case Seq("deder", subcommand, rest*) =>
+        // 1. Check if the previous word was a flag that expects a value
+        commandFlags.get(subcommand).foreach { flags =>
+          val valueCompletion = flags.collectFirst {
+            case FlagDef(long, short, Some(valueType))
+                if prevWord == long || short.exists(_ == prevWord) =>
+              valueType
+          }.flatMap { vt =>
+            Some(completeValue(vt, currentWord))
+          }
+          valueCompletion.foreach(vc => return vc)
         }
-      case _ => Seq.empty
+
+        // 2. Handle "bsp" subcommand specially (it has sub-subcommand)
+        if subcommand == "bsp" then return Seq("install").filter(_.startsWith(currentWord))
+
+        // 3. Complete flags for this subcommand
+        commandFlags.get(subcommand).map { flags =>
+          flags.flatMap { f =>
+            f.short.toSeq ++ Seq(f.long)
+          }.filter(_.startsWith(currentWord))
+        }.getOrElse {
+          // Unknown subcommand or subcommand with no flags
+          if allSubcommands.contains(subcommand) then Seq.empty
+          else allSubcommands.filter(_.startsWith(subcommand))
+        }
+
+      case Seq("deder") =>
+        allSubcommands
+
+      case Seq(first, _*) =>
+        allSubcommands.filter(_.startsWith(first))
+
+      case _ =>
+        Seq.empty
     }
-    res
   }
 
-  private def completeModule(prevWord: String, currentWord: String): Option[Seq[String]] =
-    Option.when(prevWord == "-m" || prevWord == "--module")(moduleIds.filter(_.startsWith(currentWord)))
-
-  private def completeTask(prevWord: String, currentWord: String): Option[Seq[String]] =
-    Option.when(prevWord == "-t" || prevWord == "--task")(taskIds.filter(_.startsWith(currentWord)))
+  private def completeValue(valueType: ValueType, prefix: String): Seq[String] = {
+    val candidates: Seq[String] = valueType match {
+      case ValueType.ModuleIds   => moduleIds
+      case ValueType.TaskNames   => taskIds
+      case ValueType.ShellTypes  => ShellType.values.map(_.toString).toSeq
+      case ValueType.ImportFrom  => ImportBuildTool.values.map(_.toString).toSeq
+      case ValueType.Subcommands => allSubcommands
+    }
+    candidates.filter(_.startsWith(prefix))
+  }
 }
 
 object TabCompleter {
