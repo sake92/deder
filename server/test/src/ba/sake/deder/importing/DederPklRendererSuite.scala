@@ -580,9 +580,11 @@ class DederPklRendererSuite extends FunSuite {
             repositories = Seq.empty, warnings = Seq.empty,
         )
         val result = DederPklRenderer.render(build)
-        assert(result.contains("""import "DederTpolecat.pkl""""), clues(result))
-        assert(result.contains("scalacOptions = DederTpolecat.forVersion(sv)"), clues(result))
-        assert(!result.contains("scalacOptions {"), clues(result)) // no verbatim options
+        assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.7.4/DederTpolecat.pkl""""), clues(result))
+        assert(result.contains("(DederTpolecat.tpolecatScala213)"), clues(result))
+        assert(!result.contains("scalacOptions ="), clues(result)) // no verbatim scalacOptions
+        assert(!result.contains("scalacOptions {"), clues(result)) // no raw scalacOptions block
+        assert(!result.contains("forVersion"), clues(result)) // forVersion removed
     }
 
     test("emits DederTypelevel.pkl import and shared reference when typelevel detected") {
@@ -599,8 +601,10 @@ class DederPklRendererSuite extends FunSuite {
             repositories = Seq.empty, warnings = Seq.empty,
         )
         val result = DederPklRenderer.render(build)
-        assert(result.contains("""import "DederTypelevel.pkl""""), clues(result))
-        assert(result.contains("scalacOptions = DederTypelevel.forVersion("), clues(result))
+        assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.7.4/DederTypelevel.pkl""""), clues(result))
+        assert(result.contains("(DederTypelevel.typelevelScala"), clues(result))
+        assert(!result.contains("scalacOptions ="), clues(result))
+        assert(!result.contains("forVersion"), clues(result))
     }
 
     test("emits raw scalacOptions when neither tpolecat nor typelevel detected") {
