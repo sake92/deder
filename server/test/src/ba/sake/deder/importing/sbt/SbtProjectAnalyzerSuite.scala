@@ -289,4 +289,45 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         val result = SbtProjectAnalyzer.relativizeTo(os.pwd, Seq.empty)
         assertEquals(result, Seq.empty)
     }
+
+    test("filterStandardSbtDirs removes standard sbt directories for sbt layout") {
+        val input = Seq(
+            "src/main/scala",
+            "src/main/java",
+            "src/main/resources",
+            "src/main/scala-2.13",
+            "src/main/scala-3",
+            "src/main/scala-2.13+",
+            "src/test/scala",
+            "src/test/scala-2.13",
+            "custom/path/to/src",
+            "generated/src/main/scala",
+        )
+        val result = SbtProjectAnalyzer.filterStandardSbtDirs(input,
+            ba.sake.deder.config.DederProject.DirLayout.SBT)
+        assertEquals(result, Seq("custom/path/to/src", "generated/src/main/scala"))
+    }
+
+    test("filterStandardSbtDirs removes cross-platform dirs for sbt-cross-full layout") {
+        val input = Seq(
+            "shared/src/main/scala",
+            "jvm/src/main/scala",
+            "js/src/main/scala",
+            ".jvm/src/main/scala",
+            ".js/src/main/scala",
+            "shared/src/main/scala-2.13",
+            "jvm/src/main/scala-3",
+            "custom/shared/src/main/scala",
+        )
+        val result = SbtProjectAnalyzer.filterStandardSbtDirs(input,
+            ba.sake.deder.config.DederProject.DirLayout.SBT_CROSS_FULL)
+        assertEquals(result, Seq("custom/shared/src/main/scala"))
+    }
+
+    test("filterStandardSbtDirs does not filter anything for non-sbt layout") {
+        val input = Seq("src/main/scala", "src/main/java", "src/main/scala-2.13")
+        val result = SbtProjectAnalyzer.filterStandardSbtDirs(input,
+            ba.sake.deder.config.DederProject.DirLayout.DEFAULT)
+        assertEquals(result, input)
+    }
 }

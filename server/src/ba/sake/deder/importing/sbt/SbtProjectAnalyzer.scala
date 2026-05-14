@@ -51,6 +51,7 @@ class SbtProjectAnalyzer(
                     concreteExport.scalaVersion,
                     globalIdMap,
                     warnings,
+                    layout = gi.layout,
                     isJs = concreteExport.platform == "js",
                     isNative = concreteExport.platform == "native",
                 )
@@ -175,6 +176,7 @@ class SbtProjectAnalyzer(
         dependerScalaVersion: String,
         idMap: Map[(String, String), ResolvedModuleRef],
         warnings: scala.collection.mutable.Builder[ImportWarning, Seq[ImportWarning]],
+        layout: DederProject.DirLayout,
         isJs: Boolean = false,
         isNative: Boolean = false,
     ): (ModuleDef, Int) = {
@@ -216,6 +218,11 @@ class SbtProjectAnalyzer(
         val relResourceDirs     = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredResources)
         val relTestResourceDirs = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredTestResources)
 
+        val finalSourceDirs      = SbtProjectAnalyzer.filterStandardSbtDirs(relSourceDirs, layout)
+        val finalTestSourceDirs   = SbtProjectAnalyzer.filterStandardSbtDirs(relTestSourceDirs, layout)
+        val finalResourceDirs     = SbtProjectAnalyzer.filterStandardSbtDirs(relResourceDirs, layout)
+        val finalTestResourceDirs = SbtProjectAnalyzer.filterStandardSbtDirs(relTestResourceDirs, layout)
+
         val moduleDef = ModuleDef(
             scalaVersion = pe.scalaVersion,
             scalacOptions = pe.scalacOptions,
@@ -228,10 +235,10 @@ class SbtProjectAnalyzer(
             scalaJsVersion = if (isJs) Some(SbtProjectAnalyzer.DefaultScalaJsVersion) else None,
             scalaNativeVersion = if (isNative) Some(SbtProjectAnalyzer.DefaultScalaNativeVersion) else None,
             publish = publish,
-            sources = relSourceDirs,
-            testSources = relTestSourceDirs,
-            resources = relResourceDirs,
-            testResources = relTestResourceDirs,
+            sources = finalSourceDirs,
+            testSources = finalTestSourceDirs,
+            resources = finalResourceDirs,
+            testResources = finalTestResourceDirs,
         )
         (moduleDef, filteredCount)
     }
@@ -411,6 +418,13 @@ object SbtProjectAnalyzer {
                 if rel.startsWith("..") then None else Some(rel)
             } catch case _: IllegalArgumentException => None
         }
+
+    private val SbtStandardDirPattern =
+        """^(shared/)?((jvm|js|native|\.jvm|\.js|\.native)/)?src/(main|test)/(scala|java|resources)(-[0-9].*)?$""".r
+
+    def filterStandardSbtDirs(dirs: Seq[String], layout: DederProject.DirLayout): Seq[String] =
+        if (!layout.toString.toLowerCase.startsWith("sbt")) dirs
+        else dirs.filterNot(d => SbtStandardDirPattern.findFirstIn(d).isDefined)
 
     def detectLayout(plugins: Seq[String], projectBaseDir: String): DederProject.DirLayout = {
         val hasCrossProject = plugins.exists(p =>
