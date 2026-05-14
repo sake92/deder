@@ -195,30 +195,126 @@ object DederPklRenderer {
         }.toMap
     }
 
-    /** Renders when(sv == "version") { ... } blocks for version-specific property additions.
-      * Only emits blocks for versions that have non-empty deltas. */
-    private def renderDeltaWhenBlocks(
-        deltas: Map[String, ModuleDef],
-        groupLookup: Map[String, ModuleGroup],
+    private def renderScalacOptionsWithWhens(
+        common: Seq[String],
+        deltas: Map[String, Seq[String]],
         g: ModuleGroup,
-        indent: Int = 8,
+        indent: Int,
     ): String = {
+        val hasCommon = common.nonEmpty
+        val hasAnyDelta = deltas.values.exists(_.nonEmpty)
+        if (!hasCommon && !hasAnyDelta) return ""
+        if (g.usesTpolecat || g.usesTypelevel) {
+            val dummyModule = ModuleDef("", common, Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, None, None, None, Seq.empty, Seq.empty, Seq.empty, Seq.empty)
+            return renderScalacOptionsSmart(dummyModule, g, indent, Some(ScalaVersionCtx.Placeholder))
+        }
         val spaces = " " * indent
-        deltas.toSeq.sortBy(_._1).flatMap { case (version, delta) =>
-            val props = Seq(
-                if (g.usesTpolecat || g.usesTypelevel || delta.scalacOptions.nonEmpty)
-                    Some(renderScalacOptionsSmart(delta, g, indent + 2, Some(ScalaVersionCtx.Placeholder)))
-                else None,
-                if (delta.javacOptions.nonEmpty) Some(renderJavacOptions(delta.javacOptions, indent + 2)) else None,
-                if (delta.deps.nonEmpty) Some(renderDeps(delta.deps, indent + 2)) else None,
-                if (delta.scalacPluginDeps.nonEmpty) Some(renderPluginDeps(delta.scalacPluginDeps, indent + 2)) else None,
-                if (delta.sources.nonEmpty) Some(renderSourceDirs(delta.sources, indent + 2)) else None,
-                if (delta.resources.nonEmpty) Some(renderResourceDirs(delta.resources, indent + 2)) else None,
-                if (delta.moduleDeps.nonEmpty) Some(renderModuleDepsPkl(delta.moduleDeps, indent + 2, Some(ScalaVersionCtx.Placeholder), groupLookup)) else None,
-            ).flatten
-            if (props.isEmpty) None
-            else Some(s"${spaces}when (sv == \"$version\") {\n${props.mkString("\n")}\n$spaces}")
+        val i1 = " " * (indent + 2)
+        val i2 = " " * (indent + 4)
+        val commonEntries = common.map(o => s"""$i1"$o"""").mkString("\n")
+        val whenEntries = deltas.toSeq.sortBy(_._1).flatMap { (v, items) =>
+            if (items.nonEmpty) {
+                val itemLines = items.map(o => s"""$i2"$o"""").mkString("\n")
+                Some(s"""${i1}when (sv == "$v") {\n$itemLines\n$i1}""")
+            } else None
         }.mkString("\n")
+        val body = Seq(if (commonEntries.nonEmpty) Some(commonEntries) else None,
+                       if (whenEntries.nonEmpty) Some(whenEntries) else None).flatten.mkString("\n")
+        s"""${spaces}scalacOptions {\n$body\n$spaces}"""
+    }
+
+    private def renderDepsWithWhens(
+        common: Seq[DepDef],
+        deltas: Map[String, Seq[DepDef]],
+        indent: Int,
+    ): String = {
+        val hasCommon = common.nonEmpty
+        val hasAnyDelta = deltas.values.exists(_.nonEmpty)
+        if (!hasCommon && !hasAnyDelta) return ""
+        val spaces = " " * indent
+        val i1 = " " * (indent + 2)
+        val i2 = " " * (indent + 4)
+        val commonEntries = common.map(d => s"""$i1"${d.formatted}"""").mkString("\n")
+        val whenEntries = deltas.toSeq.sortBy(_._1).flatMap { (v, deps) =>
+            if (deps.nonEmpty) {
+                val depLines = deps.map(d => s"""$i2"${d.formatted}"""").mkString("\n")
+                Some(s"""${i1}when (sv == "$v") {\n$depLines\n$i1}""")
+            } else None
+        }.mkString("\n")
+        val body = Seq(if (commonEntries.nonEmpty) Some(commonEntries) else None,
+                       if (whenEntries.nonEmpty) Some(whenEntries) else None).flatten.mkString("\n")
+        s"""${spaces}deps {\n$body\n$spaces}"""
+    }
+
+    private def renderStringListWithWhens(
+        label: String,
+        common: Seq[String],
+        deltas: Map[String, Seq[String]],
+        indent: Int,
+    ): String = {
+        val hasCommon = common.nonEmpty
+        val hasAnyDelta = deltas.values.exists(_.nonEmpty)
+        if (!hasCommon && !hasAnyDelta) return ""
+        val spaces = " " * indent
+        val i1 = " " * (indent + 2)
+        val i2 = " " * (indent + 4)
+        val commonEntries = common.map(s => s"""$i1"$s"""").mkString("\n")
+        val whenEntries = deltas.toSeq.sortBy(_._1).flatMap { (v, items) =>
+            if (items.nonEmpty) {
+                val itemLines = items.map(s => s"""$i2"$s"""").mkString("\n")
+                Some(s"""${i1}when (sv == "$v") {\n$itemLines\n$i1}""")
+            } else None
+        }.mkString("\n")
+        val body = Seq(if (commonEntries.nonEmpty) Some(commonEntries) else None,
+                       if (whenEntries.nonEmpty) Some(whenEntries) else None).flatten.mkString("\n")
+        s"""${spaces}$label {\n$body\n$spaces}"""
+    }
+
+    private def renderPluginDepsWithWhens(
+        common: Seq[DepDef],
+        deltas: Map[String, Seq[DepDef]],
+        indent: Int,
+    ): String = {
+        val hasCommon = common.nonEmpty
+        val hasAnyDelta = deltas.values.exists(_.nonEmpty)
+        if (!hasCommon && !hasAnyDelta) return ""
+        val spaces = " " * indent
+        val i1 = " " * (indent + 2)
+        val i2 = " " * (indent + 4)
+        val commonEntries = common.map(d => s"""$i1"${d.formatted}"""").mkString("\n")
+        val whenEntries = deltas.toSeq.sortBy(_._1).flatMap { (v, deps) =>
+            if (deps.nonEmpty) {
+                val depLines = deps.map(d => s"""$i2"${d.formatted}"""").mkString("\n")
+                Some(s"""${i1}when (sv == "$v") {\n$depLines\n$i1}""")
+            } else None
+        }.mkString("\n")
+        val body = Seq(if (commonEntries.nonEmpty) Some(commonEntries) else None,
+                       if (whenEntries.nonEmpty) Some(whenEntries) else None).flatten.mkString("\n")
+        s"""${spaces}scalacPluginDeps {\n$body\n$spaces}"""
+    }
+
+    private def renderModuleDepsWithWhens(
+        common: Seq[ModuleDepRef],
+        deltas: Map[String, Seq[ModuleDepRef]],
+        groupLookup: Map[String, ModuleGroup],
+        indent: Int,
+    ): String = {
+        val hasCommon = common.nonEmpty
+        val hasAnyDelta = deltas.values.exists(_.nonEmpty)
+        if (!hasCommon && !hasAnyDelta) return ""
+        val spaces = " " * indent
+        val i1 = " " * (indent + 2)
+        val i2 = " " * (indent + 4)
+        val commonEntries = common.map(r => s"$i1${crossDepFilter(r, groupLookup, ScalaVersionCtx.Placeholder)}").mkString("\n")
+        val whenEntries = deltas.toSeq.sortBy(_._1).flatMap { (v, refs) =>
+            if (refs.nonEmpty) {
+                val refLines = refs.map(r => s"$i2${crossDepFilter(r, groupLookup, ScalaVersionCtx.Placeholder)}").mkString("\n")
+                Some(s"""${i1}when (sv == "$v") {\n$refLines\n$i1}""")
+            } else None
+        }.mkString("\n")
+        val body = Seq(if (commonEntries.nonEmpty) Some(commonEntries) else None,
+                       if (whenEntries.nonEmpty) Some(whenEntries) else None).flatten.mkString("\n")
+        s"""${spaces}moduleDeps {\n$body\n$spaces}"""
     }
 
     // ---- group rendering ----
@@ -234,82 +330,40 @@ object DederPklRenderer {
         if (g.crossScalaVersions.nonEmpty) {
             val common = computeCommonProps(slices)
             val rawDeltas = computeVersionDeltas(slices, common)
-            val allVersions = versionsFor(g)
 
-            val hasScalacOptionsDelta = rawDeltas.exists(_._2.scalacOptions.nonEmpty)
-            val hasJavacOptionsDelta = rawDeltas.exists(_._2.javacOptions.nonEmpty)
-            val hasDepsDelta = rawDeltas.exists(_._2.deps.nonEmpty)
-            val hasScalacPluginDepsDelta = rawDeltas.exists(_._2.scalacPluginDeps.nonEmpty)
-            val hasSourcesDelta = rawDeltas.exists(_._2.sources.nonEmpty)
-            val hasResourcesDelta = rawDeltas.exists(_._2.resources.nonEmpty)
-            val hasModuleDepsDelta = rawDeltas.exists(_._2.moduleDeps.nonEmpty)
+            val scalacOptDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.scalacOptions }
+            val javacOptDeltas:  Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.javacOptions }
+            val depsDeltas:      Map[String, Seq[DepDef]] = rawDeltas.map { (v, d) => v -> d.deps }
+            val pluginDepsDeltas: Map[String, Seq[DepDef]] = rawDeltas.map { (v, d) => v -> d.scalacPluginDeps }
+            val srcDeltas:       Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.sources }
+            val resDeltas:       Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.resources }
+            val modDepDeltas:    Map[String, Seq[ModuleDepRef]] = rawDeltas.map { (v, d) => v -> d.moduleDeps }
 
-            val safeCommon = common.copy(
-                scalacOptions = if (hasScalacOptionsDelta) Seq.empty else common.scalacOptions,
-                javacOptions = if (hasJavacOptionsDelta) Seq.empty else common.javacOptions,
-                deps = if (hasDepsDelta) Seq.empty else common.deps,
-                scalacPluginDeps = if (hasScalacPluginDepsDelta) Seq.empty else common.scalacPluginDeps,
-                sources = if (hasSourcesDelta) Seq.empty else common.sources,
-                resources = if (hasResourcesDelta) Seq.empty else common.resources,
-                moduleDeps = if (hasModuleDepsDelta) Seq.empty else common.moduleDeps,
-            )
+            val templateProps = Seq(
+                if (g.usesTpolecat || g.usesTypelevel || common.scalacOptions.nonEmpty || scalacOptDeltas.values.exists(_.nonEmpty))
+                    Some(renderScalacOptionsWithWhens(common.scalacOptions, scalacOptDeltas, g, indent = 4)) else None,
+                if (common.javacOptions.nonEmpty || javacOptDeltas.values.exists(_.nonEmpty))
+                    Some(renderStringListWithWhens("javacOptions", common.javacOptions, javacOptDeltas, indent = 4)) else None,
+                if (common.deps.nonEmpty || depsDeltas.values.exists(_.nonEmpty))
+                    Some(renderDepsWithWhens(common.deps, depsDeltas, indent = 4)) else None,
+                if (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty))
+                    Some(renderPluginDepsWithWhens(common.scalacPluginDeps, pluginDepsDeltas, indent = 4)) else None,
+                if (common.sources.nonEmpty || srcDeltas.values.exists(_.nonEmpty))
+                    Some(renderStringListWithWhens("sources", common.sources, srcDeltas, indent = 4)) else None,
+                if (common.resources.nonEmpty || resDeltas.values.exists(_.nonEmpty))
+                    Some(renderStringListWithWhens("resources", common.resources, resDeltas, indent = 4)) else None,
+                if (common.moduleDeps.nonEmpty || modDepDeltas.values.exists(_.nonEmpty))
+                    Some(renderModuleDepsWithWhens(common.moduleDeps, modDepDeltas, groupLookup, indent = 4)) else None,
+                common.publish.map(p => renderPublishInfo(p, indent = 4)),
+            ).flatten.mkString("\n")
 
-            val versionDeltas = rawDeltas.view.mapValues { delta =>
-                delta.copy(
-                    scalacOptions = (if (hasScalacOptionsDelta) common.scalacOptions else Seq.empty) ++ delta.scalacOptions,
-                    javacOptions = (if (hasJavacOptionsDelta) common.javacOptions else Seq.empty) ++ delta.javacOptions,
-                    deps = (if (hasDepsDelta) common.deps else Seq.empty) ++ delta.deps,
-                    scalacPluginDeps = (if (hasScalacPluginDepsDelta) common.scalacPluginDeps else Seq.empty) ++ delta.scalacPluginDeps,
-                    sources = (if (hasSourcesDelta) common.sources else Seq.empty) ++ delta.sources,
-                    resources = (if (hasResourcesDelta) common.resources else Seq.empty) ++ delta.resources,
-                    moduleDeps = (if (hasModuleDepsDelta) common.moduleDeps else Seq.empty) ++ delta.moduleDeps,
-                )
-            }.toMap
-
-            val deltas = allVersions.map { v =>
-                v -> versionDeltas.getOrElse(v, ModuleDef(v,
-                    scalacOptions = if (hasScalacOptionsDelta) common.scalacOptions else Seq.empty,
-                    javacOptions = if (hasJavacOptionsDelta) common.javacOptions else Seq.empty,
-                    deps = if (hasDepsDelta) common.deps else Seq.empty,
-                    scalacPluginDeps = if (hasScalacPluginDepsDelta) common.scalacPluginDeps else Seq.empty,
-                    sources = if (hasSourcesDelta) common.sources else Seq.empty,
-                    resources = if (hasResourcesDelta) common.resources else Seq.empty,
-                    moduleDeps = if (hasModuleDepsDelta) common.moduleDeps else Seq.empty,
-                    testDeps = Seq.empty,
-                    testModuleDeps = Seq.empty,
-                    scalaJsVersion = None,
-                    scalaNativeVersion = None,
-                    publish = None,
-                    testSources = Seq.empty,
-                    testResources = Seq.empty,
-                ))
-            }.toMap
-
-            val commonPropsStr = {
-                val props = Seq(
-                    if (g.usesTpolecat || g.usesTypelevel || common.scalacOptions.nonEmpty)
-                        Some(renderScalacOptionsSmart(common, g, indent = 4, Some(ScalaVersionCtx.Placeholder)))
-                    else None,
-                    if (safeCommon.javacOptions.nonEmpty) Some(renderJavacOptions(safeCommon.javacOptions, indent = 4)) else None,
-                    if (safeCommon.deps.nonEmpty) Some(renderDeps(safeCommon.deps, indent = 4)) else None,
-                    if (safeCommon.scalacPluginDeps.nonEmpty) Some(renderPluginDeps(safeCommon.scalacPluginDeps, indent = 4)) else None,
-                    if (safeCommon.sources.nonEmpty) Some(renderSourceDirs(safeCommon.sources, indent = 4)) else None,
-                    if (safeCommon.resources.nonEmpty) Some(renderResourceDirs(safeCommon.resources, indent = 4)) else None,
-                    if (safeCommon.moduleDeps.nonEmpty) Some(renderModuleDepsPkl(safeCommon.moduleDeps, indent = 4, Some(ScalaVersionCtx.Placeholder), groupLookup)) else None,
-                    safeCommon.publish.map(p => renderPublishInfo(p, indent = 4)),
-                ).flatten.mkString("\n")
-                if (props.nonEmpty) props + "\n" else ""
-            }
-
-            val whenBlocksStr = renderDeltaWhenBlocks(deltas, groupLookup, g, indent = 4)
+            val propsBlock = if (templateProps.nonEmpty) templateProps + "\n" else ""
 
             val templateBody = {
-                val body =
-                    s"""    scalaVersion = sv
-                       |${if (commonPropsStr.nonEmpty) commonPropsStr else ""}${if (whenBlocksStr.nonEmpty) "\n" + whenBlocksStr else ""}""".stripMargin
+                val body = s"""    scalaVersion = sv
+                   |$propsBlock""".stripMargin
                 s"""  template = new ScalaModule {
-                   |$body
-                   |  }""".stripMargin
+                   |$body  }""".stripMargin
             }
 
             val repMods = slices.headOption.getOrElse(VersionSlice("", Map.empty)).modulesByPlatform

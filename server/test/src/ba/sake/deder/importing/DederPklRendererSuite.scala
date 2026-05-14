@@ -349,10 +349,15 @@ class DederPklRendererSuite extends FunSuite {
 
         assert(result.contains("local const libModules = libScalaVersions"), clues(result))
         assert(result.contains(".map((sv) ->"), clues(result))
-        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
         assert(result.contains("\"org.typelevel::cats-core:2.12.0\""), clues(result))
         assert(!result.contains("id = \"lib-2.12.21\""), clues(result))
         assert(!result.contains("id = \"lib-2.13.18\""), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val templateOnly = afterMap.split("testTemplate").head
+        val afterDeps = templateOnly.split("deps \\{").drop(1).headOption.getOrElse("")
+        assert(afterDeps.contains("when (sv == \"2.13.18\")"), s"when should be inside deps block:\n$result")
+        val templateDepsCount = templateOnly.split("deps \\{").length - 1
+        assert(templateDepsCount == 1, s"should have exactly 1 deps block in template, got $templateDepsCount:\n$result")
     }
 
     test("renders when clauses for version-specific module deps in .map() output") {
@@ -376,7 +381,11 @@ class DederPklRendererSuite extends FunSuite {
 
         assert(result.contains("local const appModules = projectScalaVersions"), clues(result))
         assert(result.contains(".map((sv) ->"), clues(result))
-        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val afterModuleDeps = afterMap.split("moduleDeps \\{").drop(1).headOption.getOrElse("")
+        assert(afterModuleDeps.contains("when (sv == \"2.13.18\")"), s"when should be inside moduleDeps block:\n$result")
+        val modDepsCount = result.split("moduleDeps \\{").length - 1
+        assert(modDepsCount == 1, s"should have exactly 1 moduleDeps block, got $modDepsCount:\n$result")
     }
 
     test("always renders all platforms in .map() output even when platform missing per version") {
@@ -450,10 +459,14 @@ class DederPklRendererSuite extends FunSuite {
 
         assert(result.contains("local const libModules = libScalaVersions"), clues(result))
         assert(result.contains(".map((sv) ->"), clues(result))
-        assert(result.contains("when (sv == \"2.12.21\")"), clues(result))
-        assert(result.contains("\"-deprecation\""), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val afterScalacOpt = afterMap.split("scalacOptions \\{").drop(1).headOption.getOrElse("")
+        assert(afterScalacOpt.contains("when (sv == \"2.12.21\")"), s"when should be inside scalacOptions block:\n$result")
+        assert(afterScalacOpt.contains("\"-deprecation\""), s"should contain -deprecation inside scalacOptions:\n$result")
         assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
         assert(result.contains("\"-Xfatal-warnings\""), clues(result))
+        val scalacOptCount = result.split("scalacOptions \\{").length - 1
+        assert(scalacOptCount == 1, s"should have exactly 1 scalacOptions block, got $scalacOptCount:\n$result")
     }
 
     test("cross-version with differing scalacOptions uses .map() with when clauses") {
@@ -478,10 +491,14 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("local const libScalaVersions = List(\"2.12.21\", \"2.13.18\")"), clues(result))
         assert(result.contains(".map((sv) ->"), clues(result))
         assert(result.contains("\"-deprecation\""), clues(result))
-        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
         assert(result.contains("\"-Xsource:3\""), clues(result))
         assert(!result.contains("id = \"lib-2.12.21\""), clues(result))
         assert(!result.contains("id = \"lib-2.13.18\""), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val afterScalacOpt = afterMap.split("scalacOptions \\{").drop(1).headOption.getOrElse("")
+        assert(afterScalacOpt.contains("when (sv == \"2.13.18\")"), s"when should be inside scalacOptions block:\n$result")
+        val scalacOptCount = result.split("scalacOptions \\{").length - 1
+        assert(scalacOptCount == 1, s"should have exactly 1 scalacOptions block, got $scalacOptCount:\n$result")
     }
 
     test("cross-version with differing deps uses .map() with when clauses") {
@@ -508,8 +525,13 @@ class DederPklRendererSuite extends FunSuite {
 
         assert(result.contains(".map((sv) ->"), clues(result))
         assert(result.contains("\"org.jsoup:jsoup:1.21.1\""), clues(result))
-        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
         assert(result.contains("\"org.typelevel::cats-core:2.12.0\""), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val templateOnly = afterMap.split("testTemplate").head
+        val afterDeps = templateOnly.split("deps \\{").drop(1).headOption.getOrElse("")
+        assert(afterDeps.contains("when (sv == \"2.13.18\")"), s"when should be inside deps block:\n$result")
+        val templateDepsCount = templateOnly.split("deps \\{").length - 1
+        assert(templateDepsCount == 1, s"should have exactly 1 deps block in template, got $templateDepsCount:\n$result")
     }
 
     test("cross-version with differing moduleDeps uses .map() with when clauses") {
@@ -534,10 +556,14 @@ class DederPklRendererSuite extends FunSuite {
         val result = DederPklRenderer.render(build)
 
         assert(result.contains(".map((sv) ->"), clues(result))
-        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
         assert(result.contains("libModules.find((m) -> m.id == \"lib-\\(sv)\")"), clues(result))
         assert(!result.contains("id = \"app-2.12.21\""), clues(result))
         assert(!result.contains("id = \"app-2.13.18\""), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val afterModuleDeps = afterMap.split("moduleDeps \\{").drop(1).headOption.getOrElse("")
+        assert(afterModuleDeps.contains("when (sv == \"2.13.18\")"), s"when should be inside moduleDeps block:\n$result")
+        val modDepsCount = result.split("moduleDeps \\{").length - 1
+        assert(modDepsCount == 1, s"should have exactly 1 moduleDeps block, got $modDepsCount:\n$result")
     }
 
     test("emits DederTpolecat.pkl import and shared reference when tpolecat detected") {
