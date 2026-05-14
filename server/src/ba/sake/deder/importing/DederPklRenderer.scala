@@ -358,9 +358,40 @@ object DederPklRenderer {
             val resDeltas:       Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.resources }
             val modDepDeltas:    Map[String, Seq[ModuleDepRef]] = rawDeltas.map { (v, d) => v -> d.moduleDeps }
 
+            // Fixup: keep flag+argument pairs together. If a paired flag (e.g.
+            // -Ybackend-parallelism) ended up in a delta but its numeric argument
+            // ended up in common, move the argument to the delta alongside the flag.
+            val pairedFlags = Set("-Ybackend-parallelism", "-release", "-java-output-version")
+            val standaloneNums = common.scalacOptions.filter(_.matches("\\d+")).toSet
+
+            val fixedScalacOptDeltas = if (standaloneNums.nonEmpty) {
+                scalacOptDeltas.map { (v, items) =>
+                    // Rebuild: for each paired flag, append its argument if found in common
+                    v -> items.flatMap { item =>
+                        if (pairedFlags.contains(item)) {
+                            // Look for the original argument in this version's slice
+                            val origItems = slices.find(sl => sl.scalaVersion == v)
+                                .flatMap(sl => sl.modulesByPlatform.get("jvm").orElse(sl.modulesByPlatform.get("main")))
+                                .map(m => m.scalacOptions).getOrElse(Seq.empty)
+                            val arg = origItems.indexOf(item) + 1 match {
+                                case i if i < origItems.length && origItems(i).matches("\\d+") =>
+                                    Some(origItems(i))
+                                case _ => None
+                            }
+                            if (arg.isDefined) Seq(item, arg.get) else Seq(item)
+                        } else Seq(item)
+                    }
+                }
+            } else scalacOptDeltas
+
+            // Remove arguments from common that were moved to deltas
+            val fixedCommonScalacOpts = common.scalacOptions.filterNot { o =>
+                o.matches("\\d+") && fixedScalacOptDeltas.values.exists(_.contains(o))
+            }
+
             val templateProps = Seq(
-                if (g.usesTpolecat || g.usesTypelevel || common.scalacOptions.nonEmpty || scalacOptDeltas.values.exists(_.nonEmpty))
-                    Some(renderScalacOptionsWithWhens(common.scalacOptions, scalacOptDeltas, g, indent = 4)) else None,
+                if (g.usesTpolecat || g.usesTypelevel || fixedCommonScalacOpts.nonEmpty || fixedScalacOptDeltas.values.exists(_.nonEmpty))
+                    Some(renderScalacOptionsWithWhens(fixedCommonScalacOpts, fixedScalacOptDeltas, g, indent = 4)) else None,
                 if (common.javacOptions.nonEmpty || javacOptDeltas.values.exists(_.nonEmpty))
                     Some(renderStringListWithWhens("javacOptions", common.javacOptions, javacOptDeltas, indent = 4)) else None,
                 if (common.deps.nonEmpty || depsDeltas.values.exists(_.nonEmpty))
@@ -380,6 +411,7 @@ object DederPklRenderer {
 
             val templateBody = {
                 val body = s"""    scalaVersion = sv
+                   |    bspVisible = true
                    |$propsBlock""".stripMargin
                 s"""  template = new ScalaModule {
                    |$body  }""".stripMargin
@@ -563,6 +595,7 @@ object DederPklRenderer {
         }
         val props = Seq(
             versionLine,
+            Some("    bspVisible = true"),
             Some(extra.trim).filter(_.nonEmpty),
             if (g.usesTpolecat || g.usesTypelevel || m.scalacOptions.nonEmpty)
                 Some(renderScalacOptionsSmart(m, g, indent = 4, scalaVersionCtx))
