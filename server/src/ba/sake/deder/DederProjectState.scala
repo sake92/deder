@@ -307,8 +307,11 @@ class DederProjectState(
           clientParams
         )
       } finally {
+        // Only unlock locks actually held by this thread (prevents IllegalMonitorStateException on interrupt)
         allTaskInstances.reverse.foreach { taskInstance =>
-          taskInstance.lock.unlock()
+          try {
+            if taskInstance.lock.isHeldByCurrentThread then taskInstance.lock.unlock()
+          } catch { case _: Exception => }
         }
         DederGlobals.cancellationTokens.remove(requestId)
       }

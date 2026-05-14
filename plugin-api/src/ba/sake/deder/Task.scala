@@ -435,7 +435,7 @@ class FanInTask[T: JsonRW: Hashable](
 class TaskInstance(
     val module: DederModule,
     val task: Task[?, ?],
-    val lock: Lock
+    val lock: ReentrantLock
 ) {
   def moduleId: String = module.id
 
