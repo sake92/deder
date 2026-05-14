@@ -22,10 +22,12 @@ object DederPklRenderer {
         val needsTpolecatImport  = build.moduleGroups.exists(_.usesTpolecat)
         val needsTypelevelImport = build.moduleGroups.exists(_.usesTypelevel)
 
-        val helperImport = (needsTypelevelImport, needsTpolecatImport) match {
-            case (true, _)  => Some("""import "DederTypelevel.pkl"""")
-            case (_, true)  => Some("""import "DederTpolecat.pkl"""")
-            case _          => None
+        val helperImport: Option[String] = {
+            val imports = Seq(
+                if (needsTypelevelImport) Some(s"""import "https://sake92.github.io/deder/config/${build.dederVersion}/DederTypelevel.pkl"""") else None,
+                if (needsTpolecatImport) Some(s"""import "https://sake92.github.io/deder/config/${build.dederVersion}/DederTpolecat.pkl"""") else None,
+            ).flatten
+            if (imports.nonEmpty) Some(imports.mkString("\n")) else None
         }
 
         val crossGroups = build.moduleGroups.filter(g => g.crossScalaVersions.nonEmpty)
@@ -70,6 +72,43 @@ object DederPklRenderer {
 
         List(Some(header), helperImport, sharedVersionsDecl, sharedPomBaseStr, if (repos.nonEmpty) Some(repos) else None, Some(builders), Some(modulesBlock))
             .flatten.mkString("\n\n")
+    }
+
+    /** Maps a Scala version string to the template key used in convention file exports.
+      * "3.7.4" -> "3", "2.13.18" -> "213", "2.12.20" -> "212" */
+    private def templateVersionKey(scalaVersion: String): String = {
+        val parts = scalaVersion.split("\\.")
+        if (parts(0) == "3") "3"
+        else parts.take(2).mkString("") // "2", "13" -> "213"
+    }
+
+    /** Returns the full namespace prefix for template amends. */
+    private def templatePrefix(g: ModuleGroup): String =
+        if (g.usesTypelevel) "DederTypelevel.typelevel"
+        else "DederTpolecat.tpolecat"
+
+    /** Returns the template amend expression for a single-version module.
+      * Example: "(DederTpolecat.tpolecatScala213)" */
+    private def templateAmendExpr(g: ModuleGroup, scalaVersion: String): String =
+        s"(${templatePrefix(g)}Scala${templateVersionKey(scalaVersion)})"
+
+    /** Returns a conditional template amend expression for cross-version .map().
+      * Example: "(if (sv.startsWith("3")) DederTpolecat.tpolecatScala3 else
+      *            if (sv.startsWith("2.13")) DederTpolecat.tpolecatScala213 else
+      *            DederTpolecat.tpolecatScala212)" */
+    private def crossVersionTemplateAmendExpr(g: ModuleGroup): String = {
+        val prefix = templatePrefix(g)
+        val cases = Seq(
+            "3"    -> """sv.startsWith("3")""",
+            "2.13" -> """sv.startsWith("2.13")""",
+            "2.12" -> """sv.startsWith("2.12")""",
+        )
+        // Build nested if/else from inside out: rightmost case is the "else", then wrap with "if"
+        val body = cases.tail.foldLeft(s"""$prefix""" + "Scala212") { (acc, pair) =>
+            val (ver, cond) = pair
+            s"""if ($cond) $prefix""" + s"Scala${templateVersionKey(ver)} else $acc"
+        }
+        s"($body)"
     }
 
     // ---- top-level blocks ----
