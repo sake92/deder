@@ -103,8 +103,9 @@ object DederPklRenderer {
             "2.13" -> """sv.startsWith("2.13")""",
             "2.12" -> """sv.startsWith("2.12")""",
         )
-        // Build nested if/else from inside out: rightmost case is the "else", then wrap with "if"
-        val body = cases.tail.foldLeft(s"""$prefix""" + "Scala212") { (acc, pair) =>
+        // Build nested if/else from inside out: rightmost case (2.12) is the "else",
+        // then fold the preceding cases (3, 2.13) from right to left wrapping with "if"
+        val body = cases.init.foldRight(s"""$prefix""" + "Scala212") { (pair, acc) =>
             val (ver, cond) = pair
             s"""if ($cond) $prefix""" + s"Scala${templateVersionKey(ver)} else $acc"
         }
