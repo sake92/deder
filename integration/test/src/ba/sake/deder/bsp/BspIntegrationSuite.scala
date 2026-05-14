@@ -90,7 +90,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     assert(uber.getCapabilities.getCanRun, "uber should be runnable")
 
     val uberTest = targets.find(_.getId.getUri.endsWith("#uber-test")).get
-    assertEquals(uberTest.getTags.asScala.toList, List(BuildTargetTag.APPLICATION, BuildTargetTag.TEST))
+    assertEquals(uberTest.getTags.asScala.toList, List(BuildTargetTag.TEST))
     assert(uberTest.getCapabilities.getCanTest, "uber-test should be testable")
   }
 

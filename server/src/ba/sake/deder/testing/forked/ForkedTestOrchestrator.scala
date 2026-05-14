@@ -13,6 +13,20 @@ import com.typesafe.scalalogging.StrictLogging
 /** Result of a forked test run, including the directory where fork data was written. */
 case class ForkedTestRun(results: DederTestResults, runDir: os.Path)
 
+/** Outcome of a single fork attempt (not the retry loop). */
+private enum ForkOutcome {
+  case Success(payload: ForkedTestResultsPayload)
+  case Crashed(
+      exitCode: Int,
+      inProgressSuiteNames: Set[String],
+      allStartedSuiteNames: Set[String]
+  )
+  case TimedOut(
+      inProgressSuiteNames: Set[String],
+      allStartedSuiteNames: Set[String]
+  )
+}
+
 object ForkedTestOrchestrator extends StrictLogging {
 
   private val MaxTestTimeMs = 30L * 60 * 1000
@@ -116,7 +130,10 @@ object ForkedTestOrchestrator extends StrictLogging {
       val futures = callables.map(forkExecutor.submit)
       val payloads = futures.flatMap { f =>
         try f.get()
-        catch { case NonFatal(_) => None }
+        catch {
+          case _: InterruptedException => Thread.currentThread().interrupt(); None
+          case NonFatal(_) => None
+        }
       }
 
       val aggregated = aggregate(payloads.map(_.results))
@@ -153,16 +170,17 @@ object ForkedTestOrchestrator extends StrictLogging {
     sem.acquire()
     try {
       if cancelled() then return None
-      spawnAndRun(
+      spawnAndRunWithRetry(
         forkId = forkId,
-        slice = slice,
+        originalSlice = slice,
+        requestId = requestId,
         javaBinary = javaBinary,
         fullClasspath = fullClasspath,
         jvmOptions = jvmOptions,
         envVars = envVars,
         testOptions = testOptions,
         testParallelism = testParallelism,
-        forkDir = runDir / s"fork-$forkId",
+        runDir = runDir,
         showForkTag = showForkTag,
         notifications = notifications,
         moduleId = moduleId
@@ -170,6 +188,91 @@ object ForkedTestOrchestrator extends StrictLogging {
     } finally {
       sem.release()
     }
+  }
+
+  /** Runs a fork with retry: on crash, marks in-progress suites as ERROR and retries
+    * the remaining (not-yet-attempted) suites. Loops until all suites are attempted.
+    */
+  private def spawnAndRunWithRetry(
+      forkId: Int,
+      originalSlice: Seq[DiscoveredFrameworkTests],
+      requestId: String,
+      javaBinary: String,
+      fullClasspath: String,
+      jvmOptions: Seq[String],
+      envVars: Map[String, String],
+      testOptions: DederTestOptions,
+      testParallelism: Int,
+      runDir: os.Path,
+      showForkTag: Boolean,
+      notifications: ServerNotificationsLogger,
+      moduleId: String
+  ): Option[ForkedTestResultsPayload] = {
+
+    var currentSlice = originalSlice
+    var crashErrorSuites = Vector.empty[DederTestSuiteReport]
+    var retryAttempt = 0
+
+    while (currentSlice.nonEmpty) {
+      val forkDir =
+        if (retryAttempt == 0) runDir / s"fork-$forkId"
+        else runDir / s"fork-$forkId-retry-$retryAttempt"
+
+      spawnAndRun(
+        forkId = forkId,
+        slice = currentSlice,
+        javaBinary = javaBinary,
+        fullClasspath = fullClasspath,
+        jvmOptions = jvmOptions,
+        envVars = envVars,
+        testOptions = testOptions,
+        testParallelism = testParallelism,
+        forkDir = forkDir,
+        showForkTag = showForkTag,
+        notifications = notifications,
+        moduleId = moduleId
+      ) match {
+        case ForkOutcome.Success(payload) =>
+          return Some(mergeCrashSuites(payload, crashErrorSuites))
+
+        case ForkOutcome.Crashed(exitCode, inProgress, allStarted) =>
+          for name <- inProgress do
+            crashErrorSuites = crashErrorSuites :+ makeErrorSuite(name, exitCode, retryAttempt)
+          val tag = if showForkTag then s"[fork-$forkId] " else ""
+          val remainingCount =
+            currentSlice.flatMap(_.testClasses).count(tc => !allStarted.contains(tc.className))
+          notifications.add(
+            ServerNotification.logError(
+              s"${tag}crashed on attempt $retryAttempt (exit $exitCode). " +
+                s"Interrupted suites: ${inProgress.mkString(", ")}. " +
+                s"Retrying $remainingCount remaining suites...",
+              Some(moduleId)
+            )
+          )
+          currentSlice = removeSuiteNames(currentSlice, allStarted)
+          retryAttempt += 1
+
+        case ForkOutcome.TimedOut(inProgress, allStarted) =>
+          for name <- inProgress do
+            crashErrorSuites = crashErrorSuites :+ makeErrorSuite(name, -1, retryAttempt)
+          val tag = if showForkTag then s"[fork-$forkId] " else ""
+          val remainingCount =
+            currentSlice.flatMap(_.testClasses).count(tc => !allStarted.contains(tc.className))
+          notifications.add(
+            ServerNotification.logError(
+              s"${tag}timed out on attempt $retryAttempt. " +
+                s"Interrupted suites: ${inProgress.mkString(", ")}. " +
+                s"Retrying $remainingCount remaining suites...",
+              Some(moduleId)
+            )
+          )
+          currentSlice = removeSuiteNames(currentSlice, allStarted)
+          retryAttempt += 1
+      }
+    }
+
+    if (crashErrorSuites.nonEmpty) Some(makeErrorPayload(crashErrorSuites))
+    else None
   }
 
   private def generateRunId(): String = {
@@ -191,7 +294,7 @@ object ForkedTestOrchestrator extends StrictLogging {
       showForkTag: Boolean,
       notifications: ServerNotificationsLogger,
       moduleId: String
-  ): Option[ForkedTestResultsPayload] = {
+  ): ForkOutcome = {
     val tag = if showForkTag then s"[fork-$forkId] " else ""
     os.makeDir.all(forkDir)
     val argsFilePath = forkDir / "fork-args.json"
@@ -199,6 +302,8 @@ object ForkedTestOrchestrator extends StrictLogging {
     val stdoutLog = forkDir / "stdout.log"
     val stderrLog = forkDir / "stderr.log"
     val suiteOutputs = new java.util.concurrent.ConcurrentHashMap[String, StringBuilder]()
+    val startedSuites = java.util.concurrent.ConcurrentHashMap.newKeySet[String]()
+    val completedSuites = java.util.concurrent.ConcurrentHashMap.newKeySet[String]()
     if os.exists(stdoutLog) then os.remove(stdoutLog)
     if os.exists(stderrLog) then os.remove(stderrLog)
 
@@ -228,7 +333,11 @@ object ForkedTestOrchestrator extends StrictLogging {
 
     withProcessCleanup(proc) {
       val stdoutThread = new Thread(
-        () => streamStdout(forkId, proc, stdoutLog, tag, notifications, moduleId, suiteOutputs),
+        () =>
+          streamStdout(
+            forkId, proc, stdoutLog, tag, notifications, moduleId, suiteOutputs,
+            startedSuites, completedSuites
+          ),
         s"fork-$forkId-stdout"
       )
       stdoutThread.setDaemon(true)
@@ -245,7 +354,12 @@ object ForkedTestOrchestrator extends StrictLogging {
       stdoutThread.join(300)
       stderrThread.join(300)
 
-      readForkResults(proc, resultsFilePath, suiteOutputs, tag, notifications, moduleId)
+      if (finished) {
+        readForkResults(proc, resultsFilePath, suiteOutputs, startedSuites, completedSuites, tag, notifications, moduleId)
+      } else {
+        val inProgress = startedSuites.asScala.toSet -- completedSuites.asScala.toSet
+        ForkOutcome.TimedOut(inProgress, startedSuites.asScala.toSet)
+      }
     }
   }
 
@@ -256,7 +370,9 @@ object ForkedTestOrchestrator extends StrictLogging {
       tag: String,
       notifications: ServerNotificationsLogger,
       moduleId: String,
-      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, StringBuilder]
+      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, StringBuilder],
+      startedSuites: java.util.Set[String],
+      completedSuites: java.util.Set[String]
   ): Unit = {
     val reader = new java.io.BufferedReader(new java.io.InputStreamReader(proc.stdout.wrapped))
     try {
@@ -266,7 +382,7 @@ object ForkedTestOrchestrator extends StrictLogging {
           val json = line.substring(ForkedTestEnvelope.LinePrefix.length)
           try {
             val env = json.parseJson[ForkedTestEnvelope]
-            renderEnvelope(env, logFile, tag, notifications, moduleId, suiteOutputs)
+            renderEnvelope(env, logFile, tag, notifications, moduleId, suiteOutputs, startedSuites, completedSuites)
           } catch {
             case NonFatal(_) =>
               os.write.append(logFile, line + "\n", createFolders = true)
@@ -317,13 +433,17 @@ object ForkedTestOrchestrator extends StrictLogging {
       tag: String,
       notifications: ServerNotificationsLogger,
       moduleId: String,
-      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, StringBuilder]
+      suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, StringBuilder],
+      startedSuites: java.util.Set[String],
+      completedSuites: java.util.Set[String]
   ): Unit = env match {
     case ForkedTestEnvelope.ForkStarted(_) =>
       notifications.add(ServerNotification.logDebug(s"${tag}started", Some(moduleId)))
     case ForkedTestEnvelope.SuiteStarted(name, _) =>
+      startedSuites.add(name)
       notifications.add(ServerNotification.logInfo(s"${tag}▶ $name", Some(moduleId)))
     case ForkedTestEnvelope.SuiteCompleted(name, _, output) =>
+      completedSuites.add(name)
       val header = s"${tag}${name} completed"
       if output.nonEmpty then {
         val key = DederTestNames.normalizeSuiteName(name)
@@ -405,14 +525,16 @@ object ForkedTestOrchestrator extends StrictLogging {
       proc: os.SubProcess,
       resultsFilePath: os.Path,
       suiteOutputs: java.util.concurrent.ConcurrentHashMap[String, StringBuilder],
+      startedSuites: java.util.Set[String],
+      completedSuites: java.util.Set[String],
       tag: String,
       notifications: ServerNotificationsLogger,
       moduleId: String
-  ): Option[ForkedTestResultsPayload] =
+  ): ForkOutcome =
     if os.exists(resultsFilePath) then
       try {
         val payload = os.read(resultsFilePath).parseJson[ForkedTestResultsPayload]
-        Some(
+        ForkOutcome.Success(
           payload.copy(
             results = payload.results.withSuiteStdout(suiteOutputs.asScala.view.mapValues(_.result()).toMap)
           )
@@ -425,18 +547,83 @@ object ForkedTestOrchestrator extends StrictLogging {
               Some(moduleId)
             )
           )
-          None
+          val inProgress = startedSuites.asScala.toSet -- completedSuites.asScala.toSet
+          ForkOutcome.Crashed(-1, inProgress, startedSuites.asScala.toSet)
       }
     else {
       val exitCode =
         try proc.exitCode()
         catch case _: IllegalThreadStateException => -1
+      val inProgress = startedSuites.asScala.toSet -- completedSuites.asScala.toSet
       notifications.add(
         ServerNotification.logError(
-          s"${tag}forked test process crashed (exit $exitCode)",
+          s"${tag}forked test process crashed (exit $exitCode). " +
+            s"Interrupted suites: ${if (inProgress.nonEmpty) inProgress.mkString(", ") else "none"}",
           Some(moduleId)
         )
       )
-      None
+      ForkOutcome.Crashed(exitCode, inProgress, startedSuites.asScala.toSet)
     }
+
+  /** Build a synthetic ERROR suite report for a suite interrupted by a fork crash. */
+  private def makeErrorSuite(suiteName: String, exitCode: Int, retryAttempt: Int): DederTestSuiteReport =
+    DederTestSuiteReport(
+      name = suiteName,
+      testCases = Seq(DederTestCaseReport(
+        name = suiteName,
+        classname = suiteName,
+        status = DederTestStatus.Error,
+        duration = 0L,
+        failure = Some(DederTestFailure(
+          message = Some(s"Test suite was interrupted by forked JVM exit (code $exitCode) on retry attempt $retryAttempt"),
+          stackTrace = None
+        ))
+      )),
+      duration = 0L
+    )
+
+  /** Remove test classes whose class names are in `namesToRemove` from the slice.
+    * Entire framework entries that become empty are dropped.
+    */
+  private def removeSuiteNames(
+      slice: Seq[DiscoveredFrameworkTests],
+      namesToRemove: Set[String]
+  ): Seq[DiscoveredFrameworkTests] =
+    slice.flatMap { dft =>
+      val remaining = dft.testClasses.filterNot(tc => namesToRemove.contains(tc.className))
+      if remaining.nonEmpty then Some(dft.copy(testClasses = remaining))
+      else None
+    }
+
+  /** Merge crash error suites into a successful payload's results. */
+  private def mergeCrashSuites(
+      payload: ForkedTestResultsPayload,
+      crashSuites: Seq[DederTestSuiteReport]
+  ): ForkedTestResultsPayload =
+    if crashSuites.isEmpty then payload
+    else {
+      val newResults = payload.results.copy(
+        total = payload.results.total + crashSuites.map(_.total).sum,
+        errors = payload.results.errors + crashSuites.map(_.errors).sum,
+        failedTestNames = payload.results.failedTestNames ++
+          crashSuites.flatMap(_.testCases.map(tc => s"${tc.classname}.${tc.name}")),
+        suites = (payload.results.suites ++ crashSuites).sortBy(_.name)
+      )
+      payload.copy(results = newResults)
+    }
+
+  /** Build a synthetic payload from only crash error suites (when all suites crashed). */
+  private def makeErrorPayload(crashSuites: Seq[DederTestSuiteReport]): ForkedTestResultsPayload = {
+    val results = DederTestResults(
+      total = crashSuites.map(_.total).sum,
+      passed = 0,
+      failed = 0,
+      errors = crashSuites.map(_.errors).sum,
+      skipped = 0,
+      duration = 0L,
+      failedTestNames = crashSuites.flatMap(_.testCases.map(tc => s"${tc.classname}.${tc.name}")),
+      suites = crashSuites.sortBy(_.name)
+    )
+    ForkedTestResultsPayload(results, Map.empty)
+  }
 }
