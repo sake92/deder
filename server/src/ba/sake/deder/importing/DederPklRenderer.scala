@@ -41,9 +41,8 @@ object DederPklRenderer {
         }
 
         val allPublishes: Seq[PublishInfo] = build.moduleGroups.flatMap { g =>
-            val cm = g.concreteModules
-            if (cm.nonEmpty) cm.head.module.publish
-            else g.jvmModule.publish
+            // Use all concrete modules, not just head — some modules may have publish in later concretes
+            g.concreteModules.flatMap(_.module.publish).headOption
         }
 
         val hasSharedPomBase: Boolean = allPublishes.size >= 2 && {
@@ -51,10 +50,7 @@ object DederPklRenderer {
             allPublishes.tail.forall { p =>
                 p.organization == base.organization &&
                 p.developers == base.developers &&
-                p.licenses == base.licenses &&
-                p.scmInfo == base.scmInfo &&
-                p.homepage == base.homepage &&
-                p.description == base.description
+                p.licenses == base.licenses
             }
         }
 
@@ -396,9 +392,13 @@ object DederPklRenderer {
             val testTmpl = renderTestTemplate(jvmModule, Some(ScalaVersionCtx.Placeholder), groupLookup)
 
             val crossPlatTmpls = if (isCross) {
+                // In cross-version mode, plugin deps are already in the template body
+                // with when-clauses. template.asJs()/asNative() inherit them, so
+                // DON'T emit them again here — that would apply to ALL versions.
                 val jsTmpl = repMods.get("js").map { m =>
                     val body = renderJsNativeOverride(
-                        "jsTemplate", "template.asJs()", m,
+                        "jsTemplate", "template.asJs()",
+                        m.copy(scalacPluginDeps = Seq.empty),
                         scalaJsVersion = m.scalaJsVersion.orElse(Some("1.18.2")),
                         scalaNativeVersion = None
                     )
@@ -407,7 +407,8 @@ object DederPklRenderer {
 
                 val nativeTmpl = repMods.get("native").map { m =>
                     val body = renderJsNativeOverride(
-                        "nativeTemplate", "template.asNative()", m,
+                        "nativeTemplate", "template.asNative()",
+                        m.copy(scalacPluginDeps = Seq.empty),
                         scalaJsVersion = None,
                         scalaNativeVersion = m.scalaNativeVersion.orElse(Some("0.5.10"))
                     )
@@ -723,7 +724,7 @@ object DederPklRenderer {
         val inner2 = "    "
 
         val lines = Seq.newBuilder[String]
-        lines += "local const basePomSettings = new {"
+        lines += "local const basePomSettings = new PomSettings {"
         lines += s"${inner}groupId = \"${p.organization}\""
         p.description.foreach(d => lines += s"""$inner description = "$d"""")
         p.homepage.foreach(h => lines += s"""$inner url = "$h"""")

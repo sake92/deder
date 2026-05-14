@@ -639,7 +639,7 @@ class DederPklRendererSuite extends FunSuite {
             ModuleGroup("mod2", ".", DederProject.DirLayout.SBT, Seq.empty, mod2, None, None, false, false, false, false),
         ), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
-        assert(result.contains("local const basePomSettings = new {"), clues(result))
+        assert(result.contains("local const basePomSettings = new PomSettings {"), clues(result))
         assert(result.contains("groupId = \"com.example\""), clues(result))
         assert(result.contains("pomSettings = (basePomSettings) {"), clues(result))
         assert(result.contains("artifactId = \"mod1\""), clues(result))

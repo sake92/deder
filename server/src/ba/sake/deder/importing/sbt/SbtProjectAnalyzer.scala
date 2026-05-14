@@ -225,8 +225,8 @@ class SbtProjectAnalyzer(
 
         val moduleDef = ModuleDef(
             scalaVersion = pe.scalaVersion,
-            scalacOptions = pe.scalacOptions,
-            javacOptions = pe.javacOptions,
+            scalacOptions = SbtProjectAnalyzer.mergeOptionPairs(pe.scalacOptions, PairedScalacFlags),
+            javacOptions = SbtProjectAnalyzer.mergeOptionPairs(pe.javacOptions, PairedJavacFlags),
             deps = compileDeps,
             scalacPluginDeps = pluginDeps,
             testDeps = testDeps,
@@ -425,6 +425,24 @@ object SbtProjectAnalyzer {
     def filterStandardSbtDirs(dirs: Seq[String], layout: DederProject.DirLayout): Seq[String] =
         if (!layout.toString.toLowerCase.startsWith("sbt")) dirs
         else dirs.filterNot(d => SbtStandardDirPattern.findFirstIn(d).isDefined)
+
+    // Flags that take an argument in scalacOptions. Merged to avoid orphaned arguments.
+    private val PairedScalacFlags = Set("-release", "-Ybackend-parallelism", "-java-output-version")
+
+    // Flags that take an argument in javacOptions.
+    private val PairedJavacFlags = Set("--release")
+
+    /** Merges known flag+argument pairs into single colon-separated entries.
+      * e.g. Seq("-release", "8") -> Seq("-release:8")
+      * This prevents orphaned argument values like "8" in the generated Pkl. */
+    def mergeOptionPairs(opts: Seq[String], pairFlags: Set[String]): Seq[String] =
+        opts.foldLeft(List.empty[String]) { (acc, opt) =>
+            acc match {
+                case head :: tail if pairFlags.contains(head) =>
+                    (s"$head:$opt") :: tail // merge "-release" "8" -> "-release:8"
+                case _ => opt :: acc
+            }
+        }.reverse
 
     def detectLayout(plugins: Seq[String], projectBaseDir: String): DederProject.DirLayout = {
         val hasCrossProject = plugins.exists(p =>
