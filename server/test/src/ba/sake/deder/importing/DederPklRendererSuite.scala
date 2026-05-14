@@ -646,6 +646,25 @@ class DederPklRendererSuite extends FunSuite {
         assert(!result.contains("forVersion"), s"should not contain forVersion:\n$result")
     }
 
+    test("cross-version with tpolecat suppresses scalacOptions when-clauses") {
+        val mods = Seq(
+            ConcreteModule("proj1", "2.13.18", "main", emptyModule(scalaVersion = "2.13.18", scalacOptions = Seq("-deprecation", "-Xfatal-warnings"))),
+            ConcreteModule("proj1", "3.7.4", "main", emptyModule(scalaVersion = "3.7.4", scalacOptions = Seq("-deprecation", "-Werror"))),
+        )
+        val g = ModuleGroup(
+            builderVarName = "core", root = ".", layout = DederProject.DirLayout.DEFAULT,
+            crossScalaVersions = Seq("2.13.18", "3.7.4"),
+            concreteModules = mods,
+            usesTpolecat = true,
+        )
+        val build = DederBuild("v0.8.0", Seq(g), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+        assert(!result.contains("scalacOptions {"), s"should not have scalacOptions block:\n$result")
+        val afterStart = result.split("template = ")(1)
+        val untilEnd = afterStart.split("  }")(0)
+        assert(!untilEnd.contains("-deprecation"), s"should not contain raw flags in template body:\n$result")
+    }
+
     test("emits shared basePomSettings when multiple modules share same publish info") {
         val publish = PublishInfo(
             organization = "com.example", artifactName = "mod1", version = "1.0.0",
