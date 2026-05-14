@@ -57,7 +57,8 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
           s"maxConnectSeconds=300\n"
       os.write.over(tempDir / ".deder/server.properties", serverProps, createFolders = true)
 
-      val importRes = executeDederCommand(tempDir, "import", "--from", "sbt")
+      // Use autodetection (build.sbt should be present in sbt projects)
+      val importRes = executeDederCommand(tempDir, "import")
       assertEquals(importRes.exitCode, 0, s"deder import failed (exit ${importRes.exitCode}):\n${importRes.err.text()}")
 
       assert(os.exists(tempDir / "deder.pkl"), "deder.pkl was not created by import")

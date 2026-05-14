@@ -384,8 +384,14 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
               }
               val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
               val importer = new Importer(serverNotificationsLogger)
-              importer.doImport(cliOptions.from)
-              serverMessages.put(CliServerMessage.Exit(0))
+              try {
+                importer.doImport(cliOptions.from)
+                serverMessages.put(CliServerMessage.Exit(0))
+              } catch {
+                case e: Exception =>
+                  serverMessages.put(CliServerMessage.Log(e.getMessage, LogLevel.ERROR))
+                  serverMessages.put(CliServerMessage.Exit(1))
+              }
           }
       case m: CliClientMessage.Complete =>
         if m.args == Seq("--help") || m.args == Seq("-h") then
