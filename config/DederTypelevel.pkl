@@ -76,10 +76,18 @@ function mkScalacOptions(version: String, mode: String): Listing<String> =
 function mkBaseMain(version: String, mode: String): P.ScalaModule = new {
   scalacOptions = mkScalacOptions(version, mode)
   compileOrder = "java-then-scala"
+  javacOptions {
+    "-encoding:utf8"
+    "-Xlint:all"
+  }
   when (version != "3") {
     scalacPluginDeps {
-      "org.typelevel:::kind-projector:0.13.3"
+      "com.olegpy::better-monadic-for:0.3.1"
+      "org.typelevel:::kind-projector:0.13.4"
     }
+  }
+  compileOnlyDeps {
+    "org.typelevel::scalac-compat-annotation:0.1.4"
   }
   pomSettings {
     licenses {
