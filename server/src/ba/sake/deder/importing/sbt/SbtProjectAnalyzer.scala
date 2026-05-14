@@ -132,7 +132,8 @@ class SbtProjectAnalyzer(
         val allPlugins = rg.modules.flatMap(_.plugins).distinct
         val usesTpolecat  = allPlugins.exists(p =>
             p.contains("sbt-tpolecat") || p.contains("org.typelevel.sbt.tpolecat"))
-        val usesTypelevel = allPlugins.exists(p => p.contains("sbt-typelevel"))
+        val usesTypelevel = allPlugins.exists(p =>
+            p.contains("sbt-typelevel") || p.contains("org.typelevel.sbt.Typelevel"))
         val layout = SbtProjectAnalyzer.detectLayout(allPlugins, rg.rootPath.toString)
         val isCross = layout == DederProject.DirLayout.SBT_CROSS_FULL ||
             layout == DederProject.DirLayout.SBT_CROSS_PURE ||
