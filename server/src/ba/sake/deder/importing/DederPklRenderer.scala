@@ -634,9 +634,7 @@ object DederPklRenderer {
             versionLine,
             Some("    bspVisible = true"),
             Some(extra.trim).filter(_.nonEmpty),
-            if (g.usesTpolecat || g.usesTypelevel || m.scalacOptions.nonEmpty)
-                Some(renderScalacOptionsSmart(m, g, indent = 4, scalaVersionCtx))
-            else None,
+            Some(renderScalacOptionsSmart(m, g, indent = 4, scalaVersionCtx)).filter(_.nonEmpty),
             Some(renderJavacOptions(m.javacOptions, indent = 4)).filter(_.nonEmpty),
             Some(renderSourceDirs(m.sources, indent = 4)).filter(_.nonEmpty),
             Some(renderResourceDirs(m.resources, indent = 4)).filter(_.nonEmpty),
@@ -645,7 +643,16 @@ object DederPklRenderer {
             Some(renderModuleDepsPkl(m.moduleDeps, indent = 4, scalaVersionCtx, groupLookup)).filter(_.nonEmpty),
             m.publish.map(p => renderPublishInfo(p, indent = 4, useBase = hasSharedPomBase)).filter(_.nonEmpty),
         ).flatten.mkString("\n")
-        s"""  template = new $moduleType {
+        val header = if (g.usesTpolecat || g.usesTypelevel) {
+            val sv = scalaVersionCtx match {
+                case Some(ScalaVersionCtx.Literal(v)) => v
+                case _ => m.scalaVersion
+            }
+            s"""  template = ${templateAmendExpr(g, sv)} {"""
+        } else {
+            s"""  template = new $moduleType {"""
+        }
+        s"""$header
            |$props
            |  }""".stripMargin
     }
