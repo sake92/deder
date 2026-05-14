@@ -446,11 +446,16 @@ object DederPklRenderer {
 
             val propsBlock = if (templateProps.nonEmpty) templateProps + "\n" else ""
 
+            val templateHeader = if (g.usesTpolecat || g.usesTypelevel) {
+                s"""  template = ${crossVersionTemplateAmendExpr(g)} {"""
+            } else {
+                """  template = new ScalaModule {"""
+            }
             val templateBody = {
                 val body = s"""    scalaVersion = sv
                    |    bspVisible = true
                    |$propsBlock""".stripMargin
-                s"""  template = new ScalaModule {
+                s"""$templateHeader
                    |$body  }""".stripMargin
             }
 
