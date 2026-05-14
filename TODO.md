@@ -5,10 +5,10 @@
 - shade test-runner to avoid classpath issues.. but first make shading work good
 - quick shutdown and start causes issues, plus race with metals&bsp when manually shutdown
 - init like giter8, autoimport from sbt?
+- FileWatchUtils for ignoring paths
+- handle test-runner failure, restart from last failed suite..
 
 # Import
-- cross scala modules are wack.. no common Pkl code..
-- relativize imported folders to repo root or module root..
 - import from other maven effective POM etc
 - import from other mill
 - import from other gradle
