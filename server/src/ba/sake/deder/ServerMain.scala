@@ -33,8 +33,8 @@ object ServerMain extends StrictLogging {
   @volatile private var gitignorePatterns: Seq[String] = Seq.empty
 
   // Watcher fields — used by stopFileWatcher/stopDebounceScheduler during shutdown
-  @volatile private var watcherThread: Thread = _
-  @volatile private var debounceScheduler: java.util.concurrent.ScheduledExecutorService = _
+  @volatile private var watcherThread: Thread = uninitialized
+  @volatile private var debounceScheduler: java.util.concurrent.ScheduledExecutorService = uninitialized
   @volatile private var pendingDebounce: Option[ScheduledFuture[?]] = None
   private val debounceLock = new Object()
   private val accumulatedChangedPaths = ConcurrentHashMap.newKeySet[os.Path]()
@@ -94,23 +94,24 @@ object ServerMain extends StrictLogging {
     val watchDebounceMs = props.getProperty("watchDebounceMillis", "300").toInt
     debounceScheduler = Executors.newSingleThreadScheduledExecutor(r => Thread(r, "watch-debounce"))
 
-    val onShutdown = () => {
+    // Must be declared before onShutdown to avoid forward reference error (var, not val)
+    var cliServer: DederCliServer | Null = null
+    var bspProxyServer: DederBspProxyServer | Null = null
+
+    val onShutdown: () => Unit = () => {
       logger.info("Deder server is shutting down...")
 
       // 1. Stop file watcher and debounce scheduler (prevents events during shutdown)
       stopFileWatcher()
       stopDebounceScheduler()
 
-      // 2. Notify BSP clients of impending shutdown
-      projectState.notifyBspClientsShuttingDown()
+      // 2. Stop CLI server — close accept loop, close socket, delete socket file
+      if (cliServer != null) cliServer.nn.stop()
 
-      // 3. Stop CLI server — close accept loop, close socket, delete socket file
-      cliServer.stop()
-
-      // 4. Stop BSP proxy server
+      // 3. Stop BSP proxy server
       if bspProxyServer != null then bspProxyServer.stop()
 
-      // 5. Graceful executor shutdown: wait briefly for in-flight tasks, then force
+      // 4. Graceful executor shutdown: wait briefly for in-flight tasks, then force
       tasksExecutorService.shutdown()
       try {
         if !tasksExecutorService.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS) then
@@ -119,7 +120,7 @@ object ServerMain extends StrictLogging {
         case _: InterruptedException => tasksExecutorService.shutdownNow()
       }
 
-      // 6. Release server lock + delete lock file (DETERMINISTIC — not in hook)
+      // 5. Release server lock + delete lock file (DETERMINISTIC — not in hook)
       logger.info("Releasing server lock...")
       try { serverFileLock.release() } catch { case _: Exception => }
       try { serverLockHandle.close() } catch { case _: Exception => }
@@ -147,11 +148,10 @@ object ServerMain extends StrictLogging {
     val tasksRegistry = TasksRegistry(allTasks)
     val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
 
-    val cliServer = DederCliServer(projectState)
-    val cliServerThread = new Thread(() => cliServer.start(), "DederCliServer")
+    cliServer = DederCliServer(projectState)
+    val cliServerThread = new Thread(() => cliServer.nn.start(), "DederCliServer")
     cliServerThread.start()
 
-    var bspProxyServer: DederBspProxyServer | Null = null
     if bspEnabled then {
       bspProxyServer = DederBspProxyServer(coreTasks, scalaJsTasks, scalaNativeTasks, projectState)
       val bspProxyServerThread = new Thread(() => bspProxyServer.nn.start(), "DederBspProxyServer")
@@ -218,6 +218,7 @@ object ServerMain extends StrictLogging {
         case _: InterruptedException => logger.info("File watcher interrupted, stopping...")
         case NonFatal(e) => logger.error(s"File watcher error: ${e.getMessage}", e)
       }
+      ()
     }, "file-watcher")
     watcherThread.setDaemon(true)
     watcherThread.start()

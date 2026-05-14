@@ -17,10 +17,11 @@ import io.opentelemetry.api.trace.StatusCode
 
 import java.util.UUID
 import scala.util.Using
+import scala.compiletime.uninitialized
 
 class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
-  private var serverChannel: ServerSocketChannel = _
+  private var serverChannel: ServerSocketChannel = uninitialized
 
   def start(): Unit = {
 

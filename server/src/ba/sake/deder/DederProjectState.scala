@@ -582,6 +582,7 @@ class DederProjectState(
 
   def shutdown(): Unit = {
     shutdownStarted = true
+    notifyBspClientsShuttingDown()
     loadedPlugins.foreach(_.closeClassLoaderQuietly())
     onShutdown()
   }

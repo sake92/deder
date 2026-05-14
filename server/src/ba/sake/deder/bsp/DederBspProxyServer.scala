@@ -12,6 +12,7 @@ import org.eclipse.lsp4j.jsonrpc.Launcher
 import ch.epfl.scala.bsp4j.*
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.{CoreTasks, DederGlobals, DederProjectState}
+import scala.compiletime.uninitialized
 
 class DederBspProxyServer(
     coreTasks: CoreTasks,
@@ -20,7 +21,7 @@ class DederBspProxyServer(
     projectState: DederProjectState
 ) extends StrictLogging {
 
-  private var serverChannel: ServerSocketChannel = _
+  private var serverChannel: ServerSocketChannel = uninitialized
 
   def start(): Unit = {
     val relativeSocketPath = ".deder/server-bsp.sock"
@@ -36,9 +37,10 @@ class DederBspProxyServer(
     try {
       while true do {
         var clientChannel: SocketChannel = null
+        var localServer: DederBspServer = null
         try {
           clientChannel = serverChannel.accept()
-          val localServer =
+          localServer =
             new DederBspServer(coreTasks, scalaJsTasks, scalaNativeTasks, projectState, () => clientChannel.close())
           val os = Channels.newOutputStream(clientChannel)
           val is = Channels.newInputStream(clientChannel)
