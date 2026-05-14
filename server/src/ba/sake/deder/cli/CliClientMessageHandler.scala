@@ -425,7 +425,10 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
         logger.info(s"Client $clientId requested server shutdown.")
         serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
         serverMessages.put(CliServerMessage.Exit(0))
-        Thread.sleep(100) // let the message be sent
+        Thread.sleep(200) // let the messages be sent to CLI client
+        // Notify BSP clients early so they have time to disconnect before deterministic shutdown
+        projectState.notifyBspClientsShuttingDown()
+        Thread.sleep(500) // flush window for BSP clients to process disconnect
         projectState.shutdown()
     }
   }

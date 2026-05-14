@@ -954,6 +954,13 @@ class DederBspServer(
     onExit() // just closes the unix socket connection
   }
 
+  /** Called by projectState when CLI shutdown is requested — gracefully ends the BSP session */
+  def initiateShutdown(): Unit = {
+    logger.info("Initiating BSP server shutdown (CLI shutdown requested)...")
+    running.set(false)
+    try { onExit() } catch { case _: Exception => }
+  }
+
   private def ensureRunning(): Unit = {
     if !running.get then throw DederException("BSP server is shut down, not accepting more requests")
   }

@@ -46,6 +46,9 @@ class DederProjectState(
   private var watchedTasks = Seq.empty[WatchedTaskData]
   private var loadedPlugins = Seq.empty[LoadedPlugin]
 
+  // Track active BSP servers for graceful teardown on CLI shutdown
+  private val bspServers = new java.util.concurrent.ConcurrentLinkedQueue[ba.sake.deder.bsp.DederBspServer]()
+
   reloadProject()
 
   scheduleInactiveShutdownChecker()
@@ -581,6 +584,23 @@ class DederProjectState(
     shutdownStarted = true
     loadedPlugins.foreach(_.closeClassLoaderQuietly())
     onShutdown()
+  }
+
+  def registerBspServer(server: ba.sake.deder.bsp.DederBspServer): Unit =
+    bspServers.add(server)
+
+  def unregisterBspServer(server: ba.sake.deder.bsp.DederBspServer): Unit =
+    bspServers.remove(server)
+
+  def notifyBspClientsShuttingDown(): Unit = {
+    val snapshot = bspServers.iterator().asScala.toSeq
+    if snapshot.nonEmpty then {
+      logger.info(s"Notifying ${snapshot.size} BSP client(s) of impending shutdown...")
+      snapshot.foreach { bspServer =>
+        try bspServer.initiateShutdown()
+        catch { case NonFatal(e) => logger.warn(s"Error notifying BSP client: ${e.getMessage}") }
+      }
+    }
   }
 
   private def closeStaleClassLoaders(previous: Seq[URLClassLoader], current: Seq[URLClassLoader]): Unit =
