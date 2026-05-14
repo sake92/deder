@@ -10,8 +10,11 @@ import ba.sake.tupson.toJson
 import ba.sake.deder.*
 import ba.sake.deder.importing.Importer
 
-class CliClientMessageHandler(projectState: DederProjectState, serverMessages: BlockingQueue[CliServerMessage])
-    extends StrictLogging {
+class CliClientMessageHandler(
+    projectState: DederProjectState,
+    serverMessages: BlockingQueue[CliServerMessage],
+    cliServer: DederCliServer
+) extends StrictLogging {
 
   def handle(
       clientId: Int,
@@ -424,8 +427,20 @@ class CliClientMessageHandler(projectState: DederProjectState, serverMessages: B
       case _: CliClientMessage.Shutdown =>
         logger.info(s"Client $clientId requested server shutdown.")
         serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
-        serverMessages.put(CliServerMessage.Exit(0))
-        Thread.sleep(100) // let the message be sent
+        serverMessages.put(CliServerMessage.Exit(0, serverShuttingDown = true))
+        Thread.sleep(100) // let the messages be sent to CLI client
+
+        // Stop accepting new CLI connections immediately — prevents new clients from
+        // connecting to this dying server during the flush sleep below
+        cliServer.stopAccepting()
+
+        // Release the server lock BEFORE BSP flush sleep so a new server process can
+        // start immediately (the client's reconnection loop spawns a server only once)
+        projectState.releaseServerLock()
+
+        // Notify BSP clients — they now have time to disconnect while the new server starts
+        projectState.notifyBspClientsShuttingDown()
+        Thread.sleep(500) // flush window for BSP clients to process disconnect
         projectState.shutdown()
     }
   }

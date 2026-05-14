@@ -76,6 +76,7 @@ CLI communication uses newline-delimited JSON over Unix sockets. Message types a
 - **Examples**: `examples/` contains working sample projects (multi-module, cross-platform, ScalaJS, etc.). Each has a `reset.sh` that copies the server JAR and runs `deder bsp install`
 - **Design docs**: Never commit files in `docs/superpowers/` directory
 - **Git**: Do not commit anything without explicit user permission
+- **Git**: Create a new worktree for bigger/impactful changes (multi-file, multi-commit, or behavioral). Use `git worktree add` with a descriptive branch name (e.g., `fix/server-restart-hardening`). This keeps `main` clean and avoids conflicts with the running Deder server. Never work directly on `main` for anything beyond trivial single-file edits.
 
 ## Output Layout
 

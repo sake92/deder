@@ -17,8 +17,11 @@ import io.opentelemetry.api.trace.StatusCode
 
 import java.util.UUID
 import scala.util.Using
+import scala.compiletime.uninitialized
 
 class DederCliServer(projectState: DederProjectState) extends StrictLogging {
+
+  private var serverChannel: ServerSocketChannel = uninitialized
 
   def start(): Unit = {
 
@@ -29,7 +32,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
     // unix limitation for socket path is 108 bytes, so use relative path
     val address = UnixDomainSocketAddress.of(Paths.get(relativeSocketPath))
-    val serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+    serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
     serverChannel.bind(address)
 
     // TODO better try catch
@@ -42,7 +45,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         val currentClientId = clientId
         logger.info(s"Client #$currentClientId connected")
         val serverMessages = new LinkedBlockingQueue[CliServerMessage]()
-        val handler = new CliClientMessageHandler(projectState, serverMessages)
+        val handler = new CliClientMessageHandler(projectState, serverMessages, this)
         val clientReadThread =
           new CliClientReadThread(projectState, handler, clientChannel, currentClientId, serverMessages)
         val clientWriteThread = new CliClientWriteThread(projectState, clientChannel, currentClientId, serverMessages)
@@ -51,10 +54,22 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         // no join, just let them run
       }
     } finally {
-      logger.info("Shutting down CLI server...")
-      serverChannel.close()
-      Files.deleteIfExists(socketPath.toNIO)
+      stop()
     }
+  }
+
+  /** Close the accept socket immediately so no new clients can connect.
+    * Existing client channels are unaffected.
+    * Does NOT delete the socket file — that's done by start() of the next server. */
+  def stopAccepting(): Unit = {
+    try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
+  }
+
+  def stop(): Unit = {
+    logger.info("Shutting down CLI server...")
+    try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
+    // Socket file intentionally NOT deleted here — the next server's start() handles cleanup.
+    // Deleting here would race with a new server process that already rebound to the socket.
   }
 
 }

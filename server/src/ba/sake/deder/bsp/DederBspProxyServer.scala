@@ -12,6 +12,7 @@ import org.eclipse.lsp4j.jsonrpc.Launcher
 import ch.epfl.scala.bsp4j.*
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.{CoreTasks, DederGlobals, DederProjectState}
+import scala.compiletime.uninitialized
 
 class DederBspProxyServer(
     coreTasks: CoreTasks,
@@ -19,6 +20,8 @@ class DederBspProxyServer(
     scalaNativeTasks: ScalaNativeTasks,
     projectState: DederProjectState
 ) extends StrictLogging {
+
+  private var serverChannel: ServerSocketChannel = uninitialized
 
   def start(): Unit = {
     val relativeSocketPath = ".deder/server-bsp.sock"
@@ -28,15 +31,16 @@ class DederBspProxyServer(
 
     // unix limitation for socket path is 108 bytes, so use relative path
     val address = UnixDomainSocketAddress.of(Paths.get(relativeSocketPath))
-    val serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+    serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
     serverChannel.bind(address)
 
     try {
       while true do {
         var clientChannel: SocketChannel = null
+        var localServer: DederBspServer = null
         try {
           clientChannel = serverChannel.accept()
-          val localServer =
+          localServer =
             new DederBspServer(coreTasks, scalaJsTasks, scalaNativeTasks, projectState, () => clientChannel.close())
           val os = Channels.newOutputStream(clientChannel)
           val is = Channels.newInputStream(clientChannel)
@@ -47,16 +51,23 @@ class DederBspProxyServer(
             .setRemoteInterface(classOf[BuildClient])
             .create()
           localServer.client = launcher.getRemoteProxy
+          projectState.registerBspServer(localServer)
           launcher.startListening().get() // listen until BSP session is over
         } finally {
+          projectState.unregisterBspServer(localServer)
           if clientChannel != null && clientChannel.isOpen then clientChannel.close()
         }
       }
     } finally {
-      serverChannel.close()
-      Files.deleteIfExists(socketPath.toNIO)
-      logger.info("BSP proxy server shut down")
+      stop()
     }
+  }
+
+  def stop(): Unit = {
+    logger.info("BSP proxy server shutting down...")
+    try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
+    // Socket file intentionally NOT deleted here — the next server's start() handles cleanup.
+    // Deleting here would race with a new server process that already rebound to the socket.
   }
 
 }

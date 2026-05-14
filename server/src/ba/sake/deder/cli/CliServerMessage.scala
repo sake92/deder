@@ -10,7 +10,7 @@ enum CliServerMessage derives JsonRW {
   case Output(text: String)
   case Log(text: String, level: LogLevel)
   case RunSubprocess(cmd: Seq[String], envVars: Map[String, String], watch: Boolean)
-  case Exit(exitCode: Int)
+  case Exit(exitCode: Int, serverShuttingDown: Boolean = false)
 }
 
 object CliServerMessage {
