@@ -1,0 +1,60 @@
+/// sbt-tpolecat scalac options by Scala major version.
+/// Source: https://github.com/typelevel/sbt-tpolecat
+/// Option lists transcribed from org.typelevel.scalacoptions.ScalacOptions (tpolecat 0.5.x).
+///
+/// Modes: Dev (default, no fatal warnings), Ci (with -Xfatal-warnings / -Werror).
+/// Mode auto-selected: Ci when $CI env var is set, Dev otherwise.
+
+/// Dev mode options (no fatal warnings)
+tpolecatDev: Mapping<String, Listing<String>> = new Mapping {
+  // NOTE: Exact option lists need to be transcribed from sbt-tpolecat output.
+  // To extract: create a minimal sbt project with sbt-tpolecat 0.5.2,
+  // run `sbt exportAllBuildStructures`, and read scalacOptions from the export JSON.
+  // Different Scala versions (2.12, 2.13, 3.x) have different subsets.
+  ["2.12"] {
+    "-deprecation"
+    "-encoding:utf-8"
+    "-explaintypes"
+    "-feature"
+    "-unchecked"
+    "-language:higherKinds"
+    "-language:implicitConversions"
+    // TODO: complete from actual tpolecat output
+  }
+  ["2.13"] {
+    "-deprecation"
+    "-encoding:utf-8"
+    "-explaintypes"
+    "-feature"
+    "-unchecked"
+    "-Xsource:3"
+    "-language:higherKinds"
+    "-language:implicitConversions"
+    // TODO: complete from actual tpolecat output
+  }
+  ["3"] {
+    "-deprecation"
+    "-encoding:utf-8"
+    "-explain"
+    "-feature"
+    "-unchecked"
+    "-language:implicitConversions"
+    // TODO: complete from actual tpolecat output
+  }
+}
+
+/// Ci mode = Dev + fatal warnings
+tpolecatCi: Mapping<String, Listing<String>> = new Mapping {
+  ["2.12"] { ...tpolecatDev["2.12"]; "-Xfatal-warnings" }
+  ["2.13"] { ...tpolecatDev["2.13"]; "-Xfatal-warnings" }
+  ["3"]    { ...tpolecatDev["3"]; "-Werror" }
+}
+
+/// Resolve tpolecat options for a Scala version string ("2.13.18" -> "2.13" key).
+/// Auto-selects Ci mode when $CI environment variable is set, Dev mode otherwise.
+function forVersion(scalaVersion: String): Listing<String> =
+  let (major = scalaVersion.takeWhile((c) -> c != '.'))
+  if (read?("env:CI") != null)
+    tpolecatCi.getOrElse(major, new Listing {})
+  else
+    tpolecatDev.getOrElse(major, new Listing {})

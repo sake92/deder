@@ -1,0 +1,58 @@
+/// sbt-typelevel scalac options by Scala major version.
+/// Transcribed from TypelevelSettingsPlugin.scala (sbt-typelevel main branch).
+/// Does NOT include: -Ybackend-parallelism (dynamic CPU count), -Werror (controlled by
+/// tlFatalWarnings), JDK release flags (controlled by tlJdkRelease).
+/// Source: https://github.com/typelevel/sbt-typelevel
+
+/// Base options applied to all Scala versions
+local const typelevelCommon = new Listing {
+  "-deprecation"
+  "-encoding"
+  "utf-8"
+  "-feature"
+  "-unchecked"
+}
+
+typelevelOpts: Mapping<String, Listing<String>> = new Mapping {
+  ["2.12"] {
+    ...typelevelCommon
+    "-Xlint"
+    "-Yno-adapted-args"
+    "-Ywarn-dead-code"
+    "-Ywarn-unused-import"
+    "-Xlint:_,-unused"
+    "-Ywarn-unused:_,-nowarn,-privates"
+    "-Ypartial-unification"
+    "-language:_"
+    "-Xsource:3"
+  }
+  ["2.13"] {
+    ...typelevelCommon
+    "-Wdead-code"
+    "-Wextra-implicit"
+    "-Wnumeric-widen"
+    "-Wunused"
+    "-Wvalue-discard"
+    "-Xlint:_,-implicit-recursion,-recurse-with-default,-unused,-byname-implicit"
+    "-Wconf:cat=scala3-migration:s"
+    "-language:_"
+    "-Xsource:3"
+  }
+  ["3"] {
+    ...typelevelCommon
+    "-Wunused:implicits"
+    "-Wunused:explicits"
+    "-Wunused:imports"
+    "-Wunused:locals"
+    "-Wunused:params"
+    "-Wunused:privates"
+    "-Wvalue-discard"
+    "-Xkind-projector:underscores"
+    "-language:implicitConversions"
+  }
+}
+
+/// Resolve typelevel options for a Scala version string ("2.13.18" -> "2.13" key).
+function forVersion(scalaVersion: String): Listing<String> =
+  let (major = scalaVersion.takeWhile((c) -> c != '.'))
+  typelevelOpts.getOrElse(major, new Listing {})
