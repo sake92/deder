@@ -52,17 +52,7 @@ class ServerRestartSuite extends BaseIntegrationSuite {
       val shutdownRes = executeDederCommand(projectPath, "shutdown")
       assertEquals(shutdownRes.exitCode, 0, "Shutdown should succeed")
 
-      // Wait for server to finish cleanup (client exits before server's async cleanup)
-      val lockFile = projectPath / ".deder/server.lock"
-      var attempts = 0
-      while (os.exists(lockFile) && attempts < 20) {
-        Thread.sleep(200)
-        attempts += 1
-      }
-      assert(!os.exists(lockFile),
-        s"Server lock file must be deleted after shutdown (still exists after ${attempts * 200}ms)")
-
-      // Immediately restart — should succeed
+      // Immediately restart — should succeed (proves lock was released)
       val res2 = executeDederCommand(projectPath, "version")
       assertEquals(res2.exitCode, 0, "Server should restart cleanly after shutdown")
     }

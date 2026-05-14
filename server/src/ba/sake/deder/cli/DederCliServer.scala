@@ -59,7 +59,8 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
   }
 
   /** Close the accept socket immediately so no new clients can connect.
-    * Existing client channels are unaffected. */
+    * Existing client channels are unaffected.
+    * Does NOT delete the socket file — that's done by start() of the next server. */
   def stopAccepting(): Unit = {
     try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
   }
@@ -67,8 +68,8 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
   def stop(): Unit = {
     logger.info("Shutting down CLI server...")
     try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
-    val socketPath = DederGlobals.projectRootDir / os.RelPath(".deder/server-cli.sock")
-    try Files.deleteIfExists(socketPath.toNIO) catch { case _: Exception => }
+    // Socket file intentionally NOT deleted here — the next server's start() handles cleanup.
+    // Deleting here would race with a new server process that already rebound to the socket.
   }
 
 }

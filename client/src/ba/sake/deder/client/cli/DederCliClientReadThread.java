@@ -65,11 +65,17 @@ public class DederCliClientReadThread extends Thread {
                     System.exit(subprocessRunningThread.getExitCode());
                 }
                 // else just let it run.. either new message will kill it, or user with CTRL+C
-            } else if (message instanceof ServerMessage.Exit(int exitCode)) {
+            } else if (message instanceof ServerMessage.Exit(int exitCode, boolean serverShuttingDown)) {
                 if (subprocessRunningThread != null && subprocessRunningThread.isAlive()) {
-                    // TODO is this logic sound? :/
                     logger.accept("Subprocess still running, not exiting...");
                 } else {
+                    if (serverShuttingDown) {
+                        // Give the server time to release the lock and close sockets
+                        // before this client process exits. The shell's && depends on
+                        // this process terminating, so a new 'deder' command would start
+                        // before the old server finished cleanup otherwise.
+                        try { Thread.sleep(1500); } catch (InterruptedException e) { }
+                    }
                     // running.set(false);
                     System.exit(exitCode);
                 }

@@ -105,14 +105,10 @@ object ServerMain extends StrictLogging {
       stopFileWatcher()
       stopDebounceScheduler()
 
-      // 2. Release server lock (if not already released early via projectState.releaseServerLock)
-      val serverLockFile = DederGlobals.projectRootDir / os.RelPath(".deder/server.lock")
-      if os.exists(serverLockFile) then {
-        logger.info("Releasing server lock...")
-        try { serverFileLock.release() } catch { case _: Exception => }
-        try { serverLockHandle.close() } catch { case _: Exception => }
-        try { os.remove.all(serverLockFile) } catch { case _: Exception => }
-      }
+      // 2. Release server lock (may already be released via early callback — idempotent)
+      logger.info("Releasing server lock...")
+      try { serverFileLock.release() } catch { case _: Exception => }
+      try { serverLockHandle.close() } catch { case _: Exception => }
 
       // 3. Close sockets so new connections go to the new server process
       if (cliServer != null) cliServer.nn.stop()
@@ -153,8 +149,6 @@ object ServerMain extends StrictLogging {
     projectState.setReleaseServerLock(() => {
       try { serverFileLock.release() } catch { case _: Exception => }
       try { serverLockHandle.close() } catch { case _: Exception => }
-      val serverLockFile = DederGlobals.projectRootDir / os.RelPath(".deder/server.lock")
-      try { os.remove.all(serverLockFile) } catch { case _: Exception => }
     })
 
     cliServer = DederCliServer(projectState)
@@ -306,11 +300,9 @@ object ServerMain extends StrictLogging {
     }
 
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
-      logger.warn("JVM shutdown hook fired (unexpected exit) — cleaning up lock file as safety net")
+      logger.warn("JVM shutdown hook fired (unexpected exit) — releasing lock as safety net")
       try { serverFileLock.release() } catch { case _: Exception => }
       try { serverLockHandle.close() } catch { case _: Exception => }
-      val serverLockFile = DederGlobals.projectRootDir / os.RelPath(".deder/server.lock")
-      try { os.remove.all(serverLockFile) } catch { case _: Exception => }
     }))
   }
 

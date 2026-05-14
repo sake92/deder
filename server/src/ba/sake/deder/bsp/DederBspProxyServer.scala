@@ -66,8 +66,8 @@ class DederBspProxyServer(
   def stop(): Unit = {
     logger.info("BSP proxy server shutting down...")
     try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
-    val socketPath = DederGlobals.projectRootDir / os.RelPath(".deder/server-bsp.sock")
-    try Files.deleteIfExists(socketPath.toNIO) catch { case _: Exception => }
+    // Socket file intentionally NOT deleted here — the next server's start() handles cleanup.
+    // Deleting here would race with a new server process that already rebound to the socket.
   }
 
 }

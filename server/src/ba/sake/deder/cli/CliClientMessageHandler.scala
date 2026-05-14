@@ -427,8 +427,8 @@ class CliClientMessageHandler(
       case _: CliClientMessage.Shutdown =>
         logger.info(s"Client $clientId requested server shutdown.")
         serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
-        serverMessages.put(CliServerMessage.Exit(0))
-        Thread.sleep(200) // let the messages be sent to CLI client
+        serverMessages.put(CliServerMessage.Exit(0, serverShuttingDown = true))
+        Thread.sleep(100) // let the messages be sent to CLI client
 
         // Stop accepting new CLI connections immediately — prevents new clients from
         // connecting to this dying server during the flush sleep below

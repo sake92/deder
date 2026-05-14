@@ -23,7 +23,7 @@ public sealed interface ServerMessage {
 	record RunSubprocess(String[] cmd, Map<String, String> envVars, boolean watch) implements ServerMessage {
 	}
 
-	record Exit(int exitCode) implements ServerMessage {
+	record Exit(int exitCode, boolean serverShuttingDown) implements ServerMessage {
 	}
 
 	enum LogLevel {
