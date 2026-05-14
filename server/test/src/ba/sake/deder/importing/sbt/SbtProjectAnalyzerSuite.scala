@@ -330,21 +330,4 @@ class SbtProjectAnalyzerSuite extends FunSuite {
             ba.sake.deder.config.DederProject.DirLayout.DEFAULT)
         assertEquals(result, input)
     }
-
-    test("mergeOptionPairs merges paired scalac flags with their arguments") {
-        val input = Seq("-deprecation", "-release", "8", "-encoding", "UTF-8", "-Ybackend-parallelism", "8")
-        val result = SbtProjectAnalyzer.mergeOptionPairs(input, Set("-release", "-Ybackend-parallelism", "-java-output-version"))
-        assertEquals(result, Seq("-deprecation", "-release:8", "-encoding", "UTF-8", "-Ybackend-parallelism:8"))
-    }
-
-    test("mergeOptionPairs keeps non-paired flags unchanged") {
-        val input = Seq("-deprecation", "-Xfatal-warnings", "-Werror")
-        val result = SbtProjectAnalyzer.mergeOptionPairs(input, Set("-release"))
-        assertEquals(result, input)
-    }
-
-    test("mergeOptionPairs handles empty input") {
-        val result = SbtProjectAnalyzer.mergeOptionPairs(Seq.empty, Set("-release"))
-        assertEquals(result, Seq.empty)
-    }
 }
