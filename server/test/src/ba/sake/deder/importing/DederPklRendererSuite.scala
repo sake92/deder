@@ -627,6 +627,25 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("\"-deprecation\""), clues(result))
     }
 
+    test("cross-version with tpolecat emits conditional template amend") {
+        val mods = Seq(
+            ConcreteModule("proj1", "2.13.18", "main", emptyModule(scalaVersion = "2.13.18", scalacOptions = Seq("-deprecation"))),
+            ConcreteModule("proj1", "3.7.4", "main", emptyModule(scalaVersion = "3.7.4", scalacOptions = Seq("-deprecation", "-Werror"))),
+        )
+        val g = ModuleGroup(
+            builderVarName = "core", root = ".", layout = DederProject.DirLayout.DEFAULT,
+            crossScalaVersions = Seq("2.13.18", "3.7.4"),
+            concreteModules = mods,
+            usesTpolecat = true,
+        )
+        val build = DederBuild("v0.8.0", Seq(g), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+        assert(result.contains("if (sv.startsWith(\"3\"))"), s"should have conditional template selection:\n$result")
+        assert(result.contains("DederTpolecat.tpolecatScala3"), s"should reference tpolecatScala3:\n$result")
+        assert(result.contains("DederTpolecat.tpolecatScala213"), s"should reference tpolecatScala213:\n$result")
+        assert(!result.contains("forVersion"), s"should not contain forVersion:\n$result")
+    }
+
     test("emits shared basePomSettings when multiple modules share same publish info") {
         val publish = PublishInfo(
             organization = "com.example", artifactName = "mod1", version = "1.0.0",
