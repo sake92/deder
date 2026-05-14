@@ -1,0 +1,28 @@
+# Keep JDK / standard library classes unshaded.
+# These must come BEFORE any shade rules because jarjar rewrites
+# all bytecode references matching rule patterns, even for classes
+# not in the JAR itself.
+rule java.** java.@1
+rule javax.** javax.@1
+rule scala.** scala.@1
+rule sun.** sun.@1
+rule jdk.** jdk.@1
+
+# Keep sbt test-interface unshaded — both the test-runner and test
+# frameworks (munit etc.) must agree on the same sbt.testing.*
+# and org.scalatools.testing.* classes.
+rule sbt.** sbt.@1
+rule org.scalatools.** org.scalatools.@1
+
+# Shade third-party dependencies to avoid classpath conflicts.
+rule ba.sake.tupson.** shaded.ba.sake.tupson.@1
+rule fansi.** shaded.fansi.@1
+rule geny.** shaded.geny.@1
+rule os.** shaded.os.@1
+rule sourcecode.** shaded.sourcecode.@1
+rule org.typelevel.** shaded.org.typelevel.@1
+
+# Shade Deder's own test-runner / test-common classes.
+# The server references the shaded ForkedTestMain by name when
+# spawning the forked JVM.
+rule ba.sake.deder.** shaded.ba.sake.deder.@1
