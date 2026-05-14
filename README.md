@@ -76,6 +76,9 @@ deder shutdown
 
 
 ################ import existing sbt project
+# autodetects build tool (currently sbt via build.sbt)
+deder import
+# explicit override (use e.g. when autodetection fails)
 deder import --from sbt
 
 ################ install shell completions

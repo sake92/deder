@@ -21,7 +21,8 @@ deder clean -m mod% -m ~mod-test  # exclude module from wildcard match (~ negate
 deder clean -t compile           # clean compile task on all modules
 deder clean -m mymodule -t test  # clean test task on specific module
 
-deder import --from sbt
+deder import                          # autodetect build tool (sbt via build.sbt)
+deder import --from sbt                # explicit override
 
 ################ install shell completions
 deder complete -s bash -o > ~/.local/share/bash-completion/completions/deder

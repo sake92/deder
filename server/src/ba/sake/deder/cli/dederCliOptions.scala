@@ -97,10 +97,10 @@ given TokensReader.Simple[ImportBuildTool] with {
   }
 }
 
-@main("import command", "Import from another build tool")
+@main("import command", "Import from another build tool. Autodetects the build tool if --from is omitted.")
 case class DederCliImportOptions(
-    @arg(doc = "Build tool to import from")
-    from: ImportBuildTool
+    @arg(doc = "Build tool to import from (e.g. sbt). If omitted, the build tool is autodetected.")
+    from: Option[ImportBuildTool] = None
 )
 
 enum ShellType:

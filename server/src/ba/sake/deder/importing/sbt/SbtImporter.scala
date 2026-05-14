@@ -14,7 +14,7 @@ class SbtImporter(
 
   private val sbtExportBuildVersion = "0.0.5"
 
-  def doImport() = {
+  def doImport(): String = {
     dumpSbtBuild()
     val exportedSbtModules = readAndParseExportedModules()
     // Analysis phase
@@ -23,11 +23,12 @@ class SbtImporter(
 
     // Render phase
     val pklContent = DederPklRenderer.render(build)
-    os.write.over(os.pwd / "deder.pkl", pklContent)
 
     // Summary
     val summary = analyzer.summary()
     summary.log(serverNotificationsLogger)
+
+    pklContent
   }
 
   private def dumpSbtBuild() = {
