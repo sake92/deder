@@ -319,6 +319,7 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.runClasspath", s"${dependencyModuleId}.runClasspath"),
       (s"${moduleId}.allJars", s"${dependencyModuleId}.allJars"),
       (s"${moduleId}.moduleDepsPomSettings", s"${dependencyModuleId}.moduleDepsPomSettings"),
-      (s"${moduleId}.publishLocal", s"${dependencyModuleId}.publishLocal")
+      (s"${moduleId}.publishLocal", s"${dependencyModuleId}.publishLocal"),
+      (s"${moduleId}.publish", s"${dependencyModuleId}.publish")
     )
 }
