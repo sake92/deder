@@ -18,6 +18,8 @@ case class ModuleGroup(
     layout:          DederProject.DirLayout,
     crossScalaVersions: Seq[String],
     concreteModules: Seq[ConcreteModule],
+    usesTpolecat:    Boolean = false,
+    usesTypelevel:   Boolean = false,
 ):
     private def platformModule(platforms: Set[String]): Option[ModuleDef] =
         concreteModules.find(cm => platforms.contains(cm.platform)).map(_.module)
@@ -48,6 +50,8 @@ object ModuleGroup:
         nativeModule: Option[ModuleDef],
         hasJsModule: Boolean,
         hasNativeModule: Boolean,
+        usesTpolecat: Boolean,
+        usesTypelevel: Boolean,
     ): ModuleGroup =
         val versions = if crossScalaVersions.nonEmpty then crossScalaVersions else Seq(jvmModule.scalaVersion)
         val jvmPlatform = if hasJsModule || hasNativeModule then "jvm" else "main"
@@ -58,7 +62,7 @@ object ModuleGroup:
                 nativeModule.map(m => ConcreteModule(builderVarName, scalaVersion, "native", m.copy(scalaVersion = scalaVersion))),
             ).flatten
         }
-        new ModuleGroup(builderVarName, root, layout, crossScalaVersions, concreteModules)
+        new ModuleGroup(builderVarName, root, layout, crossScalaVersions, concreteModules, usesTpolecat, usesTypelevel)
 
 case class ConcreteModule(
     sbtProjectId: String,

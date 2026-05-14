@@ -51,6 +51,7 @@ class SbtProjectAnalyzer(
                     concreteExport.scalaVersion,
                     globalIdMap,
                     warnings,
+                    layout = gi.layout,
                     isJs = concreteExport.platform == "js",
                     isNative = concreteExport.platform == "native",
                 )
@@ -69,6 +70,8 @@ class SbtProjectAnalyzer(
                 layout = gi.layout,
                 crossScalaVersions = gi.crossScalaVersions,
                 concreteModules = concreteModules,
+                usesTpolecat = gi.usesTpolecat,
+                usesTypelevel = gi.usesTypelevel,
             )
         }
 
@@ -112,6 +115,8 @@ class SbtProjectAnalyzer(
         crossScalaVersions: Seq[String],
         sbtIdToRef: Map[(String, String), ResolvedModuleRef],
         concreteExports: Seq[ConcreteExport],
+        usesTpolecat: Boolean = false,
+        usesTypelevel: Boolean = false,
     )
 
     private def buildGroupInfo(rg: RawGroup): GroupInfo = {
@@ -125,6 +130,9 @@ class SbtProjectAnalyzer(
         ).getOrElse(rg.modules.head)
 
         val allPlugins = rg.modules.flatMap(_.plugins).distinct
+        val usesTpolecat  = allPlugins.exists(p =>
+            p.contains("sbt-tpolecat") || p.contains("org.typelevel.sbt.tpolecat"))
+        val usesTypelevel = allPlugins.exists(p => p.contains("sbt-typelevel"))
         val layout = SbtProjectAnalyzer.detectLayout(allPlugins, rg.rootPath.toString)
         val isCross = layout == DederProject.DirLayout.SBT_CROSS_FULL ||
             layout == DederProject.DirLayout.SBT_CROSS_PURE ||
@@ -157,6 +165,7 @@ class SbtProjectAnalyzer(
 
         GroupInfo(
             builderVarName, root, layout, crossScalaVersions, sbtIdToRef, concreteExports,
+            usesTpolecat, usesTypelevel,
         )
     }
 
@@ -167,6 +176,7 @@ class SbtProjectAnalyzer(
         dependerScalaVersion: String,
         idMap: Map[(String, String), ResolvedModuleRef],
         warnings: scala.collection.mutable.Builder[ImportWarning, Seq[ImportWarning]],
+        layout: DederProject.DirLayout,
         isJs: Boolean = false,
         isNative: Boolean = false,
     ): (ModuleDef, Int) = {
@@ -196,6 +206,23 @@ class SbtProjectAnalyzer(
             ))
         } else None
 
+        val moduleBasePath = os.Path(pe.base)
+
+        val filteredSources      = SbtProjectAnalyzer.filterManagedDirs(pe.sourceDirs)
+        val filteredTestSources   = SbtProjectAnalyzer.filterManagedDirs(pe.testSourceDirs)
+        val filteredResources     = SbtProjectAnalyzer.filterManagedDirs(pe.resourceDirs)
+        val filteredTestResources = SbtProjectAnalyzer.filterManagedDirs(pe.testResourceDirs)
+
+        val relSourceDirs      = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredSources)
+        val relTestSourceDirs   = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredTestSources)
+        val relResourceDirs     = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredResources)
+        val relTestResourceDirs = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredTestResources)
+
+        val finalSourceDirs      = SbtProjectAnalyzer.filterStandardSbtDirs(relSourceDirs, layout)
+        val finalTestSourceDirs   = SbtProjectAnalyzer.filterStandardSbtDirs(relTestSourceDirs, layout)
+        val finalResourceDirs     = SbtProjectAnalyzer.filterStandardSbtDirs(relResourceDirs, layout)
+        val finalTestResourceDirs = SbtProjectAnalyzer.filterStandardSbtDirs(relTestResourceDirs, layout)
+
         val moduleDef = ModuleDef(
             scalaVersion = pe.scalaVersion,
             scalacOptions = pe.scalacOptions,
@@ -208,10 +235,10 @@ class SbtProjectAnalyzer(
             scalaJsVersion = if (isJs) Some(SbtProjectAnalyzer.DefaultScalaJsVersion) else None,
             scalaNativeVersion = if (isNative) Some(SbtProjectAnalyzer.DefaultScalaNativeVersion) else None,
             publish = publish,
-            sources = pe.sourceDirs,
-            testSources = pe.testSourceDirs,
-            resources = pe.resourceDirs,
-            testResources = pe.testResourceDirs,
+            sources = finalSourceDirs,
+            testSources = finalTestSourceDirs,
+            resources = finalResourceDirs,
+            testResources = finalTestResourceDirs,
         )
         (moduleDef, filteredCount)
     }
@@ -327,7 +354,7 @@ class SbtProjectAnalyzer(
 
 object SbtProjectAnalyzer {
 
-    val DederVersion = "v0.7.5"
+    val DederVersion = "v0.8.0"
     val DefaultScalaJsVersion = "1.18.2"
     val DefaultScalaNativeVersion = "0.5.10"
 
@@ -375,6 +402,29 @@ object SbtProjectAnalyzer {
         }
         s"${dep.organization}$scalaColon${dep.name}$platformColon${dep.revision}"
     }
+
+    def filterManagedDirs(dirs: Seq[String]): Seq[String] =
+        dirs.filterNot { d =>
+            val segments = d.split("/").toSet
+            segments.contains("src_managed") ||
+            segments.contains("resource_managed") ||
+            d.contains("/target/")
+        }
+
+    def relativizeTo(base: os.Path, paths: Seq[String]): Seq[String] =
+        paths.flatMap { p =>
+            try {
+                val rel = os.Path(p).relativeTo(base).toString
+                if rel.startsWith("..") then None else Some(rel)
+            } catch case _: IllegalArgumentException => None
+        }
+
+    private val SbtStandardDirPattern =
+        """^(shared/)?((jvm|js|native|\.jvm|\.js|\.native)/)?src/(main|test)/(scala|java|resources)(-[0-9].*)?$""".r
+
+    def filterStandardSbtDirs(dirs: Seq[String], layout: DederProject.DirLayout): Seq[String] =
+        if (!layout.toString.toLowerCase.startsWith("sbt")) dirs
+        else dirs.filterNot(d => SbtStandardDirPattern.findFirstIn(d).isDefined)
 
     def detectLayout(plugins: Seq[String], projectBaseDir: String): DederProject.DirLayout = {
         val hasCrossProject = plugins.exists(p =>

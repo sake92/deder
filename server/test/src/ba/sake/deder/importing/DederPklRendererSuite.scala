@@ -56,6 +56,8 @@ class DederPklRendererSuite extends FunSuite {
             nativeModule = nativeMod,
             hasJsModule = jsMod.isDefined,
             hasNativeModule = nativeMod.isDefined,
+            usesTpolecat = false,
+            usesTypelevel = false,
         )),
         repositories = Seq.empty,
         warnings = Seq.empty,
@@ -250,6 +252,8 @@ class DederPklRendererSuite extends FunSuite {
                 nativeModule = None,
                 hasJsModule = true,
                 hasNativeModule = false,
+                usesTpolecat = false,
+                usesTypelevel = false,
             )),
             repositories = Seq.empty,
             warnings = Seq.empty,
@@ -277,8 +281,8 @@ class DederPklRendererSuite extends FunSuite {
         val libMod = emptyModule()
         val rootMod = emptyModule(moduleDeps = Seq(ModuleDepRef("lib", "main", isTest = false)))
         val groups = Seq(
-            ModuleGroup("lib", "lib", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), libMod, None, None, false, false),
-            ModuleGroup("root", "root", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), rootMod, None, None, false, false),
+            ModuleGroup("lib", "lib", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), libMod, None, None, false, false, false, false),
+            ModuleGroup("root", "root", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), rootMod, None, None, false, false, false, false),
         )
         val build = DederBuild("v0.7.4", groups, Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
@@ -291,8 +295,8 @@ class DederPklRendererSuite extends FunSuite {
         val jsMod = emptyModule(scalaJsVersion = Some("1.18.2"))
         val appMod = emptyModule(moduleDeps = Seq(ModuleDepRef("core", "jvm", isTest = false)))
         val groups = Seq(
-            ModuleGroup("core", "core", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), coreMod, Some(jsMod), None, true, false),
-            ModuleGroup("app", "app", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), appMod, None, None, false, false),
+            ModuleGroup("core", "core", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), coreMod, Some(jsMod), None, true, false, false, false),
+            ModuleGroup("app", "app", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), appMod, None, None, false, false, false, false),
         )
         val build = DederBuild("v0.7.4", groups, Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
@@ -327,7 +331,7 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("libModules.find((m) -> m.id == \"lib-\\(sv)\")"))
     }
 
-    test("renders non-compact per-version builders when dependencies diverge by scala version") {
+    test("renders when clauses for version-specific deps in .map() output") {
         val versions = Seq("2.12.21", "2.13.18")
         val group = concreteCrossGroup(
             name = "lib",
@@ -341,15 +345,196 @@ class DederPklRendererSuite extends FunSuite {
             ),
         )
         val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
-
         val result = DederPklRenderer.render(build)
-        assert(!result.contains("local const libModules = libScalaVersions"), clues(result))
-        assert(result.contains("id = \"lib-2.12.21\""))
-        assert(result.contains("id = \"lib-2.13.18\""))
-        assert(result.contains("\"org.typelevel::cats-core:2.12.0\""))
+
+        assert(result.contains("local const libModules = libScalaVersions"), clues(result))
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("\"org.typelevel::cats-core:2.12.0\""), clues(result))
+        assert(!result.contains("id = \"lib-2.12.21\""), clues(result))
+        assert(!result.contains("id = \"lib-2.13.18\""), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val templateOnly = afterMap.split("testTemplate").head
+        val afterDeps = templateOnly.split("deps \\{").drop(1).headOption.getOrElse("")
+        assert(afterDeps.contains("when (sv == \"2.13.18\")"), s"when should be inside deps block:\n$result")
+        val templateDepsCount = templateOnly.split("deps \\{").length - 1
+        assert(templateDepsCount == 1, s"should have exactly 1 deps block in template, got $templateDepsCount:\n$result")
     }
 
-    test("renders non-compact per-version builders when module deps diverge by scala version") {
+    test("renders when clauses for version-specific module deps in .map() output") {
+        val versions = Seq("2.12.21", "2.13.18")
+        val lib = concreteCrossGroup(
+            name = "lib", versions = versions,
+            slices = versions.map(v => (v, "main", emptyModule(scalaVersion = v))),
+        )
+        val app = concreteCrossGroup(
+            name = "app", versions = versions,
+            slices = Seq(
+                ("2.12.21", "main", emptyModule(scalaVersion = "2.12.21")),
+                ("2.13.18", "main", emptyModule(
+                    scalaVersion = "2.13.18",
+                    moduleDeps = Seq(ModuleDepRef("lib", "main", targetScalaVersion = Some("2.13.18"), isTest = false)),
+                )),
+            ),
+        )
+        val build = DederBuild("v0.7.4", Seq(lib, app), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+
+        assert(result.contains("local const appModules = projectScalaVersions"), clues(result))
+        assert(result.contains(".map((sv) ->"), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val afterModuleDeps = afterMap.split("moduleDeps \\{").drop(1).headOption.getOrElse("")
+        assert(afterModuleDeps.contains("when (sv == \"2.13.18\")"), s"when should be inside moduleDeps block:\n$result")
+        val modDepsCount = result.split("moduleDeps \\{").length - 1
+        assert(modDepsCount == 1, s"should have exactly 1 moduleDeps block, got $modDepsCount:\n$result")
+    }
+
+    test("always renders all platforms in .map() output even when platform missing per version") {
+        val versions = Seq("2.12.21", "2.13.18")
+        val group = concreteCrossGroup(
+            name = "core", versions = versions,
+            layout = DederProject.DirLayout.SBT_CROSS_FULL,
+            slices = Seq(
+                ("2.12.21", "jvm", emptyModule(scalaVersion = "2.12.21")),
+                ("2.12.21", "js", emptyModule(scalaVersion = "2.12.21", scalaJsVersion = Some("1.18.2"))),
+                ("2.13.18", "jvm", emptyModule(scalaVersion = "2.13.18")),
+            ),
+        )
+        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+
+        assert(result.contains("local const coreModules = coreScalaVersions"), clues(result))
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("jsTemplate = (template.asJs())"), clues(result))
+    }
+
+    test("renders sparse cross-version slices in .map() output") {
+        val versions = Seq("2.12.21", "2.13.18")
+        val group = concreteCrossGroup(
+            name = "core", versions = versions,
+            layout = DederProject.DirLayout.SBT_CROSS_FULL,
+            slices = Seq(
+                ("2.12.21", "jvm", emptyModule(scalaVersion = "2.12.21")),
+                ("2.12.21", "js", emptyModule(scalaVersion = "2.12.21", scalaJsVersion = Some("1.18.2"))),
+                ("2.13.18", "js", emptyModule(scalaVersion = "2.13.18", scalaJsVersion = Some("1.18.2"))),
+            ),
+        )
+        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("jsTemplate = (template.asJs())"), clues(result))
+    }
+
+    test("cross-version module dep on non-cross module uses direct accessor, not find filter") {
+        // lib is single-version (no crossScalaVersions); app is cross-version and depends on lib.
+        // The renderer must emit `lib.main` not `libModules.find(...)` for the non-cross target.
+        val versions = Seq("2.12.21", "2.13.18")
+        val lib = ModuleGroup("lib", "lib", DederProject.DirLayout.SBT, Seq.empty,
+            emptyModule(scalaVersion = "2.12.21"), None, None, false, false, false, false)
+        val app = concreteCrossGroup(
+            name = "app",
+            versions = versions,
+            slices = versions.map(v => (v, "main", emptyModule(
+                scalaVersion = v,
+                moduleDeps = Seq(ModuleDepRef("lib", "main", isTest = false)),
+            ))),
+        )
+        val build = DederBuild("v0.7.4", Seq(lib, app), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+        assert(!result.contains("libModules.find"), clues(result))
+        assert(result.contains("lib.main"), clues(result))
+    }
+
+    test("renders when clauses for version-specific scalacOptions in .map() output") {
+        val versions = Seq("2.12.21", "2.13.18")
+        val group = concreteCrossGroup(
+            name = "lib", versions = versions,
+            slices = Seq(
+                ("2.12.21", "main", emptyModule(scalaVersion = "2.12.21", scalacOptions = Seq("-deprecation"))),
+                ("2.13.18", "main", emptyModule(scalaVersion = "2.13.18", scalacOptions = Seq("-Xfatal-warnings"))),
+            ),
+        )
+        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+
+        assert(result.contains("local const libModules = libScalaVersions"), clues(result))
+        assert(result.contains(".map((sv) ->"), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val afterScalacOpt = afterMap.split("scalacOptions \\{").drop(1).headOption.getOrElse("")
+        assert(afterScalacOpt.contains("when (sv == \"2.12.21\")"), s"when should be inside scalacOptions block:\n$result")
+        assert(afterScalacOpt.contains("\"-deprecation\""), s"should contain -deprecation inside scalacOptions:\n$result")
+        assert(result.contains("when (sv == \"2.13.18\")"), clues(result))
+        assert(result.contains("\"-Xfatal-warnings\""), clues(result))
+        val scalacOptCount = result.split("scalacOptions \\{").length - 1
+        assert(scalacOptCount == 1, s"should have exactly 1 scalacOptions block, got $scalacOptCount:\n$result")
+    }
+
+    test("cross-version with differing scalacOptions uses .map() with when clauses") {
+        val versions = Seq("2.12.21", "2.13.18")
+        val group = concreteCrossGroup(
+            name = "lib",
+            versions = versions,
+            slices = Seq(
+                ("2.12.21", "main", emptyModule(
+                    scalaVersion = "2.12.21",
+                    scalacOptions = Seq("-deprecation"),
+                )),
+                ("2.13.18", "main", emptyModule(
+                    scalaVersion = "2.13.18",
+                    scalacOptions = Seq("-deprecation", "-Xsource:3"),
+                )),
+            ),
+        )
+        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+
+        assert(result.contains("local const libScalaVersions = List(\"2.12.21\", \"2.13.18\")"), clues(result))
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("\"-deprecation\""), clues(result))
+        assert(result.contains("\"-Xsource:3\""), clues(result))
+        assert(!result.contains("id = \"lib-2.12.21\""), clues(result))
+        assert(!result.contains("id = \"lib-2.13.18\""), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val afterScalacOpt = afterMap.split("scalacOptions \\{").drop(1).headOption.getOrElse("")
+        assert(afterScalacOpt.contains("when (sv == \"2.13.18\")"), s"when should be inside scalacOptions block:\n$result")
+        val scalacOptCount = result.split("scalacOptions \\{").length - 1
+        assert(scalacOptCount == 1, s"should have exactly 1 scalacOptions block, got $scalacOptCount:\n$result")
+    }
+
+    test("cross-version with differing deps uses .map() with when clauses") {
+        val versions = Seq("2.12.21", "2.13.18")
+        val group = concreteCrossGroup(
+            name = "lib",
+            versions = versions,
+            slices = Seq(
+                ("2.12.21", "main", emptyModule(
+                    scalaVersion = "2.12.21",
+                    deps = Seq(dep("org.jsoup", "jsoup", "1.21.1")),
+                )),
+                ("2.13.18", "main", emptyModule(
+                    scalaVersion = "2.13.18",
+                    deps = Seq(
+                        dep("org.jsoup", "jsoup", "1.21.1"),
+                        dep("org.typelevel", "cats-core", "2.12.0", crossVersion = "binary"),
+                    ),
+                )),
+            ),
+        )
+        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("\"org.jsoup:jsoup:1.21.1\""), clues(result))
+        assert(result.contains("\"org.typelevel::cats-core:2.12.0\""), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val templateOnly = afterMap.split("testTemplate").head
+        val afterDeps = templateOnly.split("deps \\{").drop(1).headOption.getOrElse("")
+        assert(afterDeps.contains("when (sv == \"2.13.18\")"), s"when should be inside deps block:\n$result")
+        val templateDepsCount = templateOnly.split("deps \\{").length - 1
+        assert(templateDepsCount == 1, s"should have exactly 1 deps block in template, got $templateDepsCount:\n$result")
+    }
+
+    test("cross-version with differing moduleDeps uses .map() with when clauses") {
         val versions = Seq("2.12.21", "2.13.18")
         val lib = concreteCrossGroup(
             name = "lib",
@@ -368,91 +553,113 @@ class DederPklRendererSuite extends FunSuite {
             ),
         )
         val build = DederBuild("v0.7.4", Seq(lib, app), Seq.empty, Seq.empty)
-
         val result = DederPklRenderer.render(build)
-        assert(!result.contains("local const appModules = appScalaVersions"), clues(result))
-        assert(result.contains("libModules.find((m) -> m.id == \"lib-2.13.18\")"))
-        assert(!result.contains("libModules.find((m) -> m.id == \"lib-\\(sv)\")"))
+
+        assert(result.contains(".map((sv) ->"), clues(result))
+        assert(result.contains("libModules.find((m) -> m.id == \"lib-\\(sv)\")"), clues(result))
+        assert(!result.contains("id = \"app-2.12.21\""), clues(result))
+        assert(!result.contains("id = \"app-2.13.18\""), clues(result))
+        val afterMap = result.split("\\.map\\(\\(sv\\) ->").last
+        val afterModuleDeps = afterMap.split("moduleDeps \\{").drop(1).headOption.getOrElse("")
+        assert(afterModuleDeps.contains("when (sv == \"2.13.18\")"), s"when should be inside moduleDeps block:\n$result")
+        val modDepsCount = result.split("moduleDeps \\{").length - 1
+        assert(modDepsCount == 1, s"should have exactly 1 moduleDeps block, got $modDepsCount:\n$result")
     }
 
-    test("renders non-compact per-version builders when a platform is missing in one scala version") {
-        val versions = Seq("2.12.21", "2.13.18")
-        val group = concreteCrossGroup(
-            name = "core",
-            versions = versions,
-            layout = DederProject.DirLayout.SBT_CROSS_FULL,
-            slices = Seq(
-                ("2.12.21", "jvm", emptyModule(scalaVersion = "2.12.21")),
-                ("2.12.21", "js", emptyModule(scalaVersion = "2.12.21", scalaJsVersion = Some("1.18.2"))),
-                ("2.13.18", "jvm", emptyModule(scalaVersion = "2.13.18")),
-            ),
+    test("emits DederTpolecat.pkl import and shared reference when tpolecat detected") {
+        val mod = emptyModule(scalacOptions = Seq("-deprecation"))
+        val build = DederBuild(
+            dederVersion = "v0.7.4",
+            moduleGroups = Seq(ModuleGroup(
+                builderVarName = "lib", root = ".", layout = DederProject.DirLayout.SBT,
+                crossScalaVersions = Seq("2.13.18"),
+                jvmModule = mod, jsModule = None, nativeModule = None,
+                hasJsModule = false, hasNativeModule = false,
+                usesTpolecat = true, usesTypelevel = false,
+            )),
+            repositories = Seq.empty, warnings = Seq.empty,
         )
-        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
-
         val result = DederPklRenderer.render(build)
-        assert(!result.contains("local const coreModules = coreScalaVersions"), clues(result))
-        assert(result.contains("scalaVersion = \"2.12.21\""))
-        assert(result.contains("scalaVersion = \"2.13.18\""))
-        assert(result.contains("jsTemplate = (template.asJs())"))
+        assert(result.contains("""import "DederTpolecat.pkl""""), clues(result))
+        assert(result.contains("scalacOptions = DederTpolecat.forVersion(sv)"), clues(result))
+        assert(!result.contains("scalacOptions {"), clues(result)) // no verbatim options
     }
 
-    test("renders sparse cross-version slices when one version has only js platform") {
-        val versions = Seq("2.12.21", "2.13.18")
-        val group = concreteCrossGroup(
-            name = "core",
-            versions = versions,
-            layout = DederProject.DirLayout.SBT_CROSS_FULL,
-            slices = Seq(
-                ("2.12.21", "jvm", emptyModule(scalaVersion = "2.12.21")),
-                ("2.12.21", "js", emptyModule(scalaVersion = "2.12.21", scalaJsVersion = Some("1.18.2"))),
-                ("2.13.18", "js", emptyModule(scalaVersion = "2.13.18", scalaJsVersion = Some("1.18.2"))),
-            ),
+    test("emits DederTypelevel.pkl import and shared reference when typelevel detected") {
+        val mod = emptyModule()
+        val build = DederBuild(
+            dederVersion = "v0.7.4",
+            moduleGroups = Seq(ModuleGroup(
+                builderVarName = "lib", root = ".", layout = DederProject.DirLayout.SBT,
+                crossScalaVersions = Seq.empty,
+                jvmModule = mod, jsModule = None, nativeModule = None,
+                hasJsModule = false, hasNativeModule = false,
+                usesTpolecat = false, usesTypelevel = true,
+            )),
+            repositories = Seq.empty, warnings = Seq.empty,
         )
-        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
-
         val result = DederPklRenderer.render(build)
-        assert(result.contains("scalaVersion = \"2.12.21\""))
-        assert(result.contains("scalaVersion = \"2.13.18\""))
-        assert(result.contains("jsTemplate = (template.asJs())"))
+        assert(result.contains("""import "DederTypelevel.pkl""""), clues(result))
+        assert(result.contains("scalacOptions = DederTypelevel.forVersion("), clues(result))
     }
 
-    test("cross-version module dep on non-cross module uses direct accessor, not find filter") {
-        // lib is single-version (no crossScalaVersions); app is cross-version and depends on lib.
-        // The renderer must emit `lib.main` not `libModules.find(...)` for the non-cross target.
-        val versions = Seq("2.12.21", "2.13.18")
-        val lib = ModuleGroup("lib", "lib", DederProject.DirLayout.SBT, Seq.empty,
-            emptyModule(scalaVersion = "2.12.21"), None, None, false, false)
-        val app = concreteCrossGroup(
-            name = "app",
-            versions = versions,
-            slices = versions.map(v => (v, "main", emptyModule(
-                scalaVersion = v,
-                moduleDeps = Seq(ModuleDepRef("lib", "main", isTest = false)),
-            ))),
+    test("emits raw scalacOptions when neither tpolecat nor typelevel detected") {
+        val mod = emptyModule(scalacOptions = Seq("-deprecation"))
+        val build = DederBuild(
+            dederVersion = "v0.7.4",
+            moduleGroups = Seq(ModuleGroup(
+                builderVarName = "lib", root = ".", layout = DederProject.DirLayout.SBT,
+                crossScalaVersions = Seq.empty,
+                jvmModule = mod, jsModule = None, nativeModule = None,
+                hasJsModule = false, hasNativeModule = false,
+                usesTpolecat = false, usesTypelevel = false,
+            )),
+            repositories = Seq.empty, warnings = Seq.empty,
         )
-        val build = DederBuild("v0.7.4", Seq(lib, app), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
-        assert(!result.contains("libModules.find"), clues(result))
-        assert(result.contains("lib.main"), clues(result))
+        assert(!result.contains("DederTpolecat"), clues(result))
+        assert(!result.contains("DederTypelevel"), clues(result))
+        assert(result.contains("scalacOptions {"), clues(result))
+        assert(result.contains("\"-deprecation\""), clues(result))
     }
 
-    test("renders non-compact per-version builders when scalac options diverge by scala version") {
-        val versions = Seq("2.12.21", "2.13.18")
-        val group = concreteCrossGroup(
-            name = "lib",
-            versions = versions,
-            slices = Seq(
-                ("2.12.21", "main", emptyModule(scalaVersion = "2.12.21", scalacOptions = Seq("-deprecation"))),
-                ("2.13.18", "main", emptyModule(scalaVersion = "2.13.18", scalacOptions = Seq("-Xfatal-warnings"))),
-            ),
+    test("emits shared basePomSettings when multiple modules share same publish info") {
+        val publish = PublishInfo(
+            organization = "com.example", artifactName = "mod1", version = "1.0.0",
+            description = Some("desc"), homepage = Some("https://example.com"),
+            developers = Seq(DeveloperDef("dev1", "Dev One", "dev1@example.com")),
+            licenses = Seq(LicenseDef("MIT", "https://opensource.org/licenses/MIT")),
+            scmInfo = Some(ScmDef("https://github.com/eg", "scm:git:https://...", None)),
         )
-        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
-
+        val publish2 = publish.copy(artifactName = "mod2")
+        val mod1 = emptyModule(publish = Some(publish))
+        val mod2 = emptyModule(publish = Some(publish2))
+        val build = DederBuild("v0.7.4", Seq(
+            ModuleGroup("mod1", ".", DederProject.DirLayout.SBT, Seq.empty, mod1, None, None, false, false, false, false),
+            ModuleGroup("mod2", ".", DederProject.DirLayout.SBT, Seq.empty, mod2, None, None, false, false, false, false),
+        ), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
-        assert(!result.contains("local const libModules = libScalaVersions"), clues(result))
-        assert(result.contains("id = \"lib-2.12.21\""))
-        assert(result.contains("id = \"lib-2.13.18\""))
-        assert(result.contains("\"-deprecation\""))
-        assert(result.contains("\"-Xfatal-warnings\""))
+        assert(result.contains("local const basePomSettings = new PomSettings {"), clues(result))
+        assert(result.contains("groupId = \"com.example\""), clues(result))
+        assert(result.contains("pomSettings = (basePomSettings) {"), clues(result))
+        assert(result.contains("artifactId = \"mod1\""), clues(result))
+        assert(result.contains("artifactId = \"mod2\""), clues(result))
+    }
+
+    test("does not emit shared basePomSettings when publish infos differ") {
+        val publish1 = PublishInfo("com.example", "mod1", "1.0.0",
+            None, None, Seq.empty, Seq.empty, None)
+        val publish2 = PublishInfo("com.other", "mod2", "2.0.0",
+            None, None, Seq.empty, Seq.empty, None)
+        val mod1 = emptyModule(publish = Some(publish1))
+        val mod2 = emptyModule(publish = Some(publish2))
+        val build = DederBuild("v0.7.4", Seq(
+            ModuleGroup("mod1", ".", DederProject.DirLayout.SBT, Seq.empty, mod1, None, None, false, false, false, false),
+            ModuleGroup("mod2", ".", DederProject.DirLayout.SBT, Seq.empty, mod2, None, None, false, false, false, false),
+        ), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+        assert(!result.contains("local const basePomSettings"), clues(result))
+        assert(result.contains("groupId = \"com.example\""), clues(result))
+        assert(result.contains("groupId = \"com.other\""), clues(result))
     }
 }
