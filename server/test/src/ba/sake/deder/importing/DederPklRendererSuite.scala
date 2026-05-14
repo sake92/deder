@@ -622,4 +622,44 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("scalacOptions {"), clues(result))
         assert(result.contains("\"-deprecation\""), clues(result))
     }
+
+    test("emits shared basePomSettings when multiple modules share same publish info") {
+        val publish = PublishInfo(
+            organization = "com.example", artifactName = "mod1", version = "1.0.0",
+            description = Some("desc"), homepage = Some("https://example.com"),
+            developers = Seq(DeveloperDef("dev1", "Dev One", "dev1@example.com")),
+            licenses = Seq(LicenseDef("MIT", "https://opensource.org/licenses/MIT")),
+            scmInfo = Some(ScmDef("https://github.com/eg", "scm:git:https://...", None)),
+        )
+        val publish2 = publish.copy(artifactName = "mod2")
+        val mod1 = emptyModule(publish = Some(publish))
+        val mod2 = emptyModule(publish = Some(publish2))
+        val build = DederBuild("v0.7.4", Seq(
+            ModuleGroup("mod1", ".", DederProject.DirLayout.SBT, Seq.empty, mod1, None, None, false, false, false, false),
+            ModuleGroup("mod2", ".", DederProject.DirLayout.SBT, Seq.empty, mod2, None, None, false, false, false, false),
+        ), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+        assert(result.contains("local const basePomSettings = new {"), clues(result))
+        assert(result.contains("groupId = \"com.example\""), clues(result))
+        assert(result.contains("pomSettings = (basePomSettings) {"), clues(result))
+        assert(result.contains("artifactId = \"mod1\""), clues(result))
+        assert(result.contains("artifactId = \"mod2\""), clues(result))
+    }
+
+    test("does not emit shared basePomSettings when publish infos differ") {
+        val publish1 = PublishInfo("com.example", "mod1", "1.0.0",
+            None, None, Seq.empty, Seq.empty, None)
+        val publish2 = PublishInfo("com.other", "mod2", "2.0.0",
+            None, None, Seq.empty, Seq.empty, None)
+        val mod1 = emptyModule(publish = Some(publish1))
+        val mod2 = emptyModule(publish = Some(publish2))
+        val build = DederBuild("v0.7.4", Seq(
+            ModuleGroup("mod1", ".", DederProject.DirLayout.SBT, Seq.empty, mod1, None, None, false, false, false, false),
+            ModuleGroup("mod2", ".", DederProject.DirLayout.SBT, Seq.empty, mod2, None, None, false, false, false, false),
+        ), Seq.empty, Seq.empty)
+        val result = DederPklRenderer.render(build)
+        assert(!result.contains("local const basePomSettings"), clues(result))
+        assert(result.contains("groupId = \"com.example\""), clues(result))
+        assert(result.contains("groupId = \"com.other\""), clues(result))
+    }
 }

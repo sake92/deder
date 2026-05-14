@@ -40,17 +40,39 @@ object DederPklRenderer {
             }
         }
 
+        val allPublishes: Seq[PublishInfo] = build.moduleGroups.flatMap { g =>
+            val cm = g.concreteModules
+            if (cm.nonEmpty) cm.head.module.publish
+            else g.jvmModule.publish
+        }
+
+        val hasSharedPomBase: Boolean = allPublishes.size >= 2 && {
+            val base = allPublishes.head
+            allPublishes.tail.forall { p =>
+                p.organization == base.organization &&
+                p.developers == base.developers &&
+                p.licenses == base.licenses &&
+                p.scmInfo == base.scmInfo &&
+                p.homepage == base.homepage &&
+                p.description == base.description
+            }
+        }
+
+        val sharedPomBaseStr: Option[String] =
+            if (hasSharedPomBase) Some(renderPublishInfoBase(allPublishes.head)) else None
+
         val builders = build.moduleGroups.map { g =>
             val isCross = g.crossScalaVersions.nonEmpty
             renderGroup(
                 g,
                 groupLookup,
                 if (isCross) sharedVersionListName else None,
+                hasSharedPomBase,
             )
         }.mkString("\n\n")
         val modulesBlock = renderModulesBlock(build.moduleGroups)
 
-        List(Some(header), helperImport, sharedVersionsDecl, if (repos.nonEmpty) Some(repos) else None, Some(builders), Some(modulesBlock))
+        List(Some(header), helperImport, sharedVersionsDecl, sharedPomBaseStr, if (repos.nonEmpty) Some(repos) else None, Some(builders), Some(modulesBlock))
             .flatten.mkString("\n\n")
     }
 
@@ -323,6 +345,7 @@ object DederPklRenderer {
         g: ModuleGroup,
         groupLookup: Map[String, ModuleGroup],
         sharedVersionListName: Option[String],
+        hasSharedPomBase: Boolean = false,
     ): String = {
         val slices = versionSlices(g)
         val builderType = builderTypeFor(g)
@@ -354,7 +377,7 @@ object DederPklRenderer {
                     Some(renderStringListWithWhens("resources", common.resources, resDeltas, indent = 4)) else None,
                 if (common.moduleDeps.nonEmpty || modDepDeltas.values.exists(_.nonEmpty))
                     Some(renderModuleDepsWithWhens(common.moduleDeps, modDepDeltas, groupLookup, indent = 4)) else None,
-                common.publish.map(p => renderPublishInfo(p, indent = 4)),
+                common.publish.map(p => renderPublishInfo(p, indent = 4, useBase = hasSharedPomBase)),
             ).flatten.mkString("\n")
 
             val propsBlock = if (templateProps.nonEmpty) templateProps + "\n" else ""
@@ -430,7 +453,7 @@ object DederPklRenderer {
                 val fallbackVersion = versionsFor(g).headOption.getOrElse("")
                 VersionSlice(fallbackVersion, Map.empty)
             }
-            val body = renderGroupBody(representativeSlice.modulesByPlatform, groupLookup, g, None)
+            val body = renderGroupBody(representativeSlice.modulesByPlatform, groupLookup, g, None, hasSharedPomBase)
             s"""local const ${g.builderVarName} = new $builderType {
                |  root = "${g.root}"
                |  id = "${g.builderVarName}"
@@ -458,11 +481,12 @@ object DederPklRenderer {
         groupLookup: Map[String, ModuleGroup],
         g: ModuleGroup,
         scalaVersionCtx: Option[ScalaVersionCtx],
+        hasSharedPomBase: Boolean = false,
     ): String = {
         val isCross = modulesByPlatform.contains("jvm") || modulesByPlatform.contains("js") || modulesByPlatform.contains("native")
         val jvmModule = selectTemplateModule(modulesByPlatform)
 
-        val jvmBody = renderTemplateBody(jvmModule, "ScalaModule", None, scalaVersionCtx, groupLookup, g)
+        val jvmBody = renderTemplateBody(jvmModule, "ScalaModule", None, scalaVersionCtx, groupLookup, g, hasSharedPomBase)
         val testTmpl = renderTestTemplate(jvmModule, scalaVersionCtx, groupLookup)
 
         if (isCross) {
@@ -526,6 +550,7 @@ object DederPklRenderer {
         scalaVersionCtx: Option[ScalaVersionCtx] = None,
         groupLookup: Map[String, ModuleGroup] = Map.empty,
         g: ModuleGroup,
+        hasSharedPomBase: Boolean = false,
     ): String = {
         val extra = extraProps.map(e => s"    $e\n").getOrElse("")
         val versionLine = scalaVersionCtx match {
@@ -547,7 +572,7 @@ object DederPklRenderer {
             Some(renderDeps(m.deps, indent = 4)).filter(_.nonEmpty),
             Some(renderPluginDeps(m.scalacPluginDeps, indent = 4)).filter(_.nonEmpty),
             Some(renderModuleDepsPkl(m.moduleDeps, indent = 4, scalaVersionCtx, groupLookup)).filter(_.nonEmpty),
-            m.publish.map(p => renderPublishInfo(p, indent = 4)).filter(_.nonEmpty),
+            m.publish.map(p => renderPublishInfo(p, indent = 4, useBase = hasSharedPomBase)).filter(_.nonEmpty),
         ).flatten.mkString("\n")
         s"""  template = new $moduleType {
            |$props
@@ -693,15 +718,13 @@ object DederPklRenderer {
         }
     }
 
-    private def renderPublishInfo(p: PublishInfo, indent: Int): String = {
-        val spaces = " " * indent
-        val inner = " " * (indent + 2)
-        val inner2 = " " * (indent + 4)
+    private def renderPublishInfoBase(p: PublishInfo): String = {
+        val inner = "  "
+        val inner2 = "    "
 
         val lines = Seq.newBuilder[String]
-        lines += s"${spaces}pomSettings {"
+        lines += "local const basePomSettings = new {"
         lines += s"${inner}groupId = \"${p.organization}\""
-        lines += s"${inner}artifactId = \"${p.artifactName}\""
         p.description.foreach(d => lines += s"""$inner description = "$d"""")
         p.homepage.foreach(h => lines += s"""$inner url = "$h"""")
         if (p.developers.nonEmpty) {
@@ -727,11 +750,59 @@ object DederPklRenderer {
             scm.devConnection.foreach(dc => lines += s"""$inner2 developerConnection = "$dc"""")
             lines += s"$inner }"
         }
-        if (p.version.nonEmpty) {
-            lines += s"""$inner version = "${p.version}""""
-        }
-        lines += s"$spaces}"
+        lines += "}"
         lines.result().mkString("\n")
+    }
+
+    private def renderPublishInfo(p: PublishInfo, indent: Int, useBase: Boolean = false): String = {
+        val spaces = " " * indent
+        val inner = " " * (indent + 2)
+        if (useBase) {
+            val lines = Seq.newBuilder[String]
+            lines += s"${spaces}pomSettings = (basePomSettings) {"
+            lines += s"${inner}artifactId = \"${p.artifactName}\""
+            if (p.version.nonEmpty) {
+                lines += s"${inner}version = \"${p.version}\""
+            }
+            lines += s"$spaces}"
+            lines.result().mkString("\n")
+        } else {
+            val inner2 = " " * (indent + 4)
+            val lines = Seq.newBuilder[String]
+            lines += s"${spaces}pomSettings {"
+            lines += s"${inner}groupId = \"${p.organization}\""
+            lines += s"${inner}artifactId = \"${p.artifactName}\""
+            p.description.foreach(d => lines += s"""$inner description = "$d"""")
+            p.homepage.foreach(h => lines += s"""$inner url = "$h"""")
+            if (p.developers.nonEmpty) {
+                val devs = p.developers.map(d =>
+                    s"""$inner2 new PomDeveloper { id = "${d.id}"; name = "${d.name}"; email = "${d.email}" }"""
+                ).mkString("\n")
+                lines += s"${inner}developers {"
+                lines += devs
+                lines += s"$inner }"
+            }
+            if (p.licenses.nonEmpty) {
+                val lics = p.licenses.map(l =>
+                    s"""$inner2 new PomLicense { name = "${l.name}"; url = "${l.url}" }"""
+                ).mkString("\n")
+                lines += s"${inner}licenses {"
+                lines += lics
+                lines += s"$inner }"
+            }
+            p.scmInfo.foreach { scm =>
+                lines += s"${inner}scm {"
+                lines += s"""$inner2 url = "${scm.browseUrl}""""
+                lines += s"""$inner2 connection = "${scm.connection}""""
+                scm.devConnection.foreach(dc => lines += s"""$inner2 developerConnection = "$dc"""")
+                lines += s"$inner }"
+            }
+            if (p.version.nonEmpty) {
+                lines += s"""$inner version = "${p.version}""""
+            }
+            lines += s"$spaces}"
+            lines.result().mkString("\n")
+        }
     }
 
     private def refString(r: ModuleDepRef): String = {
