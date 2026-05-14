@@ -20,6 +20,8 @@ import scala.util.Using
 
 class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
+  private var serverChannel: ServerSocketChannel = _
+
   def start(): Unit = {
 
     val relativeSocketPath = ".deder/server-cli.sock"
@@ -29,7 +31,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
     // unix limitation for socket path is 108 bytes, so use relative path
     val address = UnixDomainSocketAddress.of(Paths.get(relativeSocketPath))
-    val serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+    serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
     serverChannel.bind(address)
 
     // TODO better try catch
@@ -51,10 +53,15 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         // no join, just let them run
       }
     } finally {
-      logger.info("Shutting down CLI server...")
-      serverChannel.close()
-      Files.deleteIfExists(socketPath.toNIO)
+      stop()
     }
+  }
+
+  def stop(): Unit = {
+    logger.info("Shutting down CLI server...")
+    try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
+    val socketPath = DederGlobals.projectRootDir / os.RelPath(".deder/server-cli.sock")
+    try Files.deleteIfExists(socketPath.toNIO) catch { case _: Exception => }
   }
 
 }

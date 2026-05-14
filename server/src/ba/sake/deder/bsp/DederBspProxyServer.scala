@@ -20,6 +20,8 @@ class DederBspProxyServer(
     projectState: DederProjectState
 ) extends StrictLogging {
 
+  private var serverChannel: ServerSocketChannel = _
+
   def start(): Unit = {
     val relativeSocketPath = ".deder/server-bsp.sock"
     val socketPath = DederGlobals.projectRootDir / os.RelPath(relativeSocketPath)
@@ -28,7 +30,7 @@ class DederBspProxyServer(
 
     // unix limitation for socket path is 108 bytes, so use relative path
     val address = UnixDomainSocketAddress.of(Paths.get(relativeSocketPath))
-    val serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+    serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
     serverChannel.bind(address)
 
     try {
@@ -47,16 +49,23 @@ class DederBspProxyServer(
             .setRemoteInterface(classOf[BuildClient])
             .create()
           localServer.client = launcher.getRemoteProxy
+          projectState.registerBspServer(localServer)
           launcher.startListening().get() // listen until BSP session is over
         } finally {
+          projectState.unregisterBspServer(localServer)
           if clientChannel != null && clientChannel.isOpen then clientChannel.close()
         }
       }
     } finally {
-      serverChannel.close()
-      Files.deleteIfExists(socketPath.toNIO)
-      logger.info("BSP proxy server shut down")
+      stop()
     }
+  }
+
+  def stop(): Unit = {
+    logger.info("BSP proxy server shutting down...")
+    try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
+    val socketPath = DederGlobals.projectRootDir / os.RelPath(".deder/server-bsp.sock")
+    try Files.deleteIfExists(socketPath.toNIO) catch { case _: Exception => }
   }
 
 }
