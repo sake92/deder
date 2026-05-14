@@ -21,6 +21,10 @@ private enum ForkOutcome {
       inProgressSuiteNames: Set[String],
       allStartedSuiteNames: Set[String]
   )
+  case TimedOut(
+      inProgressSuiteNames: Set[String],
+      allStartedSuiteNames: Set[String]
+  )
 }
 
 object ForkedTestOrchestrator extends StrictLogging {
@@ -126,7 +130,10 @@ object ForkedTestOrchestrator extends StrictLogging {
       val futures = callables.map(forkExecutor.submit)
       val payloads = futures.flatMap { f =>
         try f.get()
-        catch { case NonFatal(_) => None }
+        catch {
+          case _: InterruptedException => Thread.currentThread().interrupt(); None
+          case NonFatal(_) => None
+        }
       }
 
       val aggregated = aggregate(payloads.map(_.results))
@@ -244,6 +251,23 @@ object ForkedTestOrchestrator extends StrictLogging {
           )
           currentSlice = removeSuiteNames(currentSlice, allStarted)
           retryAttempt += 1
+
+        case ForkOutcome.TimedOut(inProgress, allStarted) =>
+          for name <- inProgress do
+            crashErrorSuites = crashErrorSuites :+ makeErrorSuite(name, -1, retryAttempt)
+          val tag = if showForkTag then s"[fork-$forkId] " else ""
+          val remainingCount =
+            currentSlice.flatMap(_.testClasses).count(tc => !allStarted.contains(tc.className))
+          notifications.add(
+            ServerNotification.logError(
+              s"${tag}timed out on attempt $retryAttempt. " +
+                s"Interrupted suites: ${inProgress.mkString(", ")}. " +
+                s"Retrying $remainingCount remaining suites...",
+              Some(moduleId)
+            )
+          )
+          currentSlice = removeSuiteNames(currentSlice, allStarted)
+          retryAttempt += 1
       }
     }
 
@@ -330,7 +354,12 @@ object ForkedTestOrchestrator extends StrictLogging {
       stdoutThread.join(300)
       stderrThread.join(300)
 
-      readForkResults(proc, resultsFilePath, suiteOutputs, startedSuites, completedSuites, tag, notifications, moduleId)
+      if (finished) {
+        readForkResults(proc, resultsFilePath, suiteOutputs, startedSuites, completedSuites, tag, notifications, moduleId)
+      } else {
+        val inProgress = startedSuites.asScala.toSet -- completedSuites.asScala.toSet
+        ForkOutcome.TimedOut(inProgress, startedSuites.asScala.toSet)
+      }
     }
   }
 
