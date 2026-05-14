@@ -96,8 +96,37 @@ object ServerMain extends StrictLogging {
 
     val onShutdown = () => {
       logger.info("Deder server is shutting down...")
-      // TODO cleaner shutdown of threads
-      tasksExecutorService.shutdownNow()
+
+      // 1. Stop file watcher and debounce scheduler (prevents events during shutdown)
+      stopFileWatcher()
+      stopDebounceScheduler()
+
+      // 2. Notify BSP clients of impending shutdown
+      projectState.notifyBspClientsShuttingDown()
+
+      // 3. Stop CLI server — close accept loop, close socket, delete socket file
+      cliServer.stop()
+
+      // 4. Stop BSP proxy server
+      if bspProxyServer != null then bspProxyServer.stop()
+
+      // 5. Graceful executor shutdown: wait briefly for in-flight tasks, then force
+      tasksExecutorService.shutdown()
+      try {
+        if !tasksExecutorService.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS) then
+          tasksExecutorService.shutdownNow()
+      } catch {
+        case _: InterruptedException => tasksExecutorService.shutdownNow()
+      }
+
+      // 6. Release server lock + delete lock file (DETERMINISTIC — not in hook)
+      logger.info("Releasing server lock...")
+      try { serverFileLock.release() } catch { case _: Exception => }
+      try { serverLockHandle.close() } catch { case _: Exception => }
+      val serverLockFile = DederGlobals.projectRootDir / os.RelPath(".deder/server.lock")
+      try { os.remove.all(serverLockFile) } catch { case _: Exception => }
+
+      logger.info("Server shutdown complete.")
       sys.exit(0)
     }
 
@@ -122,9 +151,10 @@ object ServerMain extends StrictLogging {
     val cliServerThread = new Thread(() => cliServer.start(), "DederCliServer")
     cliServerThread.start()
 
+    var bspProxyServer: DederBspProxyServer | Null = null
     if bspEnabled then {
-      val bspProxyServer = DederBspProxyServer(coreTasks, scalaJsTasks, scalaNativeTasks, projectState)
-      val bspProxyServerThread = new Thread(() => bspProxyServer.start(), "DederBspProxyServer")
+      bspProxyServer = DederBspProxyServer(coreTasks, scalaJsTasks, scalaNativeTasks, projectState)
+      val bspProxyServerThread = new Thread(() => bspProxyServer.nn.start(), "DederBspProxyServer")
       bspProxyServerThread.start()
     }
 
@@ -266,13 +296,11 @@ object ServerMain extends StrictLogging {
     }
 
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
-      try {
-        serverFileLock.release()
-        serverLockHandle.close()
-        os.remove.all(serverLockFile)
-      } catch {
-        case _: Exception =>
-      }
+      logger.warn("JVM shutdown hook fired (unexpected exit) — cleaning up lock file as safety net")
+      try { serverFileLock.release() } catch { case _: Exception => }
+      try { serverLockHandle.close() } catch { case _: Exception => }
+      val serverLockFile = DederGlobals.projectRootDir / os.RelPath(".deder/server.lock")
+      try { os.remove.all(serverLockFile) } catch { case _: Exception => }
     }))
   }
 
