@@ -97,7 +97,6 @@ tpolecatOpts3: Listing<String> = new {
   "-feature"
   "-unchecked"
   "-language:experimental.macros"
-  "-language:higherKinds"
   "-language:implicitConversions"
   "-Ykind-projector"
   "-Wvalue-discard"
@@ -115,7 +114,11 @@ function mkScalacOptions(version: String, mode: String): Listing<String> =
     else if (version == "2.13") tpolecatOpts2_13
     else tpolecatOpts3
   )
-  let (fatalFlag = if (version == "3") "-Werror" else "-Xfatal-warnings")
+  let (fatalFlag = 
+    if (version == "3") "-Werror"
+    else if (version == "2.13") "-Werror"
+    else "-Xfatal-warnings"
+  )
     if (mode == "ci") (opts.toList() + fatalFlag).toListing()
     else opts
 
