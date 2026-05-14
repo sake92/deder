@@ -49,6 +49,11 @@ class DederProjectState(
   // Track active BSP servers for graceful teardown on CLI shutdown
   private val bspServers = new java.util.concurrent.ConcurrentLinkedQueue[ba.sake.deder.bsp.DederBspServer]()
 
+  // Callback to release the server lock early (before executor shutdown)
+  private var releaseServerLockCallback: () => Unit = () => ()
+  def setReleaseServerLock(cb: () => Unit): Unit = { releaseServerLockCallback = cb }
+  def releaseServerLock(): Unit = releaseServerLockCallback()
+
   reloadProject()
 
   scheduleInactiveShutdownChecker()

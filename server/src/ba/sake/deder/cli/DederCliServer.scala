@@ -45,7 +45,7 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         val currentClientId = clientId
         logger.info(s"Client #$currentClientId connected")
         val serverMessages = new LinkedBlockingQueue[CliServerMessage]()
-        val handler = new CliClientMessageHandler(projectState, serverMessages)
+        val handler = new CliClientMessageHandler(projectState, serverMessages, this)
         val clientReadThread =
           new CliClientReadThread(projectState, handler, clientChannel, currentClientId, serverMessages)
         val clientWriteThread = new CliClientWriteThread(projectState, clientChannel, currentClientId, serverMessages)
@@ -56,6 +56,12 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
     } finally {
       stop()
     }
+  }
+
+  /** Close the accept socket immediately so no new clients can connect.
+    * Existing client channels are unaffected. */
+  def stopAccepting(): Unit = {
+    try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
   }
 
   def stop(): Unit = {

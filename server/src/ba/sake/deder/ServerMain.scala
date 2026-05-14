@@ -105,13 +105,21 @@ object ServerMain extends StrictLogging {
       stopFileWatcher()
       stopDebounceScheduler()
 
-      // 2. Stop CLI server — close accept loop, close socket, delete socket file
-      if (cliServer != null) cliServer.nn.stop()
+      // 2. Release server lock (if not already released early via projectState.releaseServerLock)
+      val serverLockFile = DederGlobals.projectRootDir / os.RelPath(".deder/server.lock")
+      if os.exists(serverLockFile) then {
+        logger.info("Releasing server lock...")
+        try { serverFileLock.release() } catch { case _: Exception => }
+        try { serverLockHandle.close() } catch { case _: Exception => }
+        try { os.remove.all(serverLockFile) } catch { case _: Exception => }
+      }
 
-      // 3. Stop BSP proxy server
+      // 3. Close sockets so new connections go to the new server process
+      if (cliServer != null) cliServer.nn.stop()
       if bspProxyServer != null then bspProxyServer.stop()
 
       // 4. Graceful executor shutdown: wait briefly for in-flight tasks, then force
+      //    (can take time, but lock and sockets are already released above)
       tasksExecutorService.shutdown()
       try {
         if !tasksExecutorService.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS) then
@@ -119,13 +127,6 @@ object ServerMain extends StrictLogging {
       } catch {
         case _: InterruptedException => tasksExecutorService.shutdownNow()
       }
-
-      // 5. Release server lock + delete lock file (DETERMINISTIC — not in hook)
-      logger.info("Releasing server lock...")
-      try { serverFileLock.release() } catch { case _: Exception => }
-      try { serverLockHandle.close() } catch { case _: Exception => }
-      val serverLockFile = DederGlobals.projectRootDir / os.RelPath(".deder/server.lock")
-      try { os.remove.all(serverLockFile) } catch { case _: Exception => }
 
       logger.info("Server shutdown complete.")
       sys.exit(0)
@@ -147,6 +148,14 @@ object ServerMain extends StrictLogging {
       coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
     val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
+
+    // Wire up early lock release for fast shutdown+restart
+    projectState.setReleaseServerLock(() => {
+      try { serverFileLock.release() } catch { case _: Exception => }
+      try { serverLockHandle.close() } catch { case _: Exception => }
+      val serverLockFile = DederGlobals.projectRootDir / os.RelPath(".deder/server.lock")
+      try { os.remove.all(serverLockFile) } catch { case _: Exception => }
+    })
 
     cliServer = DederCliServer(projectState)
     val cliServerThread = new Thread(() => cliServer.nn.start(), "DederCliServer")
