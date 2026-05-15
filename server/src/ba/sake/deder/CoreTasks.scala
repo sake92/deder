@@ -293,13 +293,13 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(dependenciesTask)
     .build { ctx =>
       val directDeps = ctx.depResults._1
-      val fetchResult = ctx.dependencyResolver match {
+      val resolvedGraph = ctx.dependencyResolver match {
         case resolver: DependencyResolver =>
-          resolver.fetch(directDeps, Some(ctx.notifications))
+          resolver.resolveGraph(directDeps, Some(ctx.notifications))
         case _ =>
           throw new IllegalStateException("Dependency graph task requires concrete DependencyResolver implementation")
       }
-      DependencyGraphBuilder.build(ctx.module.id, directDeps, fetchResult)
+      DependencyGraphBuilder.build(ctx.module.id, directDeps, resolvedGraph)
     }
 
   private def parseDepReportOptions(args: Seq[String]): DependencyReportOptions =

@@ -106,10 +106,11 @@ deder plan -t compileClasspath -m uber  --mermaid > uberCompileClasspath.mermaid
 # dependency reports (run as normal tasks via exec)
 # task names: depTree (default), depList, depWhy, depStats, depDot, depMermaid, depHtml
 deder exec -t depTree -m uber
-deder exec -t depStats -m uber
-deder exec -t depWhy -m uber -- --why org.scala-lang:scala-library
+deder exec -t depTree -m uber -- --sort size
+deder exec -t depWhy -m uber -- --why org.scala-lang:scala-library --path shortest
+deder exec -t depWhy -m uber -- --why org.scala-lang:scala-library --path all
 deder exec -t depDot -m uber
-deder exec -t depTree -m uber -- --max-depth 1 --direct-only
+deder exec -t depTree -m uber -- --max-depth 1
 deder exec -t depTree -m uber -- --exclude org.scala-lang:%
 
 

@@ -13,6 +13,22 @@ import dependency.api.ops.*
 import ba.sake.deder.{OTEL, ServerNotificationsLogger}
 import ba.sake.deder.ServerNotification
 
+case class ResolvedDependency(
+    organization: String,
+    name: String,
+    version: String
+) {
+  def key: String = s"${organization}:${name}"
+  def repr: String = s"${organization}:${name}:${version}"
+}
+
+case class ResolvedDependencyGraph(
+    dependencies: Seq[ResolvedDependency],
+    rootDependencies: Set[String],
+    parentDependencies: Map[String, Seq[String]],
+    artifactFilesByDependency: Map[String, java.io.File]
+)
+
 class DependencyResolver(val repositories: Seq[CsRepository]) extends DependencyResolverApi {
 
   // In-process cache for resolved file paths, keyed by sorted dependency
@@ -28,15 +44,52 @@ class DependencyResolver(val repositories: Seq[CsRepository]) extends Dependency
       coursierDependencies: Seq[CoursierDependency],
       notifications: Option[ServerNotificationsLogger] = None
   ): FetchResult = {
-    val cache = coursierapi.Cache
-      .create()
-      .withLogger(notifications.map(new DederCoursierLogger(_)).orNull)
-    val fetch = Fetch
-      .create()
-      .withCache(cache)
-      .withDependencies(coursierDependencies*)
-    if repositories.nonEmpty then fetch.withRepositories(repositories*)
-    fetch.fetchResult()
+    prepareFetch(coursierDependencies, notifications).fetchResult()
+  }
+
+  def resolveGraph(
+      dependencies: Seq[Dependency],
+      notifications: Option[ServerNotificationsLogger] = None
+  ): ResolvedDependencyGraph = {
+    if dependencies.isEmpty then
+      ResolvedDependencyGraph(Seq.empty, Set.empty, Map.empty, Map.empty)
+    else
+      val coursierDeps = dependencies.map(_.applied.toCs)
+      val shadedResult = doFetchDetailed(coursierDeps, notifications)
+      val resolution = invoke(shadedResult, "resolution")
+      val orderedDependencies = shadedSeqToSeq(invoke(resolution, "orderedDependencies"))
+        .map(toResolvedDependency)
+        .groupBy(_.repr)
+        .values
+        .map(_.head)
+        .toSeq
+        .sortBy(_.repr)
+      val rootDependencies = shadedSeqToSeq(invoke(resolution, "rootDependencies"))
+        .map(shadedDepRepr)
+        .toSet
+      val parentDependencies =
+        shadedMapToSeq(invoke(resolution, "reverseDependencies"))
+          .map { case (child, parents) =>
+            shadedDepRepr(child) -> shadedSeqToSeq(parents).map(shadedDepRepr).distinct.sorted
+          }
+          .toMap
+      val artifactFilesByDependency =
+        shadedSeqToSeq(invoke(shadedResult, "fullDetailedArtifacts"))
+          .flatMap { tuple =>
+            val fileOpt = invoke(tuple, "_4")
+            if invokeBoolean(fileOpt, "isDefined") then Some(shadedDepRepr(invoke(tuple, "_1")) -> invoke(fileOpt, "get").asInstanceOf[java.io.File])
+            else None
+          }
+          .groupMap(_._1)(_._2)
+          .view
+          .mapValues(_.head)
+          .toMap
+      ResolvedDependencyGraph(
+        dependencies = orderedDependencies,
+        rootDependencies = rootDependencies,
+        parentDependencies = parentDependencies,
+        artifactFilesByDependency = artifactFilesByDependency
+      )
   }
 
   def doFetchOne(dependency: CoursierDependency): os.Path =
@@ -85,6 +138,86 @@ class DependencyResolver(val repositories: Seq[CsRepository]) extends Dependency
         .toSeq
         .map(d => (d.getModule.getOrganization, d.getModule.getName, d.getVersion))
   }
+
+  private def prepareFetch(
+      coursierDependencies: Seq[CoursierDependency],
+      notifications: Option[ServerNotificationsLogger]
+  ): Fetch = {
+    val cache = coursierapi.Cache
+      .create()
+      .withLogger(notifications.map(new DederCoursierLogger(_)).orNull)
+    val fetch = Fetch
+      .create()
+      .withCache(cache)
+      .withDependencies(coursierDependencies*)
+    if repositories.nonEmpty then fetch.withRepositories(repositories*)
+    fetch
+  }
+
+  private def doFetchDetailed(
+      coursierDependencies: Seq[CoursierDependency],
+      notifications: Option[ServerNotificationsLogger]
+  ): AnyRef = {
+    val apiFetch = prepareFetch(coursierDependencies, notifications)
+    val helper = moduleSingleton("coursierapi.shaded.coursier.internal.api.ApiHelper$")
+    val fetchMethod = helper.getClass.getDeclaredMethods.find(_.getName == "fetch").get
+    fetchMethod.setAccessible(true)
+    val shadedFetch = fetchMethod.invoke(helper, apiFetch).asInstanceOf[AnyRef]
+    val fetchOps = moduleSingleton("coursierapi.shaded.coursier.Fetch$FetchTaskOps$")
+    val defaultEcMethod = fetchOps.getClass.getMethods.find(_.getName == "eitherResult$default$1$extension").get
+    val executionContext = defaultEcMethod.invoke(fetchOps, shadedFetch)
+    val eitherResultMethod = fetchOps.getClass.getMethods.find(_.getName == "eitherResult$extension").get
+    val resultEither = eitherResultMethod.invoke(fetchOps, shadedFetch, executionContext).asInstanceOf[AnyRef]
+    if invokeBoolean(resultEither, "isLeft") then
+      throw new IllegalStateException(invoke(invoke(resultEither, "left"), "get").toString)
+    invoke(invoke(resultEither, "toOption"), "get")
+  }
+
+  private def shadedSeqToSeq(seq: AnyRef): Seq[AnyRef] = {
+    val buffer = scala.collection.mutable.ArrayBuffer.empty[AnyRef]
+    val iterator = invoke(seq, "iterator")
+    while invokeBoolean(iterator, "hasNext") do buffer += invoke(iterator, "next")
+    buffer.toSeq
+  }
+
+  private def shadedMapToSeq(map: AnyRef): Seq[(AnyRef, AnyRef)] = {
+    val buffer = scala.collection.mutable.ArrayBuffer.empty[(AnyRef, AnyRef)]
+    val iterator = invoke(map, "iterator")
+    while invokeBoolean(iterator, "hasNext") do {
+      val entry = invoke(iterator, "next")
+      buffer += ((invoke(entry, "_1"), invoke(entry, "_2")))
+    }
+    buffer.toSeq
+  }
+
+  private def shadedDepRepr(dep: AnyRef): String = {
+    val module = invoke(dep, "module")
+    s"${invoke(module, "organization")}:${invoke(module, "name")}:${invoke(dep, "version")}"
+  }
+
+  private def toResolvedDependency(dep: AnyRef): ResolvedDependency = {
+    val module = invoke(dep, "module")
+    ResolvedDependency(
+      organization = invoke(module, "organization").toString,
+      name = invoke(module, "name").toString,
+      version = invoke(dep, "version").toString
+    )
+  }
+
+  private def moduleSingleton(className: String): AnyRef =
+    Class.forName(className).getField("MODULE$").get(null).asInstanceOf[AnyRef]
+
+  private def invoke(target: AnyRef, methodName: String, args: AnyRef*): AnyRef = {
+    val method = target.getClass.getMethods.find(m => m.getName == methodName && m.getParameterCount == args.length)
+      .orElse(target.getClass.getDeclaredMethods.find(m => m.getName == methodName && m.getParameterCount == args.length))
+      .getOrElse(throw new NoSuchMethodException(s"${target.getClass.getName}.${methodName}/${args.length}"))
+    method.setAccessible(true)
+    method.invoke(target, args*)
+      .asInstanceOf[AnyRef]
+  }
+
+  private def invokeBoolean(target: AnyRef, methodName: String): Boolean =
+    invoke(target, methodName).asInstanceOf[java.lang.Boolean].booleanValue()
 }
 
 object DependencyResolver {
