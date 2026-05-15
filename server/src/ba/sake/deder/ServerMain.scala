@@ -216,6 +216,14 @@ object ServerMain extends StrictLogging {
               case NonFatal(_) =>
               // ignore, config might be bad, tasks might fail, etc
             }
+          ,
+          filter = p => {
+            val segs = p.relativeTo(DederGlobals.projectRootDir).segments.toSeq
+            val firstSeg = segs.headOption.getOrElse("")
+            val isDederSubdir = firstSeg == ".deder" && segs.lift(1).exists(FileWatchUtils.ignoredDederSubdirs.contains)
+            val isDevDir = FileWatchUtils.ignoredDirNames.contains(firstSeg)
+            !(isDederSubdir || isDevDir)
+          }
         )
       } catch {
         case _: InterruptedException => logger.info("File watcher interrupted, stopping...")
