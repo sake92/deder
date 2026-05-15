@@ -254,17 +254,12 @@ object DederPklRenderer {
         val (effectiveCommon, effectiveDeltas) = if (g.usesTpolecat || g.usesTypelevel) {
             val refVersion = g.crossScalaVersions.headOption.getOrElse("2.13")
             val templateSet = if (g.usesTpolecat)
-                TemplateOptionsReader.tpolecatScalacOptions(TemplateOptionsReader.tpolecatOptions, refVersion)
+                TemplateOptionsReader.tpolecatScalacOptions(refVersion)
             else
-                TemplateOptionsReader.typelevelScalacOptions(TemplateOptionsReader.typelevelOptions, refVersion)
-            if (templateSet.isEmpty)
-                // Template not loadable (e.g. test env): suppress all
-                return ""
-            else {
-                val filteredCommon = common.filterNot(templateSet.contains)
-                val filteredDeltas = deltas.view.mapValues(_.filterNot(templateSet.contains)).filter(_._2.nonEmpty).toMap
-                (filteredCommon, filteredDeltas)
-            }
+                TemplateOptionsReader.typelevelScalacOptions(refVersion)
+            val filteredCommon = common.filterNot(templateSet.contains)
+            val filteredDeltas = deltas.view.mapValues(_.filterNot(templateSet.contains)).filter(_._2.nonEmpty).toMap
+            (filteredCommon, filteredDeltas)
         } else (common, deltas)
 
         val hasCommon = effectiveCommon.nonEmpty
@@ -732,6 +727,15 @@ object DederPklRenderer {
                 case Some(ScalaVersionCtx.Literal(v)) => v
                 case _                                 => m.scalaVersion
             }
+            val templateSet = if (g.usesTpolecat)
+                TemplateOptionsReader.tpolecatScalacOptions(version)
+            else
+                TemplateOptionsReader.typelevelScalacOptions(version)
+            val filtered = m.scalacOptions.filterNot(templateSet.contains)
+            if (filtered.isEmpty) ""
+            else renderScalacOptions(filtered, indent)
+        } else renderScalacOptions(m.scalacOptions, indent)
+    }
             val templateSet = if (g.usesTpolecat)
                 TemplateOptionsReader.tpolecatScalacOptions(TemplateOptionsReader.tpolecatOptions, version)
             else

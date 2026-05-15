@@ -701,4 +701,33 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("groupId = \"com.example\""), clues(result))
         assert(result.contains("groupId = \"com.other\""), clues(result))
     }
+
+    test("TemplateOptionsReader tpolecat options have correct encoding") {
+        val scala3 = TemplateOptionsReader.tpolecatScalacOptions("3.3.5")
+        val scala213 = TemplateOptionsReader.tpolecatScalacOptions("2.13.18")
+        val scala212 = TemplateOptionsReader.tpolecatScalacOptions("2.12.20")
+
+        assert(scala3.nonEmpty, "scala3 options should be non-empty")
+        assert(scala213.nonEmpty, "scala213 options should be non-empty")
+        assert(scala212.nonEmpty, "scala212 options should be non-empty")
+
+        // Verify encoding is split properly (not combined -encoding:utf8)
+        assert(scala3.contains("-encoding"), s"scala3 should contain -encoding: $scala3")
+        assert(scala3.contains("utf-8"), s"scala3 should contain utf-8: $scala3")
+        assert(!scala3.contains("-encoding:utf8"), s"scala3 should NOT contain combined -encoding:utf8: $scala3")
+        assert(!scala3.contains("utf8"), s"scala3 should be utf-8 not utf8: $scala3")
+
+        // Verify key options are present
+        assert(scala213.contains("-deprecation"), s"scala213 should contain -deprecation: $scala213")
+        assert(scala213.contains("-feature"), s"scala213 should contain -feature: $scala213")
+        assert(scala3.contains("-deprecation"), s"scala3 should contain -deprecation: $scala3")
+    }
+
+    test("TemplateOptionsReader typelevel options have correct encoding") {
+        val scala3 = TemplateOptionsReader.typelevelScalacOptions("3.3.5")
+        assert(scala3.nonEmpty, "scala3 typelevel options should be non-empty")
+        assert(scala3.contains("-encoding"), s"typelevel scala3 should contain -encoding: $scala3")
+        assert(scala3.contains("utf-8"), s"typelevel scala3 should contain utf-8: $scala3")
+        assert(scala3.contains("-deprecation"), s"typelevel scala3 should contain -deprecation: $scala3")
+    }
 }

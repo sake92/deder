@@ -1,83 +1,88 @@
 package ba.sake.deder.importing
 
-import scala.jdk.CollectionConverters.*
-import scala.util.Using
-import scala.util.control.NonFatal
-import org.pkl.config.java.ConfigEvaluatorBuilder
-import org.pkl.core.ModuleSource
-import org.pkl.core.module.ModuleKeyFactories
-import ba.sake.deder.config.{DederTpolecat, DederTypelevel}
-
-/** Reads template default option values at runtime by evaluating the bundled Pkl templates
-  * via `ConfigEvaluator` with classpath module path resolution.
+/** Template default scalacOptions, transcribed from `DederTpolecat.pkl` and `DederTypelevel.pkl`.
   *
-  * Mirrors [[ba.sake.deder.PluginConfigEvaluators]] pattern: builds an evaluator that
-  * resolves `modulepath:/` URIs against the config JAR's classpath, then evaluates a
-  * "dummy module" (`amends "modulepath:/..."` with no overrides) to extract default values.
-  *
-  * Falls back to empty option sets when the template modules are not resolvable (e.g. in
-  * test environments where the config JAR classpath resources aren't set up). In that case
-  * the renderer falls through to the old blanket-suppression behaviour.
+  * These are literal constants (not loaded from Pkl at runtime) so the renderer
+  * can diff against them without requiring Pkl modulepath resolution on the classpath.
+  * When the template `.pkl` files are updated, these constants must be synced manually.
   */
 object TemplateOptionsReader {
 
-  private val configClassLoader: ClassLoader = classOf[DederTpolecat].getClassLoader
+  // ---- tpolecat options (from DederTpolecat.pkl) ----
 
-  private lazy val tpolecatInstance: Option[DederTpolecat] =
-    try Some(evaluateTemplate("ba/sake/deder/config/DederTpolecat", classOf[DederTpolecat]))
-    catch { case NonFatal(_) => None }
+  val tpolecat2_12: Set[String] = Set(
+    "-encoding", "utf-8",
+    "-deprecation", "-feature", "-unchecked",
+    "-language:existentials", "-language:experimental.macros", "-language:higherKinds", "-language:implicitConversions",
+    "-Xlint:adapted-args", "-Xlint:by-name-right-associative", "-Xlint:constant", "-Xlint:delayedinit-select",
+    "-Xlint:deprecation", "-Xlint:doc-detached", "-Xlint:inaccessible", "-Xlint:infer-any",
+    "-Xlint:missing-interpolator", "-Xlint:nullary-override", "-Xlint:nullary-unit", "-Xlint:option-implicit",
+    "-Xlint:package-object-classes", "-Xlint:poly-implicit-overload", "-Xlint:private-shadow", "-Xlint:stars-align",
+    "-Xlint:type-parameter-shadow", "-Xlint:unsound-match",
+    "-Yno-adapted-args", "-Ypartial-unification", "-Ywarn-dead-code", "-Ywarn-extra-implicit",
+    "-Ywarn-nullary-override", "-Ywarn-nullary-unit", "-Ywarn-numeric-widen", "-Ywarn-unused",
+    "-Ywarn-unused:implicits", "-Ywarn-unused:imports", "-Ywarn-unused:locals", "-Ywarn-unused:params",
+    "-Ywarn-unused:patvars", "-Ywarn-unused:privates", "-Ywarn-unused:nowarn",
+  )
 
-  private lazy val typelevelInstance: Option[DederTypelevel] =
-    try Some(evaluateTemplate("ba/sake/deder/config/DederTypelevel", classOf[DederTypelevel]))
-    catch { case NonFatal(_) => None }
+  val tpolecat2_13: Set[String] = Set(
+    "-encoding", "utf-8",
+    "-feature", "-unchecked",
+    "-Wdead-code", "-Wextra-implicit", "-Wnumeric-widen", "-Wunused", "-Wvalue-discard",
+    "-Wunused:implicits", "-Wunused:imports", "-Wunused:locals", "-Wunused:params", "-Wunused:patvars", "-Wunused:privates",
+    "-Xlint:deprecation", "-Xlint:inaccessible", "-Xlint:infer-any", "-Xlint:missing-interpolator",
+    "-Xlint:nullary-override", "-Xlint:private-shadow", "-Xlint:stars-align", "-Xlint:type-parameter-shadow",
+    "-Xsource:3",
+  )
 
-  /** Returns the full set of tpolecat scalacOptions defaults for all Scala versions. */
-  def tpolecatOptions: Option[DederTpolecat] = tpolecatInstance
+  val tpolecat3: Set[String] = Set(
+    "-encoding", "utf-8",
+    "-deprecation", "-feature", "-unchecked",
+    "-Wunused:implicits", "-Wunused:imports", "-Wunused:locals", "-Wunused:params", "-Wunused:privates",
+    "-Xlint:deprecation", "-Xlint:inaccessible", "-Xlint:infer-any", "-Xlint:missing-interpolator",
+    "-Xlint:private-shadow", "-Xlint:stars-align", "-Xlint:type-parameter-shadow",
+  )
 
-  /** Returns the full set of typelevel scalacOptions defaults for all Scala versions. */
-  def typelevelOptions: Option[DederTypelevel] = typelevelInstance
+  // ---- typelevel options (from DederTypelevel.pkl) ----
 
-  /** Given a DederTpolecat instance, extract the option list for a specific Scala version. */
-  def tpolecatScalacOptions(opts: Option[DederTpolecat], scalaVersion: String): Set[String] =
-    opts match {
-      case Some(o) =>
-        val list: java.util.List[String] = scalaVersion match {
-          case v if v.startsWith("3")    => o.tpolecatScalacOptions3
-          case v if v.startsWith("2.13") => o.tpolecatScalacOptions2_13
-          case v if v.startsWith("2.12") => o.tpolecatScalacOptions2_12
-          case _                          => o.tpolecatScalacOptions2_13
-        }
-        list.asScala.toSet
-      case None => Set.empty
+  val typelevel2_12: Set[String] = Set(
+    "-deprecation", "-encoding", "utf-8", "-feature", "-unchecked",
+    "-Xlint", "-Yno-adapted-args", "-Ywarn-dead-code", "-Ywarn-unused-import",
+    "-Xlint:_,-unused", "-Ywarn-unused:_,-nowarn,-privates",
+    "-Ypartial-unification", "-language:_", "-Xsource:3",
+  )
+
+  val typelevel2_13: Set[String] = Set(
+    "-deprecation", "-encoding", "utf-8", "-feature", "-unchecked",
+    "-Wdead-code", "-Wextra-implicit", "-Wnumeric-widen", "-Wunused", "-Wvalue-discard",
+    "-Xlint:_,-implicit-recursion,-recurse-with-default,-unused,-byname-implicit",
+    "-Wconf:cat=scala3-migration:s", "-language:_", "-Xsource:3",
+  )
+
+  val typelevel3: Set[String] = Set(
+    "-deprecation", "-encoding", "utf-8", "-feature", "-unchecked",
+    "-Wunused:implicits", "-Wunused:imports", "-Wunused:locals",
+    "-Wvalue-discard", "-Xlint:deprecation", "-Xlint:inaccessible",
+    "-language:postfixOps", "-Xsource:3",
+  )
+
+  // ---- public API ----
+
+  /** Returns the default tpolecat scalacOptions for the given Scala version. */
+  def tpolecatScalacOptions(scalaVersion: String): Set[String] =
+    scalaVersion match {
+      case v if v.startsWith("3")    => tpolecat3
+      case v if v.startsWith("2.13") => tpolecat2_13
+      case v if v.startsWith("2.12") => tpolecat2_12
+      case _                          => tpolecat2_13 // default: latest 2.x
     }
 
-  /** Given a DederTypelevel instance, extract the option list for a specific Scala version. */
-  def typelevelScalacOptions(opts: Option[DederTypelevel], scalaVersion: String): Set[String] =
-    opts match {
-      case Some(o) =>
-        val list: java.util.List[String] = scalaVersion match {
-          case v if v.startsWith("3")    => o.typelevelScalacOptions3
-          case v if v.startsWith("2.13") => o.typelevelScalacOptions2_13
-          case v if v.startsWith("2.12") => o.typelevelScalacOptions2_12
-          case _                          => o.typelevelScalacOptions2_13
-        }
-        list.asScala.toSet
-      case None => Set.empty
+  /** Returns the default typelevel scalacOptions for the given Scala version. */
+  def typelevelScalacOptions(scalaVersion: String): Set[String] =
+    scalaVersion match {
+      case v if v.startsWith("3")    => typelevel3
+      case v if v.startsWith("2.13") => typelevel2_13
+      case v if v.startsWith("2.12") => typelevel2_12
+      case _                          => typelevel2_13 // default: latest 2.x
     }
-
-  private def evaluateTemplate[T](modulePath: String, clazz: Class[T]): T = {
-    val evaluatorBuilder = ConfigEvaluatorBuilder.preconfigured()
-    val underlyingBuilder = evaluatorBuilder.getEvaluatorBuilder()
-
-    // Register classpath module resolution so `modulepath:/` URIs resolve against the config JAR
-    val moduleKeyFactories = (ModuleKeyFactories
-      .classPath(configClassLoader) +: underlyingBuilder.getModuleKeyFactories().asScala.toSeq).distinct
-    underlyingBuilder.setModuleKeyFactories(moduleKeyFactories.asJava)
-
-    val moduleText = s"""amends "modulepath:/$modulePath""""
-
-    Using.resource(evaluatorBuilder.build()) { evaluator =>
-      evaluator.evaluate(ModuleSource.text(moduleText)).as(clazz)
-    }
-  }
 }
