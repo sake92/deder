@@ -466,6 +466,13 @@ class PublishTasks(coreTasks: CoreTasks) {
               "Add e.g. `publishTo = new SonatypeCentralRepo { id = \"my-sonatype\" }` to the module definition."
           )
 
+        // validate POM settings for Sonatype Central before attempting credentials
+        publishTo match {
+          case _: SonatypeCentralRepo =>
+            PublishValidator.validateForSonatypeCentral(ctx.module.id, javaModule.pomSettings, pom.version)
+          case _ =>
+        }
+
         val credentialsFile = os.home / ".deder/credentials.pkl"
         val credentialsOpt = if os.exists(credentialsFile) then
           CredentialsParser.parse(credentialsFile) match {
@@ -485,7 +492,6 @@ class PublishTasks(coreTasks: CoreTasks) {
 
         publishTo match {
           case _: SonatypeCentralRepo =>
-            PublishValidator.validateForSonatypeCentral(ctx.module.id, javaModule.pomSettings, pom.version)
             val scCreds = creds.asInstanceOf[SonatypeCentralCredentials]
             stagingFiles.foreach(f => PgpSigner.signFile(f, scCreds.pgpSecret, scCreds.pgpPassphrase.toCharArray))
             val allFiles = stagingFiles.flatMap { f =>
