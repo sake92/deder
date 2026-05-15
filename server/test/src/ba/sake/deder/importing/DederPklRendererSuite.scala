@@ -640,10 +640,12 @@ class DederPklRendererSuite extends FunSuite {
         val build = DederBuild(DederPklRenderer.DederVersion, Seq(g), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
         assert(result.contains("DederTpolecat.forVersion(sv)"), s"should have forVersion call:\n$result")
-        assert(!result.contains("scalacOptions {"), s"should not contain raw scalacOptions:\n$result")
+        // -deprecation is not in tpolecat2_13 template, so it's preserved as an addition
+        assert(result.contains("scalacOptions {"), s"should have scalacOptions block for additions:\n$result")
+        assert(result.contains("\"-deprecation\""), s"should contain -deprecation as addition:\n$result")
     }
 
-    test("cross-version with tpolecat suppresses scalacOptions when-clauses") {
+    test("cross-version with tpolecat emits deltas for non-template options") {
         val mods = Seq(
             ConcreteModule("proj1", "2.13.18", "main", emptyModule(scalaVersion = "2.13.18", scalacOptions = Seq("-deprecation", "-Xfatal-warnings"))),
             ConcreteModule("proj1", "3.7.4", "main", emptyModule(scalaVersion = "3.7.4", scalacOptions = Seq("-deprecation", "-Werror"))),
@@ -656,10 +658,11 @@ class DederPklRendererSuite extends FunSuite {
         )
         val build = DederBuild(DederPklRenderer.DederVersion, Seq(g), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
-        assert(!result.contains("scalacOptions {"), s"should not have scalacOptions block:\n$result")
-        val afterStart = result.split("template = ")(1)
-        val untilEnd = afterStart.split("  }")(0)
-        assert(!untilEnd.contains("-deprecation"), s"should not contain raw flags in template body:\n$result")
+        // -deprecation is not in the template, so it's rendered; -Xfatal-warnings and -Werror are deltas
+        assert(result.contains("scalacOptions {"), s"should have scalacOptions block:\n$result")
+        assert(result.contains("\"-deprecation\""), s"should contain -deprecation:\n$result")
+        assert(result.contains("\"-Xfatal-warnings\""), s"should contain -Xfatal-warnings in when clause:\n$result")
+        assert(result.contains("\"-Werror\""), s"should contain -Werror in when clause:\n$result")
     }
 
     test("emits shared basePomSettings when multiple modules share same publish info") {
@@ -712,15 +715,18 @@ class DederPklRendererSuite extends FunSuite {
         assert(scala212.nonEmpty, "scala212 options should be non-empty")
 
         // Verify encoding is split properly (not combined -encoding:utf8)
-        assert(scala3.contains("-encoding"), s"scala3 should contain -encoding: $scala3")
-        assert(scala3.contains("utf-8"), s"scala3 should contain utf-8: $scala3")
-        assert(!scala3.contains("-encoding:utf8"), s"scala3 should NOT contain combined -encoding:utf8: $scala3")
-        assert(!scala3.contains("utf8"), s"scala3 should be utf-8 not utf8: $scala3")
+        for (opts <- Seq(scala3, scala213, scala212)) {
+            assert(opts.contains("-encoding"), s"should contain -encoding: $opts")
+            assert(opts.contains("utf-8"), s"should contain utf-8: $opts")
+            assert(!opts.contains("-encoding:utf8"), s"should NOT contain combined -encoding:utf8: $opts")
+            assert(!opts.contains("utf8"), s"should be utf-8 not utf8: $opts")
+        }
 
-        // Verify key options are present
-        assert(scala213.contains("-deprecation"), s"scala213 should contain -deprecation: $scala213")
-        assert(scala213.contains("-feature"), s"scala213 should contain -feature: $scala213")
+        // Verify key options: scala3 + 2.12 have -deprecation, 2.13 has -Xlint:deprecation instead
         assert(scala3.contains("-deprecation"), s"scala3 should contain -deprecation: $scala3")
+        assert(scala212.contains("-deprecation"), s"scala212 should contain -deprecation: $scala212")
+        assert(scala213.contains("-Xlint:deprecation"), s"scala213 should contain -Xlint:deprecation: $scala213")
+        assert(scala213.contains("-feature"), s"scala213 should contain -feature: $scala213")
     }
 
     test("TemplateOptionsReader typelevel options have correct encoding") {
