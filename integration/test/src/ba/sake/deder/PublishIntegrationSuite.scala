@@ -127,7 +127,7 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/publish-sonatype-incomplete") { projectPath =>
       val result = executeDederCommand(projectPath, "exec", "-m", "lib1", "-t", "publish")
       assert(result.exitCode != 0, s"Expected non-zero exit code, got ${result.exitCode}")
-      val err = result.stderr.text()
+      val err = result.err.text()
       assert(err.contains("Invalid POM settings for module 'lib1'"), s"Error should mention module, got: $err")
       assert(err.contains("description"), s"Error should mention missing description, got: $err")
       assert(err.contains("url"), s"Error should mention missing url, got: $err")
