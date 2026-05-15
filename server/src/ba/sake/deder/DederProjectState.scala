@@ -3,7 +3,7 @@ package ba.sake.deder
 import java.net.URLClassLoader
 import java.time.{Duration, Instant}
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
@@ -40,7 +40,8 @@ class DederProjectState(
   // used for BSP
   private var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
 
-  private val lastRequestStartedAt = new java.util.concurrent.atomic.AtomicReference[Instant](null)
+  private val lastRequestEndedAt = new java.util.concurrent.atomic.AtomicReference[Instant](Instant.now())
+  private val inFlightRequests = new AtomicInteger(0)
 
   private val watchedTasksLock = new AnyRef
   private var watchedTasks = Seq.empty[WatchedTaskData]
@@ -281,7 +282,7 @@ class DederProjectState(
       clientParams: CliClientParams = CliClientParams(Map.empty)
   ): Seq[TaskExecResult] =
     try {
-      lastRequestStartedAt.set(Instant.now())
+      inFlightRequests.incrementAndGet()
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
 
       val state = readState(useLastGood) match
@@ -329,6 +330,9 @@ class DederProjectState(
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
         if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         throw TaskEvaluationException(s"Error during execution of task '${taskName}': ${e.getMessage}", e)
+    } finally {
+      inFlightRequests.decrementAndGet()
+      lastRequestEndedAt.set(Instant.now())
     }
 
   def cancelRequest(requestId: String): Unit = {
@@ -433,12 +437,12 @@ class DederProjectState(
     executor.scheduleAtFixedRate(
       () => {
         try {
-          val lastStarted = lastRequestStartedAt.get()
-          if lastStarted != null then {
+           val lastEnded = lastRequestEndedAt.get()
+           if inFlightRequests.get() == 0 then {
             val now = Instant.now()
-            val inactiveDuration = Duration.between(lastStarted, now)
+            val inactiveDuration = Duration.between(lastEnded, now)
             if inactiveDuration.compareTo(maxInactiveDuration) > 0 then {
-              logger.info(s"No requests in flight for ${inactiveDuration.toMinutes} minutes, shutting down server.")
+              logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
               shutdown()
             }
           }
