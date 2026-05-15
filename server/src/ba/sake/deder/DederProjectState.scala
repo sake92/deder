@@ -24,7 +24,7 @@ class DederProjectState(
     maxInactiveSeconds: Int,
     tasksExecutorService: ExecutorService,
     onShutdown: () => Unit,
-    configFilePath: os.Path = DederGlobals.projectRootDir / "deder.pkl"
+    configFile: os.Path
 ) extends StrictLogging {
 
   private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)
@@ -32,7 +32,6 @@ class DederProjectState(
   @volatile private var shutdownStarted = false
 
   private val configParser = ConfigParser(writeJson = true)
-  private val configFile = configFilePath
   private val baseTasks = tasksRegistry.all
 
   private val stateLock = new AnyRef

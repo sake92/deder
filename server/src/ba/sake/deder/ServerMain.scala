@@ -143,7 +143,8 @@ object ServerMain extends StrictLogging {
     val allTasks =
       coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
-    val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
+    val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown,
+        configFile = DederGlobals.projectRootDir / "deder.pkl")
 
     // Wire up early lock release for fast shutdown+restart
     projectState.setReleaseServerLock(() => {
