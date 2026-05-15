@@ -3,9 +3,8 @@
 # Misc
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - maybe use https://github.com/encalmo/graphs coz zero deps?
-- shade test-runner to avoid classpath issues.. but first make shading work good
 - init like giter8, autoimport from sbt?
-- FileWatchUtils for ignoring paths
+- assembly still slowish
 
 # Import
 - import from other maven effective POM etc
