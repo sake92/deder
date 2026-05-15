@@ -433,7 +433,7 @@ object DederPklRenderer {
                     Some(renderStringListWithWhens("javacOptions", common.javacOptions, javacOptDeltas, indent = 4)) else None,
                 if (common.deps.nonEmpty || depsDeltas.values.exists(_.nonEmpty))
                     Some(renderDepsWithWhens(common.deps, depsDeltas, indent = 4)) else None,
-                if (!suppressPluginDepsDeltas(common.scalacPluginDeps, pluginDepsDeltas, g, slices.headOption.map(_.scalaVersion).getOrElse("")) && (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty)))
+                if (!suppressPluginDepsDeltas(common.scalacPluginDeps, pluginDepsDeltas, g, slices.exists(_.scalaVersion.startsWith("2"))) && (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty)))
                     Some(renderPluginDepsWithWhens(common.scalacPluginDeps, pluginDepsDeltas, indent = 4)) else None,
                 if (common.sources.nonEmpty || srcDeltas.values.exists(_.nonEmpty))
                     Some(renderStringListWithWhens("sources", common.sources, srcDeltas, indent = 4)) else None,
@@ -744,10 +744,10 @@ object DederPklRenderer {
         if (scalaVersion.startsWith("3")) return false
         deps.forall(d => pluginDefaults.contains(d.organization -> d.name))
     }
-    private def suppressPluginDepsDeltas(deps: Seq[DepDef], deltas: Map[String, Seq[DepDef]], g: ModuleGroup, scalaVersion: String): Boolean = {
+    private def suppressPluginDepsDeltas(deps: Seq[DepDef], deltas: Map[String, Seq[DepDef]], g: ModuleGroup, hasScala2: Boolean): Boolean = {
         if (!g.usesTypelevel) return false
         if (deps.isEmpty && deltas.values.forall(_.isEmpty)) return false
-        if (scalaVersion.startsWith("3")) return false
+        if (!hasScala2) return false
         deps.forall(d => pluginDefaults.contains(d.organization -> d.name)) &&
             deltas.values.forall(_.forall(d => pluginDefaults.contains(d.organization -> d.name)))
     }
