@@ -109,9 +109,10 @@ class CredentialsResolverSuite extends munit.FunSuite {
     val ex = intercept[RuntimeException] {
       CredentialsResolver.resolve(repo, None, clientEnv, sysEnv)
     }
-    assert(ex.getMessage.contains("Missing credential 'password'"))
+    assert(ex.getMessage.contains("Missing credentials for publish to 'sonatype-central'"))
     assert(ex.getMessage.contains("DEDER_SONATYPE_CENTRAL_PASSWORD"))
-    assert(ex.getMessage.contains("SonatypeCentralCredentials"))
+    assert(ex.getMessage.contains("DEDER_SONATYPE_CENTRAL_PGP_SECRET"))
+    assert(ex.getMessage.contains("DEDER_SONATYPE_CENTRAL_PGP_PASSPHRASE"))
   }
 
   test("repo id with hyphens generates correct env key") {
