@@ -78,7 +78,7 @@ class SbtProjectAnalyzer(
         _cachedSummary = buildSummary(moduleGroups, warnings.result(), filteredDepCount)
 
         DederBuild(
-            dederVersion = DederVersion,
+            dederVersion = DederPklRenderer.DederVersion,
             moduleGroups = moduleGroups,
             repositories = exportedSbtModules.flatMap(_.repositories).distinct.map(RepositoryDef.apply),
             warnings = warnings.result(),
@@ -355,7 +355,6 @@ class SbtProjectAnalyzer(
 
 object SbtProjectAnalyzer {
 
-    val DederVersion = "v0.9.0"
     val DefaultScalaJsVersion = "1.18.2"
     val DefaultScalaNativeVersion = "0.5.10"
 
