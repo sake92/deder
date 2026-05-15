@@ -331,44 +331,14 @@ object ServerMain extends StrictLogging {
 
   private def loadGitignore(): Unit = {
     val gitignoreFile = DederGlobals.projectRootDir / ".gitignore"
-    if os.exists(gitignoreFile) && os.isFile(gitignoreFile) then {
-      gitignorePatterns = os.read.lines(gitignoreFile)
-        .map(_.trim)
-        .filter(l => l.nonEmpty && !l.startsWith("#"))
-      logger.debug(s"Loaded ${gitignorePatterns.size} .gitignore patterns from ${gitignoreFile}")
-    } else {
-      gitignorePatterns = Seq.empty
-    }
+    gitignorePatterns = FileWatchUtils.readGitignorePatterns(gitignoreFile)
+    logger.debug(s"Loaded ${gitignorePatterns.size} .gitignore patterns from ${gitignoreFile}")
   }
 
   private def isIgnoredByGitignore(p: os.Path): Boolean = {
     val relativePath = p.relativeTo(DederGlobals.projectRootDir).toString.replace(java.io.File.separatorChar, '/')
     val isDir = os.isDir(p)
-    gitignorePatterns.exists { pattern =>
-      val effectivePattern = pattern.stripPrefix("!")
-      globMatch(effectivePattern, relativePath, isDir)
-    }
-  }
-
-  private def globMatch(pattern: String, path: String, isDir: Boolean): Boolean = {
-    val normalizedPattern = pattern.stripSuffix("/")
-    if !normalizedPattern.contains("/") then {
-      val filename = path.split("/").last
-      simpleGlobMatch(normalizedPattern, filename)
-    } else {
-      simpleGlobMatch(normalizedPattern, path)
-      || (isDir && normalizedPattern.endsWith("/*") && path.startsWith(normalizedPattern.stripSuffix("/*")))
-    }
-  }
-
-  private def simpleGlobMatch(pattern: String, str: String): Boolean = {
-    val regex = pattern
-      .replace(".", "\\.")
-      .replace("*", ".*")
-      .replace("?", ".")
-      .replace("[", "\\[")
-      .replace("]", "\\]")
-    str.matches(regex)
+    FileWatchUtils.isIgnoredByGitignore(relativePath, isDir, gitignorePatterns)
   }
 
   private def isDevArtifact(p: os.Path): Boolean =
