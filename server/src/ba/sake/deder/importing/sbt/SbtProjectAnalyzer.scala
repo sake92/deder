@@ -355,7 +355,7 @@ class SbtProjectAnalyzer(
 
 object SbtProjectAnalyzer {
 
-    val DederVersion = "v0.8.0"
+    val DederVersion = "v0.9.0"
     val DefaultScalaJsVersion = "1.18.2"
     val DefaultScalaNativeVersion = "0.5.10"
 

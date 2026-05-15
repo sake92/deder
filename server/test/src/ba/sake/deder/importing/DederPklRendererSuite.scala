@@ -43,7 +43,7 @@ class DederPklRendererSuite extends FunSuite {
         nativeMod: Option[ModuleDef] = None,
         layout: DederProject.DirLayout = DederProject.DirLayout.SBT,
         crossScalaVersions: Seq[String] = Seq.empty,
-        dederVersion: String = "v0.7.4",
+        dederVersion: String = "v0.9.0",
     ): DederBuild = DederBuild(
         dederVersion = dederVersion,
         moduleGroups = Seq(ModuleGroup(
@@ -107,7 +107,7 @@ class DederPklRendererSuite extends FunSuite {
     test("generates correct Pkl header with amends directive") {
         val build = singleModuleBuild()
         val result = DederPklRenderer.render(build)
-        assert(result.contains(s"""amends "https://sake92.github.io/deder/config/v0.7.4/DederProject.pkl""""))
+        assert(result.contains(s"""amends "https://sake92.github.io/deder/config/v0.9.0/DederProject.pkl""""))
     }
 
     test("single Scala module generates CreateScalaModules builder and modules block") {
@@ -241,7 +241,7 @@ class DederPklRendererSuite extends FunSuite {
         val jvmMod = emptyModule(scalaVersion = "3.3.5")
         val jsMod = emptyModule(scalaVersion = "3.3.5", scalaJsVersion = Some("1.18.2"))
         val build = DederBuild(
-            dederVersion = "v0.7.4",
+            dederVersion = "v0.9.0",
             moduleGroups = Seq(ModuleGroup(
                 builderVarName = "core",
                 root = ".",
@@ -284,7 +284,7 @@ class DederPklRendererSuite extends FunSuite {
             ModuleGroup("lib", "lib", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), libMod, None, None, false, false, false, false),
             ModuleGroup("root", "root", DederProject.DirLayout.SBT, Seq("2.12.21", "2.13.18"), rootMod, None, None, false, false, false, false),
         )
-        val build = DederBuild("v0.7.4", groups, Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", groups, Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
         assert(result.contains("libModules.find((m) -> m.id == \"lib-\\(sv)\")"))
         assert(result.contains("local const projectScalaVersions"))
@@ -298,7 +298,7 @@ class DederPklRendererSuite extends FunSuite {
             ModuleGroup("core", "core", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), coreMod, Some(jsMod), None, true, false, false, false),
             ModuleGroup("app", "app", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.12.21"), appMod, None, None, false, false, false, false),
         )
-        val build = DederBuild("v0.7.4", groups, Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", groups, Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
         assert(result.contains("id = \"core\""))
         assert(result.contains("coreModules.find((m) -> m.id == \"core-jvm-\\(sv)\")"))
@@ -323,7 +323,7 @@ class DederPklRendererSuite extends FunSuite {
                 moduleDeps = Seq(ModuleDepRef("lib", "main", targetScalaVersion = Some(v), isTest = false)),
             ))),
         )
-        val build = DederBuild("v0.7.4", Seq(lib, app), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(lib, app), Seq.empty, Seq.empty)
 
         val result = DederPklRenderer.render(build)
         assert(result.contains("local const appModules = projectScalaVersions"))
@@ -344,7 +344,7 @@ class DederPklRendererSuite extends FunSuite {
                 )),
             ),
         )
-        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(group), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
 
         assert(result.contains("local const libModules = libScalaVersions"), clues(result))
@@ -376,7 +376,7 @@ class DederPklRendererSuite extends FunSuite {
                 )),
             ),
         )
-        val build = DederBuild("v0.7.4", Seq(lib, app), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(lib, app), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
 
         assert(result.contains("local const appModules = projectScalaVersions"), clues(result))
@@ -399,7 +399,7 @@ class DederPklRendererSuite extends FunSuite {
                 ("2.13.18", "jvm", emptyModule(scalaVersion = "2.13.18")),
             ),
         )
-        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(group), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
 
         assert(result.contains("local const coreModules = coreScalaVersions"), clues(result))
@@ -418,7 +418,7 @@ class DederPklRendererSuite extends FunSuite {
                 ("2.13.18", "js", emptyModule(scalaVersion = "2.13.18", scalaJsVersion = Some("1.18.2"))),
             ),
         )
-        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(group), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
 
         assert(result.contains(".map((sv) ->"), clues(result))
@@ -439,7 +439,7 @@ class DederPklRendererSuite extends FunSuite {
                 moduleDeps = Seq(ModuleDepRef("lib", "main", isTest = false)),
             ))),
         )
-        val build = DederBuild("v0.7.4", Seq(lib, app), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(lib, app), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
         assert(!result.contains("libModules.find"), clues(result))
         assert(result.contains("lib.main"), clues(result))
@@ -454,7 +454,7 @@ class DederPklRendererSuite extends FunSuite {
                 ("2.13.18", "main", emptyModule(scalaVersion = "2.13.18", scalacOptions = Seq("-Xfatal-warnings"))),
             ),
         )
-        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(group), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
 
         assert(result.contains("local const libModules = libScalaVersions"), clues(result))
@@ -485,7 +485,7 @@ class DederPklRendererSuite extends FunSuite {
                 )),
             ),
         )
-        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(group), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
 
         assert(result.contains("local const libScalaVersions = List(\"2.12.21\", \"2.13.18\")"), clues(result))
@@ -520,7 +520,7 @@ class DederPklRendererSuite extends FunSuite {
                 )),
             ),
         )
-        val build = DederBuild("v0.7.4", Seq(group), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(group), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
 
         assert(result.contains(".map((sv) ->"), clues(result))
@@ -552,7 +552,7 @@ class DederPklRendererSuite extends FunSuite {
                 )),
             ),
         )
-        val build = DederBuild("v0.7.4", Seq(lib, app), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(lib, app), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
 
         assert(result.contains(".map((sv) ->"), clues(result))
@@ -569,7 +569,7 @@ class DederPklRendererSuite extends FunSuite {
     test("emits DederTpolecat.pkl import and shared reference when tpolecat detected") {
         val mod = emptyModule(scalacOptions = Seq("-deprecation"))
         val build = DederBuild(
-            dederVersion = "v0.7.4",
+            dederVersion = "v0.9.0",
             moduleGroups = Seq(ModuleGroup(
                 builderVarName = "lib", root = ".", layout = DederProject.DirLayout.SBT,
                 crossScalaVersions = Seq("2.13.18"),
@@ -580,7 +580,7 @@ class DederPklRendererSuite extends FunSuite {
             repositories = Seq.empty, warnings = Seq.empty,
         )
         val result = DederPklRenderer.render(build)
-        assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.7.4/DederTpolecat.pkl""""), clues(result))
+        assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.9.0/DederTpolecat.pkl""""), clues(result))
         assert(result.contains("DederTpolecat.forVersion(sv)"), clues(result))
         assert(!result.contains("scalacOptions ="), clues(result)) // no verbatim scalacOptions
         assert(!result.contains("scalacOptions {"), clues(result)) // no raw scalacOptions block
@@ -589,7 +589,7 @@ class DederPklRendererSuite extends FunSuite {
     test("emits DederTypelevel.pkl import and shared reference when typelevel detected") {
         val mod = emptyModule()
         val build = DederBuild(
-            dederVersion = "v0.7.4",
+            dederVersion = "v0.9.0",
             moduleGroups = Seq(ModuleGroup(
                 builderVarName = "lib", root = ".", layout = DederProject.DirLayout.SBT,
                 crossScalaVersions = Seq.empty,
@@ -600,7 +600,7 @@ class DederPklRendererSuite extends FunSuite {
             repositories = Seq.empty, warnings = Seq.empty,
         )
         val result = DederPklRenderer.render(build)
-        assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.7.4/DederTypelevel.pkl""""), clues(result))
+        assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.9.0/DederTypelevel.pkl""""), clues(result))
         assert(result.contains("(DederTypelevel.typelevelScala"), clues(result))
         assert(!result.contains("scalacOptions ="), clues(result))
         assert(!result.contains("forVersion"), clues(result))
@@ -609,7 +609,7 @@ class DederPklRendererSuite extends FunSuite {
     test("emits raw scalacOptions when neither tpolecat nor typelevel detected") {
         val mod = emptyModule(scalacOptions = Seq("-deprecation"))
         val build = DederBuild(
-            dederVersion = "v0.7.4",
+            dederVersion = "v0.9.0",
             moduleGroups = Seq(ModuleGroup(
                 builderVarName = "lib", root = ".", layout = DederProject.DirLayout.SBT,
                 crossScalaVersions = Seq.empty,
@@ -637,7 +637,7 @@ class DederPklRendererSuite extends FunSuite {
             concreteModules = mods,
             usesTpolecat = true,
         )
-        val build = DederBuild("v0.8.0", Seq(g), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(g), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
         assert(result.contains("DederTpolecat.forVersion(sv)"), s"should have forVersion call:\n$result")
         assert(!result.contains("scalacOptions {"), s"should not contain raw scalacOptions:\n$result")
@@ -654,7 +654,7 @@ class DederPklRendererSuite extends FunSuite {
             concreteModules = mods,
             usesTpolecat = true,
         )
-        val build = DederBuild("v0.8.0", Seq(g), Seq.empty, Seq.empty)
+        val build = DederBuild("v0.9.0", Seq(g), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
         assert(!result.contains("scalacOptions {"), s"should not have scalacOptions block:\n$result")
         val afterStart = result.split("template = ")(1)
@@ -673,7 +673,7 @@ class DederPklRendererSuite extends FunSuite {
         val publish2 = publish.copy(artifactName = "mod2")
         val mod1 = emptyModule(publish = Some(publish))
         val mod2 = emptyModule(publish = Some(publish2))
-        val build = DederBuild("v0.7.4", Seq(
+        val build = DederBuild("v0.9.0", Seq(
             ModuleGroup("mod1", ".", DederProject.DirLayout.SBT, Seq.empty, mod1, None, None, false, false, false, false),
             ModuleGroup("mod2", ".", DederProject.DirLayout.SBT, Seq.empty, mod2, None, None, false, false, false, false),
         ), Seq.empty, Seq.empty)
@@ -692,7 +692,7 @@ class DederPklRendererSuite extends FunSuite {
             None, None, Seq.empty, Seq.empty, None)
         val mod1 = emptyModule(publish = Some(publish1))
         val mod2 = emptyModule(publish = Some(publish2))
-        val build = DederBuild("v0.7.4", Seq(
+        val build = DederBuild("v0.9.0", Seq(
             ModuleGroup("mod1", ".", DederProject.DirLayout.SBT, Seq.empty, mod1, None, None, false, false, false, false),
             ModuleGroup("mod2", ".", DederProject.DirLayout.SBT, Seq.empty, mod2, None, None, false, false, false, false),
         ), Seq.empty, Seq.empty)
