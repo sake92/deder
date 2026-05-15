@@ -1,60 +1,234 @@
-/// sbt-tpolecat scalac options by Scala major version.
+import "DederProject.pkl" as P
+
+/// sbt-tpolecat scalac options as reusable ScalaModule templates.
 /// Source: https://github.com/typelevel/sbt-tpolecat
 /// Option lists transcribed from org.typelevel.scalacoptions.ScalacOptions (tpolecat 0.5.x).
 ///
 /// Modes: Dev (default, no fatal warnings), Ci (with -Xfatal-warnings / -Werror).
-/// Mode auto-selected: Ci when $CI env var is set, Dev otherwise.
+/// Mode auto-selected via $CI env var.
 
-/// Dev mode options (no fatal warnings)
-tpolecatDev: Mapping<String, Listing<String>> = new Mapping {
-  // NOTE: Exact option lists need to be transcribed from sbt-tpolecat output.
-  // To extract: create a minimal sbt project with sbt-tpolecat 0.5.2,
-  // run `sbt exportAllBuildStructures`, and read scalacOptions from the export JSON.
-  // Different Scala versions (2.12, 2.13, 3.x) have different subsets.
-  ["2.12"] {
-    "-deprecation"
-    "-encoding:utf-8"
-    "-explaintypes"
-    "-feature"
-    "-unchecked"
-    "-language:higherKinds"
-    "-language:implicitConversions"
-    // TODO: complete from actual tpolecat output
-  }
-  ["2.13"] {
-    "-deprecation"
-    "-encoding:utf-8"
-    "-explaintypes"
-    "-feature"
-    "-unchecked"
-    "-Xsource:3"
-    "-language:higherKinds"
-    "-language:implicitConversions"
-    // TODO: complete from actual tpolecat output
-  }
-  ["3"] {
-    "-deprecation"
-    "-encoding:utf-8"
-    "-explain"
-    "-feature"
-    "-unchecked"
-    "-language:implicitConversions"
-    // TODO: complete from actual tpolecat output
-  }
+tpolecatScalacOptions2_12: Listing<String> = new {
+  "-encoding:utf8"
+  "-deprecation"
+  "-feature"
+  "-unchecked"
+  "-language:existentials"
+  "-language:experimental.macros"
+  "-language:higherKinds"
+  "-language:implicitConversions"
+  "-Xlint:adapted-args"
+  "-Xlint:by-name-right-associative"
+  "-Xlint:constant"
+  "-Xlint:delayedinit-select"
+  "-Xlint:deprecation"
+  "-Xlint:doc-detached"
+  "-Xlint:inaccessible"
+  "-Xlint:infer-any"
+  "-Xlint:missing-interpolator"
+  "-Xlint:nullary-override"
+  "-Xlint:nullary-unit"
+  "-Xlint:option-implicit"
+  "-Xlint:package-object-classes"
+  "-Xlint:poly-implicit-overload"
+  "-Xlint:private-shadow"
+  "-Xlint:stars-align"
+  "-Xlint:type-parameter-shadow"
+  "-Xlint:unsound-match"
+  "-Yno-adapted-args"
+  "-Ypartial-unification"
+  "-Ywarn-dead-code"
+  "-Ywarn-extra-implicit"
+  "-Ywarn-nullary-override"
+  "-Ywarn-nullary-unit"
+  "-Ywarn-numeric-widen"
+  "-Ywarn-value-discard"
+  "-Ywarn-unused:implicits"
+  "-Ywarn-unused:imports"
+  "-Ywarn-unused:locals"
+  "-Ywarn-unused:params"
+  "-Ywarn-unused:patvars"
+  "-Ywarn-unused:privates"
+  "-Ywarn-unused:nowarn"
 }
 
-/// Ci mode = Dev + fatal warnings
-tpolecatCi: Mapping<String, Listing<String>> = new Mapping {
-  ["2.12"] { ...tpolecatDev["2.12"]; "-Xfatal-warnings" }
-  ["2.13"] { ...tpolecatDev["2.13"]; "-Xfatal-warnings" }
-  ["3"]    { ...tpolecatDev["3"]; "-Werror" }
+tpolecatScalacOptions2_13: Listing<String> = new {
+  "-encoding:utf8"
+  "-feature"
+  "-unchecked"
+  "-language:existentials"
+  "-language:experimental.macros"
+  "-language:higherKinds"
+  "-language:implicitConversions"
+  "-Xlint:adapted-args"
+  "-Xlint:constant"
+  "-Xlint:delayedinit-select"
+  "-Xlint:deprecation"
+  "-Xlint:doc-detached"
+  "-Xlint:implicit-recursion"
+  "-Xlint:implicit-not-found"
+  "-Xlint:inaccessible"
+  "-Xlint:infer-any"
+  "-Xlint:missing-interpolator"
+  "-Xlint:nullary-unit"
+  "-Xlint:option-implicit"
+  "-Xlint:package-object-classes"
+  "-Xlint:poly-implicit-overload"
+  "-Xlint:private-shadow"
+  "-Xlint:stars-align"
+  "-Xlint:strict-unsealed-patmat"
+  "-Xlint:type-parameter-shadow"
+  "-Xlint:-byname-implicit"
+  "-Wdead-code"
+  "-Wextra-implicit"
+  "-Wnumeric-widen"
+  "-Wvalue-discard"
+  "-Wnonunit-statement"
+  "-Wunused:nowarn"
+  "-Wunused:implicits"
+  "-Wunused:explicits"
+  "-Wunused:imports"
+  "-Wunused:locals"
+  "-Wunused:params"
+  "-Wunused:patvars"
+  "-Wunused:privates"
 }
 
-/// Resolve tpolecat options for a Scala version string ("2.13.18" -> "2.13" key).
-/// Auto-selects Ci mode when $CI environment variable is set, Dev mode otherwise.
-function forVersion(scalaVersion: String): Listing<String> =
-  let (major = scalaVersion.takeWhile((c) -> c != '.'))
-  if (read?("env:CI") != null)
-    tpolecatCi.getOrElse(major, new Listing {})
-  else
-    tpolecatDev.getOrElse(major, new Listing {})
+tpolecatScalacOptions3: Listing<String> = new {
+  "-encoding:utf8"
+  "-deprecation"
+  "-feature"
+  "-unchecked"
+  "-language:experimental.macros"
+  "-language:implicitConversions"
+  "-Ykind-projector"
+  "-Wvalue-discard"
+  "-Wunused:implicits"
+  "-Wunused:explicits"
+  "-Wunused:imports"
+  "-Wunused:locals"
+  "-Wunused:params"
+  "-Wunused:privates"
+}
+
+function mkScalacOptions(version: String, mode: String): Listing<String> =
+  let (opts =
+    if (version == "2.12") tpolecatScalacOptions2_12
+    else if (version == "2.13") tpolecatScalacOptions2_13
+    else tpolecatScalacOptions3
+  )
+  let (fatalFlag = 
+    if (version == "3") "-Werror"
+    else if (version == "2.13") "-Werror"
+    else "-Xfatal-warnings"
+  )
+    if (mode == "ci") (opts.toList() + fatalFlag).toListing()
+    else opts
+
+function mkBaseMain(version: String, mode: String): P.ScalaModule = new {
+  scalacOptions = mkScalacOptions(version, mode)
+  compileOrder = "java-then-scala"
+}
+
+function mkBaseTest(version: String, mode: String): P.ScalaTestModule =
+  (mkBaseMain(version, mode)).asTest()
+
+function mkBaseJs(version: String, mode: String): P.ScalaJsModule =
+  ((mkBaseMain(version, mode)).asJs()) {
+    scalaJsVersion = "1.18.2"
+  }
+
+function mkBaseJsTest(version: String, mode: String): P.ScalaJsTestModule =
+  (mkBaseJs(version, mode)).asTest()
+
+function mkBaseNative(version: String, mode: String): P.ScalaNativeModule =
+  ((mkBaseMain(version, mode)).asNative()) {
+    scalaNativeVersion = "0.5.7"
+  }
+
+function mkBaseNativeTest(version: String, mode: String): P.ScalaNativeTestModule =
+  (mkBaseNative(version, mode)).asTest()
+
+// --- Scala 3 exports ---
+
+tpolecatScala3Dev = mkBaseMain("3", "dev")
+tpolecatScala3Ci  = mkBaseMain("3", "ci")
+tpolecatScala3    = if (read?("env:CI") != null) tpolecatScala3Ci else tpolecatScala3Dev
+
+tpolecatScala3TestDev = mkBaseTest("3", "dev")
+tpolecatScala3TestCi  = mkBaseTest("3", "ci")
+tpolecatScala3Test    = if (read?("env:CI") != null) tpolecatScala3TestCi else tpolecatScala3TestDev
+
+tpolecatScala3JsDev = mkBaseJs("3", "dev")
+tpolecatScala3JsCi  = mkBaseJs("3", "ci")
+tpolecatScala3Js    = if (read?("env:CI") != null) tpolecatScala3JsCi else tpolecatScala3JsDev
+
+tpolecatScala3JsTestDev = mkBaseJsTest("3", "dev")
+tpolecatScala3JsTestCi  = mkBaseJsTest("3", "ci")
+tpolecatScala3JsTest    = if (read?("env:CI") != null) tpolecatScala3JsTestCi else tpolecatScala3JsTestDev
+
+tpolecatScala3NativeDev = mkBaseNative("3", "dev")
+tpolecatScala3NativeCi  = mkBaseNative("3", "ci")
+tpolecatScala3Native    = if (read?("env:CI") != null) tpolecatScala3NativeCi else tpolecatScala3NativeDev
+
+tpolecatScala3NativeTestDev = mkBaseNativeTest("3", "dev")
+tpolecatScala3NativeTestCi  = mkBaseNativeTest("3", "ci")
+tpolecatScala3NativeTest    = if (read?("env:CI") != null) tpolecatScala3NativeTestCi else tpolecatScala3NativeTestDev
+
+// --- Scala 2.13 exports ---
+
+tpolecatScala213Dev = mkBaseMain("2.13", "dev")
+tpolecatScala213Ci  = mkBaseMain("2.13", "ci")
+tpolecatScala213    = if (read?("env:CI") != null) tpolecatScala213Ci else tpolecatScala213Dev
+
+tpolecatScala213TestDev = mkBaseTest("2.13", "dev")
+tpolecatScala213TestCi  = mkBaseTest("2.13", "ci")
+tpolecatScala213Test    = if (read?("env:CI") != null) tpolecatScala213TestCi else tpolecatScala213TestDev
+
+tpolecatScala213JsDev = mkBaseJs("2.13", "dev")
+tpolecatScala213JsCi  = mkBaseJs("2.13", "ci")
+tpolecatScala213Js    = if (read?("env:CI") != null) tpolecatScala213JsCi else tpolecatScala213JsDev
+
+tpolecatScala213JsTestDev = mkBaseJsTest("2.13", "dev")
+tpolecatScala213JsTestCi  = mkBaseJsTest("2.13", "ci")
+tpolecatScala213JsTest    = if (read?("env:CI") != null) tpolecatScala213JsTestCi else tpolecatScala213JsTestDev
+
+tpolecatScala213NativeDev = mkBaseNative("2.13", "dev")
+tpolecatScala213NativeCi  = mkBaseNative("2.13", "ci")
+tpolecatScala213Native    = if (read?("env:CI") != null) tpolecatScala213NativeCi else tpolecatScala213NativeDev
+
+tpolecatScala213NativeTestDev = mkBaseNativeTest("2.13", "dev")
+tpolecatScala213NativeTestCi  = mkBaseNativeTest("2.13", "ci")
+tpolecatScala213NativeTest    = if (read?("env:CI") != null) tpolecatScala213NativeTestCi else tpolecatScala213NativeTestDev
+
+// --- Scala 2.12 exports ---
+
+tpolecatScala212Dev = mkBaseMain("2.12", "dev")
+tpolecatScala212Ci  = mkBaseMain("2.12", "ci")
+tpolecatScala212    = if (read?("env:CI") != null) tpolecatScala212Ci else tpolecatScala212Dev
+
+tpolecatScala212TestDev = mkBaseTest("2.12", "dev")
+tpolecatScala212TestCi  = mkBaseTest("2.12", "ci")
+tpolecatScala212Test    = if (read?("env:CI") != null) tpolecatScala212TestCi else tpolecatScala212TestDev
+
+tpolecatScala212JsDev = mkBaseJs("2.12", "dev")
+tpolecatScala212JsCi  = mkBaseJs("2.12", "ci")
+tpolecatScala212Js    = if (read?("env:CI") != null) tpolecatScala212JsCi else tpolecatScala212JsDev
+
+tpolecatScala212JsTestDev = mkBaseJsTest("2.12", "dev")
+tpolecatScala212JsTestCi  = mkBaseJsTest("2.12", "ci")
+tpolecatScala212JsTest    = if (read?("env:CI") != null) tpolecatScala212JsTestCi else tpolecatScala212JsTestDev
+
+tpolecatScala212NativeDev = mkBaseNative("2.12", "dev")
+tpolecatScala212NativeCi  = mkBaseNative("2.12", "ci")
+tpolecatScala212Native    = if (read?("env:CI") != null) tpolecatScala212NativeCi else tpolecatScala212NativeDev
+
+tpolecatScala212NativeTestDev = mkBaseNativeTest("2.12", "dev")
+tpolecatScala212NativeTestCi  = mkBaseNativeTest("2.12", "ci")
+tpolecatScala212NativeTest    = if (read?("env:CI") != null) tpolecatScala212NativeTestCi else tpolecatScala212NativeTestDev
+
+/// Returns the auto-select base template for a given Scala version string.
+/// "3.7.4" -> tpolecatScala3, "2.13.18" -> tpolecatScala213, "2.12.20" -> tpolecatScala212
+function forVersion(scalaVersion: String): P.ScalaModule =
+  if (scalaVersion.startsWith("3")) tpolecatScala3
+  else if (scalaVersion.startsWith("2.13")) tpolecatScala213
+  else tpolecatScala212
