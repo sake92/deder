@@ -11,8 +11,6 @@ import ba.sake.deder.BaseIntegrationSuite
 
 class BspResilienceSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout: Duration = 10.minutes
-
   private val testResourceDir: os.Path = os.pwd / "integration/test/resources"
   private val bspRequestTimeoutMinutes = 5L
 

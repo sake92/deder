@@ -9,7 +9,6 @@ import ba.sake.deder.BaseIntegrationSuite
 
 class BspVisibilityIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout: Duration = 10.minutes
   private val bspRequestTimeoutMinutes = 5L
 
   private def targetId(baseUri: String, moduleId: String) = new BuildTargetIdentifier(s"$baseUri#$moduleId")

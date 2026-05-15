@@ -4,8 +4,6 @@ import scala.concurrent.duration.*
 
 class RunTestsSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout: Duration = 3.minutes
-
   test("deder should run JUnit4 tests") {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "junit4", "-t", "test")

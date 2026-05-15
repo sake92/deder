@@ -6,8 +6,6 @@ import ba.sake.tupson.*
 
 class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 2.minute
-
   // default command is compile
   // and the logs go to stderr!
   test("deder should compile scalajs project") {

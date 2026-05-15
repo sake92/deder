@@ -7,8 +7,6 @@ import ba.sake.tupson.*
 
 class IntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 2.minute
-
   test("deder should work with multimodule project") {
     withTestProject("sample-projects/multi") { projectPath =>
       // deder version

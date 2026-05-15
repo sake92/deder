@@ -4,8 +4,6 @@ import scala.concurrent.duration.*
 
 class CustomRepoIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 2.minute
-
   test("deder should resolve deps from a file:// custom repository") {
     withTestProject("sample-projects/custom-repo") { projectPath =>
       val localRepoUrl = (projectPath / "local-repo").toNIO.toUri.toString

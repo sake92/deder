@@ -7,8 +7,6 @@ import org.apache.maven.model.io.xpp3.MavenXpp3Reader
 
 class PublishIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 2.minute
-
   test("deder should make publishArtifacts") {
     withTestProject("sample-projects/publish") { projectPath =>
       executeDederCommand(projectPath, "exec", "-m", "lib1", "-t", "publishArtifacts").out.text()

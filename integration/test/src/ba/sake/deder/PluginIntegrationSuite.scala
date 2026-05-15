@@ -4,8 +4,6 @@ import scala.concurrent.duration.*
 
 class PluginIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 5.minute
-
   // copy the whole config directory, because the test is run from tmp/temp_folder
   // so the sample modules can just refer to it without needing to tweak paths
   private def stageConfigSupport(parentDir: os.Path): Unit = {

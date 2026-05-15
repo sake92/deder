@@ -4,8 +4,6 @@ import scala.concurrent.duration.*
 
 class ServerRestartSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 2.minute
-
   test("rapid restart loop — deder shutdown then deder version should not hang") {
     withTestProject("sample-projects/multi") { projectPath =>
       for (i <- 1 to 5) {
