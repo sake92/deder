@@ -14,6 +14,7 @@ local const function pom(artId: String, artName: String) = new PomSettings {
   version = read?("env:VERSION")
   name = artName
   description = name
+  url = "https://github.com/sake92/deder"
   licenses {
     new PomLicense {
       name = "Apache 2.0 License"
