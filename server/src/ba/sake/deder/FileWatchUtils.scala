@@ -18,13 +18,17 @@ object FileWatchUtils:
     * Single source of truth — used by DederBspServer. */
   val bspExcludedDirNames: Seq[String] = Seq(".deder", ".bsp", ".metals", ".idea", ".vscode")
 
-  /** True if path is under .deder/ (any file or directory under .deder/). */
+  /** True if the path is anywhere under `.deder/`.
+    * Covers the entire `.deder/` tree: build output, logs, lock files, sockets, etc.
+    * Callers must check `server.properties` separately if needed (it's under `.deder/` too). */
   def isDederArtifact(path: os.Path, projectRoot: os.Path): Boolean =
-    path.relativeTo(projectRoot).segments.toSeq.headOption.contains(".deder")
+    path.startsWith(projectRoot) &&
+    path.relativeTo(projectRoot).segments.headOption.contains(".deder")
 
   /** True if the path's first segment relative to project root is a known dev/build-tool directory.
     * Uses root-relative prefix matching (not segment containment) to avoid false positives
-    * on nested directories named "target" or "out" inside source trees. */
+    * on nested directories named "target" or "out" inside source trees.
+    * Returns false for paths outside `projectRoot` (instead of throwing). */
   def isDevArtifact(path: os.Path, projectRoot: os.Path): Boolean =
-    val firstSegment = path.relativeTo(projectRoot).segments.toSeq.headOption.getOrElse("")
-    ignoredDirNames.contains(firstSegment)
+    path.startsWith(projectRoot) &&
+    ignoredDirNames.contains(path.relativeTo(projectRoot).segments.headOption.getOrElse(""))
