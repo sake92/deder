@@ -250,15 +250,32 @@ object DederPklRenderer {
         g: ModuleGroup,
         indent: Int,
     ): String = {
-        val hasCommon = common.nonEmpty
-        val hasAnyDelta = deltas.values.exists(_.nonEmpty)
+        // If using tpolecat/typelevel template, diff against its default options
+        val (effectiveCommon, effectiveDeltas) = if (g.usesTpolecat || g.usesTypelevel) {
+            val refVersion = g.crossScalaVersions.headOption.getOrElse("2.13")
+            val templateSet = if (g.usesTpolecat)
+                TemplateOptionsReader.tpolecatScalacOptions(TemplateOptionsReader.tpolecatOptions, refVersion)
+            else
+                TemplateOptionsReader.typelevelScalacOptions(TemplateOptionsReader.typelevelOptions, refVersion)
+            if (templateSet.isEmpty)
+                // Template not loadable (e.g. test env): suppress all
+                return ""
+            else {
+                val filteredCommon = common.filterNot(templateSet.contains)
+                val filteredDeltas = deltas.view.mapValues(_.filterNot(templateSet.contains)).filter(_._2.nonEmpty).toMap
+                (filteredCommon, filteredDeltas)
+            }
+        } else (common, deltas)
+
+        val hasCommon = effectiveCommon.nonEmpty
+        val hasAnyDelta = effectiveDeltas.values.exists(_.nonEmpty)
         if (!hasCommon && !hasAnyDelta) return ""
-        if (g.usesTpolecat || g.usesTypelevel) return ""
+
         val spaces = " " * indent
         val i1 = " " * (indent + 2)
         val i2 = " " * (indent + 4)
-        val commonEntries = common.map(o => s"""$i1"$o"""").mkString("\n")
-        val whenEntries = deltas.toSeq.sortBy(_._1).flatMap { (v, items) =>
+        val commonEntries = effectiveCommon.map(o => s"""$i1"$o"""").mkString("\n")
+        val whenEntries = effectiveDeltas.toSeq.sortBy(_._1).flatMap { (v, items) =>
             if (items.nonEmpty) {
                 val itemLines = items.map(o => s"""$i2"$o"""").mkString("\n")
                 Some(s"""${i1}when (sv == "$v") {\n$itemLines\n$i1}""")
@@ -710,8 +727,24 @@ object DederPklRenderer {
         indent: Int,
         scalaVersionCtx: Option[ScalaVersionCtx],
     ): String = {
-        if (g.usesTpolecat || g.usesTypelevel) ""
-        else renderScalacOptions(m.scalacOptions, indent)
+        if (g.usesTpolecat || g.usesTypelevel) {
+            val version = scalaVersionCtx match {
+                case Some(ScalaVersionCtx.Literal(v)) => v
+                case _                                 => m.scalaVersion
+            }
+            val templateSet = if (g.usesTpolecat)
+                TemplateOptionsReader.tpolecatScalacOptions(TemplateOptionsReader.tpolecatOptions, version)
+            else
+                TemplateOptionsReader.typelevelScalacOptions(TemplateOptionsReader.typelevelOptions, version)
+            if (templateSet.isEmpty)
+                // Template not loadable (e.g. test env): suppress all
+                ""
+            else {
+                val filtered = m.scalacOptions.filterNot(templateSet.contains)
+                if (filtered.isEmpty) ""
+                else renderScalacOptions(filtered, indent)
+            }
+        } else renderScalacOptions(m.scalacOptions, indent)
     }
 
     /** Suppress javacOptions when the typelevel template already provides them. */
