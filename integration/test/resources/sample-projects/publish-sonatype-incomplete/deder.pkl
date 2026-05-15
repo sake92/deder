@@ -1,0 +1,21 @@
+amends "../../../../../config/DederProject.pkl"
+
+local const lib1 = new ScalaModule {
+  scalaVersion = "3.7.1"
+  id = "lib1"
+  deps {
+    "com.lihaoyi::os-lib:0.11.6"
+  }
+  pomSettings = new PomSettings {
+    groupId = "com.example"
+    artifactId = "lib-incomplete"
+    version = "1.0.0"
+  }
+  publishTo = new SonatypeCentralRepo {
+    id = "sonatype"
+  }
+}
+
+modules {
+  lib1
+}

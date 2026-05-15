@@ -123,6 +123,21 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("publish with incomplete POM settings for Sonatype Central should fail with all missing fields listed") {
+    withTestProject("sample-projects/publish-sonatype-incomplete") { projectPath =>
+      val result = executeDederCommand(projectPath, "exec", "-m", "lib1", "-t", "publish")
+      assert(result.exitCode != 0, s"Expected non-zero exit code, got ${result.exitCode}")
+      val err = result.stderr.text()
+      assert(err.contains("Invalid POM settings for module 'lib1'"), s"Error should mention module, got: $err")
+      assert(err.contains("description"), s"Error should mention missing description, got: $err")
+      assert(err.contains("url"), s"Error should mention missing url, got: $err")
+      assert(err.contains("licenses"), s"Error should mention missing licenses, got: $err")
+      assert(err.contains("developers"), s"Error should mention missing developers, got: $err")
+      assert(err.contains("scm.url"), s"Error should mention missing scm.url, got: $err")
+      assert(err.contains("scm.connection"), s"Error should mention missing scm.connection, got: $err")
+    }
+  }
+
   private def expectedPublishLocalFiles(baseName: String): Seq[String] =
     for { art <- Seq(".jar", "-sources.jar", "-javadoc.jar", ".pom")
           suf <- Seq("", ".md5", ".sha1")
