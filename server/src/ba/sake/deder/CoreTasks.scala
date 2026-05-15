@@ -91,14 +91,16 @@ class CoreTasks() extends StrictLogging {
     name = "allGeneratedSources",
     collectKind = TaskKind.SourceGenerator,
     description = "All generated source dirs aggregated from SourceGenerator tasks",
-    category = "Build"
+    category = "Build",
+    internal = true
   )
 
   /** Walks every dir from `allGeneratedSourcesTask` into a flat list of .java/.scala files. */
   val allGeneratedSourceFilesTask = CachedTaskBuilder
     .make[Seq[DederPath]](
       name = "allGeneratedSourceFiles",
-      category = "Build"
+      category = "Build",
+      internal = true
     )
     .dependsOn(allGeneratedSourcesTask)
     .build { ctx =>
@@ -118,7 +120,8 @@ class CoreTasks() extends StrictLogging {
     name = "allGeneratedResources",
     collectKind = TaskKind.ResourceGenerator,
     description = "All generated resource dirs aggregated from ResourceGenerator tasks",
-    category = "Build"
+    category = "Build",
+    internal = true
   )
 
   /** resource folders */
@@ -234,7 +237,8 @@ class CoreTasks() extends StrictLogging {
   val compileOnlyDependenciesTask = CachedTaskBuilder
     .make[Seq[deps.Dependency]](
       name = "compileOnlyDependencies",
-      category = "Dependencies"
+      category = "Dependencies",
+      internal = true
     )
     .dependsOn(compileOnlyDepsTask)
     .dependsOn(scalaVersionTask)
@@ -252,7 +256,8 @@ class CoreTasks() extends StrictLogging {
   val dependenciesTask = CachedTaskBuilder
     .make[Seq[deps.Dependency]](
       name = "dependencies",
-      category = "Dependencies"
+      category = "Dependencies",
+      internal = true
     )
     .dependsOn(depsTask)
     .dependsOn(scalaVersionTask)
@@ -270,7 +275,8 @@ class CoreTasks() extends StrictLogging {
     .make[Seq[deps.Dependency]](
       name = "allDependencies",
       transitive = true,
-      category = "Dependencies"
+      category = "Dependencies",
+      internal = true
     )
     .dependsOn(dependenciesTask)
     .build { ctx =>
@@ -415,7 +421,8 @@ class CoreTasks() extends StrictLogging {
   val mandatoryDependenciesTask = CachedTaskBuilder
     .make[Seq[deps.Dependency]](
       name = "mandatoryDependencies",
-      category = "Dependencies"
+      category = "Dependencies",
+      internal = true
     )
     .dependsOn(scalaVersionTask)
     .build { ctx =>
@@ -583,7 +590,8 @@ class CoreTasks() extends StrictLogging {
     .make[Seq[os.Path]](
       name = "allClassesDirs",
       transitive = true,
-      category = "Build"
+      category = "Build",
+      internal = true
     )
     .dependsOn(classesTask)
     .build { ctx =>
@@ -770,7 +778,8 @@ class CoreTasks() extends StrictLogging {
   val compilerJarsTask = CachedTaskBuilder
     .make[Seq[os.Path]](
       name = "compilerJars",
-      category = "Dependencies"
+      category = "Dependencies",
+      internal = true
     )
     .dependsOn(compilerDepsTask)
     .build { ctx =>
@@ -1386,13 +1395,12 @@ class CoreTasks() extends StrictLogging {
       }
       val cmd = ctx.module match {
         case _: ScalaModule =>
-          val allJars = (replJars ++ runClasspath).map(_.toString)
-          val cp = allJars.mkString(File.pathSeparator)
+          val replCp = replJars.map(_.toString).mkString(File.pathSeparator)
           val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)
           val mainClass =
             if scalaVersion.startsWith("3.") then "dotty.tools.repl.Main"
             else "scala.tools.nsc.MainGenericRunner"
-          Seq("java") ++ jvmOptions ++ Seq("-cp", cp, mainClass, "-classpath", userClasspath) ++ ctx.args
+          Seq("java") ++ jvmOptions ++ Seq("-cp", replCp, mainClass, "-classpath", userClasspath) ++ ctx.args
         case _ =>
           val jshellBin = javaHome.map(h => (h / "bin" / "jshell").toString).getOrElse("jshell")
           val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)

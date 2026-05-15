@@ -13,8 +13,6 @@ trait BspServerAll extends BuildServer, JvmBuildServer, JavaBuildServer, ScalaBu
 
 class BspIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout: Duration = 10.minutes
-
   private var testDir: os.Path = uninitialized
   private var bspProcess: os.SubProcess = uninitialized
   private var buildServer: BspServerAll = uninitialized
@@ -37,7 +35,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     )
     os.write.over(
       testDir / ".deder/server.properties",
-      s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+      s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\nmaxConnectSeconds=300\n",
       createFolders = true
     )
     executeDederCommand(testDir, "bsp", "install")
@@ -90,7 +88,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     assert(uber.getCapabilities.getCanRun, "uber should be runnable")
 
     val uberTest = targets.find(_.getId.getUri.endsWith("#uber-test")).get
-    assertEquals(uberTest.getTags.asScala.toList, List(BuildTargetTag.APPLICATION, BuildTargetTag.TEST))
+    assertEquals(uberTest.getTags.asScala.toList, List(BuildTargetTag.TEST))
     assert(uberTest.getCapabilities.getCanTest, "uber-test should be testable")
   }
 

@@ -1,13 +1,36 @@
-//amends "https://sake92.github.io/deder/config/v0.7.7/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/v0.9.1/DederProject.pkl"
 
-amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+//amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 local const scalaVer = "3.7.4"
 
-local const function pom(artId: String) = new PomSettings {
+local const sonatypeRepo = new SonatypeCentralRepo {
+  id = "sonatype"
+}
+
+local const function pom(artId: String, artName: String) = new PomSettings {
   groupId = "ba.sake"
   artifactId = artId
   version = read?("env:VERSION")
+  name = artName
+  description = name
+  url = "https://github.com/sake92/deder"
+  licenses {
+    new PomLicense {
+      name = "Apache 2.0 License"
+      url = "https://opensource.org/license/apache-2.0"
+    }
+  }
+  developers {
+    new PomDeveloper {
+      id = "sake92"
+      name = "Sakib Hadžiavdić"
+      email = "sake92@sake.ba"
+    }
+  }
+  scm {
+    url = "git@github.com:sake92/deder.git"
+  }
 }
 
 local const config = new JavaModule {
@@ -15,41 +38,42 @@ local const config = new JavaModule {
   deps {
     "org.pkl-lang:pkl-config-java:0.30.2"
   }
-  pomSettings = pom("deder-config")
+  pomSettings = pom("deder-config", "Deder config")
+  publish = true
+  publishTo = sonatypeRepo
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
 }
 
-local const testCommon = new ScalaModule {
-  id = "test-common"
-  scalaVersion = scalaVer
-  publish = false
-  deps {
-    "ba.sake::tupson:0.18.0"
-    "com.lihaoyi::os-lib:0.11.6"
-    "org.scala-sbt:test-interface:1.0"
-    "com.lihaoyi::fansi:0.5.1"
-  }
-}
-
-local const testCommonTest = new ScalaTestModule {
-  id = "test-common-test"
-  root = "test-common/test"
-  scalaVersion = scalaVer
-  moduleDeps { testCommon }
-  deps {
-    "org.scalameta::munit:1.2.1"
-  }
-  junitXmlReport {
-    enabled = true
-  }
-}
+local const testCommonModules =
+  new CreateScalaModules {
+    root = "test-common"
+    template = new {
+      scalaVersion = scalaVer
+      publish = false
+      deps {
+        "ba.sake::tupson:0.18.0"
+        "com.lihaoyi::os-lib:0.11.6"
+        "org.scala-sbt:test-interface:1.0"
+        "com.lihaoyi::fansi:0.5.1"
+      }
+    }
+    testTemplate = (template.asTest()) {
+      deps {
+        "org.scalameta::munit:1.2.1"
+      }
+      junitXmlReport {
+        enabled = true
+      }
+    }
+  }.get
 
 local const testRunner = new ScalaModule {
   id = "test-runner"
   scalaVersion = scalaVer
   publish = false
-  moduleDeps { testCommon }
+  moduleDeps { testCommonModules.main }
   mainClass = "ba.sake.deder.testing.forked.ForkedTestMain"
+  shadeRulesFile = "shade.rules"
 }
 
 local const pluginApi = new ScalaModule {
@@ -57,7 +81,9 @@ local const pluginApi = new ScalaModule {
   root = "plugin-api"
   scalaVersion = scalaVer
   moduleDeps { config }
-  pomSettings = pom("deder-plugin-api")
+  pomSettings = pom("deder-plugin-api", "Deder plugin API")
+  publish = true
+  publishTo = sonatypeRepo
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
   deps {
     "ba.sake::tupson:0.18.0"
@@ -76,7 +102,7 @@ local const serverModules =
     template = new ScalaModule {
       scalaVersion = scalaVer
       publish = false
-      moduleDeps { config; testCommon; pluginApi }
+      moduleDeps { config; testCommonModules.main; pluginApi }
       mainClass = "ba.sake.deder.ServerMain"
       scalacOptions {
         "-Yretain-trees"
@@ -86,7 +112,7 @@ local const serverModules =
           ["Multi-Release"] = "true"
         }
       }
-      pomSettings = pom("deder-server")
+      pomSettings = pom("deder-server", "Deder server")
       deps {
         "org.jgrapht:jgrapht-core:1.5.2"
         "org.jgrapht:jgrapht-io:1.5.2"
@@ -134,7 +160,7 @@ local const client = new JavaModule {
   id = "client"
   publish = false
   mainClass = "ba.sake.deder.client.Main"
-  pomSettings = pom("deder-client")
+  pomSettings = pom("deder-client", "Deder client")
   deps {
     "com.fasterxml.jackson.core:jackson-databind:2.20.1"
   }
@@ -160,13 +186,16 @@ local const integrationTest = new ScalaTestModule {
   junitXmlReport {
     enabled = true
   }
+  forkEnv {
+    ["DEDER_TMP_M2_REPO"] = "tmp/m2"
+    ["DEDER_PLUGIN_API_VERSION"] = "it-test-version"
+  }
 }
 
 modules {
   config
   pluginApi
-  testCommon
-  testCommonTest
+  ...testCommonModules.all
   testRunner
   ...serverModules.all
   client

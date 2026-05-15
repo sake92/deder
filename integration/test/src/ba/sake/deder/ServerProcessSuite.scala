@@ -4,8 +4,6 @@ import scala.concurrent.duration.*
 
 class ServerProcessSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 2.minute
-
   test("server lock should prevent multiple servers for the same project") {
     withTestProject("sample-projects/multi") { projectPath =>
       // 1. Start first server via CLI (blocks until server responds = fully up)

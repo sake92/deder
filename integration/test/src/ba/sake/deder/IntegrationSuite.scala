@@ -7,8 +7,6 @@ import ba.sake.tupson.*
 
 class IntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 2.minute
-
   test("deder should work with multimodule project") {
     withTestProject("sample-projects/multi") { projectPath =>
       // deder version
@@ -62,7 +60,6 @@ class IntegrationSuite extends BaseIntegrationSuite {
         assertEquals(
           dederOutput,
           """|Stage #0:
-             |  common.allGeneratedSources
              |  common.classes
              |  common.compileOnlyDeps
              |  common.deps
@@ -79,19 +76,11 @@ class IntegrationSuite extends BaseIntegrationSuite {
              |  common.semanticdbEnabled
              |  common.sources
              |Stage #1:
-             |  common.allClassesDirs
-             |  common.allGeneratedSourceFiles
-             |  common.compileOnlyDependencies
              |  common.compilerDeps
-             |  common.dependencies
              |  common.javacAnnotationProcessors
-             |  common.mandatoryDependencies
              |  common.scalaSemanticdbVersion
              |  common.scalacPlugins
              |  common.sourceFiles
-             |Stage #2:
-             |  common.allDependencies
-             |  common.compilerJars
              |Stage #3:
              |  common.compileClasspath
              |Stage #4:

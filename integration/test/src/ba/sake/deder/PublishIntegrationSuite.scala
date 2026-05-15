@@ -7,8 +7,6 @@ import org.apache.maven.model.io.xpp3.MavenXpp3Reader
 
 class PublishIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 2.minute
-
   test("deder should make publishArtifacts") {
     withTestProject("sample-projects/publish") { projectPath =>
       executeDederCommand(projectPath, "exec", "-m", "lib1", "-t", "publishArtifacts").out.text()
@@ -122,6 +120,21 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
       } finally {
         jarFile.close()
       }
+    }
+  }
+
+  test("publish with incomplete POM settings for Sonatype Central should fail with all missing fields listed") {
+    withTestProject("sample-projects/publish-sonatype-incomplete") { projectPath =>
+      val result = executeDederCommand(projectPath, "exec", "-m", "lib1", "-t", "publish")
+      assert(result.exitCode != 0, s"Expected non-zero exit code, got ${result.exitCode}")
+      val err = result.err.text()
+      assert(err.contains("Invalid POM settings for module 'lib1'"), s"Error should mention module, got: $err")
+      assert(err.contains("description"), s"Error should mention missing description, got: $err")
+      assert(err.contains("url"), s"Error should mention missing url, got: $err")
+      assert(err.contains("licenses"), s"Error should mention missing licenses, got: $err")
+      assert(err.contains("developers"), s"Error should mention missing developers, got: $err")
+      assert(err.contains("scm.url"), s"Error should mention missing scm.url, got: $err")
+      assert(err.contains("scm.connection"), s"Error should mention missing scm.connection, got: $err")
     }
   }
 

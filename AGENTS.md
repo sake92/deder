@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-Deder is a **client-server JVM build tool** for Scala/Java projects. Configuration is defined in [Pkl](https://pkl-lang.org/) (`deder.pkl`), the server compiles via Zinc, and communication happens over Unix domain sockets. It implements the [BSP (Build Server Protocol)](https://build-server-protocol.github.io/) for IDE integration.
+Deder is a **client-server JVM build tool** for Scala/Java projects. 
+Configuration is defined in [Pkl](https://pkl-lang.org/) (`deder.pkl`), the server compiles via Zinc, and communication happens over Unix domain sockets. 
+It implements the [BSP (Build Server Protocol)](https://build-server-protocol.github.io/) for IDE integration.
 
 Prefer to use these tools/skills if available:
 - "scalex" for scala/java definitions, implementations, usages, imports, members, scaladoc, codebase overview, package 
@@ -27,8 +29,7 @@ This project uses Deder to build itself (`deder.pkl` build file). Key commands:
 
 ```sh
 ./scripts/gen-config-bindings.sh   # regenerate Pkl→Java config bindings (required before first build)
-deder exec -t assembly -m server   # build server fat JAR
-deder exec -t assembly -m client   # build client fat JAR
+./scripts/build-jars.sh            # build client, server and test-runner fat JAR (assembly)
 deder exec -t test -m server-test  # run unit tests (munit)
 ./scripts/run-it-tests.sh          # build everything + run integration tests
 ./scripts/run-it-tests.sh ba.sake.deder.bsp.BspIntegrationSuite  # single IT suite
@@ -38,7 +39,8 @@ Check out @README.md @CONTRIBUTING.md @docs/content/reference/server-properties.
 
 ## Key Patterns
 
-- prefer running single test and integration test (because they take very long)
+- prefer running single unit test 
+- prefer running single integration test, because they take very long and can be flaky
 
 ### Task DAG
 The core abstraction is `Task[T, Deps]` (`server/src/ba/sake/deder/Task.scala`). Tasks form a typed DAG:
@@ -76,6 +78,7 @@ CLI communication uses newline-delimited JSON over Unix sockets. Message types a
 - **Examples**: `examples/` contains working sample projects (multi-module, cross-platform, ScalaJS, etc.). Each has a `reset.sh` that copies the server JAR and runs `deder bsp install`
 - **Design docs**: Never commit files in `docs/superpowers/` directory
 - **Git**: Do not commit anything without explicit user permission
+- **Git**: Create a new worktree for bigger/impactful changes (multi-file, multi-commit, or behavioral). Use `git worktree add` with a descriptive branch name (e.g., `fix/server-restart-hardening`). This keeps `main` clean and avoids conflicts with the running Deder server. Never work directly on `main` for anything beyond trivial single-file edits.
 
 ## Output Layout
 
@@ -85,6 +88,8 @@ All build artifacts go under `.deder/out/<moduleId>/<taskName>/`. Cache metadata
 
 Check @CONTRIBUTING.md for technical details, how to test server, client, test-runner changes locally.  
 
+Use "deder shutdown && sleep 1" to kill the server.
+
 You can use one of @examples/ scenarios to test changes, just make sure to revert when you finish testing.
 
 You can clean results/cache/metadata per task and per module with "deder clean -m mymodule -t mytask".  
@@ -92,4 +97,32 @@ Or leave out both to clean everything.
 
 Keep integration test classes rather small, because then it is easier to run them one by one.  
 Run minimal affected integration tests, rarely all of them.
+
+## JarJar Shading (`jarjar-abrams 1.16.0`)
+
+Assembly shading is configured via `shadeRulesFile` on a module in `deder.pkl`.  
+The rules file uses standard jarjar directives (`rule`, `keep`, `zap`).  
+Implementation: `PublishTasks.scala` reads the config → `JarUtils.scala` calls `Shader.parseRulesFile` + `Shader.shadeFile`.
+
+### Critical pitfalls learned from shading the test-runner
+
+1. **`keep` drops unreachable classes — NOT a "preserve" directive.**  
+   In jarjar-abrams, `keep` marks classes as roots for dependency analysis; all classes not reachable from roots are **discarded**. Use a no-op `rule` to protect classes from renaming: `rule sbt.** sbt.@1`.
+
+2. **Jarjar rewrites ALL bytecode references matching any rule pattern**, even for classes not in the JAR itself (e.g. `java.lang.Object`).  
+   Always add no-op rules for JDK/standard-library packages BEFORE any shade rules:
+   ```
+   rule java.** java.@1
+   rule javax.** javax.@1
+   rule scala.** scala.@1
+   ```
+
+3. **Broad wildcard patterns (`*.**`) cause `ArrayIndexOutOfBoundsException`** in jarjar-abrams' `ScalaSigAnnotationVisitor` when rewriting Scala signature annotations.  
+   Use targeted package-specific rules (`ba.sake.tupson.** → shaded.ba.sake.tupson.@1`) instead of catch-all patterns.
+
+4. **Tupson's `@type` discriminator uses simple names** (e.g. `"ForkStarted"`, not FQCN), so the JSON protocol is unaffected by shading.  
+   Bytecode references to renamed classes are rewritten, but string literals (including tupson's `@type` values) are not.
+
+5. **The `mainClass` in `deder.pkl` and the server's hardcoded main-class string must match the post-shading name.**  
+   The `ForkedTestOrchestrator` (in the unshaded server JAR) must reference the shaded main class name when spawning forked test JVMs.
 

@@ -1,5 +1,6 @@
 package ba.sake.deder.client.cli;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.*;
@@ -14,7 +15,8 @@ public class DederCliClientReadThread extends Thread {
     private final AtomicBoolean running;
     private final InputStream is;
 
-    private final ObjectMapper jsonMapper = new ObjectMapper();
+    private final ObjectMapper jsonMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public DederCliClientReadThread(Consumer<String> logger, AtomicBoolean running, InputStream is) {
         super("DederCliClientReadThread");
@@ -65,11 +67,17 @@ public class DederCliClientReadThread extends Thread {
                     System.exit(subprocessRunningThread.getExitCode());
                 }
                 // else just let it run.. either new message will kill it, or user with CTRL+C
-            } else if (message instanceof ServerMessage.Exit(int exitCode)) {
+            } else if (message instanceof ServerMessage.Exit(int exitCode, boolean serverShuttingDown)) {
                 if (subprocessRunningThread != null && subprocessRunningThread.isAlive()) {
-                    // TODO is this logic sound? :/
                     logger.accept("Subprocess still running, not exiting...");
                 } else {
+                    if (serverShuttingDown) {
+                        // Give the server time to release the lock and close sockets
+                        // before this client process exits. The shell's && depends on
+                        // this process terminating, so a new 'deder' command would start
+                        // before the old server finished cleanup otherwise.
+                        try { Thread.sleep(1500); } catch (InterruptedException e) { }
+                    }
                     // running.set(false);
                     System.exit(exitCode);
                 }

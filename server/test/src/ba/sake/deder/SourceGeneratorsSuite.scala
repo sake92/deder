@@ -79,7 +79,9 @@ class SourceGeneratorsSuite extends munit.FunSuite {
     val tasksResolver = TasksResolver(parsed, tasksRegistry)
 
     val graph = tasksResolver.taskInstancesGraph
-    val edges = graph.edgeSet().asScala
+    val edges = graph
+      .edgeSet()
+      .asScala
       .map(e => (graph.getEdgeSource(e).id, graph.getEdgeTarget(e).id))
       .toSet
     Seq("common", "frontend", "backend", "uber").foreach { m =>
@@ -106,7 +108,8 @@ class SourceGeneratorsSuite extends munit.FunSuite {
     val tasksRegistry = TasksRegistry(coreTasks.all ++ Seq(gen, fanIn))
     val pool = java.util.concurrent.Executors.newFixedThreadPool(4)
     try {
-      val state = DederProjectState(tasksRegistry, Int.MaxValue, pool, () => ())
+      val state =
+        DederProjectState(tasksRegistry, Int.MaxValue, pool, () => (), configFile = testProjectDir / "deder.pkl")
       val notif = new ServerNotificationsLogger(_ => ())
       val results = state.executeTasks(
         requestId = java.util.UUID.randomUUID().toString,

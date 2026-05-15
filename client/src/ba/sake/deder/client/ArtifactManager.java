@@ -53,7 +53,7 @@ public class ArtifactManager {
      * Resolves the server version using three sources in priority order:
      * 1. server.properties "version" key
      * 2. deder.pkl amends URL version segment
-     * 3. Latest stable release from GitHub (writes a minimal deder.pkl as a side effect)
+     * 3. Latest stable release from GitHub
      * 
      * @param serverProps server properties
      * @return resolved version string (e.g., "v0.5.1" or "early-access")
@@ -76,7 +76,6 @@ public class ArtifactManager {
         // 3. Fetch from GitHub
         var ghVersion = fetchLatestGithubVersion();
         if (ghVersion.isPresent()) {
-            writeMinimalDederPkl(ghVersion.get());
             log("Server version from GitHub releases: " + ghVersion.get());
             return ghVersion.get();
         }
@@ -315,26 +314,6 @@ public class ArtifactManager {
             log("Could not fetch latest version from GitHub: " + e.getMessage());
         }
         return Optional.empty();
-    }
-
-    /**
-     * Writes minimal deder.pkl if not exists
-     */
-    private void writeMinimalDederPkl(String version) {
-        var pklFile = Path.of("deder.pkl");
-        if (Files.exists(pklFile)) {
-            return;
-        }
-        try {
-            var content = "amends \"https://sake92.github.io/deder/config/" + version + "/DederProject.pkl\"\n";
-            content += "modules {}\n";
-            Files.writeString(pklFile, content, StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            System.err.println("No deder.pkl found — created minimal config with version " + version);
-            log("Created minimal deder.pkl with version " + version);
-        } catch (IOException e) {
-            log("Could not write minimal deder.pkl: " + e.getMessage());
-        }
     }
 
     private void log(String message) {

@@ -10,15 +10,15 @@ import java.util.Objects;
 import org.pkl.config.java.mapper.Named;
 import org.pkl.config.java.mapper.NonNull;
 
-public final class Hello {
+public final class HelloPluginModule {
   public final @NonNull HelloPluginConfig config;
 
-  public Hello(@Named("config") @NonNull HelloPluginConfig config) {
+  public HelloPluginModule(@Named("config") @NonNull HelloPluginConfig config) {
     this.config = config;
   }
 
-  public Hello withConfig(@NonNull HelloPluginConfig config) {
-    return new Hello(config);
+  public HelloPluginModule withConfig(@NonNull HelloPluginConfig config) {
+    return new HelloPluginModule(config);
   }
 
   @Override
@@ -26,7 +26,7 @@ public final class Hello {
     if (this == obj) return true;
     if (obj == null) return false;
     if (this.getClass() != obj.getClass()) return false;
-    Hello other = (Hello) obj;
+    HelloPluginModule other = (HelloPluginModule) obj;
     if (!Objects.equals(this.config, other.config)) return false;
     return true;
   }
@@ -41,7 +41,7 @@ public final class Hello {
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder(100);
-    builder.append(Hello.class.getSimpleName()).append(" {");
+    builder.append(HelloPluginModule.class.getSimpleName()).append(" {");
     appendProperty(builder, "config", this.config);
     builder.append("\n}");
     return builder.toString();

@@ -1,8 +1,9 @@
 package ba.sake.deder
 
+import java.net.URLClassLoader
 import java.time.{Duration, Instant}
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
@@ -15,14 +16,15 @@ import ba.sake.tupson.toJson
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
-import ba.sake.deder.deps.DependencyResolver
-import ba.sake.deder.plugin.PluginLoader
+import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
+import ba.sake.deder.plugin.{LoadedPlugin, PluginLoader, PluginLoaderApi}
 
 class DederProjectState(
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
     tasksExecutorService: ExecutorService,
-    onShutdown: () => Unit
+    onShutdown: () => Unit,
+    configFile: os.Path
 ) extends StrictLogging {
 
   private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)
@@ -30,17 +32,27 @@ class DederProjectState(
   @volatile private var shutdownStarted = false
 
   private val configParser = ConfigParser(writeJson = true)
-  private val configFile = DederGlobals.projectRootDir / "deder.pkl"
+  private val baseTasks = tasksRegistry.all
 
   private val stateLock = new AnyRef
   private var current: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
   // used for BSP
   private var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
 
-  private val lastRequestStartedAt = new java.util.concurrent.atomic.AtomicReference[Instant](null)
+  private val lastRequestEndedAt = new java.util.concurrent.atomic.AtomicReference[Instant](Instant.now())
+  private val inFlightRequests = new AtomicInteger(0)
 
   private val watchedTasksLock = new AnyRef
   private var watchedTasks = Seq.empty[WatchedTaskData]
+  private var loadedPlugins = Seq.empty[LoadedPlugin]
+
+  // Track active BSP servers for graceful teardown on CLI shutdown
+  private val bspServers = new java.util.concurrent.ConcurrentLinkedQueue[ba.sake.deder.bsp.DederBspServer]()
+
+  // Callback to release the server lock early (before executor shutdown)
+  private var releaseServerLockCallback: () => Unit = () => ()
+  def setReleaseServerLock(cb: () => Unit): Unit = { releaseServerLockCallback = cb }
+  def releaseServerLock(): Unit = releaseServerLockCallback()
 
   reloadProject()
 
@@ -48,10 +60,11 @@ class DederProjectState(
 
   def readState(useLastGood: Boolean): Either[String, DederProjectStateData] =
     stateLock.synchronized {
-      if useLastGood then lastGood match {
-        case Left(_) => current // current has latest error message!
-        case Right(value) => Right(value)
-      }
+      if useLastGood then
+        lastGood match {
+          case Left(_)      => current // current has latest error message!
+          case Right(value) => Right(value)
+        }
       else current
     }
 
@@ -84,22 +97,20 @@ class DederProjectState(
                   return
             val dependencyResolver = new DependencyResolver(assembledRepos)
 
-            // Load plugin tasks before TasksResolver so they are included in the execution graph
+            // Load plugin tasks before TasksResolver so they are included in the execution graph.
+            // Plugin tasks are kept separately and the effective registry is rebuilt per reload.
             val coreTasksApi = CoreTasksApiAdapter(new CoreTasks())
             val pluginLoader = PluginLoader(coreTasksApi, dependencyResolver)
-            pluginLoader.load(configFile) match {
-              case Left(err) =>
-                logger.warn(s"Failed to reload plugins: $err")
-              case Right(tasks) =>
-                tasks.foreach(t => tasksRegistry.add(t.asInstanceOf[Task[?, ?]]))
-            }
-
-            val tasksResolver = TasksResolver(newConfig, tasksRegistry)
+            loadedPlugins = pluginLoader.load(loadedPlugins, configFile, newConfig).loadedPlugins
+            // TODO prepend plugin id to task name to avoid conflicts?
+            val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?]])
+            val effectiveRegistry = TasksRegistry(baseTasks ++ pluginTasks)
+            val tasksResolver = TasksResolver(newConfig, effectiveRegistry)
             val executionPlanner =
               ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
 
             val goodProjectStateData =
-              DederProjectStateData(newConfig, tasksRegistry, tasksResolver, executionPlanner, dependencyResolver)
+              DederProjectStateData(newConfig, effectiveRegistry, tasksResolver, executionPlanner, dependencyResolver)
             lastGood = Right(goodProjectStateData)
             current = Right(goodProjectStateData)
             triggerConfigWatchedTasks()
@@ -152,7 +163,9 @@ class DederProjectState(
             Seq.empty
           case Right(values) =>
             val plural = if values.size > 1 then "s" else ""
-            val modulesString = values.take(5).map(_._1).mkString(", ") + (if values.size > 5 then s", and ${values.size - 5} more" else "")
+            val modulesString =
+              values.take(5).map(_._1).mkString(", ") + (if values.size > 5 then s", and ${values.size - 5} more"
+                                                         else "")
             serverNotificationsLogger.add(
               ServerNotification.logInfo(
                 s"Executing '${taskName}' task on module${plural}: ${modulesString}"
@@ -268,7 +281,7 @@ class DederProjectState(
       clientParams: CliClientParams = CliClientParams(Map.empty)
   ): Seq[TaskExecResult] =
     try {
-      lastRequestStartedAt.set(Instant.now())
+      inFlightRequests.incrementAndGet()
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
 
       val state = readState(useLastGood) match
@@ -291,10 +304,22 @@ class DederProjectState(
           taskInstance.lock.lock()
         }
         DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
-        tasksExecutor.execute(requestId, tasksExecStages, moduleIds, taskName, args, watch, serverNotificationsLogger, clientParams)
+        tasksExecutor.execute(
+          requestId,
+          tasksExecStages,
+          moduleIds,
+          taskName,
+          args,
+          watch,
+          serverNotificationsLogger,
+          clientParams
+        )
       } finally {
+        // Only unlock locks actually held by this thread (prevents IllegalMonitorStateException on interrupt)
         allTaskInstances.reverse.foreach { taskInstance =>
-          taskInstance.lock.unlock()
+          try {
+            if taskInstance.lock.isHeldByCurrentThread then taskInstance.lock.unlock()
+          } catch { case _: Exception => }
         }
         DederGlobals.cancellationTokens.remove(requestId)
       }
@@ -304,6 +329,9 @@ class DederProjectState(
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
         if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         throw TaskEvaluationException(s"Error during execution of task '${taskName}': ${e.getMessage}", e)
+    } finally {
+      inFlightRequests.decrementAndGet()
+      lastRequestEndedAt.set(Instant.now())
     }
 
   def cancelRequest(requestId: String): Unit = {
@@ -408,12 +436,12 @@ class DederProjectState(
     executor.scheduleAtFixedRate(
       () => {
         try {
-          val lastStarted = lastRequestStartedAt.get()
-          if lastStarted != null then {
+           val lastEnded = lastRequestEndedAt.get()
+           if inFlightRequests.get() == 0 then {
             val now = Instant.now()
-            val inactiveDuration = Duration.between(lastStarted, now)
+            val inactiveDuration = Duration.between(lastEnded, now)
             if inactiveDuration.compareTo(maxInactiveDuration) > 0 then {
-              logger.info(s"No requests in flight for ${inactiveDuration.toMinutes} minutes, shutting down server.")
+              logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
               shutdown()
             }
           }
@@ -480,7 +508,10 @@ class DederProjectState(
           clientParams = watchedTask.clientParams
         )
         watchedTask.serverNotificationsLogger.add(
-          ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...", watchedTask.taskInstance.moduleId)
+          ServerNotification.logInfo(
+            s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+            watchedTask.taskInstance.moduleId
+          )
         )
       }
     }
@@ -533,7 +564,10 @@ class DederProjectState(
           clientParams = watchedTask.clientParams
         )
         watchedTask.serverNotificationsLogger.add(
-          ServerNotification.logInfo(s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...", watchedTask.taskInstance.moduleId)
+          ServerNotification.logInfo(
+            s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+            watchedTask.taskInstance.moduleId
+          )
         )
       }
     }
@@ -556,8 +590,41 @@ class DederProjectState(
 
   def shutdown(): Unit = {
     shutdownStarted = true
+    notifyBspClientsShuttingDown()
+    loadedPlugins.foreach(_.closeClassLoaderQuietly())
     onShutdown()
   }
+
+  def registerBspServer(server: ba.sake.deder.bsp.DederBspServer): Unit =
+    bspServers.add(server)
+
+  def unregisterBspServer(server: ba.sake.deder.bsp.DederBspServer): Unit =
+    bspServers.remove(server)
+
+  def notifyBspClientsShuttingDown(): Unit = {
+    val snapshot = bspServers.iterator().asScala.toSeq
+    if snapshot.nonEmpty then {
+      logger.info(s"Notifying ${snapshot.size} BSP client(s) of impending shutdown...")
+      snapshot.foreach { bspServer =>
+        try bspServer.initiateShutdown()
+        catch { case NonFatal(e) => logger.warn(s"Error notifying BSP client: ${e.getMessage}") }
+      }
+    }
+  }
+
+  private def closeStaleClassLoaders(previous: Seq[URLClassLoader], current: Seq[URLClassLoader]): Unit =
+    previous.distinct.foreach { old =>
+      // Compare by reference: if the same classloader instance is still active, keep it open.
+      val shouldClose = current.forall(_ ne old)
+      if shouldClose then closeClassLoader(old)
+    }
+
+  private def closeClassLoader(classLoader: URLClassLoader): Unit =
+    try classLoader.close()
+    catch {
+      case NonFatal(e) =>
+        logger.warn(s"Failed to close old plugin classloader: ${e.getMessage}")
+    }
 }
 
 case class DederProjectStateData(

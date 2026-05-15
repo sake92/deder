@@ -14,13 +14,15 @@ Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 - exploring the build with listing modules, tasks, and execution plans (visualized as DOT graphs)
 - packaging module as JAR, uber JAR, Scala.js bundle, Scala Native executable
 - executing tests
+- module REPL
 - watch mode with concurrent execution in multiple terminals
-- import from sbt (experimental, feedback needed)
+- import from sbt
 - OTEL tracing support
-- global artifact cache with checksum verification
+- basic plugins support with automatic reloading
 
 ## Adoption and feedback
 Deder is used in some of my OSS projects:
+- https://github.com/sake92/deder (yes, it bootstraps itself!)
 - https://github.com/sake92/sharaf
 - https://github.com/sake92/regenesca
 - https://github.com/sake92/squery
@@ -74,6 +76,9 @@ deder shutdown
 
 
 ################ import existing sbt project
+# autodetects build tool (currently sbt via build.sbt)
+deder import
+# explicit override (use e.g. when autodetection fails)
 deder import --from sbt
 
 ################ install shell completions
@@ -94,7 +99,8 @@ deder tasks
 ################
 # print execution plan for a task
 # supports flags: --json, --dot, --mermaid
-deder plan -m common -t compileClasspath
+deder plan -t compileClasspath -m common 
+deder plan -t compileClasspath -m uber  --mermaid > uberCompileClasspath.mermaid
 
 ################
 # dependency reports (run as normal tasks via exec)

@@ -60,7 +60,15 @@ class DederTestDiscovery(
       testClasses.flatMap { className =>
         fingerprints.collectFirst {
           case fp if matchesFingerprint(className, fp, classLoader) =>
-            (className, fp)
+            // sbt test interface spec: for module classes, the framework expects the name
+            // WITHOUT the trailing "$". The framework appends "$" based on isModule().
+            val fpIsModule = fp match {
+              case sub: SubclassFingerprint => sub.isModule
+              case ann: AnnotatedFingerprint => ann.isModule
+              case _ => false
+            }
+            val normalizedName = if fpIsModule then className.stripSuffix("$") else className
+            (normalizedName, fp)
         }
       }
     }

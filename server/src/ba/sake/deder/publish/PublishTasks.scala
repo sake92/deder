@@ -181,7 +181,20 @@ class PublishTasks(coreTasks: CoreTasks) {
         skipAssemblyEntry
       )
       val resultJarPath = ctx.out / "out.jar"
-      JarUtils.createAssemblyJar(resultJarPath, mergedJar)
+      
+      val shadeRulesOpt = ctx.module match {
+        case jm: JavaModule =>
+          val shadeRulesFile = jm.shadeRulesFile
+          if (shadeRulesFile != null) {
+            val moduleRoot = DederGlobals.projectRootDir / jm.root
+            Some(JarUtils.resolveShadeRules(Some(shadeRulesFile), moduleRoot))
+          } else {
+            None
+          }
+        case _ => None
+      }
+      
+      JarUtils.createAssemblyJar(resultJarPath, mergedJar, shadeRulesOpt)
       resultJarPath
     }
 
@@ -376,7 +389,8 @@ class PublishTasks(coreTasks: CoreTasks) {
   val publishLocalTask = TaskBuilder
     .make[Option[os.Path]](
       name = "publishLocal",
-      category = "Publishing"
+      category = "Publishing",
+      transitive = true
     )
     .dependsOn(publishArtifactsTask)
     .build { ctx =>
@@ -413,7 +427,7 @@ class PublishTasks(coreTasks: CoreTasks) {
             } else {
               ctx.notifications.add(
                 ServerNotification
-                  .logInfo(s"Skipping ${ctx.module.id} publishing because it is disabled", ctx.module.id)
+                  .logInfo(s"Skipping publishing '${ctx.module.id}' because it is disabled", ctx.module.id)
               )
             }
           case _ =>
@@ -425,7 +439,8 @@ class PublishTasks(coreTasks: CoreTasks) {
   val publishTask = TaskBuilder
     .make[String](
       name = "publish",
-      category = "Publishing"
+      category = "Publishing",
+      transitive = true
     )
     .dependsOn(publishArtifactsTask)
     .build { ctx =>
@@ -440,15 +455,23 @@ class PublishTasks(coreTasks: CoreTasks) {
         artifacts.foreach(f => os.copy(f, stagingDir / f.last))
         val stagingFiles = os.list(stagingDir)
 
-        val publishTo = ctx.module match {
-          case jm: JavaModule => jm.publishTo
-          case _ => null
+        val javaModule = ctx.module match {
+          case jm: JavaModule => jm
+          case other => throw RuntimeException(s"Module '${other.id}' does not support publish")
         }
+        val publishTo = javaModule.publishTo
         if publishTo == null then
           throw RuntimeException(
             s"publishTo is not configured for module '${ctx.module.id}' in deder.pkl. " +
               "Add e.g. `publishTo = new SonatypeCentralRepo { id = \"my-sonatype\" }` to the module definition."
           )
+
+        // validate POM settings for Sonatype Central before attempting credentials
+        publishTo match {
+          case _: SonatypeCentralRepo =>
+            PublishValidator.validateForSonatypeCentral(ctx.module.id, javaModule.pomSettings, pom.version)
+          case _ =>
+        }
 
         val credentialsFile = os.home / ".deder/credentials.pkl"
         val credentialsOpt = if os.exists(credentialsFile) then

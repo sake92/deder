@@ -5,7 +5,9 @@ import "https://sake92.github.io/deder/config/early-access/DederProject.pkl" as 
 
 class HelloPlugin extends P.DederPlugin {
   id = "hello"
-  deps { "ba.sake::deder-hello-plugin:0.1.0-SNAPSHOT" }
+  deps {
+    "ba.sake::deder-hello-plugin:0.7.8-SNAPSHOT"
+  }
   config: HelloPluginConfig = new {}
 }
 

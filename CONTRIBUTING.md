@@ -55,4 +55,15 @@ This will build the server and client, and run the integration tests:
 ---
 
 
+## Testing the plugins api changes
+
+Probably you will need to rebuild the server, see section above.
+
+If you need to make changes to the plugin api, you will have to publish it first:
+```shell
+deder exec -t publishLocal -m plugin-api
+```
+
+This will publish the "plugin-api" and "config" modules locally to .m2 repo.
+
 

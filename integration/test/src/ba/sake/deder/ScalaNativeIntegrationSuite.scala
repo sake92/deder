@@ -5,8 +5,6 @@ import scala.util.Properties
 
 class ScalaNativeIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 5.minutes
-
   // default command is compile
   // and the logs go to stderr!
   test("deder should compile scalanative cli project") {

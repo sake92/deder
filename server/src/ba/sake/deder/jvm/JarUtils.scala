@@ -10,6 +10,7 @@ import java.util.jar.JarOutputStream
 import scala.collection.mutable
 import com.eed3si9n.jarjarabrams.{ShadeRule, Shader, ShadeTarget}
 import com.typesafe.scalalogging.StrictLogging
+import scala.io.Source
 
 object JarUtils extends StrictLogging{
 
@@ -123,9 +124,8 @@ object JarUtils extends StrictLogging{
     out.close()
   }
 
-  def createAssemblyJar(resultJarPath: os.Path, mergedJar: os.Path): Unit = {
-    // TODO expose shade rules OR make it read from standard location lirke resources/META-INF/shade.rules
-    val shadeRules = Seq()
+  def createAssemblyJar(resultJarPath: os.Path, mergedJar: os.Path, shadeRulesOpt: Option[Seq[ShadeRule]] = None): Unit = {
+    val shadeRules = shadeRulesOpt.getOrElse(Seq())
     Shader.shadeFile(
       shadeRules,
       mergedJar.toNIO,
@@ -137,4 +137,30 @@ object JarUtils extends StrictLogging{
     )
 
   }
+
+  def resolveShadeRules(shadeRulesFileOpt: Option[String], moduleRoot: os.Path): Seq[ShadeRule] = {
+    shadeRulesFileOpt match {
+      case None => Seq()
+      case Some(rulesPath) =>
+        val rulesFile = if (java.nio.file.Paths.get(rulesPath).isAbsolute) {
+          os.Path(rulesPath)
+        } else {
+          moduleRoot / rulesPath
+        }
+        
+        if (os.exists(rulesFile)) {
+          try {
+            Shader.parseRulesFile(rulesFile.toNIO)
+          } catch {
+            case e: Exception =>
+              logger.warn(s"Failed to load shade rules from $rulesFile: ${e.getMessage}")
+              Seq()
+          }
+        } else {
+          logger.warn(s"Shade rules file not found: $rulesFile")
+          Seq()
+        }
+    }
+  }
+
 }

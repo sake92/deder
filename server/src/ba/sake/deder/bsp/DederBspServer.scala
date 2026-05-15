@@ -39,10 +39,21 @@ class DederBspServer(
 
   private val running = AtomicBoolean(true)
 
-  // Track in-progress compilations keyed by sorted target IDs.
-  // When a duplicate request arrives for the same targets while one is in flight,
-  // we return the existing future instead of starting a redundant compilation.
-  private val activeCompilations = new ConcurrentHashMap[String, CompletableFuture[CompileResult]]
+  // Per-module-keyed buffer for in-flight compilations.
+  // Each InFlightCompilation is registered under EVERY module ID it covers,
+  // so overlapping requests (including subsets like [A,B] vs [B]) are correctly buffered.
+  private val inFlightCompilations = new ConcurrentHashMap[String, InFlightCompilation]
+
+  private case class InFlightCompilation(
+      modulesBeingCompiled: Set[String],
+      compileFuture: CompletableFuture[CompileResult],
+      pendingRequests: ConcurrentLinkedQueue[PendingRequest]
+  )
+
+  private case class PendingRequest(
+      originId: String,
+      resultFuture: CompletableFuture[CompileResult]
+  )
 
   override def cancelRequest(params: CancelRequestParams): Unit = {
     val originId: String = params.getId match {
@@ -50,6 +61,21 @@ class DederBspServer(
       case e if e.isRight => e.getRight.toString
     }
     logger.debug(s"BSP cancel request for originId: $originId")
+
+    // Check pending (buffered) requests across all in-flight compilations
+    inFlightCompilations.values().asScala.foreach { inFlight =>
+      inFlight.pendingRequests.removeIf { pr =>
+        if pr.originId == originId then
+          val cancelled = new CompileResult(StatusCode.CANCELLED)
+          cancelled.setOriginId(originId)
+          pr.resultFuture.complete(cancelled)
+          logger.debug(s"Cancelled buffered compile request for originId: $originId")
+          true
+        else false
+      }
+    }
+
+    // Also try to cancel the primary in-flight compilation
     projectState.cancelRequest(originId)
   }
 
@@ -324,70 +350,119 @@ class DederBspServer(
       result
     }
 
-  override def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] = {
-    // Debounce: if an identical compile request is already in flight, join it
-    // instead of starting a redundant compilation, using atomic computeIfAbsent.
-    if !params.getTargets.isEmpty then {
-      val targetsKey = params.getTargets.asScala.map(_.moduleId).sorted.mkString(",")
-      return activeCompilations.computeIfAbsent(targetsKey, _ => {
-        val future = javaFuture("buildTargetCompile", Option(params.getOriginId)) {
-          logger.debug(s"buildTargetCompile for params: ${params}")
-          ensureRunning()
-          val taskId = TaskId(s"compile-${UUID.randomUUID}")
-          val taskStartParams = TaskStartParams(taskId)
-          taskStartParams.setEventTime(System.currentTimeMillis())
-          taskStartParams.setOriginId(params.getOriginId)
-          taskStartParams.setMessage(s"Compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}")
-          client.onBuildTaskStart(taskStartParams)
-          var allCompileSucceeded = true
-          withLastGoodState(_ => allCompileSucceeded = false) { projectStateData =>
-            resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).foreach { case (_, module) =>
-              val moduleId = module.id
-              val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
-              subtaskId.setParents(List(taskId.getId).asJava)
-              logger.debug(s"buildTargetCompile subtaskId ${subtaskId}")
-              val serverNotificationsLogger = makeServerNotificationsLogger(
-                originId = Option(params.getOriginId),
-                taskId = Some(subtaskId),
-                moduleId = Some(moduleId),
-                isCompileTask = true
-              )
-
-              tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty, originId = params.getOriginId) { _ =>
-                allCompileSucceeded = false
-              }
-            }
-          }
-
-          val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
-          val taskFinishParams = TaskFinishParams(taskId, status)
-          taskFinishParams.setEventTime(System.currentTimeMillis())
-          taskFinishParams.setOriginId(params.getOriginId)
-          taskFinishParams.setMessage(
-            s"Finished compiling modules: ${params.getTargets.asScala.map(_.moduleId).mkString(", ")}"
-          )
-          client.onBuildTaskFinish(taskFinishParams)
-          val result = new CompileResult(status)
-          result.setOriginId(params.getOriginId)
-          logger.debug(s"buildTargetCompile for params ${params} return: ${result}")
-          result
-        }
-        future.whenComplete { (_, _) =>
-          activeCompilations.remove(targetsKey, future)
-        }
-        future
-      })
-    }
-
-    val future = javaFuture("buildTargetCompile", Option(params.getOriginId)) {
+  private def createCompileFuture(params: CompileParams, requestedModules: Set[String]): CompletableFuture[CompileResult] =
+    javaFuture("buildTargetCompile", Option(params.getOriginId)) {
       logger.debug(s"buildTargetCompile for params: ${params}")
       ensureRunning()
-      // no need to start a task, it would confuse IDE
-      val compileResult = new CompileResult(StatusCode.OK)
-      compileResult.setOriginId(params.getOriginId)
-      compileResult
+      val taskId = TaskId(s"compile-${UUID.randomUUID}")
+      val taskStartParams = TaskStartParams(taskId)
+      taskStartParams.setEventTime(System.currentTimeMillis())
+      taskStartParams.setOriginId(params.getOriginId)
+      taskStartParams.setMessage(s"Compiling modules: ${requestedModules.mkString(", ")}")
+      client.onBuildTaskStart(taskStartParams)
+      var allCompileSucceeded = true
+      withLastGoodState(_ => allCompileSucceeded = false) { projectStateData =>
+        resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).foreach { case (_, module) =>
+          val moduleId = module.id
+          val subtaskId = TaskId(s"compile-${moduleId}-${UUID.randomUUID}")
+          subtaskId.setParents(List(taskId.getId).asJava)
+          logger.debug(s"buildTargetCompile subtaskId ${subtaskId}")
+          val serverNotificationsLogger = makeServerNotificationsLogger(
+            originId = Option(params.getOriginId),
+            taskId = Some(subtaskId),
+            moduleId = Some(moduleId),
+            isCompileTask = true
+          )
+          tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty, originId = params.getOriginId) { _ =>
+            allCompileSucceeded = false
+          }
+        }
+      }
+      val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
+      val taskFinishParams = TaskFinishParams(taskId, status)
+      taskFinishParams.setEventTime(System.currentTimeMillis())
+      taskFinishParams.setOriginId(params.getOriginId)
+      taskFinishParams.setMessage(s"Finished compiling modules: ${requestedModules.mkString(", ")}")
+      client.onBuildTaskFinish(taskFinishParams)
+      val result = new CompileResult(status)
+      result.setOriginId(params.getOriginId)
+      logger.debug(s"buildTargetCompile for params ${params} return: ${result}")
+      result
     }
-    future
+
+  private def registerFanOut(
+      compileFuture: CompletableFuture[CompileResult],
+      inFlight: InFlightCompilation
+  ): Unit =
+    compileFuture.whenComplete { (result, ex) =>
+      val pending = inFlight.pendingRequests.asScala.toSeq
+      inFlight.pendingRequests.clear()
+      pending.foreach { pr =>
+        if ex != null then pr.resultFuture.completeExceptionally(ex)
+        else {
+          val copy = new CompileResult(result.getStatusCode)
+          copy.setOriginId(pr.originId)
+          pr.resultFuture.complete(copy)
+        }
+      }
+      inFlight.modulesBeingCompiled.foreach { modId =>
+        inFlightCompilations.remove(modId, inFlight)
+      }
+    }
+
+  override def buildTargetCompile(params: CompileParams): CompletableFuture[CompileResult] = {
+    if params.getTargets.isEmpty then {
+      val future = javaFuture("buildTargetCompile", Option(params.getOriginId)) {
+        logger.debug(s"buildTargetCompile for params: ${params}")
+        ensureRunning()
+        val compileResult = new CompileResult(StatusCode.OK)
+        compileResult.setOriginId(params.getOriginId)
+        compileResult
+      }
+      return future
+    }
+
+    val requestedModules = params.getTargets.asScala.map(_.moduleId).toSet
+
+    // Check if any requested module has an in-flight compilation
+    val inFlightEntries: Set[InFlightCompilation] = requestedModules.flatMap { modId =>
+      Option(inFlightCompilations.get(modId))
+    }
+
+    // Remove stale entries (compileFuture already done)
+    inFlightEntries.filter(_.compileFuture.isDone).foreach { stale =>
+      stale.modulesBeingCompiled.foreach { modId =>
+        inFlightCompilations.remove(modId, stale)
+      }
+    }
+    val activeEntries = inFlightEntries.filter(!_.compileFuture.isDone)
+
+    if activeEntries.isEmpty then {
+      // Scenario A: No overlap — start a new compilation
+      val compileFuture = createCompileFuture(params, requestedModules)
+      val inFlight = InFlightCompilation(requestedModules, compileFuture, new ConcurrentLinkedQueue[PendingRequest]())
+      requestedModules.foreach { modId =>
+        inFlightCompilations.put(modId, inFlight)
+      }
+      registerFanOut(compileFuture, inFlight)
+      compileFuture
+    } else if requestedModules.subsetOf(activeEntries.flatMap(_.modulesBeingCompiled)) then {
+      // Scenario B: All requested modules are covered by in-flight compilations — buffer this request
+      // All in-flight entries covering these modules point to the same InFlightCompilation object
+      val inFlight = activeEntries.head
+      val pendingFuture = new CompletableFuture[CompileResult]()
+      inFlight.pendingRequests.add(PendingRequest(params.getOriginId, pendingFuture))
+      pendingFuture
+    } else {
+      // Scenario B-prime: Partial overlap — proceed normally (will block on TaskInstance locks)
+      val compileFuture = createCompileFuture(params, requestedModules)
+      val inFlight = InFlightCompilation(requestedModules, compileFuture, new ConcurrentLinkedQueue[PendingRequest]())
+      requestedModules.foreach { modId =>
+        inFlightCompilations.put(modId, inFlight)
+      }
+      registerFanOut(compileFuture, inFlight)
+      compileFuture
+    }
   }
 
   override def buildTargetCleanCache(params: CleanCacheParams): CompletableFuture[CleanCacheResult] =
@@ -487,7 +562,7 @@ class DederBspServer(
       logger.debug(s"buildTargetOutputPaths for params ${params}")
       ensureRunning()
       val modulesItems = withLastGoodState(_ => Seq.empty) { projectStateData =>
-        val excludedDirNames = Seq(".deder", ".bsp", ".metals", ".idea", ".vscode")
+        val excludedDirNames = FileWatchUtils.bspExcludedDirNames
         val outputPathsItems =
           for dirName <- excludedDirNames
           yield OutputPathItem(DederPath(dirName).absPath.toNIO.toUri.toString, OutputPathItemKind.DIRECTORY)
@@ -877,6 +952,13 @@ class DederBspServer(
   override def onBuildExit(): Unit = traced("onBuildExit") {
     logger.debug(s"onBuildExit")
     onExit() // just closes the unix socket connection
+  }
+
+  /** Called by projectState when CLI shutdown is requested — gracefully ends the BSP session */
+  def initiateShutdown(): Unit = {
+    logger.info("Initiating BSP server shutdown (CLI shutdown requested)...")
+    running.set(false)
+    try { onExit() } catch { case _: Exception => }
   }
 
   private def ensureRunning(): Unit = {

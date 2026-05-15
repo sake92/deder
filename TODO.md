@@ -1,14 +1,15 @@
 
-
 # Misc
-- autodetect sbt/maven for import
+- publish pkl configs as proper Pkl modules, good for offline/caching
 - maybe use https://github.com/encalmo/graphs coz zero deps?
-- deps graph  https://www.scala-sbt.org/sbt-dependency-graph/index.html
-- add limits on plan/modules graphing, up/down
-- color instead of quotes for "Executing 'mytask'"
-- hide some internal tasks like deps resolving etc, helper assemblyDeps.. (rebind edges when displaying)
-- color stages in plan
-- shade test-runner to avoid classpath issues.. but first make shading work good
+- init like giter8, autoimport from sbt?
+- assembly still slowish
+- nit: align lines length === with test report
+
+# Import
+- import from other maven effective POM etc
+- import from other mill
+- import from other gradle
 
 
 # Docs
@@ -18,6 +19,11 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 # Client
 
 # Compilers
+
+
+## Plugins
+- more precise reload/unload
+- add starter github repo
 
 
 # Caching
@@ -50,13 +56,12 @@ https://pkl-lang.org/main/current/pkl-doc/index.html
 - temp override of settings, say scalacOptions when running BSP request??? hmmm
 
 ## BSP
-- still lingering compilations.. maybe I broke it in recent refactors?
-- more interactive / resiliency tests
+- check if futures caching logic is ok with Metals..?
 - java main classes cant be run..??
 
 
 ## Packaging, publishing
-
+- test if user/pass works for other rpos: nexus etc
 - publish for github packages etc
 
 
@@ -69,26 +74,5 @@ Locally would be interesting to have a dashboard with nice overview:
 - filtering of modules and tasks
 - execute a task, if not "run" ?
 - HTMX and polling #simple
-
-# Add more commands
-
-- init like giter8
-- import from other build tools... maven effective POM etc
-
-
-## Plugins
-
-https://github.com/pf4j/pf4j ? no, too complex
-
-- maybe just use a simple ServiceLoader with start() + configure(): Seq[Task[?]] + stop()
-- just give it CoreTasks so it can make deps
-- add `runsBefore` so that graph can be made properly
-- define its config in Pkl and distribute in its JAR or??
-- reconfigure if its config changes
-- reload if dep changed, force always in dev mode?
-- unload if removed from project
-
-
-
 
 

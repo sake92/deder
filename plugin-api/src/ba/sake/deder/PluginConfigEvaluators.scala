@@ -10,7 +10,7 @@ import org.pkl.core.resource.ResourceReaders
 
 object PluginConfigEvaluators {
 
-  def evaluateModulePathConfig(
+  private[deder] def evaluateModulePathConfig(
       pluginClassLoader: ClassLoader,
       modulePath: String,
       configText: String
@@ -18,7 +18,8 @@ object PluginConfigEvaluators {
     val evaluatorBuilder = ConfigEvaluatorBuilder.preconfigured()
     val underlyingBuilder = evaluatorBuilder.getEvaluatorBuilder()
     val moduleKeyFactories =
-      (ModuleKeyFactories.classPath(pluginClassLoader) +: underlyingBuilder.getModuleKeyFactories().asScala.toSeq).distinct
+      (ModuleKeyFactories
+        .classPath(pluginClassLoader) +: underlyingBuilder.getModuleKeyFactories().asScala.toSeq).distinct
     underlyingBuilder.setModuleKeyFactories(moduleKeyFactories.asJava)
     val resourceReaders =
       (ResourceReaders.classPath(pluginClassLoader) +: underlyingBuilder.getResourceReaders().asScala.toSeq).distinct
@@ -35,7 +36,7 @@ object PluginConfigEvaluators {
     }
   }
 
-  def evaluateModulePath[T](
+  def evaluate[T](
       pluginClassLoader: ClassLoader,
       modulePath: String,
       configText: String,

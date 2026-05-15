@@ -4,18 +4,32 @@ import scala.concurrent.duration.*
 
 class PluginIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 5.minute
-
+  // copy the whole config directory, because the test is run from tmp/temp_folder
+  // so the sample modules can just refer to it without needing to tweak paths
   private def stageConfigSupport(parentDir: os.Path): Unit = {
-    os.copy(os.pwd / "config", parentDir / "config", createFolders = true, replaceExisting = true)
+   // os.copy(os.pwd / "config", parentDir / "config", createFolders = true, replaceExisting = true)
   }
 
   private def stageSiblingProject(parentDir: os.Path, projectName: String): os.Path = {
     val stagedPath = parentDir / projectName
     os.copy(testResourceDir / "sample-projects" / projectName, stagedPath, createFolders = true, replaceExisting = true)
-    val originalLines = os.read.lines(stagedPath / "deder.pkl")
-    val tweakedLines = Seq("""amends "../config/DederProject.pkl"""") ++ originalLines.tail
-    os.write.over(stagedPath / "deder.pkl", tweakedLines.mkString("\n"))
+    // tweak deder.pkl, because test is run from tmp/temp_folder
+    /*locally {
+      val originalLines = os.read.lines(stagedPath / "deder.pkl")
+      val tweakedLines = Seq(""" amends "../config/DederProject.pkl" """.trim) ++ originalLines.tail
+      os.write.over(stagedPath / "deder.pkl", tweakedLines.mkString("\n"))
+    }*/
+    // tweak HelloPluginModule.pkl
+    // doesnt work because it expects DederProject to be in classpath/modulepath too..
+    /*if projectName == "hello-plugin" then {
+      val originalLines = os.read.lines(stagedPath / "resources/HelloPluginModule.pkl")
+      val tweakedLines = Seq(
+        """|module ba.sake.deder.hello.HelloPluginModule
+           |import "../../config/DederProject.pkl" as P
+           |""".stripMargin
+      ) ++ originalLines.dropWhile(!_.trim.startsWith("class"))
+      os.write.over(stagedPath / "resources/HelloPluginModule.pkl", tweakedLines.mkString("\n"))
+    }*/
     os.write.over(
       stagedPath / ".deder/server.properties",
       s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",

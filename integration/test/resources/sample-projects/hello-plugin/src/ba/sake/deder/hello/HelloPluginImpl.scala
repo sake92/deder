@@ -5,13 +5,13 @@ import ba.sake.deder.*
 class HelloPluginImpl extends DederPluginApi {
   def id: String = "hello"
 
-  def tasks(coreTasks: CoreTasksApi, configText: String): Seq[AbstractTask[?]] = {
+  override def tasks(params: PluginTasksParams): Either[String, Seq[AbstractTask[?]]] = {
     val pluginModule =
-      PluginConfigEvaluators.evaluateModulePath(
+      PluginConfigEvaluators.evaluate(
         getClass.getClassLoader,
-        modulePath = "HelloPlugin.pkl",
-        configText = configText,
-        clazz = classOf[Hello]
+        modulePath = "HelloPluginModule.pkl",
+        configText = params.configText,
+        clazz = classOf[HelloPluginModule]
       )
 
     val greeting = pluginModule.config.greeting
@@ -23,6 +23,6 @@ class HelloPluginImpl extends DederPluginApi {
         greeting
       }
 
-    Seq(helloTask)
+    Right(Seq(helloTask))
   }
 }

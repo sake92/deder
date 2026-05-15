@@ -26,7 +26,8 @@ class ConcurrencySuite extends munit.FunSuite {
       }
     tasksRegistry.add(task1)
     val dederExecutorService = java.util.concurrent.Executors.newFixedThreadPool(8)
-    val state = DederProjectState(tasksRegistry, Int.MaxValue, dederExecutorService, () => ())
+    val state = DederProjectState(tasksRegistry, Int.MaxValue, dederExecutorService, () => (),
+        configFile = testProjectDir / "deder.pkl")
     val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
     // simulate clients calling "task1" concurrently
     val clientsCount = 10
@@ -66,7 +67,8 @@ class ConcurrencySuite extends munit.FunSuite {
     tasksRegistry.add(task1)
     tasksRegistry.add(task2)
     val dederExecutorService = java.util.concurrent.Executors.newFixedThreadPool(8)
-    val state = DederProjectState(tasksRegistry, Int.MaxValue, dederExecutorService, () => ())
+    val state = DederProjectState(tasksRegistry, Int.MaxValue, dederExecutorService, () => (),
+        configFile = testProjectDir / "deder.pkl")
     val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
     // simulate clients calling random tasks concurrently
     val taskNames = Seq("compile", "sources", "javacOptions")

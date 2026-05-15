@@ -11,17 +11,64 @@ case class DederBuild(
 )
 
 /** A group of modules sharing a root and builder variable.
-  * jvm is always present; js/native are optional for cross-platform projects. */
+  * concreteModules preserve the exported scala-version/platform slices. */
 case class ModuleGroup(
     builderVarName:  String,
     root:            String,
     layout:          DederProject.DirLayout,
     crossScalaVersions: Seq[String],
-    jvmModule:       ModuleDef,
-    jsModule:        Option[ModuleDef],
-    nativeModule:    Option[ModuleDef],
-    hasJsModule:     Boolean,
-    hasNativeModule: Boolean
+    concreteModules: Seq[ConcreteModule],
+    usesTpolecat:    Boolean = false,
+    usesTypelevel:   Boolean = false,
+):
+    private def platformModule(platforms: Set[String]): Option[ModuleDef] =
+        concreteModules.find(cm => platforms.contains(cm.platform)).map(_.module)
+
+    def jvmModule: ModuleDef =
+        platformModule(Set("main", "jvm")).get
+
+    def jsModule: Option[ModuleDef] =
+        platformModule(Set("js"))
+
+    def nativeModule: Option[ModuleDef] =
+        platformModule(Set("native"))
+
+    def hasJsModule: Boolean =
+        concreteModules.exists(_.platform == "js")
+
+    def hasNativeModule: Boolean =
+        concreteModules.exists(_.platform == "native")
+
+object ModuleGroup:
+    def apply(
+        builderVarName: String,
+        root: String,
+        layout: DederProject.DirLayout,
+        crossScalaVersions: Seq[String],
+        jvmModule: ModuleDef,
+        jsModule: Option[ModuleDef],
+        nativeModule: Option[ModuleDef],
+        hasJsModule: Boolean,
+        hasNativeModule: Boolean,
+        usesTpolecat: Boolean,
+        usesTypelevel: Boolean,
+    ): ModuleGroup =
+        val versions = if crossScalaVersions.nonEmpty then crossScalaVersions else Seq(jvmModule.scalaVersion)
+        val jvmPlatform = if hasJsModule || hasNativeModule then "jvm" else "main"
+        val concreteModules = versions.flatMap { scalaVersion =>
+            Seq(
+                Some(ConcreteModule(builderVarName, scalaVersion, jvmPlatform, jvmModule.copy(scalaVersion = scalaVersion))),
+                jsModule.map(m => ConcreteModule(builderVarName, scalaVersion, "js", m.copy(scalaVersion = scalaVersion))),
+                nativeModule.map(m => ConcreteModule(builderVarName, scalaVersion, "native", m.copy(scalaVersion = scalaVersion))),
+            ).flatten
+        }
+        new ModuleGroup(builderVarName, root, layout, crossScalaVersions, concreteModules, usesTpolecat, usesTypelevel)
+
+case class ConcreteModule(
+    sbtProjectId: String,
+    scalaVersion: String,
+    platform: String,
+    module: ModuleDef,
 )
 
 /** All properties of one concrete module (single platform). */
@@ -54,6 +101,7 @@ case class DepDef(
 case class ModuleDepRef(
     targetGroup:    String,
     targetPlatform: String,
+    targetScalaVersion: Option[String] = None,
     isTest:         Boolean
 )
 

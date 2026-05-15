@@ -69,6 +69,12 @@ local const ztest = (scalaTestModule("ztest")) {
   }
 }
 
+local const scalacheck = (scalaTestModule("scalacheck")) {
+  deps {
+    "org.scalacheck::scalacheck:1.19.0"
+  }
+}
+
 modules {
   junit4
   junit5
@@ -78,4 +84,5 @@ modules {
   utest
   weaver
   ztest
+  scalacheck
 }

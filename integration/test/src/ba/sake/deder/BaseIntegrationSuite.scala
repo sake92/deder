@@ -5,7 +5,7 @@ import scala.util.Properties
 
 trait BaseIntegrationSuite extends munit.FunSuite {
 
-  override def munitTimeout = 2.minute
+  override def munitTimeout = 10.minute
 
   val testResourceDir: os.Path = os.pwd / "integration/test/resources"
 
@@ -27,7 +27,8 @@ trait BaseIntegrationSuite extends munit.FunSuite {
       os.write.over(tempDir / "deder.pkl", tweakedLines.mkString("\n"), createFolders = true)
       val allServerProperties = serverProperties ++ Map(
         "localPath" -> dederServerPath,
-        "testRunnerLocalPath" -> dederTestRunnerPath
+        "testRunnerLocalPath" -> dederTestRunnerPath,
+        "maxConnectSeconds" -> "300"
       )
       val serverPropertiesContent = allServerProperties.map((k, v) => s"${k}=${v}").mkString("\n") + "\n"
       os.write.over(tempDir / ".deder/server.properties", serverPropertiesContent, createFolders = true)

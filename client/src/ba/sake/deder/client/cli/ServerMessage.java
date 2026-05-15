@@ -1,10 +1,12 @@
 package ba.sake.deder.client.cli;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.util.Map;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
 @JsonSubTypes({ @JsonSubTypes.Type(value = ServerMessage.Output.class, name = "Output"),
 		@JsonSubTypes.Type(value = ServerMessage.Log.class, name = "Log"),
@@ -23,7 +25,7 @@ public sealed interface ServerMessage {
 	record RunSubprocess(String[] cmd, Map<String, String> envVars, boolean watch) implements ServerMessage {
 	}
 
-	record Exit(int exitCode) implements ServerMessage {
+	record Exit(int exitCode, boolean serverShuttingDown) implements ServerMessage {
 	}
 
 	enum LogLevel {

@@ -6,6 +6,8 @@ class TasksRegistry(initialTasks: Seq[Task[?, ?]]) {
   ensureUnique(initialTasks)
   private var allTasks: Seq[Task[?, ?]] = initialTasks
 
+  def all: Seq[Task[?, ?]] = allTasks
+
   def resolve(moduleType: ModuleType): Seq[Task[?, ?]] =
     allTasks.filter { t =>
       // if empty -> supports all types...

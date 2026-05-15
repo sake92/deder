@@ -18,35 +18,55 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         plugins: Seq[String] = Seq.empty,
         scalacOptions: Seq[String] = Seq.empty,
         javacOptions: Seq[String] = Seq.empty,
-        crossScalaVersions: Seq[String] = Seq.empty,
         repositories: Seq[String] = Seq.empty,
-    ): ProjectExport = ProjectExport(
-        id = id,
-        base = base,
-        name = name,
-        javacOptions = javacOptions,
-        scalaVersion = scalaVersion,
-        crossScalaVersions = crossScalaVersions,
-        scalacOptions = scalacOptions,
-        interProjectDependencies = interProjectDeps,
-        externalDependencies = externalDeps,
-        repositories = repositories,
-        sourceDirs = Seq("src/main/scala"),
-        testSourceDirs = Seq("src/test/scala"),
-        resourceDirs = Seq.empty,
-        testResourceDirs = Seq.empty,
-        plugins = plugins,
-        organization = "com.example",
-        artifactName = name,
-        artifactType = "jar",
-        artifactClassifier = None,
-        version = "0.1.0",
-        description = "",
-        homepage = None,
-        developers = Seq.empty,
-        licenses = Seq.empty,
-        scmInfo = None,
+    ): ExportedProjectExportFile = ExportedProjectExportFile(
+        payload = ProjectExport(
+            id = id,
+            base = base,
+            name = name,
+            javacOptions = javacOptions,
+            scalaVersion = scalaVersion,
+            scalacOptions = scalacOptions,
+            interProjectDependencies = interProjectDeps,
+            externalDependencies = externalDeps,
+            repositories = repositories,
+            sourceDirs = Seq("src/main/scala"),
+            testSourceDirs = Seq("src/test/scala"),
+            resourceDirs = Seq.empty,
+            testResourceDirs = Seq.empty,
+            plugins = plugins,
+            organization = "com.example",
+            artifactName = name,
+            artifactType = "jar",
+            artifactClassifier = None,
+            version = "0.1.0",
+            description = "",
+            homepage = None,
+            developers = Seq.empty,
+            licenses = Seq.empty,
+            scmInfo = None,
+        ),
+        exportedProjectId = id,
+        exportedScalaVersion = scalaVersion,
+        platform = ExportedPlatform.fromBase(base),
     )
+
+    private def concreteModule(
+        group: ModuleGroup,
+        scalaVersion: String,
+        platform: String,
+    ): ConcreteModule =
+        group.concreteModules.find(cm =>
+            cm.scalaVersion == scalaVersion && cm.platform == platform
+        ).getOrElse(fail(s"Missing concrete module for scalaVersion=$scalaVersion platform=$platform"))
+
+    private def withDirs(dirs: Seq[os.Path])(body: => Unit): Unit = {
+        dirs.foreach(os.makeDir.all)
+        try body
+        finally dirs.reverse.foreach { dir =>
+            if os.exists(dir) then os.remove.all(dir)
+        }
+    }
 
     test("single module produces one ModuleGroup") {
         val mod = baseModule("myapp", os.pwd.toString, "myapp")
@@ -106,11 +126,127 @@ class SbtProjectAnalyzerSuite extends FunSuite {
     }
 
     test("surfaces crossScalaVersions on ModuleGroup") {
-        val mod = baseModule("app", os.pwd.toString, "app", crossScalaVersions = Seq("2.13.15", "3.3.5"))
+        val mod213 = baseModule("app", os.pwd.toString, "app", scalaVersion = "2.13.15")
+        val mod3 = baseModule("app", os.pwd.toString, "app", scalaVersion = "3.3.5")
         val analyzer = new SbtProjectAnalyzer(noopLogger)
-        val build = analyzer.analyze(IndexedSeq(mod))
+        val build = analyzer.analyze(IndexedSeq(mod213, mod3))
         val group = build.moduleGroups.head
         assertEquals(group.crossScalaVersions, Seq("2.13.15", "3.3.5"))
+    }
+
+    test("preserves distinct single-platform per-version exports as concrete modules") {
+        val mod213 = baseModule("app", os.pwd.toString, "app", scalaVersion = "2.13.15")
+        val mod3 = baseModule(
+            "app",
+            os.pwd.toString,
+            "app",
+            scalaVersion = "3.3.5",
+            scalacOptions = Seq("-Ykind-projector:underscores"),
+        )
+        val analyzer = new SbtProjectAnalyzer(noopLogger)
+        val build = analyzer.analyze(IndexedSeq(mod213, mod3))
+        val group = build.moduleGroups.head
+
+        assertEquals(
+            group.concreteModules.map(cm => (cm.scalaVersion, cm.platform, cm.sbtProjectId)),
+            Seq(
+                ("2.13.15", "main", "app"),
+                ("3.3.5", "main", "app"),
+            )
+        )
+        assertEquals(concreteModule(group, "2.13.15", "main").module.scalacOptions, Seq.empty)
+        assertEquals(
+            concreteModule(group, "3.3.5", "main").module.scalacOptions,
+            Seq("-Ykind-projector:underscores")
+        )
+    }
+
+    test("preserves concrete platform and scala-version slices for cross-platform builds") {
+        val root = os.pwd / "target" / "sbt-project-analyzer-suite" / "core"
+        val rootStr = root.toString
+        val plugins = Seq("ScalaJSCrossPlugin")
+        val analyzer = new SbtProjectAnalyzer(noopLogger)
+        withDirs(Seq(root / "jvm", root / "js")) {
+            val build = analyzer.analyze(IndexedSeq(
+                baseModule("core", s"$rootStr/jvm", "coreJVM", scalaVersion = "2.13.15", plugins = plugins),
+                baseModule("core", s"$rootStr/js", "coreJS", scalaVersion = "2.13.15", plugins = plugins),
+                baseModule("core", s"$rootStr/jvm", "coreJVM", scalaVersion = "3.3.5", plugins = plugins),
+                baseModule("core", s"$rootStr/js", "coreJS", scalaVersion = "3.3.5", plugins = plugins),
+            ))
+
+            val group = build.moduleGroups.head
+            assertEquals(group.crossScalaVersions, Seq("2.13.15", "3.3.5"))
+            assertEquals(
+                group.concreteModules.map(cm => (cm.scalaVersion, cm.platform)).sorted,
+                Seq(
+                    ("2.13.15", "js"),
+                    ("2.13.15", "jvm"),
+                    ("3.3.5", "js"),
+                    ("3.3.5", "jvm"),
+                )
+            )
+        }
+    }
+
+    test("resolves inter-project deps to the matching scala-version slice") {
+        val lib213 = baseModule("lib", (os.pwd / "lib").toString, "lib", scalaVersion = "2.13.15")
+        val lib3 = baseModule("lib", (os.pwd / "lib").toString, "lib", scalaVersion = "3.3.5")
+        val app213 = baseModule(
+            "app",
+            (os.pwd / "app").toString,
+            "app",
+            scalaVersion = "2.13.15",
+            interProjectDeps = Seq(InterProjectDependencyExport("lib", "default")),
+        )
+        val app3 = baseModule(
+            "app",
+            (os.pwd / "app").toString,
+            "app",
+            scalaVersion = "3.3.5",
+            interProjectDeps = Seq(InterProjectDependencyExport("lib", "default")),
+        )
+        val analyzer = new SbtProjectAnalyzer(noopLogger)
+        val build = analyzer.analyze(IndexedSeq(app3, lib3, app213, lib213))
+        val appGroup = build.moduleGroups.find(_.builderVarName == "app").get
+
+        assertEquals(
+            concreteModule(appGroup, "2.13.15", "main").module.moduleDeps,
+            Seq(ModuleDepRef("lib", "main", targetScalaVersion = Some("2.13.15"), isTest = false))
+        )
+        assertEquals(
+            concreteModule(appGroup, "3.3.5", "main").module.moduleDeps,
+            Seq(ModuleDepRef("lib", "main", targetScalaVersion = Some("3.3.5"), isTest = false))
+        )
+    }
+
+    test("counts actual concrete slices when version-platform matrix is sparse") {
+        val dep213Jvm = DependencyExport(
+            organization = "org.example", name = "core-jvm-213", revision = "1.0.0",
+            extraAttributes = Map.empty, configurations = None, excludes = Seq.empty, crossVersion = "none"
+        )
+        val dep213Js = DependencyExport(
+            organization = "org.example", name = "core-js-213", revision = "1.0.0",
+            extraAttributes = Map.empty, configurations = None, excludes = Seq.empty, crossVersion = "none"
+        )
+        val dep3Jvm = DependencyExport(
+            organization = "org.example", name = "core-jvm-3", revision = "1.0.0",
+            extraAttributes = Map.empty, configurations = None, excludes = Seq.empty, crossVersion = "none"
+        )
+        val root = os.pwd / "target" / "sbt-project-analyzer-suite" / "core-matrix"
+        val rootStr = root.toString
+        val plugins = Seq("ScalaJSCrossPlugin")
+        val analyzer = new SbtProjectAnalyzer(noopLogger)
+        withDirs(Seq(root / "jvm", root / "js")) {
+            analyzer.analyze(IndexedSeq(
+                baseModule("core", s"$rootStr/jvm", "coreJVM", scalaVersion = "2.13.15", plugins = plugins, externalDeps = Seq(dep213Jvm)),
+                baseModule("core", s"$rootStr/js", "coreJS", scalaVersion = "2.13.15", plugins = plugins, externalDeps = Seq(dep213Js)),
+                baseModule("core", s"$rootStr/jvm", "coreJVM", scalaVersion = "3.3.5", plugins = plugins, externalDeps = Seq(dep3Jvm)),
+            ))
+
+            val summary = analyzer.summary()
+            assertEquals(summary.modulesImported, 6)
+            assertEquals(summary.dependenciesMapped, 3)
+        }
     }
 
     test("maps custom repositories") {
@@ -119,5 +255,79 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         val build = analyzer.analyze(IndexedSeq(mod))
         assertEquals(build.repositories.size, 1)
         assertEquals(build.repositories.head.url, "https://repo.example.com/maven")
+    }
+
+    test("filterManagedDirs removes src_managed, resource_managed, and target/ paths") {
+        val input = Seq(
+            "src/main/scala",
+            "src/main/resources",
+            "target/scala-2.13/src_managed/main",
+            "target/resource_managed/main",
+            "some/path/with/target/in/middle/src",
+        )
+        val result = SbtProjectAnalyzer.filterManagedDirs(input)
+        assertEquals(result, Seq("src/main/scala", "src/main/resources"))
+    }
+
+    test("relativizeTo makes paths relative to base") {
+        val base = os.Path("/home/user/project/moduleA")
+        val input = Seq(
+            "/home/user/project/moduleA/src/main/scala",
+            "/home/user/project/moduleA/src/main/resources",
+            "/home/user/project/moduleB/src/main/scala",
+        )
+        val result = SbtProjectAnalyzer.relativizeTo(base, input)
+        assertEquals(result, Seq("src/main/scala", "src/main/resources"))
+    }
+
+    test("filterManagedDirs handles empty input") {
+        val result = SbtProjectAnalyzer.filterManagedDirs(Seq.empty)
+        assertEquals(result, Seq.empty)
+    }
+
+    test("relativizeTo handles empty input") {
+        val result = SbtProjectAnalyzer.relativizeTo(os.pwd, Seq.empty)
+        assertEquals(result, Seq.empty)
+    }
+
+    test("filterStandardSbtDirs removes standard sbt directories for sbt layout") {
+        val input = Seq(
+            "src/main/scala",
+            "src/main/java",
+            "src/main/resources",
+            "src/main/scala-2.13",
+            "src/main/scala-3",
+            "src/main/scala-2.13+",
+            "src/test/scala",
+            "src/test/scala-2.13",
+            "custom/path/to/src",
+            "generated/src/main/scala",
+        )
+        val result = SbtProjectAnalyzer.filterStandardSbtDirs(input,
+            ba.sake.deder.config.DederProject.DirLayout.SBT)
+        assertEquals(result, Seq("custom/path/to/src", "generated/src/main/scala"))
+    }
+
+    test("filterStandardSbtDirs removes cross-platform dirs for sbt-cross-full layout") {
+        val input = Seq(
+            "shared/src/main/scala",
+            "jvm/src/main/scala",
+            "js/src/main/scala",
+            ".jvm/src/main/scala",
+            ".js/src/main/scala",
+            "shared/src/main/scala-2.13",
+            "jvm/src/main/scala-3",
+            "custom/shared/src/main/scala",
+        )
+        val result = SbtProjectAnalyzer.filterStandardSbtDirs(input,
+            ba.sake.deder.config.DederProject.DirLayout.SBT_CROSS_FULL)
+        assertEquals(result, Seq("custom/shared/src/main/scala"))
+    }
+
+    test("filterStandardSbtDirs does not filter anything for non-sbt layout") {
+        val input = Seq("src/main/scala", "src/main/java", "src/main/scala-2.13")
+        val result = SbtProjectAnalyzer.filterStandardSbtDirs(input,
+            ba.sake.deder.config.DederProject.DirLayout.DEFAULT)
+        assertEquals(result, input)
     }
 }

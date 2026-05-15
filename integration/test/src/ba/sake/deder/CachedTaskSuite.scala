@@ -4,8 +4,6 @@ import scala.concurrent.duration.*
 
 class CachedTaskSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 2.minute
-
   test("cached tasks: first run should compute results") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")

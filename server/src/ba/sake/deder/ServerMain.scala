@@ -4,8 +4,12 @@ import java.io.RandomAccessFile
 import java.nio.channels.FileLock
 import java.nio.channels.OverlappingFileLockException
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
 import java.util as ju
+import scala.compiletime.uninitialized
+import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 import scala.util.Properties
 import scala.util.Using
@@ -23,8 +27,17 @@ import ba.sake.deder.graalvm.GraalVmNativeImageTasks
 
 object ServerMain extends StrictLogging {
 
-  private var serverLockHandle: RandomAccessFile = _
-  private var serverFileLock: FileLock = _
+  private var serverLockHandle: RandomAccessFile = uninitialized
+  private var serverFileLock: FileLock = uninitialized
+
+  @volatile private var gitignorePatterns: Seq[String] = Seq.empty
+
+  // Watcher fields — used by stopFileWatcher/stopDebounceScheduler during shutdown
+  @volatile private var watcherThread: Thread = uninitialized
+  @volatile private var debounceScheduler: java.util.concurrent.ScheduledExecutorService = uninitialized
+  @volatile private var pendingDebounce: Option[ScheduledFuture[?]] = None
+  private val debounceLock = new Object()
+  private val accumulatedChangedPaths = ConcurrentHashMap.newKeySet[os.Path]()
 
   def main(args: Array[String]): Unit = Parser(this).runOrExit(args)
 
@@ -38,13 +51,14 @@ object ServerMain extends StrictLogging {
     // 21 because unix sockets locking bug, i'd have to use bytebuffers for 17 and 18.. meh
     if !Properties.isJavaAtLeast(21) then throw DederException("Must run with Java 21+")
 
-    val realProjectDir = try {
-      java.nio.file.Path.of(projectRootDir).toRealPath().toString
-    } catch {
-      case e: Exception =>
-        logger.warn(s"Could not resolve canonical path for '$projectRootDir', using as-is: ${e.getMessage}")
-        projectRootDir
-    }
+    val realProjectDir =
+      try {
+        java.nio.file.Path.of(projectRootDir).toRealPath().toString
+      } catch {
+        case e: Exception =>
+          logger.warn(s"Could not resolve canonical path for '$projectRootDir', using as-is: ${e.getMessage}")
+          projectRootDir
+      }
     val projectRoot = os.Path(realProjectDir)
     System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
@@ -61,7 +75,7 @@ object ServerMain extends StrictLogging {
     }
 
     val logLevel = props.getProperty("logLevel", "INFO").toUpperCase
-    val maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "600").toInt
+    val maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "1800").toInt
     val workerThreads = props.getProperty("workerThreads", "16").toInt
     val bspEnabled = props.getProperty("bspEnabled", "true").toBoolean
     val maxConcurrentTestForks = Option(props.getProperty("maxConcurrentTestForks"))
@@ -77,10 +91,40 @@ object ServerMain extends StrictLogging {
     val originalTasksExecutorService = Executors.newFixedThreadPool(workerThreads)
     // automatically propagate OTEL context, parent span
     val tasksExecutorService = Context.taskWrapping(originalTasksExecutorService)
-    val onShutdown = () => {
+    val watchDebounceMs = props.getProperty("watchDebounceMillis", "300").toInt
+    debounceScheduler = Executors.newSingleThreadScheduledExecutor(r => Thread(r, "watch-debounce"))
+
+    // Must be declared before onShutdown to avoid forward reference error (var, not val)
+    var cliServer: DederCliServer | Null = null
+    var bspProxyServer: DederBspProxyServer | Null = null
+
+    val onShutdown: () => Unit = () => {
       logger.info("Deder server is shutting down...")
-      // TODO cleaner shutdown of threads
-      tasksExecutorService.shutdownNow()
+
+      // 1. Stop file watcher and debounce scheduler (prevents events during shutdown)
+      stopFileWatcher()
+      stopDebounceScheduler()
+
+      // 2. Release server lock (may already be released via early callback — idempotent)
+      logger.info("Releasing server lock...")
+      try { serverFileLock.release() } catch { case _: Exception => }
+      try { serverLockHandle.close() } catch { case _: Exception => }
+
+      // 3. Close sockets so new connections go to the new server process
+      if (cliServer != null) cliServer.nn.stop()
+      if bspProxyServer != null then bspProxyServer.stop()
+
+      // 4. Graceful executor shutdown: wait briefly for in-flight tasks, then force
+      //    (can take time, but lock and sockets are already released above)
+      tasksExecutorService.shutdown()
+      try {
+        if !tasksExecutorService.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS) then
+          tasksExecutorService.shutdownNow()
+      } catch {
+        case _: InterruptedException => tasksExecutorService.shutdownNow()
+      }
+
+      logger.info("Server shutdown complete.")
       sys.exit(0)
     }
 
@@ -99,41 +143,110 @@ object ServerMain extends StrictLogging {
     val allTasks =
       coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
-    val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown)
+    val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown,
+        configFile = DederGlobals.projectRootDir / "deder.pkl")
 
-    val cliServer = DederCliServer(projectState)
-    val cliServerThread = new Thread(() => cliServer.start(), "DederCliServer")
+    // Wire up early lock release for fast shutdown+restart
+    projectState.setReleaseServerLock(() => {
+      try { serverFileLock.release() } catch { case _: Exception => }
+      try { serverLockHandle.close() } catch { case _: Exception => }
+    })
+
+    cliServer = DederCliServer(projectState)
+    val cliServerThread = new Thread(() => cliServer.nn.start(), "DederCliServer")
     cliServerThread.start()
 
     if bspEnabled then {
-      val bspProxyServer = DederBspProxyServer(coreTasks, scalaJsTasks, scalaNativeTasks, projectState)
-      val bspProxyServerThread = new Thread(() => bspProxyServer.start(), "DederBspProxyServer")
+      bspProxyServer = DederBspProxyServer(coreTasks, scalaJsTasks, scalaNativeTasks, projectState)
+      val bspProxyServerThread = new Thread(() => bspProxyServer.nn.start(), "DederBspProxyServer")
       bspProxyServerThread.start()
     }
 
     logger.info("Deder server started.")
 
-    os.watch.watch(
-      roots = Seq(projectRoot),
-      onEvent = paths =>
-        try {
-          if paths.exists(isServerConfigFile) then
-            logger.debug(
-              s"Server configuration file changed: ${paths}, you need to shutdown the server with 'deder shutdown' and start it again!"
-            )
-            // TODO maybe implement restart in client ?
-            // or even in server, but that is trickier..
-          else if paths.exists(isProjectConfigFile) then
-            logger.debug(s"Configuration file changed: ${paths}, reloading project...")
-            projectState.reloadProject()
-          else if paths.exists(isTaskTriggerCandidate) then
-            logger.debug(s"Source files changed: ${paths}, triggering tasks...")
-            projectState.triggerFileWatchedTasks(paths)
-        } catch {
-          case NonFatal(_) =>
-          // ignore, config might be bad, tasks might fail, etc
-        }
-    )
+    loadGitignore()
+
+    // Run file watcher on a dedicated daemon thread so it can be interrupted during shutdown
+    watcherThread = new Thread(() => {
+      try {
+        os.watch.watch(
+          roots = Seq(projectRoot),
+          onEvent = paths =>
+            try {
+              if paths.exists(isServerConfigFile) then
+                logger.debug(
+                  s"Server configuration file changed: ${paths}, you need to shutdown the server with 'deder shutdown' and start it again!"
+                )
+              else if paths.exists(isProjectConfigFile) then
+                logger.debug(s"Configuration file changed: ${paths}, reloading project...")
+                projectState.reloadProject()
+              else if paths.exists(p => p == projectRoot / ".gitignore") then
+                logger.debug(s".gitignore changed, reloading...")
+                loadGitignore()
+              else if paths.exists(isTaskTriggerCandidate) then
+                val candidates = paths.filter(isTaskTriggerCandidate)
+                if candidates.nonEmpty then {
+                  accumulatedChangedPaths.addAll(candidates.asJava)
+                  debounceLock.synchronized {
+                    pendingDebounce.foreach(_.cancel(false))
+                    pendingDebounce = Some(debounceScheduler.schedule(
+                      new Runnable {
+                        def run(): Unit = {
+                          val snapshot = {
+                            val iter = accumulatedChangedPaths.iterator()
+                            val buf = Set.newBuilder[os.Path]
+                            while iter.hasNext do
+                              buf += iter.next()
+                              iter.remove()
+                            buf.result()
+                          }
+                          if snapshot.nonEmpty then {
+                            logger.debug(s"Debounce fired, triggering tasks for ${snapshot.size} changed paths: ${snapshot.take(3).mkString(", ")}...")
+                            projectState.triggerFileWatchedTasks(snapshot)
+                          }
+                          debounceLock.synchronized { pendingDebounce = None }
+                        }
+                      },
+                      watchDebounceMs,
+                      java.util.concurrent.TimeUnit.MILLISECONDS
+                    ))
+                  }
+                }
+            } catch {
+              case _: InterruptedException => throw new InterruptedException // propagate to exit watcher loop
+              case NonFatal(_) =>
+              // ignore, config might be bad, tasks might fail, etc
+            }
+          ,
+          filter = p => {
+            val segs = p.relativeTo(DederGlobals.projectRootDir).segments.toSeq
+            val firstSeg = segs.headOption.getOrElse("")
+            val isDederSubdir = firstSeg == ".deder" && segs.lift(1).exists(FileWatchUtils.ignoredDederSubdirs.contains)
+            val isDevDir = FileWatchUtils.ignoredDirNames.contains(firstSeg)
+            !(isDederSubdir || isDevDir)
+          }
+        )
+      } catch {
+        case _: InterruptedException => logger.info("File watcher interrupted, stopping...")
+        case NonFatal(e) => logger.error(s"File watcher error: ${e.getMessage}", e)
+      }
+      ()
+    }, "file-watcher")
+    watcherThread.setDaemon(true)
+    watcherThread.start()
+    watcherThread.join()
+  }
+
+  private def stopFileWatcher(): Unit = {
+    logger.info("Stopping file watcher...")
+    try { watcherThread.interrupt() } catch { case _: Exception => }
+    try { watcherThread.join(3000) } catch { case _: Exception => }
+  }
+
+  private def stopDebounceScheduler(): Unit = {
+    logger.info("Stopping debounce scheduler...")
+    try { debounceScheduler.shutdownNow() } catch { case _: Exception => }
+    try { debounceScheduler.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS) } catch { case _: Exception => }
   }
 
   private def acquireServerLock(projectRoot: os.Path): Unit = {
@@ -154,10 +267,11 @@ object ServerMain extends StrictLogging {
 
     val (handle, lock) = attemptLock()
     if lock == null then {
-      val existingPidOpt = try {
-        val content = os.read(serverLockFile).trim
-        if content.nonEmpty then Some(content.toLong) else None
-      } catch { case _: Exception => None }
+      val existingPidOpt =
+        try {
+          val content = os.read(serverLockFile).trim
+          if content.nonEmpty then Some(content.toLong) else None
+        } catch { case _: Exception => None }
 
       val isStale = existingPidOpt match {
         case Some(pid) =>
@@ -195,13 +309,9 @@ object ServerMain extends StrictLogging {
     }
 
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
-      try {
-        serverFileLock.release()
-        serverLockHandle.close()
-        os.remove.all(serverLockFile)
-      } catch {
-        case _: Exception =>
-      }
+      logger.warn("JVM shutdown hook fired (unexpected exit) — releasing lock as safety net")
+      try { serverFileLock.release() } catch { case _: Exception => }
+      try { serverLockHandle.close() } catch { case _: Exception => }
     }))
   }
 
@@ -214,31 +324,24 @@ object ServerMain extends StrictLogging {
   private def isTaskTriggerCandidate(p: os.Path): Boolean =
     !isServerConfigFile(p) && (
       isProjectConfigFile(p) ||
-        !(isDederArtifact(p) || isDevArtifact(p))
+        !(isDederArtifact(p) || isDevArtifact(p) || isIgnoredByGitignore(p))
     )
 
-  private def isDederArtifact(p: os.Path): Boolean = {
-    val pathSegments = p.segments.toSeq
-    val pathSegments2 = pathSegments.sliding(2).map(s => (s(0), s(1))).toSet
-    pathSegments2.contains(".deder" -> "out") ||
-    pathSegments2.contains(".deder" -> "logs") ||
-    pathSegments2.contains(".deder" -> "server.jar") ||
-    pathSegments2.contains(".deder" -> "server.lock") ||
-    pathSegments2.contains(".deder" -> "server-cli.sock") ||
-    pathSegments2.contains(".deder" -> "server-bsp.sock")
+  private def isDederArtifact(p: os.Path): Boolean =
+    FileWatchUtils.isDederArtifact(p, DederGlobals.projectRootDir)
+
+  private def loadGitignore(): Unit = {
+    val gitignoreFile = DederGlobals.projectRootDir / ".gitignore"
+    gitignorePatterns = FileWatchUtils.readGitignorePatterns(gitignoreFile)
+    logger.debug(s"Loaded ${gitignorePatterns.size} .gitignore patterns from ${gitignoreFile}")
   }
 
-  // TODO read gitignore..
-  def isDevArtifact(p: os.Path): Boolean = {
-    val pathSegments = p.segments.toSeq
-    pathSegments.contains(".git") ||
-    pathSegments.contains(".github") ||
-    pathSegments.contains(".idea") ||
-    pathSegments.contains(".vscode") ||
-    pathSegments.contains(".metals") ||
-    pathSegments.contains(".bsp") ||
-    pathSegments.contains(".scala-build") ||
-    pathSegments.contains("target") ||
-    pathSegments.contains("out")
+  private def isIgnoredByGitignore(p: os.Path): Boolean = {
+    val relativePath = p.relativeTo(DederGlobals.projectRootDir).toString.replace(java.io.File.separatorChar, '/')
+    val isDir = os.isDir(p)
+    FileWatchUtils.isIgnoredByGitignore(relativePath, isDir, gitignorePatterns)
   }
+
+  private def isDevArtifact(p: os.Path): Boolean =
+    FileWatchUtils.isDevArtifact(p, DederGlobals.projectRootDir)
 }

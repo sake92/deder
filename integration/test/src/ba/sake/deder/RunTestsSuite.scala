@@ -4,8 +4,6 @@ import scala.concurrent.duration.*
 
 class RunTestsSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout: Duration = 3.minutes
-
   test("deder should run JUnit4 tests") {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "junit4", "-t", "test")
@@ -90,6 +88,15 @@ class RunTestsSuite extends BaseIntegrationSuite {
       val res = executeDederCommand(projectPath, "exec", "-m", "ztest", "-t", "test")
       val outText = res.err.text()
       assert(outText.contains("1 passed"), s"Expected test output to contain '1 passed', got: ${outText}")
+      assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
+    }
+  }
+
+  test("deder should run ScalaCheck tests") {
+    withTestProject("sample-projects/tests") { projectPath =>
+      val res = executeDederCommand(projectPath, "exec", "-m", "scalacheck", "-t", "test")
+      val outText = res.err.text()
+      assert(outText.contains("startsWith"), s"Expected test output to contain 'startsWith', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
   }

@@ -1,7 +1,7 @@
 package ba.sake.deder
 
 import scala.concurrent.duration.*
-import ba.sake.deder.importing.sbt.SbtProjectAnalyzer
+import ba.sake.deder.importing.DederPklRenderer
 
 class ImportIntegrationSuite extends BaseIntegrationSuite {
 
@@ -53,17 +53,19 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
 
       val serverProps =
         s"localPath=$dederServerPath\n" +
-          s"testRunnerLocalPath=$dederTestRunnerPath\n"
+          s"testRunnerLocalPath=$dederTestRunnerPath\n" +
+          s"maxConnectSeconds=300\n"
       os.write.over(tempDir / ".deder/server.properties", serverProps, createFolders = true)
 
-      val importRes = executeDederCommand(tempDir, "import", "--from", "sbt")
+      // Use autodetection (build.sbt should be present in sbt projects)
+      val importRes = executeDederCommand(tempDir, "import")
       assertEquals(importRes.exitCode, 0, s"deder import failed (exit ${importRes.exitCode}):\n${importRes.err.text()}")
 
       assert(os.exists(tempDir / "deder.pkl"), "deder.pkl was not created by import")
       // Tweak amends to use local config (so we don't need network)
       val dederPklContent = os.read(tempDir / "deder.pkl")
       val tweakedContent = dederPklContent.replaceFirst(
-        s"amends \"https://sake92.github.io/deder/config/${SbtProjectAnalyzer.DederVersion}/DederProject.pkl\"",
+        s"amends \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederProject.pkl\"",
         "amends \"../../config/DederProject.pkl\""
       )
       os.write.over(tempDir / "deder.pkl", tweakedContent)

@@ -12,7 +12,7 @@ class SbtProjectAnalyzer(
     import SbtProjectAnalyzer._
 
     def analyze(
-        exportedSbtModules: IndexedSeq[ProjectExport]
+        exportedSbtModules: IndexedSeq[ExportedProjectExportFile]
     ): DederBuild = {
         var filteredDepCount = 0
 
@@ -29,7 +29,7 @@ class SbtProjectAnalyzer(
 
         // Build group infos and global id mapping
         val groupInfos = grouped.map(buildGroupInfo)
-        val globalIdMap: Map[String, String] = groupInfos.flatMap(_.sbtIdToRef).toMap
+        val globalIdMap: Map[(String, String), ResolvedModuleRef] = groupInfos.flatMap(_.sbtIdToRef).toMap
 
         serverNotificationsLogger.add(ServerNotification.logInfo(
             s"Resolved ${groupInfos.size} module groups, ${globalIdMap.size} id mappings"
@@ -45,34 +45,40 @@ class SbtProjectAnalyzer(
         val warnings = Seq.newBuilder[ImportWarning]
 
         val moduleGroups = sortedGroups.map { gi =>
-            val (jvmModule, jvmFiltered) = buildModuleDef(gi.mainModule, globalIdMap, warnings)
-            filteredDepCount += jvmFiltered
-            val jsResult = gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "js"))
-                .map(pe => buildModuleDef(pe, globalIdMap, warnings, isJs = true))
-            val (jsModule, jsFiltered) = (jsResult.map(_._1), jsResult.map(_._2).getOrElse(0))
-            filteredDepCount += jsFiltered
-            val nativeResult = gi.allModules.find(pe => lastIsPlatform(os.Path(pe.base).last, "native"))
-                .map(pe => buildModuleDef(pe, globalIdMap, warnings, isNative = true))
-            val (nativeModule, nativeFiltered) = (nativeResult.map(_._1), nativeResult.map(_._2).getOrElse(0))
-            filteredDepCount += nativeFiltered
+            val concreteModules = gi.concreteExports.map { concreteExport =>
+                val (moduleDef, filtered) = buildModuleDef(
+                    concreteExport.exportedModule,
+                    concreteExport.scalaVersion,
+                    globalIdMap,
+                    warnings,
+                    layout = gi.layout,
+                    isJs = concreteExport.platform == "js",
+                    isNative = concreteExport.platform == "native",
+                )
+                filteredDepCount += filtered
+                ConcreteModule(
+                    sbtProjectId = concreteExport.sbtProjectId,
+                    scalaVersion = concreteExport.scalaVersion,
+                    platform = concreteExport.platform,
+                    module = moduleDef,
+                )
+            }
 
             ModuleGroup(
                 builderVarName = gi.builderVarName,
                 root = gi.root,
                 layout = gi.layout,
                 crossScalaVersions = gi.crossScalaVersions,
-                jvmModule = jvmModule,
-                jsModule = jsModule,
-                nativeModule = nativeModule,
-                hasJsModule = gi.hasJsModule,
-                hasNativeModule = gi.hasNativeModule,
+                concreteModules = concreteModules,
+                usesTpolecat = gi.usesTpolecat,
+                usesTypelevel = gi.usesTypelevel,
             )
         }
 
         _cachedSummary = buildSummary(moduleGroups, warnings.result(), filteredDepCount)
 
         DederBuild(
-            dederVersion = DederVersion,
+            dederVersion = DederPklRenderer.DederVersion,
             moduleGroups = moduleGroups,
             repositories = exportedSbtModules.flatMap(_.repositories).distinct.map(RepositoryDef.apply),
             warnings = warnings.result(),
@@ -87,20 +93,30 @@ class SbtProjectAnalyzer(
 
     // ---- internal types ----
 
-    private case class RawGroup(rootPath: os.Path, modules: Seq[ProjectExport])
+    private case class RawGroup(rootPath: os.Path, modules: Seq[ExportedProjectExportFile])
+
+    private case class ConcreteExport(
+        sbtProjectId: String,
+        scalaVersion: String,
+        platform: String,
+        exportedModule: ExportedProjectExportFile,
+    )
+
+    private case class ResolvedModuleRef(
+        targetGroup: String,
+        targetPlatform: String,
+        targetScalaVersion: String,
+    )
 
     private case class GroupInfo(
         builderVarName: String,
         root: String,
         layout: DederProject.DirLayout,
-        isCross: Boolean,
-        hasJsModule: Boolean,
-        hasNativeModule: Boolean,
-        scalaVersion: String,
         crossScalaVersions: Seq[String],
-        sbtIdToRef: Map[String, String],
-        mainModule: ProjectExport,
-        allModules: Seq[ProjectExport],
+        sbtIdToRef: Map[(String, String), ResolvedModuleRef],
+        concreteExports: Seq[ConcreteExport],
+        usesTpolecat: Boolean = false,
+        usesTypelevel: Boolean = false,
     )
 
     private def buildGroupInfo(rg: RawGroup): GroupInfo = {
@@ -114,53 +130,66 @@ class SbtProjectAnalyzer(
         ).getOrElse(rg.modules.head)
 
         val allPlugins = rg.modules.flatMap(_.plugins).distinct
+        val usesTpolecat  = allPlugins.exists(p =>
+            p.contains("sbt-tpolecat") || p.contains("org.typelevel.sbt.tpolecat"))
+        val usesTypelevel = allPlugins.exists(p =>
+            p.contains("sbt-typelevel") || p.contains("org.typelevel.sbt.Typelevel"))
         val layout = SbtProjectAnalyzer.detectLayout(allPlugins, rg.rootPath.toString)
         val isCross = layout == DederProject.DirLayout.SBT_CROSS_FULL ||
             layout == DederProject.DirLayout.SBT_CROSS_PURE ||
             layout == DederProject.DirLayout.SBT_CROSS_DUMMY
 
-        val scalaVersion = mainModule.scalaVersion
-        val crossScalaVersions = mainModule.crossScalaVersions
+        val concreteExports = rg.modules.map { pe =>
+            val platform = if isCross then platformRefName(pe) else "main"
+            ConcreteExport(
+                sbtProjectId = pe.id,
+                scalaVersion = pe.exportedScalaVersion,
+                platform = platform,
+                exportedModule = pe,
+            )
+        }
+
+        val allScalaVersions = concreteExports.map(_.scalaVersion).distinct
+        val crossScalaVersions = if allScalaVersions.size > 1 then allScalaVersions else Seq.empty
 
         val rawName = ImportingUtils.sanitizeId(mainModule.name)
         val baseName = if (isCross) rawName.replaceFirst("(?i)jvm$", "") else rawName
         val builderVarName = baseName.replaceAll("[.-]", "_").replaceAll("[^a-zA-Z0-9_]", "")
 
-        val sbtIdToRef = rg.modules.map { pe =>
-            val sbtId = pe.id
-            val rawSegment = os.Path(pe.base).last
-            val lastSegment = if (rawSegment.startsWith(".")) rawSegment.tail else rawSegment
-            val ref = if (isCross) s"$builderVarName.$lastSegment" else s"$builderVarName.main"
-            sbtId -> ref
+        val sbtIdToRef = concreteExports.map { concreteExport =>
+            (concreteExport.sbtProjectId, concreteExport.scalaVersion) -> ResolvedModuleRef(
+                targetGroup = builderVarName,
+                targetPlatform = concreteExport.platform,
+                targetScalaVersion = concreteExport.scalaVersion,
+            )
         }.toMap
 
-        val hasJsModule = rg.modules.exists(pe => Set("js", ".js").contains(os.Path(pe.base).last))
-        val hasNativeModule = rg.modules.exists(pe => Set("native", ".native").contains(os.Path(pe.base).last))
-
         GroupInfo(
-            builderVarName, root, layout, isCross,
-            hasJsModule, hasNativeModule,
-            scalaVersion, crossScalaVersions, sbtIdToRef, mainModule, rg.modules,
+            builderVarName, root, layout, crossScalaVersions, sbtIdToRef, concreteExports,
+            usesTpolecat, usesTypelevel,
         )
     }
 
     // ---- ModuleDef construction ----
 
     private def buildModuleDef(
-        pe: ProjectExport,
-        idMap: Map[String, String],
+        pe: ExportedProjectExportFile,
+        dependerScalaVersion: String,
+        idMap: Map[(String, String), ResolvedModuleRef],
         warnings: scala.collection.mutable.Builder[ImportWarning, Seq[ImportWarning]],
+        layout: DederProject.DirLayout,
         isJs: Boolean = false,
         isNative: Boolean = false,
     ): (ModuleDef, Int) = {
         val (compileDeps, pluginDeps, testDeps, filteredCount) = partitionDeps(pe)
         val moduleDeps = pe.interProjectDependencies
             .filter(ipde => ipde.configuration == "default" || ipde.configuration.contains("compile"))
-            .flatMap(ipde => idMap.get(ipde.project))
+            .flatMap(ipde => idMap.get((ipde.project, dependerScalaVersion)))
             .map(ref => refToModuleDepRef(ref, isTest = false))
+            .distinct
         val testModuleDeps = pe.interProjectDependencies
             .filter(ipde => ipde.configuration.contains("test"))
-            .flatMap(ipde => idMap.get(ipde.project))
+            .flatMap(ipde => idMap.get((ipde.project, dependerScalaVersion)))
             .map(ref => refToModuleDepRef(ref, isTest = true))
             .distinct
 
@@ -178,6 +207,23 @@ class SbtProjectAnalyzer(
             ))
         } else None
 
+        val moduleBasePath = os.Path(pe.base)
+
+        val filteredSources      = SbtProjectAnalyzer.filterManagedDirs(pe.sourceDirs)
+        val filteredTestSources   = SbtProjectAnalyzer.filterManagedDirs(pe.testSourceDirs)
+        val filteredResources     = SbtProjectAnalyzer.filterManagedDirs(pe.resourceDirs)
+        val filteredTestResources = SbtProjectAnalyzer.filterManagedDirs(pe.testResourceDirs)
+
+        val relSourceDirs      = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredSources)
+        val relTestSourceDirs   = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredTestSources)
+        val relResourceDirs     = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredResources)
+        val relTestResourceDirs = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredTestResources)
+
+        val finalSourceDirs      = SbtProjectAnalyzer.filterStandardSbtDirs(relSourceDirs, layout)
+        val finalTestSourceDirs   = SbtProjectAnalyzer.filterStandardSbtDirs(relTestSourceDirs, layout)
+        val finalResourceDirs     = SbtProjectAnalyzer.filterStandardSbtDirs(relResourceDirs, layout)
+        val finalTestResourceDirs = SbtProjectAnalyzer.filterStandardSbtDirs(relTestResourceDirs, layout)
+
         val moduleDef = ModuleDef(
             scalaVersion = pe.scalaVersion,
             scalacOptions = pe.scalacOptions,
@@ -190,15 +236,15 @@ class SbtProjectAnalyzer(
             scalaJsVersion = if (isJs) Some(SbtProjectAnalyzer.DefaultScalaJsVersion) else None,
             scalaNativeVersion = if (isNative) Some(SbtProjectAnalyzer.DefaultScalaNativeVersion) else None,
             publish = publish,
-            sources = pe.sourceDirs,
-            testSources = pe.testSourceDirs,
-            resources = pe.resourceDirs,
-            testResources = pe.testResourceDirs,
+            sources = finalSourceDirs,
+            testSources = finalTestSourceDirs,
+            resources = finalResourceDirs,
+            testResources = finalTestResourceDirs,
         )
         (moduleDef, filteredCount)
     }
 
-    private def partitionDeps(pe: ProjectExport): (Seq[DepDef], Seq[DepDef], Seq[DepDef], Int) = {
+    private def partitionDeps(pe: ExportedProjectExportFile): (Seq[DepDef], Seq[DepDef], Seq[DepDef], Int) = {
         val ignoredCount = pe.externalDependencies.count(d => isIgnoredDep(d.organization, d.name))
         val compileDeps = pe.externalDependencies
             .filterNot(d => isIgnoredDep(d.organization, d.name))
@@ -225,15 +271,13 @@ class SbtProjectAnalyzer(
         name = d.name,
     )
 
-    private def refToModuleDepRef(ref: String, isTest: Boolean): ModuleDepRef = {
-        val dotIdx = ref.indexOf('.')
-        val (group, platform) = if (dotIdx >= 0) {
-            (ref.substring(0, dotIdx), ref.substring(dotIdx + 1))
-        } else {
-            (ref, "main")
-        }
-        ModuleDepRef(targetGroup = group, targetPlatform = platform, isTest = isTest)
-    }
+    private def refToModuleDepRef(ref: ResolvedModuleRef, isTest: Boolean): ModuleDepRef =
+        ModuleDepRef(
+            targetGroup = ref.targetGroup,
+            targetPlatform = ref.targetPlatform,
+            targetScalaVersion = Some(ref.targetScalaVersion),
+            isTest = isTest,
+        )
 
     // ---- Summary ----
 
@@ -242,18 +286,12 @@ class SbtProjectAnalyzer(
         warnings: Seq[ImportWarning],
         filteredDepCount: Int,
     ): ImportSummary = {
-        val concreteModules = groups.map { g =>
-            val versionCount = if (g.crossScalaVersions.nonEmpty) g.crossScalaVersions.size else 1
-            val baseModules = 2  // main + test
-            val jsModules = if (g.hasJsModule) 2 else 0
-            val nativeModules = if (g.hasNativeModule) 2 else 0
-            (baseModules + jsModules + nativeModules) * versionCount
-        }.sum
-        val allDeps = groups.flatMap(g =>
-            g.jvmModule.deps ++ g.jvmModule.scalacPluginDeps ++ g.jvmModule.testDeps
+        val concreteModules = groups.flatMap(_.concreteModules)
+        val allDeps = concreteModules.flatMap(cm =>
+            cm.module.deps ++ cm.module.scalacPluginDeps ++ cm.module.testDeps
         )
         ImportSummary(
-            modulesImported = concreteModules,
+            modulesImported = concreteModules.size * 2,
             moduleGroups = groups.size,
             dependenciesMapped = allDeps.size,
             depsFiltered = filteredDepCount,
@@ -265,15 +303,17 @@ class SbtProjectAnalyzer(
 
     // ---- Topological sort ----
 
-    private def topoSort(groups: Seq[GroupInfo], idMap: Map[String, String]): Seq[GroupInfo] = {
+    private def topoSort(groups: Seq[GroupInfo], idMap: Map[(String, String), ResolvedModuleRef]): Seq[GroupInfo] = {
         val builderNames = groups.map(_.builderVarName).toSet
         val nameToGroup = groups.map(g => g.builderVarName -> g).toMap
 
         val depsOf: Map[String, Set[String]] = groups.map { gi =>
-            val deps = gi.mainModule.interProjectDependencies
-                .filter(_.configuration == "default")
-                .flatMap(ipde => idMap.get(ipde.project))
-                .map(ref => ref.takeWhile(_ != '.'))
+            val deps = gi.concreteExports.flatMap { concreteExport =>
+                concreteExport.exportedModule.interProjectDependencies
+                    .filter(ipde => ipde.configuration == "default" || ipde.configuration.contains("compile"))
+                    .flatMap(ipde => idMap.get((ipde.project, concreteExport.scalaVersion)))
+                    .map(_.targetGroup)
+            }
                 .filter(builderNames.contains)
             gi.builderVarName -> deps.toSet
         }.toMap
@@ -306,11 +346,15 @@ class SbtProjectAnalyzer(
         }
         sorted.toSeq
     }
+
+    private def platformRefName(pe: ExportedProjectExportFile): String = {
+        val rawSegment = os.Path(pe.base).last
+        if rawSegment.startsWith(".") then rawSegment.tail else rawSegment
+    }
 }
 
 object SbtProjectAnalyzer {
 
-    val DederVersion = "v0.7.5"
     val DefaultScalaJsVersion = "1.18.2"
     val DefaultScalaNativeVersion = "0.5.10"
 
@@ -358,6 +402,29 @@ object SbtProjectAnalyzer {
         }
         s"${dep.organization}$scalaColon${dep.name}$platformColon${dep.revision}"
     }
+
+    def filterManagedDirs(dirs: Seq[String]): Seq[String] =
+        dirs.filterNot { d =>
+            val segments = d.split("/").toSet
+            segments.contains("src_managed") ||
+            segments.contains("resource_managed") ||
+            d.contains("/target/")
+        }
+
+    def relativizeTo(base: os.Path, paths: Seq[String]): Seq[String] =
+        paths.flatMap { p =>
+            try {
+                val rel = os.Path(p).relativeTo(base).toString
+                if rel.startsWith("..") then None else Some(rel)
+            } catch case _: IllegalArgumentException => None
+        }
+
+    private val SbtStandardDirPattern =
+        """^(shared/)?((jvm|js|native|\.jvm|\.js|\.native)/)?src/(main|test)/(scala|java|resources)(-[0-9].*)?$""".r
+
+    def filterStandardSbtDirs(dirs: Seq[String], layout: DederProject.DirLayout): Seq[String] =
+        if (!layout.toString.toLowerCase.startsWith("sbt")) dirs
+        else dirs.filterNot(d => SbtStandardDirPattern.findFirstIn(d).isDefined)
 
     def detectLayout(plugins: Seq[String], projectBaseDir: String): DederProject.DirLayout = {
         val hasCrossProject = plugins.exists(p =>

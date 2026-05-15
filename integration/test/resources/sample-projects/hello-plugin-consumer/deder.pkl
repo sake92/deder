@@ -1,6 +1,8 @@
-amends "../../../config/DederProject.pkl"
+//amends "../../../../../config/DederProject.pkl"
 
-import "../hello-plugin/HelloPlugin.pkl" as HP
+amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+
+import "../hello-plugin/resources/HelloPluginModule.pkl" as HPM
 
 // Shared local Maven repository (set by run-it-tests.sh via DEDER_TMP_M2_REPO env var)
 repositories {
@@ -8,8 +10,8 @@ repositories {
 }
 
 plugins {
-  new HP.HelloPlugin {
-    config = new HP.HelloPluginConfig {
+  new HPM.HelloPlugin {
+    config = new HPM.HelloPluginConfig {
       greeting = "Hello from typed config!"
     }
   }
