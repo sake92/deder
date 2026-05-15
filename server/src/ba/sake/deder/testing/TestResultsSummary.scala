@@ -18,18 +18,15 @@ object TestResultsSummary {
       failedTestNames = results.flatMap(_._2.failedTestNames),
       suites = results.flatMap(_._2.suites).sortBy(_.name)
     )
-    val separator = "═" * 50
     val statusIcon = if totalResults.success then "✅ PASS" else "🔴 FAIL"
     val totalFailed = totalResults.failed + totalResults.errors
     val suitesStr = renderCounts(totalResults.suitesPassed, totalResults.suitesFailed, 0, totalResults.suitesTotal)
     val testsStr = renderCounts(totalResults.passed, totalFailed, totalResults.skipped, totalResults.total)
     val timeStr = Duration.ofMillis(totalResults.duration).toPrettyString
+    val summaryLine = s"$statusIcon  Suites: $suitesStr  │  Tests: $testsStr  │  $timeStr"
+    val separator = "═" * summaryLine.length
     notifications.add(ServerNotification.logInfo(separator))
-    notifications.add(
-      ServerNotification.logInfo(
-        s"$statusIcon  Suites: $suitesStr  │  Tests: $testsStr  │  $timeStr"
-      )
-    )
+    notifications.add(ServerNotification.logInfo(summaryLine))
     val interesting = results.filter { case (_, res) =>
       val moduleFailed = res.failed + res.errors
       moduleFailed > 0 || res.skipped > 0
