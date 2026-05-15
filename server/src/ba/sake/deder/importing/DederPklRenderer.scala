@@ -429,11 +429,11 @@ object DederPklRenderer {
             val templateProps = Seq(
                 if (g.usesTpolecat || g.usesTypelevel || fixedCommonScalacOpts.nonEmpty || fixedScalacOptDeltas.values.exists(_.nonEmpty))
                     Some(renderScalacOptionsWithWhens(fixedCommonScalacOpts, fixedScalacOptDeltas, g, indent = 4)) else None,
-                if (common.javacOptions.nonEmpty || javacOptDeltas.values.exists(_.nonEmpty))
+                if (!suppressJavacOptions(common.javacOptions, g) && (common.javacOptions.nonEmpty || javacOptDeltas.values.exists(_.nonEmpty)))
                     Some(renderStringListWithWhens("javacOptions", common.javacOptions, javacOptDeltas, indent = 4)) else None,
                 if (common.deps.nonEmpty || depsDeltas.values.exists(_.nonEmpty))
                     Some(renderDepsWithWhens(common.deps, depsDeltas, indent = 4)) else None,
-                if (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty))
+                if (!suppressPluginDeps(common.scalacPluginDeps, g, slices.headOption.map(_.scalaVersion).getOrElse("")) && (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty)))
                     Some(renderPluginDepsWithWhens(common.scalacPluginDeps, pluginDepsDeltas, indent = 4)) else None,
                 if (common.sources.nonEmpty || srcDeltas.values.exists(_.nonEmpty))
                     Some(renderStringListWithWhens("sources", common.sources, srcDeltas, indent = 4)) else None,
@@ -641,11 +641,13 @@ object DederPklRenderer {
             Some("    bspVisible = true"),
             Some(extra.trim).filter(_.nonEmpty),
             Some(renderScalacOptionsSmart(m, g, indent = 4, scalaVersionCtx)).filter(_.nonEmpty),
-            Some(renderJavacOptions(m.javacOptions, indent = 4)).filter(_.nonEmpty),
+            if (suppressJavacOptions(m.javacOptions, g)) None
+            else Some(renderJavacOptions(m.javacOptions, indent = 4)).filter(_.nonEmpty),
             Some(renderSourceDirs(m.sources, indent = 4)).filter(_.nonEmpty),
             Some(renderResourceDirs(m.resources, indent = 4)).filter(_.nonEmpty),
             Some(renderDeps(m.deps, indent = 4)).filter(_.nonEmpty),
-            Some(renderPluginDeps(m.scalacPluginDeps, indent = 4)).filter(_.nonEmpty),
+            if (suppressPluginDeps(m.scalacPluginDeps, g, m.scalaVersion)) None
+            else Some(renderPluginDeps(m.scalacPluginDeps, indent = 4)).filter(_.nonEmpty),
             Some(renderModuleDepsPkl(m.moduleDeps, indent = 4, scalaVersionCtx, groupLookup)).filter(_.nonEmpty),
             m.publish.map(p => renderPublishInfo(p, indent = 4, useBase = hasSharedPomBase)).filter(_.nonEmpty),
         ).flatten.mkString("\n")
@@ -720,6 +722,19 @@ object DederPklRenderer {
     ): String = {
         if (g.usesTpolecat || g.usesTypelevel) ""
         else renderScalacOptions(m.scalacOptions, indent)
+    }
+
+    /** Suppress javacOptions when the typelevel template already provides them. */
+    private def suppressJavacOptions(opts: Seq[String], g: ModuleGroup): Boolean =
+        g.usesTypelevel && opts.nonEmpty && opts.toSet.subsetOf(Set("-encoding:utf8", "-Xlint:all"))
+
+    /** Suppress scalacPluginDeps when the typelevel template already provides them. */
+    private def suppressPluginDeps(deps: Seq[DepDef], g: ModuleGroup, scalaVersion: String): Boolean = {
+        if (!g.usesTypelevel) return false
+        if (deps.isEmpty) return false
+        if (scalaVersion.startsWith("3")) return false
+        val defaults = Set("com.olegpy::better-monadic-for:0.3.1", "org.typelevel:::kind-projector:0.13.4")
+        deps.map(_.formatted).toSet.subsetOf(defaults)
     }
 
     private def renderJavacOptions(opts: Seq[String], indent: Int): String = {
