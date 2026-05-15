@@ -429,11 +429,11 @@ object DederPklRenderer {
             val templateProps = Seq(
                 if (g.usesTpolecat || g.usesTypelevel || fixedCommonScalacOpts.nonEmpty || fixedScalacOptDeltas.values.exists(_.nonEmpty))
                     Some(renderScalacOptionsWithWhens(fixedCommonScalacOpts, fixedScalacOptDeltas, g, indent = 4)) else None,
-                if (!suppressJavacOptions(common.javacOptions, g) && (common.javacOptions.nonEmpty || javacOptDeltas.values.exists(_.nonEmpty)))
+                if (!suppressJavacOptionsDeltas(common.javacOptions, javacOptDeltas, g) && (common.javacOptions.nonEmpty || javacOptDeltas.values.exists(_.nonEmpty)))
                     Some(renderStringListWithWhens("javacOptions", common.javacOptions, javacOptDeltas, indent = 4)) else None,
                 if (common.deps.nonEmpty || depsDeltas.values.exists(_.nonEmpty))
                     Some(renderDepsWithWhens(common.deps, depsDeltas, indent = 4)) else None,
-                if (!suppressPluginDeps(common.scalacPluginDeps, g, slices.headOption.map(_.scalaVersion).getOrElse("")) && (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty)))
+                if (!suppressPluginDepsDeltas(common.scalacPluginDeps, pluginDepsDeltas, g, slices.headOption.map(_.scalaVersion).getOrElse("")) && (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty)))
                     Some(renderPluginDepsWithWhens(common.scalacPluginDeps, pluginDepsDeltas, indent = 4)) else None,
                 if (common.sources.nonEmpty || srcDeltas.values.exists(_.nonEmpty))
                     Some(renderStringListWithWhens("sources", common.sources, srcDeltas, indent = 4)) else None,
@@ -725,16 +725,30 @@ object DederPklRenderer {
     }
 
     /** Suppress javacOptions when the typelevel template already provides them. */
+    private val javacDefaults = Set("-encoding:utf8", "-Xlint:all")
     private def suppressJavacOptions(opts: Seq[String], g: ModuleGroup): Boolean =
-        g.usesTypelevel && opts.nonEmpty && opts.toSet.subsetOf(Set("-encoding:utf8", "-Xlint:all"))
+        g.usesTypelevel && opts.nonEmpty && opts.forall(javacDefaults.contains)
+    private def suppressJavacOptionsDeltas(opts: Seq[String], deltas: Map[String, Seq[String]], g: ModuleGroup): Boolean =
+        g.usesTypelevel && opts.nonEmpty && opts.forall(javacDefaults.contains) &&
+            deltas.values.forall(_.forall(javacDefaults.contains))
 
     /** Suppress scalacPluginDeps when the typelevel template already provides them. */
+    private val pluginDefaults = Set(
+        "com.olegpy"    -> "better-monadic-for",
+        "org.typelevel" -> "kind-projector",
+    )
     private def suppressPluginDeps(deps: Seq[DepDef], g: ModuleGroup, scalaVersion: String): Boolean = {
         if (!g.usesTypelevel) return false
         if (deps.isEmpty) return false
         if (scalaVersion.startsWith("3")) return false
-        val defaults = Set("com.olegpy::better-monadic-for:0.3.1", "org.typelevel:::kind-projector:0.13.4")
-        deps.map(_.formatted).toSet.subsetOf(defaults)
+        deps.forall(d => pluginDefaults.contains(d.organization -> d.name))
+    }
+    private def suppressPluginDepsDeltas(deps: Seq[DepDef], deltas: Map[String, Seq[DepDef]], g: ModuleGroup, scalaVersion: String): Boolean = {
+        if (!g.usesTypelevel) return false
+        if (deps.isEmpty) return false
+        if (scalaVersion.startsWith("3")) return false
+        deps.forall(d => pluginDefaults.contains(d.organization -> d.name)) &&
+            deltas.values.forall(_.forall(d => pluginDefaults.contains(d.organization -> d.name)))
     }
 
     private def renderJavacOptions(opts: Seq[String], indent: Int): String = {
