@@ -562,7 +562,7 @@ class DederBspServer(
       logger.debug(s"buildTargetOutputPaths for params ${params}")
       ensureRunning()
       val modulesItems = withLastGoodState(_ => Seq.empty) { projectStateData =>
-        val excludedDirNames = Seq(".deder", ".bsp", ".metals", ".idea", ".vscode")
+        val excludedDirNames = FileWatchUtils.bspExcludedDirNames
         val outputPathsItems =
           for dirName <- excludedDirNames
           yield OutputPathItem(DederPath(dirName).absPath.toNIO.toUri.toString, OutputPathItemKind.DIRECTORY)

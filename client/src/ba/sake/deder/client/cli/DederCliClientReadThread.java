@@ -1,5 +1,6 @@
 package ba.sake.deder.client.cli;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.*;
@@ -14,7 +15,8 @@ public class DederCliClientReadThread extends Thread {
     private final AtomicBoolean running;
     private final InputStream is;
 
-    private final ObjectMapper jsonMapper = new ObjectMapper();
+    private final ObjectMapper jsonMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public DederCliClientReadThread(Consumer<String> logger, AtomicBoolean running, InputStream is) {
         super("DederCliClientReadThread");

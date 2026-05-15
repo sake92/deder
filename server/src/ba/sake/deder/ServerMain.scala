@@ -216,6 +216,14 @@ object ServerMain extends StrictLogging {
               case NonFatal(_) =>
               // ignore, config might be bad, tasks might fail, etc
             }
+          ,
+          filter = p => {
+            val segs = p.relativeTo(DederGlobals.projectRootDir).segments.toSeq
+            val firstSeg = segs.headOption.getOrElse("")
+            val isDederSubdir = firstSeg == ".deder" && segs.lift(1).exists(FileWatchUtils.ignoredDederSubdirs.contains)
+            val isDevDir = FileWatchUtils.ignoredDirNames.contains(firstSeg)
+            !(isDederSubdir || isDevDir)
+          }
         )
       } catch {
         case _: InterruptedException => logger.info("File watcher interrupted, stopping...")
@@ -318,70 +326,21 @@ object ServerMain extends StrictLogging {
         !(isDederArtifact(p) || isDevArtifact(p) || isIgnoredByGitignore(p))
     )
 
-  private def isDederArtifact(p: os.Path): Boolean = {
-    val pathSegments = p.segments.toSeq
-    val pathSegments2 = pathSegments.sliding(2).map(s => (s(0), s(1))).toSet
-    pathSegments2.contains(".deder" -> "out") ||
-    pathSegments2.contains(".deder" -> "logs") ||
-    pathSegments2.contains(".deder" -> "server.jar") ||
-    pathSegments2.contains(".deder" -> "server.lock") ||
-    pathSegments2.contains(".deder" -> "server-cli.sock") ||
-    pathSegments2.contains(".deder" -> "server-bsp.sock")
-  }
+  private def isDederArtifact(p: os.Path): Boolean =
+    FileWatchUtils.isDederArtifact(p, DederGlobals.projectRootDir)
 
   private def loadGitignore(): Unit = {
     val gitignoreFile = DederGlobals.projectRootDir / ".gitignore"
-    if os.exists(gitignoreFile) && os.isFile(gitignoreFile) then {
-      gitignorePatterns = os.read.lines(gitignoreFile)
-        .map(_.trim)
-        .filter(l => l.nonEmpty && !l.startsWith("#"))
-      logger.debug(s"Loaded ${gitignorePatterns.size} .gitignore patterns from ${gitignoreFile}")
-    } else {
-      gitignorePatterns = Seq.empty
-    }
+    gitignorePatterns = FileWatchUtils.readGitignorePatterns(gitignoreFile)
+    logger.debug(s"Loaded ${gitignorePatterns.size} .gitignore patterns from ${gitignoreFile}")
   }
 
   private def isIgnoredByGitignore(p: os.Path): Boolean = {
     val relativePath = p.relativeTo(DederGlobals.projectRootDir).toString.replace(java.io.File.separatorChar, '/')
     val isDir = os.isDir(p)
-    gitignorePatterns.exists { pattern =>
-      val effectivePattern = pattern.stripPrefix("!")
-      globMatch(effectivePattern, relativePath, isDir)
-    }
+    FileWatchUtils.isIgnoredByGitignore(relativePath, isDir, gitignorePatterns)
   }
 
-  private def globMatch(pattern: String, path: String, isDir: Boolean): Boolean = {
-    val normalizedPattern = pattern.stripSuffix("/")
-    if !normalizedPattern.contains("/") then {
-      val filename = path.split("/").last
-      simpleGlobMatch(normalizedPattern, filename)
-    } else {
-      simpleGlobMatch(normalizedPattern, path)
-      || (isDir && normalizedPattern.endsWith("/*") && path.startsWith(normalizedPattern.stripSuffix("/*")))
-    }
-  }
-
-  private def simpleGlobMatch(pattern: String, str: String): Boolean = {
-    val regex = pattern
-      .replace(".", "\\.")
-      .replace("*", ".*")
-      .replace("?", ".")
-      .replace("[", "\\[")
-      .replace("]", "\\]")
-    str.matches(regex)
-  }
-
-  // TODO read gitignore..
-  def isDevArtifact(p: os.Path): Boolean = {
-    val pathSegments = p.segments.toSeq
-    pathSegments.contains(".git") ||
-    pathSegments.contains(".github") ||
-    pathSegments.contains(".idea") ||
-    pathSegments.contains(".vscode") ||
-    pathSegments.contains(".metals") ||
-    pathSegments.contains(".bsp") ||
-    pathSegments.contains(".scala-build") ||
-    pathSegments.contains("target") ||
-    pathSegments.contains("out")
-  }
+  private def isDevArtifact(p: os.Path): Boolean =
+    FileWatchUtils.isDevArtifact(p, DederGlobals.projectRootDir)
 }

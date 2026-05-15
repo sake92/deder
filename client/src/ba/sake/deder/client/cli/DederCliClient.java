@@ -12,7 +12,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import ba.sake.deder.client.DederClient;
 
 // TODO handle color stuff https://clig.dev/#output
@@ -23,7 +22,6 @@ public class DederCliClient implements DederClient {
     private final String[] args;
     private Thread writeThread;
     private Thread readThread;
-    private final ObjectMapper jsonMapper = new ObjectMapper();
 
     private final AtomicBoolean running = new AtomicBoolean(true);
     private BlockingQueue<ClientMessage> clientMessages;
