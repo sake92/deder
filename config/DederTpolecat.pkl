@@ -1,3 +1,5 @@
+module ba.sake.deder.config.DederTpolecat
+
 import "DederProject.pkl" as P
 
 /// sbt-tpolecat scalac options as reusable ScalaModule templates.
@@ -8,7 +10,8 @@ import "DederProject.pkl" as P
 /// Mode auto-selected via $CI env var.
 
 tpolecatScalacOptions2_12: Listing<String> = new {
-  "-encoding:utf8"
+  "-encoding"
+  "utf-8"
   "-deprecation"
   "-feature"
   "-unchecked"
@@ -52,7 +55,8 @@ tpolecatScalacOptions2_12: Listing<String> = new {
 }
 
 tpolecatScalacOptions2_13: Listing<String> = new {
-  "-encoding:utf8"
+  "-encoding"
+  "utf-8"
   "-feature"
   "-unchecked"
   "-language:existentials"
@@ -94,7 +98,8 @@ tpolecatScalacOptions2_13: Listing<String> = new {
 }
 
 tpolecatScalacOptions3: Listing<String> = new {
-  "-encoding:utf8"
+  "-encoding"
+  "utf-8"
   "-deprecation"
   "-feature"
   "-unchecked"
