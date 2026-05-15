@@ -7,7 +7,7 @@ import "DederProject.pkl" as P
 /// Modes: Dev (default, no fatal warnings), Ci (with -Xfatal-warnings / -Werror).
 /// Mode auto-selected via $CI env var.
 
-typelevelOpts2_12: Listing<String> = new {
+typelevelScalacOptions2_12: Listing<String> = new {
   "-deprecation"
   "-encoding"
   "utf-8"
@@ -24,7 +24,7 @@ typelevelOpts2_12: Listing<String> = new {
   "-Xsource:3"
 }
 
-typelevelOpts2_13: Listing<String> = new {
+typelevelScalacOptions2_13: Listing<String> = new {
   "-deprecation"
   "-encoding"
   "utf-8"
@@ -41,7 +41,7 @@ typelevelOpts2_13: Listing<String> = new {
   "-Xsource:3"
 }
 
-typelevelOpts3: Listing<String> = new {
+typelevelScalacOptions3: Listing<String> = new {
   "-deprecation"
   "-encoding"
   "utf-8"
@@ -60,9 +60,9 @@ typelevelOpts3: Listing<String> = new {
 
 function mkScalacOptions(version: String, mode: String): Listing<String> = 
   let (opts =
-    if (version == "2.12") typelevelOpts2_12
-    else if (version == "2.13") typelevelOpts2_13
-    else typelevelOpts3
+    if (version == "2.12") typelevelScalacOptions2_12
+    else if (version == "2.13") typelevelScalacOptions2_13
+    else typelevelScalacOptions3
   )
   let (fatalFlag = 
     if (version == "3") "-Werror"

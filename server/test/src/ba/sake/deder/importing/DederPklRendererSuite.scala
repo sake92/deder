@@ -584,7 +584,6 @@ class DederPklRendererSuite extends FunSuite {
         assert(result.contains("DederTpolecat.forVersion(sv)"), clues(result))
         assert(!result.contains("scalacOptions ="), clues(result)) // no verbatim scalacOptions
         assert(!result.contains("scalacOptions {"), clues(result)) // no raw scalacOptions block
-        assert(!result.contains("forVersion"), clues(result)) // forVersion removed
     }
 
     test("emits DederTypelevel.pkl import and shared reference when typelevel detected") {

@@ -92,10 +92,14 @@ object DederPklRenderer {
     private def templateAmendExpr(g: ModuleGroup, scalaVersion: String): String =
         s"(${templatePrefix(g)}Scala${templateVersionKey(scalaVersion)})"
 
+    /** Returns the Pkl module name for convention imports. */
+    private def templateModuleName(g: ModuleGroup): String =
+        if (g.usesTypelevel) "DederTypelevel" else "DederTpolecat"
+
     /** Returns a template amend expression for cross-version .map() using forVersion helper.
       * Example: "(DederTpolecat.forVersion(sv))" */
     private def crossVersionTemplateAmendExpr(g: ModuleGroup): String =
-        s"(${templatePrefix(g)}.forVersion(sv))"
+        s"(${templateModuleName(g)}.forVersion(sv))"
 
     // ---- top-level blocks ----
 
