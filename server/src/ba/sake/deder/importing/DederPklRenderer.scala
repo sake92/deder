@@ -92,25 +92,10 @@ object DederPklRenderer {
     private def templateAmendExpr(g: ModuleGroup, scalaVersion: String): String =
         s"(${templatePrefix(g)}Scala${templateVersionKey(scalaVersion)})"
 
-    /** Returns a conditional template amend expression for cross-version .map().
-      * Example: "(if (sv.startsWith("3")) DederTpolecat.tpolecatScala3 else
-      *            if (sv.startsWith("2.13")) DederTpolecat.tpolecatScala213 else
-      *            DederTpolecat.tpolecatScala212)" */
-    private def crossVersionTemplateAmendExpr(g: ModuleGroup): String = {
-        val prefix = templatePrefix(g)
-        val cases = Seq(
-            "3"    -> """sv.startsWith("3")""",
-            "2.13" -> """sv.startsWith("2.13")""",
-            "2.12" -> """sv.startsWith("2.12")""",
-        )
-        // Build nested if/else from inside out: rightmost case (2.12) is the "else",
-        // then fold the preceding cases (3, 2.13) from right to left wrapping with "if"
-        val body = cases.init.foldRight(s"""$prefix""" + "Scala212") { (pair, acc) =>
-            val (ver, cond) = pair
-            s"""if ($cond) $prefix""" + s"Scala${templateVersionKey(ver)} else $acc"
-        }
-        s"($body)"
-    }
+    /** Returns a template amend expression for cross-version .map() using forVersion helper.
+      * Example: "(DederTpolecat.forVersion(sv))" */
+    private def crossVersionTemplateAmendExpr(g: ModuleGroup): String =
+        s"(${templatePrefix(g)}.forVersion(sv))"
 
     // ---- top-level blocks ----
 
@@ -453,7 +438,6 @@ object DederPklRenderer {
             }
             val templateBody = {
                 val body = s"""    scalaVersion = sv
-                   |    bspVisible = true
                    |$propsBlock""".stripMargin
                 s"""$templateHeader
                    |$body  }""".stripMargin
@@ -638,7 +622,7 @@ object DederPklRenderer {
         }
         val props = Seq(
             versionLine,
-            Some("    bspVisible = true"),
+
             Some(extra.trim).filter(_.nonEmpty),
             Some(renderScalacOptionsSmart(m, g, indent = 4, scalaVersionCtx)).filter(_.nonEmpty),
             if (suppressJavacOptions(m.javacOptions, g)) None

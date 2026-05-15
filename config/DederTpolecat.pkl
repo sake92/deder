@@ -225,3 +225,10 @@ tpolecatScala212Native    = if (read?("env:CI") != null) tpolecatScala212NativeC
 tpolecatScala212NativeTestDev = mkBaseNativeTest("2.12", "dev")
 tpolecatScala212NativeTestCi  = mkBaseNativeTest("2.12", "ci")
 tpolecatScala212NativeTest    = if (read?("env:CI") != null) tpolecatScala212NativeTestCi else tpolecatScala212NativeTestDev
+
+/// Returns the auto-select base template for a given Scala version string.
+/// "3.7.4" -> tpolecatScala3, "2.13.18" -> tpolecatScala213, "2.12.20" -> tpolecatScala212
+function forVersion(scalaVersion: String): P.ScalaModule =
+  if (scalaVersion.startsWith("3")) tpolecatScala3
+  else if (scalaVersion.startsWith("2.13")) tpolecatScala213
+  else tpolecatScala212

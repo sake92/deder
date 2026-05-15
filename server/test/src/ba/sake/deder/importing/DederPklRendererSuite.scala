@@ -581,8 +581,7 @@ class DederPklRendererSuite extends FunSuite {
         )
         val result = DederPklRenderer.render(build)
         assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.7.4/DederTpolecat.pkl""""), clues(result))
-        assert(result.contains("if (sv.startsWith(\"3\"))"), clues(result))
-        assert(result.contains("DederTpolecat.tpolecatScala213"), clues(result))
+        assert(result.contains("DederTpolecat.forVersion(sv)"), clues(result))
         assert(!result.contains("scalacOptions ="), clues(result)) // no verbatim scalacOptions
         assert(!result.contains("scalacOptions {"), clues(result)) // no raw scalacOptions block
         assert(!result.contains("forVersion"), clues(result)) // forVersion removed
@@ -641,10 +640,8 @@ class DederPklRendererSuite extends FunSuite {
         )
         val build = DederBuild("v0.8.0", Seq(g), Seq.empty, Seq.empty)
         val result = DederPklRenderer.render(build)
-        assert(result.contains("if (sv.startsWith(\"3\"))"), s"should have conditional template selection:\n$result")
-        assert(result.contains("DederTpolecat.tpolecatScala3"), s"should reference tpolecatScala3:\n$result")
-        assert(result.contains("DederTpolecat.tpolecatScala213"), s"should reference tpolecatScala213:\n$result")
-        assert(!result.contains("forVersion"), s"should not contain forVersion:\n$result")
+        assert(result.contains("DederTpolecat.forVersion(sv)"), s"should have forVersion call:\n$result")
+        assert(!result.contains("scalacOptions {"), s"should not contain raw scalacOptions:\n$result")
     }
 
     test("cross-version with tpolecat suppresses scalacOptions when-clauses") {

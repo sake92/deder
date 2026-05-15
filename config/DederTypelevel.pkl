@@ -225,3 +225,10 @@ typelevelScala212Native    = if (read?("env:CI") != null) typelevelScala212Nativ
 typelevelScala212NativeTestDev = mkBaseNativeTest("2.12", "dev")
 typelevelScala212NativeTestCi  = mkBaseNativeTest("2.12", "ci")
 typelevelScala212NativeTest    = if (read?("env:CI") != null) typelevelScala212NativeTestCi else typelevelScala212NativeTestDev
+
+/// Returns the auto-select base template for a given Scala version string.
+/// "3.7.4" -> typelevelScala3, "2.13.18" -> typelevelScala213, "2.12.20" -> typelevelScala212
+function forVersion(scalaVersion: String): P.ScalaModule =
+  if (scalaVersion.startsWith("3")) typelevelScala3
+  else if (scalaVersion.startsWith("2.13")) typelevelScala213
+  else typelevelScala212
