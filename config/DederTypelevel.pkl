@@ -1,3 +1,5 @@
+module ba.sake.deder.config.DederTypelevel
+
 import "DederProject.pkl" as P
 
 /// sbt-typelevel convention templates as reusable ScalaModule templates.
