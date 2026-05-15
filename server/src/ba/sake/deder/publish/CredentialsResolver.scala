@@ -35,22 +35,21 @@ object CredentialsResolver {
     sysEnv: Map[String, String]
   ): RepoCredentials = {
     val prefix = envPrefix(publishTo.id)
+    val missing = scala.collection.mutable.Buffer.empty[(String, String)] // (fieldName, envKey)
 
     def field(name: String, pklValue: => Option[String]): String = {
       val envKey = prefix + camelToScreamingSnake(name)
       clientEnv.get(envKey)
         .orElse(sysEnv.get(envKey))
-        .orElse(pklValue.filter(_.nonEmpty))
-        .getOrElse {
-          throw new RuntimeException(
-            s"Missing credential '${name}' for repo '${publishTo.id}'. " +
-            s"Set ${envKey} environment variable, or add to ~/.deder/credentials.pkl:\n" +
-            s"  [\"${publishTo.id}\"] = new ${expectedCredentialType(publishTo)} { ${name} = \"...\" }"
-          )
+        .orElse(pklValue.filter(_.nonEmpty)) match {
+          case Some(value) => value
+          case None =>
+            missing += ((name, envKey))
+            "" // dummy, won't be used because we check missing before returning
         }
     }
 
-    publishTo match {
+    val creds = publishTo match {
       case _: SonatypeCentralRepo =>
         val pkl = credentialsOpt.flatMap(getCreds[SonatypeCentralCredentials](_, publishTo.id))
         new SonatypeCentralCredentials(
@@ -74,6 +73,14 @@ object CredentialsResolver {
           field("password", pkl.map(_.password))
         )
     }
+
+    if missing.nonEmpty then
+      throw RuntimeException(
+        s"Missing credentials for publish to '${publishTo.id}':\n" +
+        missing.map((_, envKey) => s"  - $envKey environment variable").mkString("\n")
+      )
+
+    creds
   }
 
   private def envPrefix(repoId: String): String =
