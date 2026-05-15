@@ -729,7 +729,8 @@ object DederPklRenderer {
     private def suppressJavacOptions(opts: Seq[String], g: ModuleGroup): Boolean =
         g.usesTypelevel && opts.nonEmpty && opts.forall(javacDefaults.contains)
     private def suppressJavacOptionsDeltas(opts: Seq[String], deltas: Map[String, Seq[String]], g: ModuleGroup): Boolean =
-        g.usesTypelevel && opts.nonEmpty && opts.forall(javacDefaults.contains) &&
+        g.usesTypelevel && (opts.nonEmpty || deltas.values.exists(_.nonEmpty)) &&
+            opts.forall(javacDefaults.contains) &&
             deltas.values.forall(_.forall(javacDefaults.contains))
 
     /** Suppress scalacPluginDeps when the typelevel template already provides them. */
@@ -745,7 +746,7 @@ object DederPklRenderer {
     }
     private def suppressPluginDepsDeltas(deps: Seq[DepDef], deltas: Map[String, Seq[DepDef]], g: ModuleGroup, scalaVersion: String): Boolean = {
         if (!g.usesTypelevel) return false
-        if (deps.isEmpty) return false
+        if (deps.isEmpty && deltas.values.forall(_.isEmpty)) return false
         if (scalaVersion.startsWith("3")) return false
         deps.forall(d => pluginDefaults.contains(d.organization -> d.name)) &&
             deltas.values.forall(_.forall(d => pluginDefaults.contains(d.organization -> d.name)))
