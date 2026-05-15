@@ -152,4 +152,65 @@ class CredentialsResolverSuite extends munit.FunSuite {
     assertEquals(mvn.username, "mvn-user")
     assertEquals(mvn.password, "mvn-pass")
   }
+
+  test("all fields missing lists every one") {
+    val repo = sonatypeCentralRepo()
+    val clientEnv = Map.empty[String, String]
+    val sysEnv = Map.empty[String, String]
+
+    val ex = intercept[RuntimeException] {
+      CredentialsResolver.resolve(repo, None, clientEnv, sysEnv)
+    }
+    assert(ex.getMessage.contains("Missing credentials for publish to 'sonatype-central'"))
+    assert(ex.getMessage.contains("DEDER_SONATYPE_CENTRAL_USERNAME"))
+    assert(ex.getMessage.contains("DEDER_SONATYPE_CENTRAL_PASSWORD"))
+    assert(ex.getMessage.contains("DEDER_SONATYPE_CENTRAL_PGP_SECRET"))
+    assert(ex.getMessage.contains("DEDER_SONATYPE_CENTRAL_PGP_PASSPHRASE"))
+  }
+
+  test("all fields missing for snapshot repo") {
+    val repo = sonatypeSnapshotRepo()
+    val clientEnv = Map.empty[String, String]
+    val sysEnv = Map.empty[String, String]
+
+    val ex = intercept[RuntimeException] {
+      CredentialsResolver.resolve(repo, None, clientEnv, sysEnv)
+    }
+    assert(ex.getMessage.contains("Missing credentials for publish to 'sonatype-central'"))
+    assert(ex.getMessage.contains("DEDER_SONATYPE_CENTRAL_USERNAME"))
+    assert(ex.getMessage.contains("DEDER_SONATYPE_CENTRAL_PASSWORD"))
+  }
+
+  test("all fields missing for maven repo") {
+    val repo = mavenRepo(id = "my-maven-repo")
+    val clientEnv = Map.empty[String, String]
+    val sysEnv = Map.empty[String, String]
+
+    val ex = intercept[RuntimeException] {
+      CredentialsResolver.resolve(repo, None, clientEnv, sysEnv)
+    }
+    assert(ex.getMessage.contains("Missing credentials for publish to 'my-maven-repo'"))
+    assert(ex.getMessage.contains("DEDER_MY_MAVEN_REPO_USERNAME"))
+    assert(ex.getMessage.contains("DEDER_MY_MAVEN_REPO_PASSWORD"))
+  }
+
+  test("mixed sources — missing fields listed, present fields not") {
+    val repo = sonatypeCentralRepo()
+    val clientEnv = Map(
+      "DEDER_SONATYPE_CENTRAL_USERNAME" -> "env-user",
+      "DEDER_SONATYPE_CENTRAL_PASSWORD" -> "env-pass"
+    )
+    val sysEnv = Map.empty[String, String]
+
+    val ex = intercept[RuntimeException] {
+      CredentialsResolver.resolve(repo, None, clientEnv, sysEnv)
+    }
+    val msg = ex.getMessage
+    // password and username should NOT be in the error
+    assert(!msg.contains("DEDER_SONATYPE_CENTRAL_USERNAME"))
+    assert(!msg.contains("DEDER_SONATYPE_CENTRAL_PASSWORD"))
+    // pgp fields should be listed as missing
+    assert(msg.contains("DEDER_SONATYPE_CENTRAL_PGP_SECRET"))
+    assert(msg.contains("DEDER_SONATYPE_CENTRAL_PGP_PASSPHRASE"))
+  }
 }
