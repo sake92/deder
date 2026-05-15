@@ -318,16 +318,8 @@ object ServerMain extends StrictLogging {
         !(isDederArtifact(p) || isDevArtifact(p) || isIgnoredByGitignore(p))
     )
 
-  private def isDederArtifact(p: os.Path): Boolean = {
-    val pathSegments = p.segments.toSeq
-    val pathSegments2 = pathSegments.sliding(2).map(s => (s(0), s(1))).toSet
-    pathSegments2.contains(".deder" -> "out") ||
-    pathSegments2.contains(".deder" -> "logs") ||
-    pathSegments2.contains(".deder" -> "server.jar") ||
-    pathSegments2.contains(".deder" -> "server.lock") ||
-    pathSegments2.contains(".deder" -> "server-cli.sock") ||
-    pathSegments2.contains(".deder" -> "server-bsp.sock")
-  }
+  private def isDederArtifact(p: os.Path): Boolean =
+    FileWatchUtils.isDederArtifact(p, DederGlobals.projectRootDir)
 
   private def loadGitignore(): Unit = {
     val gitignoreFile = DederGlobals.projectRootDir / ".gitignore"
@@ -371,17 +363,6 @@ object ServerMain extends StrictLogging {
     str.matches(regex)
   }
 
-  // TODO read gitignore..
-  def isDevArtifact(p: os.Path): Boolean = {
-    val pathSegments = p.segments.toSeq
-    pathSegments.contains(".git") ||
-    pathSegments.contains(".github") ||
-    pathSegments.contains(".idea") ||
-    pathSegments.contains(".vscode") ||
-    pathSegments.contains(".metals") ||
-    pathSegments.contains(".bsp") ||
-    pathSegments.contains(".scala-build") ||
-    pathSegments.contains("target") ||
-    pathSegments.contains("out")
-  }
+  private def isDevArtifact(p: os.Path): Boolean =
+    FileWatchUtils.isDevArtifact(p, DederGlobals.projectRootDir)
 }
