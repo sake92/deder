@@ -94,3 +94,31 @@ Or leave out both to clean everything.
 Keep integration test classes rather small, because then it is easier to run them one by one.  
 Run minimal affected integration tests, rarely all of them.
 
+## JarJar Shading (`jarjar-abrams 1.16.0`)
+
+Assembly shading is configured via `shadeRulesFile` on a module in `deder.pkl`.  
+The rules file uses standard jarjar directives (`rule`, `keep`, `zap`).  
+Implementation: `PublishTasks.scala` reads the config → `JarUtils.scala` calls `Shader.parseRulesFile` + `Shader.shadeFile`.
+
+### Critical pitfalls learned from shading the test-runner
+
+1. **`keep` drops unreachable classes — NOT a "preserve" directive.**  
+   In jarjar-abrams, `keep` marks classes as roots for dependency analysis; all classes not reachable from roots are **discarded**. Use a no-op `rule` to protect classes from renaming: `rule sbt.** sbt.@1`.
+
+2. **Jarjar rewrites ALL bytecode references matching any rule pattern**, even for classes not in the JAR itself (e.g. `java.lang.Object`).  
+   Always add no-op rules for JDK/standard-library packages BEFORE any shade rules:
+   ```
+   rule java.** java.@1
+   rule javax.** javax.@1
+   rule scala.** scala.@1
+   ```
+
+3. **Broad wildcard patterns (`*.**`) cause `ArrayIndexOutOfBoundsException`** in jarjar-abrams' `ScalaSigAnnotationVisitor` when rewriting Scala signature annotations.  
+   Use targeted package-specific rules (`ba.sake.tupson.** → shaded.ba.sake.tupson.@1`) instead of catch-all patterns.
+
+4. **Tupson's `@type` discriminator uses simple names** (e.g. `"ForkStarted"`, not FQCN), so the JSON protocol is unaffected by shading.  
+   Bytecode references to renamed classes are rewritten, but string literals (including tupson's `@type` values) are not.
+
+5. **The `mainClass` in `deder.pkl` and the server's hardcoded main-class string must match the post-shading name.**  
+   The `ForkedTestOrchestrator` (in the unshaded server JAR) must reference the shaded main class name when spawning forked test JVMs.
+

@@ -319,7 +319,7 @@ object ForkedTestOrchestrator extends StrictLogging {
     val cmd = Seq(javaBinary) ++ jvmOptions ++ Seq(
       "-cp",
       fullClasspath,
-      "ba.sake.deder.testing.forked.ForkedTestMain",
+      "shaded.ba.sake.deder.testing.forked.ForkedTestMain",
       argsFilePath.toString
     )
     val proc = os

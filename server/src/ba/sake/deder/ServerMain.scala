@@ -75,7 +75,7 @@ object ServerMain extends StrictLogging {
     }
 
     val logLevel = props.getProperty("logLevel", "INFO").toUpperCase
-    val maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "600").toInt
+    val maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "1800").toInt
     val workerThreads = props.getProperty("workerThreads", "16").toInt
     val bspEnabled = props.getProperty("bspEnabled", "true").toBoolean
     val maxConcurrentTestForks = Option(props.getProperty("maxConcurrentTestForks"))

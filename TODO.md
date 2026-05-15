@@ -4,11 +4,8 @@
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - shade test-runner to avoid classpath issues.. but first make shading work good
-- quick shutdown and start causes issues, plus race with metals&bsp when manually shutdown
 - init like giter8, autoimport from sbt?
 - FileWatchUtils for ignoring paths
-- handle test-runner failure, restart from last failed suite..
-- add scalacheck integration test
 
 # Import
 - import from other maven effective POM etc

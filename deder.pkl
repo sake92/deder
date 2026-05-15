@@ -69,6 +69,7 @@ local const testRunner = new ScalaModule {
   publish = false
   moduleDeps { testCommonModules.main }
   mainClass = "ba.sake.deder.testing.forked.ForkedTestMain"
+  shadeRulesFile = "shade.rules"
 }
 
 local const pluginApi = new ScalaModule {
