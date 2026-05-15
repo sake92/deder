@@ -582,8 +582,9 @@ class DederPklRendererSuite extends FunSuite {
         val result = DederPklRenderer.render(build)
         assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.9.0/DederTpolecat.pkl""""), clues(result))
         assert(result.contains("DederTpolecat.forVersion(sv)"), clues(result))
-        assert(!result.contains("scalacOptions ="), clues(result)) // no verbatim scalacOptions
-        assert(!result.contains("scalacOptions {"), clues(result)) // no raw scalacOptions block
+        // -deprecation is not in tpolecat2_13 template, so it's preserved
+        assert(result.contains("\"-deprecation\""), clues(result))
+        assert(result.contains("scalacOptions {"), clues(result))
     }
 
     test("emits DederTypelevel.pkl import and shared reference when typelevel detected") {
