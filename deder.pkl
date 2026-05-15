@@ -7,10 +7,13 @@ local const scalaVer = "3.7.4"
 local const sonatypeRepo = new SonatypeCentralRepo {
   id = "sonatype"
 }
-local const function pom(artId: String) = new PomSettings {
+
+local const function pom(artId: String, artName: String) = new PomSettings {
   groupId = "ba.sake"
   artifactId = artId
   version = read?("env:VERSION")
+  name = artName
+  description = name
   licenses {
     new PomLicense {
       name = "Apache 2.0 License"
@@ -34,7 +37,7 @@ local const config = new JavaModule {
   deps {
     "org.pkl-lang:pkl-config-java:0.30.2"
   }
-  pomSettings = pom("deder-config")
+  pomSettings = pom("deder-config", "Deder config")
   publish = true
   publishTo = sonatypeRepo
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
@@ -77,7 +80,7 @@ local const pluginApi = new ScalaModule {
   root = "plugin-api"
   scalaVersion = scalaVer
   moduleDeps { config }
-  pomSettings = pom("deder-plugin-api")
+  pomSettings = pom("deder-plugin-api", "Deder plugin API")
   publish = true
   publishTo = sonatypeRepo
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
@@ -108,7 +111,7 @@ local const serverModules =
           ["Multi-Release"] = "true"
         }
       }
-      pomSettings = pom("deder-server")
+      pomSettings = pom("deder-server", "Deder server")
       deps {
         "org.jgrapht:jgrapht-core:1.5.2"
         "org.jgrapht:jgrapht-io:1.5.2"
@@ -156,7 +159,7 @@ local const client = new JavaModule {
   id = "client"
   publish = false
   mainClass = "ba.sake.deder.client.Main"
-  pomSettings = pom("deder-client")
+  pomSettings = pom("deder-client", "Deder client")
   deps {
     "com.fasterxml.jackson.core:jackson-databind:2.20.1"
   }
