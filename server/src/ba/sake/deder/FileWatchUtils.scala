@@ -32,3 +32,94 @@ object FileWatchUtils:
   def isDevArtifact(path: os.Path, projectRoot: os.Path): Boolean =
     path.startsWith(projectRoot) &&
     ignoredDirNames.contains(path.relativeTo(projectRoot).segments.headOption.getOrElse(""))
+
+  /** Reads a .gitignore file at the given path and returns parsed patterns.
+    * Strips comments (lines starting with #) and empty lines.
+    * Preserves `!` prefix for negation support.
+    * Returns empty Seq if the file does not exist. */
+  def readGitignorePatterns(file: os.Path): Seq[String] =
+    if os.exists(file) && os.isFile(file) then
+      os.read.lines(file)
+        .map(_.trim)
+        .filter(l => l.nonEmpty && !l.startsWith("#"))
+    else
+      Seq.empty
+
+  /** Checks whether `relativePath` matches any pattern in the list.
+    * Patterns are evaluated in order — the LAST matching pattern wins,
+    * enabling proper `!` negation semantics.
+    *
+    * Supports:
+    *   - `*` — matches any characters except /
+    *   - `**` — matches zero or more directories
+    *   - `?` — matches any single character except /
+    *   - Leading `/` — anchors to root
+    *   - Trailing `/` — matches directories only
+    *   - `!` prefix — negation (un-ignores a path)
+    *
+    * @param relativePath relative path from project root, with `/` separators
+    * @param isDir whether the path is a directory
+    * @param patterns parsed gitignore patterns (from readGitignorePatterns)
+    */
+  def isIgnoredByGitignore(relativePath: String, isDir: Boolean, patterns: Seq[String]): Boolean =
+    var ignored = false
+    for pattern <- patterns do
+      if pattern.startsWith("!") then
+        val p = pattern.stripPrefix("!")
+        if globMatch(p, relativePath, isDir) then ignored = false
+      else
+        if globMatch(pattern, relativePath, isDir) then ignored = true
+    ignored
+
+  /** Matches a single gitignore pattern against a relative path. */
+  private def globMatch(pattern: String, path: String, isDir: Boolean): Boolean =
+    var p = pattern
+
+    // Trailing / means match directories only
+    if p.endsWith("/") then
+      if !isDir then return false
+      p = p.stripSuffix("/")
+
+    // Normalize path: append / for directories so prefix matching works
+    val normalizedPath = if isDir then path + "/" else path
+
+    if p.contains("/") then
+      // Pattern has path separator — match against full relative path
+      val pClean = if p.startsWith("/") then p.stripPrefix("/") else p
+      if pClean.contains("**") then
+        globToRegex(pClean).matches(normalizedPath)
+      else
+        // Prefix match: "build/output/" should match paths starting with "build/output/"
+        normalizedPath.startsWith(pClean)
+    else
+      // No separator — match against filename
+      val filename = normalizedPath.split("/").last
+      simpleGlobMatch(p, filename)
+
+  /** Converts a glob pattern containing ** to a Regex. */
+  private def globToRegex(pattern: String): scala.util.matching.Regex =
+    val sb = new StringBuilder
+    sb.append("^")
+    var i = 0
+    while i < pattern.length do
+      pattern.charAt(i) match
+        case '*' =>
+          if i + 1 < pattern.length && pattern.charAt(i + 1) == '*' then
+            sb.append(".*")
+            i += 1
+          else
+            sb.append("[^/]*")
+        case '?' => sb.append("[^/]")
+        case '.' => sb.append("\\.")
+        case c   => sb.append(c)
+      i += 1
+    sb.append("$")
+    sb.toString.r
+
+  /** Simple glob match for filename-only patterns (no / in pattern). */
+  private def simpleGlobMatch(pattern: String, str: String): Boolean =
+    val regex = pattern
+      .replace(".", "\\.")
+      .replace("*", ".*")
+      .replace("?", ".")
+    str.matches(regex)
