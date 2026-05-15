@@ -86,8 +86,10 @@ object FileWatchUtils:
     if p.contains("/") then
       // Pattern has path separator — match against full relative path
       val pClean = if p.startsWith("/") then p.stripPrefix("/") else p
-      if pClean.contains("**") then
-        globToRegex(pClean).matches(normalizedPath)
+      if pClean.contains("**") || pClean.contains("*") || pClean.contains("?") then
+        // Strip trailing / from normalized dir paths for regex matching
+        val regexPath = if normalizedPath.endsWith("/") then normalizedPath.stripSuffix("/") else normalizedPath
+        globToRegex(pClean).matches(regexPath)
       else
         // Prefix match with path-boundary check so "build/output" matches
         // "build/output/" but NOT "build/output2.class"
@@ -107,8 +109,14 @@ object FileWatchUtils:
       pattern.charAt(i) match
         case '*' =>
           if i + 1 < pattern.length && pattern.charAt(i + 1) == '*' then
-            sb.append(".*")
-            i += 1
+            // ** followed by / should match zero or more directories
+            if i + 2 < pattern.length && pattern.charAt(i + 2) == '/' then
+              sb.append("(.*/)?")
+              i += 2 // skip second * and the following /
+              // skip the / (the i += 1 at end of loop will advance past it)
+            else
+              sb.append(".*")
+              i += 1
           else
             sb.append("[^/]*")
         case '?' => sb.append("[^/]")
