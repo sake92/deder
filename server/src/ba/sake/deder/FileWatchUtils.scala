@@ -89,8 +89,10 @@ object FileWatchUtils:
       if pClean.contains("**") then
         globToRegex(pClean).matches(normalizedPath)
       else
-        // Prefix match: "build/output/" should match paths starting with "build/output/"
+        // Prefix match with path-boundary check so "build/output" matches
+        // "build/output/" but NOT "build/output2.class"
         normalizedPath.startsWith(pClean)
+        && (normalizedPath.length == pClean.length || normalizedPath.charAt(pClean.length) == '/')
     else
       // No separator — match against filename
       val filename = normalizedPath.split("/").last
