@@ -5,6 +5,7 @@
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - init like giter8, autoimport from sbt?
 - assembly still slowish
+- nit: align lines length === with test report
 
 # Import
 - import from other maven effective POM etc
