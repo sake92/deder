@@ -15,8 +15,8 @@ object FileWatchUtils:
   val ignoredDederSubdirs: Set[String] = Set("out", "logs")
 
   /** Excluded directory names for BSP buildTargetOutputPaths reporting.
-    * Single source of truth — used by DederBspServer. */
-  val bspExcludedDirNames: Seq[String] = Seq(".deder", ".bsp", ".metals", ".idea", ".vscode")
+    * Derived from `ignoredDirNames` plus `.deder` — single source of truth. */
+  val bspExcludedDirNames: Seq[String] = (ignoredDirNames + ".deder").toSeq
 
   /** True if the path is anywhere under `.deder/`.
     * Covers the entire `.deder/` tree: build output, logs, lock files, sockets, etc.
