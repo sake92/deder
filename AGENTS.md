@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-Deder is a **client-server JVM build tool** for Scala/Java projects. Configuration is defined in [Pkl](https://pkl-lang.org/) (`deder.pkl`), the server compiles via Zinc, and communication happens over Unix domain sockets. It implements the [BSP (Build Server Protocol)](https://build-server-protocol.github.io/) for IDE integration.
+Deder is a **client-server JVM build tool** for Scala/Java projects. 
+Configuration is defined in [Pkl](https://pkl-lang.org/) (`deder.pkl`), the server compiles via Zinc, and communication happens over Unix domain sockets. 
+It implements the [BSP (Build Server Protocol)](https://build-server-protocol.github.io/) for IDE integration.
 
 Prefer to use these tools/skills if available:
 - "scalex" for scala/java definitions, implementations, usages, imports, members, scaladoc, codebase overview, package 
@@ -27,8 +29,7 @@ This project uses Deder to build itself (`deder.pkl` build file). Key commands:
 
 ```sh
 ./scripts/gen-config-bindings.sh   # regenerate Pkl→Java config bindings (required before first build)
-deder exec -t assembly -m server   # build server fat JAR
-deder exec -t assembly -m client   # build client fat JAR
+./scripts/build-jars.sh            # build client, server and test-runner fat JAR (assembly)
 deder exec -t test -m server-test  # run unit tests (munit)
 ./scripts/run-it-tests.sh          # build everything + run integration tests
 ./scripts/run-it-tests.sh ba.sake.deder.bsp.BspIntegrationSuite  # single IT suite
@@ -38,7 +39,8 @@ Check out @README.md @CONTRIBUTING.md @docs/content/reference/server-properties.
 
 ## Key Patterns
 
-- prefer running single test and integration test (because they take very long)
+- prefer running single unit test 
+- prefer running single integration test, because they take very long and can be flaky
 
 ### Task DAG
 The core abstraction is `Task[T, Deps]` (`server/src/ba/sake/deder/Task.scala`). Tasks form a typed DAG:
@@ -85,6 +87,8 @@ All build artifacts go under `.deder/out/<moduleId>/<taskName>/`. Cache metadata
 ## Testing
 
 Check @CONTRIBUTING.md for technical details, how to test server, client, test-runner changes locally.  
+
+Use "deder shutdown && sleep 1" to kill the server.
 
 You can use one of @examples/ scenarios to test changes, just make sure to revert when you finish testing.
 

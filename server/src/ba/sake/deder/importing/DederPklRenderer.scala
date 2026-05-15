@@ -3,6 +3,8 @@ package ba.sake.deder.importing
 import ba.sake.deder.config.DederProject
 
 object DederPklRenderer {
+    val DederVersion = "v0.9.0"
+
     private enum ScalaVersionCtx:
         case Placeholder
         case Literal(value: String)
@@ -22,10 +24,12 @@ object DederPklRenderer {
         val needsTpolecatImport  = build.moduleGroups.exists(_.usesTpolecat)
         val needsTypelevelImport = build.moduleGroups.exists(_.usesTypelevel)
 
-        val helperImport = (needsTypelevelImport, needsTpolecatImport) match {
-            case (true, _)  => Some("""import "DederTypelevel.pkl"""")
-            case (_, true)  => Some("""import "DederTpolecat.pkl"""")
-            case _          => None
+        val helperImport: Option[String] = {
+            val imports = Seq(
+                if (needsTypelevelImport) Some(s"""import "https://sake92.github.io/deder/config/${build.dederVersion}/DederTypelevel.pkl"""") else None,
+                if (needsTpolecatImport) Some(s"""import "https://sake92.github.io/deder/config/${build.dederVersion}/DederTpolecat.pkl"""") else None,
+            ).flatten
+            if (imports.nonEmpty) Some(imports.mkString("\n")) else None
         }
 
         val crossGroups = build.moduleGroups.filter(g => g.crossScalaVersions.nonEmpty)
@@ -71,6 +75,33 @@ object DederPklRenderer {
         List(Some(header), helperImport, sharedVersionsDecl, sharedPomBaseStr, if (repos.nonEmpty) Some(repos) else None, Some(builders), Some(modulesBlock))
             .flatten.mkString("\n\n")
     }
+
+    /** Maps a Scala version string to the template key used in convention file exports.
+      * "3.7.4" -> "3", "2.13.18" -> "213", "2.12.20" -> "212" */
+    private def templateVersionKey(scalaVersion: String): String = {
+        val parts = scalaVersion.split("\\.")
+        if (parts(0) == "3") "3"
+        else parts.take(2).mkString("") // "2", "13" -> "213"
+    }
+
+    /** Returns the full namespace prefix for template amends. */
+    private def templatePrefix(g: ModuleGroup): String =
+        if (g.usesTypelevel) "DederTypelevel.typelevel"
+        else "DederTpolecat.tpolecat"
+
+    /** Returns the template amend expression for a single-version module.
+      * Example: "(DederTpolecat.tpolecatScala213)" */
+    private def templateAmendExpr(g: ModuleGroup, scalaVersion: String): String =
+        s"(${templatePrefix(g)}Scala${templateVersionKey(scalaVersion)})"
+
+    /** Returns the Pkl module name for convention imports. */
+    private def templateModuleName(g: ModuleGroup): String =
+        if (g.usesTypelevel) "DederTypelevel" else "DederTpolecat"
+
+    /** Returns a template amend expression for cross-version .map() using forVersion helper.
+      * Example: "(DederTpolecat.forVersion(sv))" */
+    private def crossVersionTemplateAmendExpr(g: ModuleGroup): String =
+        s"(${templateModuleName(g)}.forVersion(sv))"
 
     // ---- top-level blocks ----
 
@@ -222,10 +253,7 @@ object DederPklRenderer {
         val hasCommon = common.nonEmpty
         val hasAnyDelta = deltas.values.exists(_.nonEmpty)
         if (!hasCommon && !hasAnyDelta) return ""
-        if (g.usesTpolecat || g.usesTypelevel) {
-            val dummyModule = ModuleDef("", common, Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, Seq.empty, None, None, None, Seq.empty, Seq.empty, Seq.empty, Seq.empty)
-            return renderScalacOptionsSmart(dummyModule, g, indent, Some(ScalaVersionCtx.Placeholder))
-        }
+        if (g.usesTpolecat || g.usesTypelevel) return ""
         val spaces = " " * indent
         val i1 = " " * (indent + 2)
         val i2 = " " * (indent + 4)
@@ -392,11 +420,11 @@ object DederPklRenderer {
             val templateProps = Seq(
                 if (g.usesTpolecat || g.usesTypelevel || fixedCommonScalacOpts.nonEmpty || fixedScalacOptDeltas.values.exists(_.nonEmpty))
                     Some(renderScalacOptionsWithWhens(fixedCommonScalacOpts, fixedScalacOptDeltas, g, indent = 4)) else None,
-                if (common.javacOptions.nonEmpty || javacOptDeltas.values.exists(_.nonEmpty))
+                if (!suppressJavacOptionsDeltas(common.javacOptions, javacOptDeltas, g) && (common.javacOptions.nonEmpty || javacOptDeltas.values.exists(_.nonEmpty)))
                     Some(renderStringListWithWhens("javacOptions", common.javacOptions, javacOptDeltas, indent = 4)) else None,
                 if (common.deps.nonEmpty || depsDeltas.values.exists(_.nonEmpty))
                     Some(renderDepsWithWhens(common.deps, depsDeltas, indent = 4)) else None,
-                if (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty))
+                if (!suppressPluginDepsDeltas(common.scalacPluginDeps, pluginDepsDeltas, g, slices.exists(_.scalaVersion.startsWith("2"))) && (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty)))
                     Some(renderPluginDepsWithWhens(common.scalacPluginDeps, pluginDepsDeltas, indent = 4)) else None,
                 if (common.sources.nonEmpty || srcDeltas.values.exists(_.nonEmpty))
                     Some(renderStringListWithWhens("sources", common.sources, srcDeltas, indent = 4)) else None,
@@ -409,11 +437,15 @@ object DederPklRenderer {
 
             val propsBlock = if (templateProps.nonEmpty) templateProps + "\n" else ""
 
+            val templateHeader = if (g.usesTpolecat || g.usesTypelevel) {
+                s"""  template = ${crossVersionTemplateAmendExpr(g)} {"""
+            } else {
+                """  template = new ScalaModule {"""
+            }
             val templateBody = {
                 val body = s"""    scalaVersion = sv
-                   |    bspVisible = true
                    |$propsBlock""".stripMargin
-                s"""  template = new ScalaModule {
+                s"""$templateHeader
                    |$body  }""".stripMargin
             }
 
@@ -461,7 +493,7 @@ object DederPklRenderer {
                     } else ""
                 }.getOrElse("")
 
-                Seq(jsTmpl, nativeTmpl, jsTestTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
+                Seq(jsTmpl, jsTestTmpl, nativeTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
             } else ""
 
             val body = Seq(Some(templateBody), Some(testTmpl), if (crossPlatTmpls.nonEmpty) Some(crossPlatTmpls) else None)
@@ -559,11 +591,12 @@ object DederPklRenderer {
                 } else ""
             }.getOrElse("")
 
-            val tmpls = Seq(jsTmpl, nativeTmpl, jsTestTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
+            val tmpls = Seq(jsTmpl, jsTestTmpl, nativeTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
             val tmplsWithNewline = if (tmpls.nonEmpty) tmpls + "\n" else ""
 
             s"""$jvmBody
-               |$tmplsWithNewline$testTmpl""".stripMargin
+               |$testTmpl
+               |$tmplsWithNewline""".stripMargin
         } else {
             s"""$jvmBody
                |$testTmpl""".stripMargin
@@ -595,20 +628,29 @@ object DederPklRenderer {
         }
         val props = Seq(
             versionLine,
-            Some("    bspVisible = true"),
+
             Some(extra.trim).filter(_.nonEmpty),
-            if (g.usesTpolecat || g.usesTypelevel || m.scalacOptions.nonEmpty)
-                Some(renderScalacOptionsSmart(m, g, indent = 4, scalaVersionCtx))
-            else None,
-            Some(renderJavacOptions(m.javacOptions, indent = 4)).filter(_.nonEmpty),
+            Some(renderScalacOptionsSmart(m, g, indent = 4, scalaVersionCtx)).filter(_.nonEmpty),
+            if (suppressJavacOptions(m.javacOptions, g)) None
+            else Some(renderJavacOptions(m.javacOptions, indent = 4)).filter(_.nonEmpty),
             Some(renderSourceDirs(m.sources, indent = 4)).filter(_.nonEmpty),
             Some(renderResourceDirs(m.resources, indent = 4)).filter(_.nonEmpty),
             Some(renderDeps(m.deps, indent = 4)).filter(_.nonEmpty),
-            Some(renderPluginDeps(m.scalacPluginDeps, indent = 4)).filter(_.nonEmpty),
+            if (suppressPluginDeps(m.scalacPluginDeps, g, m.scalaVersion)) None
+            else Some(renderPluginDeps(m.scalacPluginDeps, indent = 4)).filter(_.nonEmpty),
             Some(renderModuleDepsPkl(m.moduleDeps, indent = 4, scalaVersionCtx, groupLookup)).filter(_.nonEmpty),
             m.publish.map(p => renderPublishInfo(p, indent = 4, useBase = hasSharedPomBase)).filter(_.nonEmpty),
         ).flatten.mkString("\n")
-        s"""  template = new $moduleType {
+        val header = if (g.usesTpolecat || g.usesTypelevel) {
+            val sv = scalaVersionCtx match {
+                case Some(ScalaVersionCtx.Literal(v)) => v
+                case _ => m.scalaVersion
+            }
+            s"""  template = ${templateAmendExpr(g, sv)} {"""
+        } else {
+            s"""  template = new $moduleType {"""
+        }
+        s"""$header
            |$props
            |  }""".stripMargin
     }
@@ -668,21 +710,36 @@ object DederPklRenderer {
         indent: Int,
         scalaVersionCtx: Option[ScalaVersionCtx],
     ): String = {
-        val spaces = " " * indent
-        val versionRef = scalaVersionCtx match {
-            case Some(ScalaVersionCtx.Placeholder) => "sv"
-            case Some(ScalaVersionCtx.Literal(v))  => s""""$v""""
-            case None                              => "\"\""
-        }
-        if (g.usesTypelevel) {
-            s"""${spaces}// Managed by sbt-typelevel. To customize: override scalacOptions directly.
-               |${spaces}scalacOptions = DederTypelevel.forVersion($versionRef)""".stripMargin
-        } else if (g.usesTpolecat) {
-            s"""${spaces}// Managed by sbt-tpolecat. Mode auto-selected: Ci when $$CI is set, Dev otherwise.
-               |${spaces}scalacOptions = DederTpolecat.forVersion($versionRef)""".stripMargin
-        } else {
-            renderScalacOptions(m.scalacOptions, indent)
-        }
+        if (g.usesTpolecat || g.usesTypelevel) ""
+        else renderScalacOptions(m.scalacOptions, indent)
+    }
+
+    /** Suppress javacOptions when the typelevel template already provides them. */
+    private val javacDefaults = Set("-encoding:utf8", "-Xlint:all")
+    private def suppressJavacOptions(opts: Seq[String], g: ModuleGroup): Boolean =
+        g.usesTypelevel && opts.nonEmpty && opts.forall(javacDefaults.contains)
+    private def suppressJavacOptionsDeltas(opts: Seq[String], deltas: Map[String, Seq[String]], g: ModuleGroup): Boolean =
+        g.usesTypelevel && (opts.nonEmpty || deltas.values.exists(_.nonEmpty)) &&
+            opts.forall(javacDefaults.contains) &&
+            deltas.values.forall(_.forall(javacDefaults.contains))
+
+    /** Suppress scalacPluginDeps when the typelevel template already provides them. */
+    private val pluginDefaults = Set(
+        "com.olegpy"    -> "better-monadic-for",
+        "org.typelevel" -> "kind-projector",
+    )
+    private def suppressPluginDeps(deps: Seq[DepDef], g: ModuleGroup, scalaVersion: String): Boolean = {
+        if (!g.usesTypelevel) return false
+        if (deps.isEmpty) return false
+        if (scalaVersion.startsWith("3")) return false
+        deps.forall(d => pluginDefaults.contains(d.organization -> d.name))
+    }
+    private def suppressPluginDepsDeltas(deps: Seq[DepDef], deltas: Map[String, Seq[DepDef]], g: ModuleGroup, hasScala2: Boolean): Boolean = {
+        if (!g.usesTypelevel) return false
+        if (deps.isEmpty && deltas.values.forall(_.isEmpty)) return false
+        if (!hasScala2) return false
+        deps.forall(d => pluginDefaults.contains(d.organization -> d.name)) &&
+            deltas.values.forall(_.forall(d => pluginDefaults.contains(d.organization -> d.name)))
     }
 
     private def renderJavacOptions(opts: Seq[String], indent: Int): String = {
@@ -882,3 +939,6 @@ object DederPklRenderer {
         }
     }
 }
+
+// TEMP DEBUG
+private def _dbg(msg: String): Unit = println(s"[SUPPRESS] $msg")
