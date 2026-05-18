@@ -16,10 +16,10 @@ mv config/src/java/* config/src
 rmdir config/src/java
 
 # Bundle all .pkl files (except *Test.pkl) as Pkl module-path classpath resources
-mkdir -p config/resources/pkl/ba/sake/deder/config
+mkdir -p config/resources/ba/sake/deder/config
 for pklfile in config/*.pkl; do
     basename=$(basename "$pklfile")
     if [[ "$basename" != *"Test.pkl" ]]; then
-        cp "$pklfile" config/resources/pkl/ba/sake/deder/config/
+        cp "$pklfile" config/resources/ba/sake/deder/config/
     fi
 done

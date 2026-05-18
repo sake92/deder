@@ -17,17 +17,11 @@ class SbtImporter(
   def doImport(): String = {
     dumpSbtBuild()
     val exportedSbtModules = readAndParseExportedModules()
-    // Analysis phase
     val analyzer = new SbtProjectAnalyzer(serverNotificationsLogger)
     val build = analyzer.analyze(exportedSbtModules)
-
-    // Render phase
     val pklContent = DederPklRenderer.render(build)
-
-    // Summary
     val summary = analyzer.summary()
     summary.log(serverNotificationsLogger)
-
     pklContent
   }
 
@@ -55,8 +49,7 @@ class SbtImporter(
   private def readAndParseExportedModules(): IndexedSeq[ExportedProjectExportFile] = {
     val exportDir = os.pwd / "target/build-export"
     val exportedSbtModuleFiles = os.list(exportDir).filter(_.ext == "json")
-    exportedSbtModuleFiles
-      .map(mf => ExportedProjectExportFile.parse(mf, os.read(mf)))
+    exportedSbtModuleFiles.map(mf => ExportedProjectExportFile.parse(mf, os.read(mf)))
   }
 
 }
