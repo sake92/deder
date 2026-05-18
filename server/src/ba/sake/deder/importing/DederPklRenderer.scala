@@ -1210,16 +1210,30 @@ object DederPklRenderer {
     val builderType = if (targetGroup != null) builderTypeFor(targetGroup) else "CreateScalaModules"
     val plat = if (ref.targetPlatform == "main") "" else s"-${ref.targetPlatform}"
     val testSuffix = if (ref.isTest) "-test" else ""
-    val idWithoutVersion = builderType match {
-      case "CreateCrossModules" => s"$name$plat$testSuffix"
-      case _                    => s"$name$testSuffix"
-    }
     scalaVersionCtx match {
       case ScalaVersionCtx.Placeholder =>
-        s"""${name}Modules.find((m) -> m.id == "$idWithoutVersion-\\(sv)")"""
+        builderType match {
+          case "CreateCrossModules" =>
+            // id: {name}{-plat}{-test}-\(sv)  e.g. myapp-jvm-test-3.7.4
+            val idPattern = s"$name$plat$testSuffix"
+            s"""${name}Modules.find((m) -> m.id == "$idPattern-\\(sv)")"""
+          case _ =>
+            // id: {name}-\(sv){-test}  e.g. msc_common-3.7.4-test
+            val idPattern = s"$name-\\(sv)$testSuffix"
+            s"""${name}Modules.find((m) -> m.id == "$idPattern")"""
+        }
       case ScalaVersionCtx.Literal(ownerVersion) =>
         val targetVersion = ref.targetScalaVersion.getOrElse(ownerVersion)
-        s"""${name}Modules.find((m) -> m.id == "$idWithoutVersion-$targetVersion")"""
+        builderType match {
+          case "CreateCrossModules" =>
+            // id: {name}{-plat}{-test}-{version}  e.g. myapp-jvm-test-3.7.4
+            val idWithVersion = s"$name$plat$testSuffix-$targetVersion"
+            s"""${name}Modules.find((m) -> m.id == "$idWithVersion")"""
+          case _ =>
+            // id: {name}-{version}{-test}  e.g. msc_common-2.13.18-test
+            val idWithVersion = s"$name-$targetVersion$testSuffix"
+            s"""${name}Modules.find((m) -> m.id == "$idWithVersion")"""
+        }
     }
   }
 }
