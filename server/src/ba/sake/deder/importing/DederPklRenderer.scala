@@ -292,10 +292,8 @@ object DederPklRenderer {
     val (effectiveCommon, effectiveDeltas) = if (g.usesTpolecat || g.usesTypelevel) {
       val refVersion = g.crossScalaVersions.headOption.getOrElse("2.13")
       val templateSet =
-        if (g.usesTpolecat)
-          TemplateOptionsReader.tpolecatScalacOptions(refVersion)
-        else
-          TemplateOptionsReader.typelevelScalacOptions(refVersion)
+        if (g.usesTpolecat) TemplateOptionsReader.tpolecatScalacOptions(refVersion)
+        else TemplateOptionsReader.typelevelScalacOptions(refVersion)
       val filteredCommon = common.filterNot(templateSet.contains)
       val filteredDeltas = deltas.view.mapValues(_.filterNot(templateSet.contains)).filter(_._2.nonEmpty).toMap
       (filteredCommon, filteredDeltas)
