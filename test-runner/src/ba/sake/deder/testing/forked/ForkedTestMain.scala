@@ -22,18 +22,57 @@ object ForkedTestMain {
 
     val logger = new ForkedTestLogger
 
-    val testRunner = new DederTestRunner(
-      testParallelism = forkedArgs.testParallelism,
-      discoveredTests = forkedArgs.discoveredTests,
-      frameworkOverrides = Map.empty,
-      classLoader = classLoader,
-      logger = logger,
-      forkHooks = Some(ForkRunnerHooks(capture, reporter))
-    )
-    val results = testRunner.run(DederTestOptions(forkedArgs.testSelectors))
-    val payload = ForkedTestResultsPayload(results, testRunner.perClassStats)
-    os.write.over(os.Path(forkedArgs.resultsFile), payload.toJson, createFolders = true)
-    reporter.emit(ForkedTestEnvelope.ForkCompleted(forkedArgs.forkId, results))
-    System.exit(if results.success then 0 else 1)
+    try {
+      val testRunner = new DederTestRunner(
+        testParallelism = forkedArgs.testParallelism,
+        discoveredTests = forkedArgs.discoveredTests,
+        frameworkOverrides = Map.empty,
+        classLoader = classLoader,
+        logger = logger,
+        forkHooks = Some(ForkRunnerHooks(capture, reporter))
+      )
+      val results = testRunner.run(DederTestOptions(forkedArgs.testSelectors))
+      val payload = ForkedTestResultsPayload(results, testRunner.perClassStats)
+      os.write.over(os.Path(forkedArgs.resultsFile), payload.toJson, createFolders = true)
+      reporter.emit(ForkedTestEnvelope.ForkCompleted(forkedArgs.forkId, results))
+      System.exit(if results.success then 0 else 1)
+    } catch {
+      case e: Throwable =>
+        // On any crash during initialization or execution (e.g. NoSuchMethodError
+        // from a framework with a mismatched Scala version), write an error payload
+        // so the orchestrator doesn't keep retrying forever.
+        val errorResults = DederTestResults(
+          total = forkedArgs.discoveredTests.flatMap(_.testClasses).size,
+          passed = 0,
+          failed = 0,
+          errors = forkedArgs.discoveredTests.flatMap(_.testClasses).size,
+          skipped = 0,
+          duration = 0L,
+          failedTestNames = forkedArgs.discoveredTests.flatMap(_.testClasses.map(tc => s"${tc.className}.${tc.className}")),
+          suites = forkedArgs.discoveredTests.flatMap(_.testClasses).map { tc =>
+            DederTestSuiteReport(
+              name = tc.className,
+              testCases = Seq(DederTestCaseReport(
+                name = tc.className,
+                classname = tc.className,
+                status = DederTestStatus.Error,
+                duration = 0L,
+                failure = Some(DederTestFailure(
+                  message = Some(s"Forked JVM crashed before tests could run: ${e.getMessage}"),
+                  stackTrace = None
+                ))
+              )),
+              duration = 0L
+            )
+          }
+        )
+        try {
+          val payload = ForkedTestResultsPayload(errorResults, Map.empty)
+          os.write.over(os.Path(forkedArgs.resultsFile), payload.toJson, createFolders = true)
+        } catch {
+          case _: Throwable => // best effort
+        }
+        System.exit(1)
+    }
   }
 }
