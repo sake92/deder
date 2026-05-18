@@ -30,6 +30,7 @@ private enum ForkOutcome {
 object ForkedTestOrchestrator extends StrictLogging {
 
   private val MaxTestTimeMs = 30L * 60 * 1000
+  private val MaxRetries = 3
   private val RunIdFormatter =
     DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS").withZone(java.time.ZoneId.systemDefault())
 
@@ -214,60 +215,111 @@ object ForkedTestOrchestrator extends StrictLogging {
     var retryAttempt = 0
 
     while (currentSlice.nonEmpty) {
-      val forkDir =
-        if (retryAttempt == 0) runDir / s"fork-$forkId"
-        else runDir / s"fork-$forkId-retry-$retryAttempt"
-
-      spawnAndRun(
-        forkId = forkId,
-        slice = currentSlice,
-        javaBinary = javaBinary,
-        fullClasspath = fullClasspath,
-        jvmOptions = jvmOptions,
-        envVars = envVars,
-        testOptions = testOptions,
-        testParallelism = testParallelism,
-        forkDir = forkDir,
-        showForkTag = showForkTag,
-        notifications = notifications,
-        moduleId = moduleId
-      ) match {
-        case ForkOutcome.Success(payload) =>
-          return Some(mergeCrashSuites(payload, crashErrorSuites))
-
-        case ForkOutcome.Crashed(exitCode, inProgress, allStarted) =>
-          for name <- inProgress do
-            crashErrorSuites = crashErrorSuites :+ makeErrorSuite(name, exitCode, retryAttempt)
-          val tag = if showForkTag then s"[fork-$forkId] " else ""
-          val remainingCount =
-            currentSlice.flatMap(_.testClasses).count(tc => !allStarted.contains(tc.className))
-          notifications.add(
-            ServerNotification.logError(
-              s"${tag}crashed on attempt $retryAttempt (exit $exitCode). " +
-                s"Interrupted suites: ${inProgress.mkString(", ")}. " +
-                s"Retrying $remainingCount remaining suites...",
-              Some(moduleId)
-            )
+      // Safety net: don't retry forever if every attempt fails the same way.
+      if (retryAttempt > MaxRetries) {
+        val tag = if showForkTag then s"[fork-$forkId] " else ""
+        notifications.add(
+          ServerNotification.logError(
+            s"${tag}giving up after ${retryAttempt} attempts. Reporting remaining suites as errors.",
+            Some(moduleId)
           )
-          currentSlice = removeSuiteNames(currentSlice, allStarted)
-          retryAttempt += 1
-
-        case ForkOutcome.TimedOut(inProgress, allStarted) =>
-          for name <- inProgress do
-            crashErrorSuites = crashErrorSuites :+ makeErrorSuite(name, -1, retryAttempt)
-          val tag = if showForkTag then s"[fork-$forkId] " else ""
-          val remainingCount =
-            currentSlice.flatMap(_.testClasses).count(tc => !allStarted.contains(tc.className))
-          notifications.add(
-            ServerNotification.logError(
-              s"${tag}timed out on attempt $retryAttempt. " +
-                s"Interrupted suites: ${inProgress.mkString(", ")}. " +
-                s"Retrying $remainingCount remaining suites...",
-              Some(moduleId)
-            )
+        )
+        for dft <- currentSlice; tc <- dft.testClasses do
+          crashErrorSuites = crashErrorSuites :+ makeErrorSuite(
+            tc.className, -1, retryAttempt,
+            "Max retries exceeded"
           )
-          currentSlice = removeSuiteNames(currentSlice, allStarted)
-          retryAttempt += 1
+        currentSlice = Seq.empty
+      } else {
+        val forkDir =
+          if (retryAttempt == 0) runDir / s"fork-$forkId"
+          else runDir / s"fork-$forkId-retry-$retryAttempt"
+
+        spawnAndRun(
+          forkId = forkId,
+          slice = currentSlice,
+          javaBinary = javaBinary,
+          fullClasspath = fullClasspath,
+          jvmOptions = jvmOptions,
+          envVars = envVars,
+          testOptions = testOptions,
+          testParallelism = testParallelism,
+          forkDir = forkDir,
+          showForkTag = showForkTag,
+          notifications = notifications,
+          moduleId = moduleId
+        ) match {
+          case ForkOutcome.Success(payload) =>
+            return Some(mergeCrashSuites(payload, crashErrorSuites))
+
+          case ForkOutcome.Crashed(exitCode, inProgress, allStarted) =>
+            val tag = if showForkTag then s"[fork-$forkId] " else ""
+            if (allStarted.isEmpty) {
+              // Framework initialization or JVM-level crash before any suite started.
+              // Mark ALL current suites as errors — retrying would hit the same crash.
+              for dft <- currentSlice; tc <- dft.testClasses do
+                crashErrorSuites = crashErrorSuites :+ makeErrorSuite(
+                  tc.className, exitCode, retryAttempt,
+                  s"Fork crashed (exit $exitCode) before any suite could start"
+                )
+              notifications.add(
+                ServerNotification.logError(
+                  s"${tag}crashed on attempt $retryAttempt (exit $exitCode) before any suite started. " +
+                    s"Reporting all ${currentSlice.flatMap(_.testClasses).size} suites as errors.",
+                  Some(moduleId)
+                )
+              )
+              currentSlice = Seq.empty
+            } else {
+              for name <- inProgress do
+                crashErrorSuites = crashErrorSuites :+ makeErrorSuite(name, exitCode, retryAttempt)
+              val remainingCount =
+                currentSlice.flatMap(_.testClasses).count(tc => !allStarted.contains(tc.className))
+              notifications.add(
+                ServerNotification.logError(
+                  s"${tag}crashed on attempt $retryAttempt (exit $exitCode). " +
+                    s"Interrupted suites: ${inProgress.mkString(", ")}. " +
+                    s"Retrying $remainingCount remaining suites...",
+                  Some(moduleId)
+                )
+              )
+              currentSlice = removeSuiteNames(currentSlice, allStarted)
+            }
+            retryAttempt += 1
+
+          case ForkOutcome.TimedOut(inProgress, allStarted) =>
+            val tag = if showForkTag then s"[fork-$forkId] " else ""
+            if (allStarted.isEmpty) {
+              for dft <- currentSlice; tc <- dft.testClasses do
+                crashErrorSuites = crashErrorSuites :+ makeErrorSuite(
+                  tc.className, -1, retryAttempt,
+                  "Fork timed out before any suite could start"
+                )
+              notifications.add(
+                ServerNotification.logError(
+                  s"${tag}timed out on attempt $retryAttempt before any suite started. " +
+                    s"Reporting all ${currentSlice.flatMap(_.testClasses).size} suites as errors.",
+                  Some(moduleId)
+                )
+              )
+              currentSlice = Seq.empty
+            } else {
+              for name <- inProgress do
+                crashErrorSuites = crashErrorSuites :+ makeErrorSuite(name, -1, retryAttempt)
+              val remainingCount =
+                currentSlice.flatMap(_.testClasses).count(tc => !allStarted.contains(tc.className))
+              notifications.add(
+                ServerNotification.logError(
+                  s"${tag}timed out on attempt $retryAttempt. " +
+                    s"Interrupted suites: ${inProgress.mkString(", ")}. " +
+                    s"Retrying $remainingCount remaining suites...",
+                  Some(moduleId)
+                )
+              )
+              currentSlice = removeSuiteNames(currentSlice, allStarted)
+            }
+            retryAttempt += 1
+        }
       }
     }
 
@@ -566,7 +618,14 @@ object ForkedTestOrchestrator extends StrictLogging {
     }
 
   /** Build a synthetic ERROR suite report for a suite interrupted by a fork crash. */
-  private def makeErrorSuite(suiteName: String, exitCode: Int, retryAttempt: Int): DederTestSuiteReport =
+  private def makeErrorSuite(
+      suiteName: String,
+      exitCode: Int,
+      retryAttempt: Int,
+      extraMessage: String = ""
+  ): DederTestSuiteReport = {
+    val msg = s"Test suite was interrupted by forked JVM exit (code $exitCode) on retry attempt $retryAttempt" +
+      (if (extraMessage.isEmpty) "" else s": $extraMessage")
     DederTestSuiteReport(
       name = suiteName,
       testCases = Seq(DederTestCaseReport(
@@ -575,12 +634,13 @@ object ForkedTestOrchestrator extends StrictLogging {
         status = DederTestStatus.Error,
         duration = 0L,
         failure = Some(DederTestFailure(
-          message = Some(s"Test suite was interrupted by forked JVM exit (code $exitCode) on retry attempt $retryAttempt"),
+          message = Some(msg),
           stackTrace = None
         ))
       )),
       duration = 0L
     )
+  }
 
   /** Remove test classes whose class names are in `namesToRemove` from the slice.
     * Entire framework entries that become empty are dropped.
