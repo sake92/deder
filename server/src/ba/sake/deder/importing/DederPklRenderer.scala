@@ -944,11 +944,16 @@ object DederPklRenderer {
   ): String = {
     val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(jvmModule.scalaVersion))
     val amendExpr = platformAmendExpr(g, "Test", resolvedCtx)
+    val scalaVersionLine = resolvedCtx match {
+      case ScalaVersionCtx.Placeholder    => "    scalaVersion = sv"
+      case ScalaVersionCtx.Literal(v) => s"""    scalaVersion = "$v""""
+    }
     val testModuleDepsStr = renderModuleDepsPkl(jvmModule.testModuleDeps, indent = 6, scalaVersionCtx, groupLookup)
     val testDepsStr =
       if (jvmModule.testDeps.nonEmpty) renderDeps(jvmModule.testDeps, indent = 6)
       else """    deps { "org.scalameta::munit:1.2.1" }"""
     s"""  testTemplate = ($amendExpr) {
+       |$scalaVersionLine
        |$testModuleDepsStr
        |$testDepsStr
        |  }""".stripMargin

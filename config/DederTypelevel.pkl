@@ -276,12 +276,12 @@ function forVersion(scalaVersion: String): P.ScalaModule =
 
 /// Returns the auto-select test template for a given Scala version string.
 function testForVersion(scalaVersion: String): P.ScalaTestModule =
-  if (scalaVersion.startsWith("3"))
+  (if (scalaVersion.startsWith("3"))
     typelevelScala3Test
   else if (scalaVersion.startsWith("2.13"))
     typelevelScala213Test
   else
-    typelevelScala212Test
+    typelevelScala212Test) { scalaVersion = scalaVersion }
 
 /// Returns the auto-select Scala.js template for a given Scala version string.
 function jsForVersion(scalaVersion: String, scalaJsVersion: String): P.ScalaJsModule =
@@ -290,7 +290,10 @@ function jsForVersion(scalaVersion: String, scalaJsVersion: String): P.ScalaJsMo
   else if (scalaVersion.startsWith("2.13"))
     typelevelScala213Js
   else
-    typelevelScala212Js) { scalaJsVersion = scalaJsVersion }
+    typelevelScala212Js) {
+    scalaVersion = scalaVersion
+    scalaJsVersion = scalaJsVersion
+  }
 
 /// Returns the auto-select Scala.js test template for a given Scala version string.
 function jsTestForVersion(scalaVersion: String, scalaJsVersion: String): P.ScalaJsTestModule =
@@ -299,7 +302,10 @@ function jsTestForVersion(scalaVersion: String, scalaJsVersion: String): P.Scala
   else if (scalaVersion.startsWith("2.13"))
     typelevelScala213JsTest
   else
-    typelevelScala212JsTest) { scalaJsVersion = scalaJsVersion }
+    typelevelScala212JsTest) {
+    scalaVersion = scalaVersion
+    scalaJsVersion = scalaJsVersion
+  }
 
 /// Returns the auto-select Scala Native template for a given Scala version string.
 function nativeForVersion(scalaVersion: String, scalaNativeVersion: String): P.ScalaNativeModule =
@@ -308,7 +314,10 @@ function nativeForVersion(scalaVersion: String, scalaNativeVersion: String): P.S
   else if (scalaVersion.startsWith("2.13"))
     typelevelScala213Native
   else
-    typelevelScala212Native) { scalaNativeVersion = scalaNativeVersion }
+    typelevelScala212Native) {
+    scalaVersion = scalaVersion
+    scalaNativeVersion = scalaNativeVersion
+  }
 
 /// Returns the auto-select Scala Native test template for a given Scala version string.
 function nativeTestForVersion(scalaVersion: String, scalaNativeVersion: String): P.ScalaNativeTestModule =
@@ -317,4 +326,7 @@ function nativeTestForVersion(scalaVersion: String, scalaNativeVersion: String):
   else if (scalaVersion.startsWith("2.13"))
     typelevelScala213NativeTest
   else
-    typelevelScala212NativeTest) { scalaNativeVersion = scalaNativeVersion }
+    typelevelScala212NativeTest) {
+    scalaVersion = scalaVersion
+    scalaNativeVersion = scalaNativeVersion
+  }
