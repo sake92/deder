@@ -292,6 +292,8 @@ class JavaTestModule extends JavaModule {
   }
 }
 
+typealias ScalaBinaryVersion = "2.12" | "2.13" | "3"
+
 open class ScalaModule extends JavaModule {
   type = "scala"
   scalaVersion: String(scalaVersionValidation)
