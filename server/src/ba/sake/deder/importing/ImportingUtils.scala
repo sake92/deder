@@ -33,10 +33,11 @@ object ImportingUtils {
     if ReservedIdentifiers.contains(id) then s"_${id}"
     else id
 
-  /** Detects the build tool used in the current project by inspecting known marker files.
-    * Currently only sbt (`build.sbt`) is supported.
+  /** Detects the build tool used in the current project by inspecting known marker files. Currently only sbt
+    * (`build.sbt`) is supported.
     *
-    * @return Some build tool if a supported build file exists, None otherwise.
+    * @return
+    *   Some build tool if a supported build file exists, None otherwise.
     */
   def detectBuildTool(): Option[ImportBuildTool] = {
     val projectRoot = DederGlobals.projectRootDir
@@ -44,8 +45,8 @@ object ImportingUtils {
     else None
   }
 
-  /** Finds the next available backup path for deder.pkl.
-    * Returns `deder.pkl.bak1`, then `.bak2`, etc., skipping existing files.
+  /** Finds the next available backup path for deder.pkl. Returns `deder.pkl.bak1`, then `.bak2`, etc., skipping
+    * existing files.
     */
   def findNextBackupPath(): os.Path = {
     val projectRoot = DederGlobals.projectRootDir
