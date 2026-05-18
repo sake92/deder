@@ -724,7 +724,8 @@ object DederPklRenderer {
         val fallbackVersion = versionsFor(g).headOption.getOrElse("")
         VersionSlice(fallbackVersion, Map.empty)
       }
-      val body = renderGroupBody(representativeSlice.modulesByPlatform, groupLookup, g, None, hasSharedPomBase)
+      val scalaVersionCtx = ScalaVersionCtx.Literal(representativeSlice.scalaVersion)
+      val body = renderGroupBody(representativeSlice.modulesByPlatform, groupLookup, g, Some(scalaVersionCtx), hasSharedPomBase)
       s"""local const ${g.builderVarName} = new $builderType {
                |  root = "${g.root}"
                |  id = "${g.builderVarName}"
@@ -1201,9 +1202,9 @@ object DederPklRenderer {
   ): String = {
     val name = ref.targetGroup
     val targetGroup = groupLookup.getOrElse(name, null)
-    // Non-cross targets are declared as `local const name = ...get` (no Modules suffix).
-    // Use the direct accessor rather than nameModules.find(...).
-    if (targetGroup != null && targetGroup.crossScalaVersions.isEmpty) {
+    // Non-cross targets (and unknown/external targets) are declared as `local const name = ...get`
+    // (no Modules suffix). Use the direct accessor rather than nameModules.find(...).
+    if (targetGroup == null || targetGroup.crossScalaVersions.isEmpty) {
       return refString(ref)
     }
     val builderType = if (targetGroup != null) builderTypeFor(targetGroup) else "CreateScalaModules"
