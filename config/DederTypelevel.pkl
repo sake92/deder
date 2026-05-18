@@ -273,3 +273,48 @@ function forVersion(scalaVersion: String): P.ScalaModule =
     typelevelScala213
   else
     typelevelScala212
+
+/// Returns the auto-select test template for a given Scala version string.
+function testForVersion(scalaVersion: String): P.ScalaTestModule =
+  if (scalaVersion.startsWith("3"))
+    typelevelScala3Test
+  else if (scalaVersion.startsWith("2.13"))
+    typelevelScala213Test
+  else
+    typelevelScala212Test
+
+/// Returns the auto-select Scala.js template for a given Scala version string.
+function jsForVersion(scalaVersion: String, scalaJsVersion: String): P.ScalaJsModule =
+  (if (scalaVersion.startsWith("3"))
+    typelevelScala3Js
+  else if (scalaVersion.startsWith("2.13"))
+    typelevelScala213Js
+  else
+    typelevelScala212Js) { scalaJsVersion = scalaJsVersion }
+
+/// Returns the auto-select Scala.js test template for a given Scala version string.
+function jsTestForVersion(scalaVersion: String, scalaJsVersion: String): P.ScalaJsTestModule =
+  (if (scalaVersion.startsWith("3"))
+    typelevelScala3JsTest
+  else if (scalaVersion.startsWith("2.13"))
+    typelevelScala213JsTest
+  else
+    typelevelScala212JsTest) { scalaJsVersion = scalaJsVersion }
+
+/// Returns the auto-select Scala Native template for a given Scala version string.
+function nativeForVersion(scalaVersion: String, scalaNativeVersion: String): P.ScalaNativeModule =
+  (if (scalaVersion.startsWith("3"))
+    typelevelScala3Native
+  else if (scalaVersion.startsWith("2.13"))
+    typelevelScala213Native
+  else
+    typelevelScala212Native) { scalaNativeVersion = scalaNativeVersion }
+
+/// Returns the auto-select Scala Native test template for a given Scala version string.
+function nativeTestForVersion(scalaVersion: String, scalaNativeVersion: String): P.ScalaNativeTestModule =
+  (if (scalaVersion.startsWith("3"))
+    typelevelScala3NativeTest
+  else if (scalaVersion.startsWith("2.13"))
+    typelevelScala213NativeTest
+  else
+    typelevelScala212NativeTest) { scalaNativeVersion = scalaNativeVersion }

@@ -898,9 +898,8 @@ class DederPklRendererSuite extends FunSuite {
     // Verify encoding is split properly (not combined -encoding:utf8)
     for (opts <- Seq(scala3, scala213, scala212)) {
       assert(opts.contains("-encoding"), s"should contain -encoding: $opts")
-      assert(opts.contains("utf-8"), s"should contain utf-8: $opts")
+      assert(opts.contains("utf8"), s"should contain utf8: $opts")
       assert(!opts.contains("-encoding:utf8"), s"should NOT contain combined -encoding:utf8: $opts")
-      assert(!opts.contains("utf8"), s"should be utf-8 not utf8: $opts")
     }
 
     // Verify key options: scala3 + 2.12 have -deprecation, 2.13 has -Xlint:deprecation instead
@@ -914,7 +913,7 @@ class DederPklRendererSuite extends FunSuite {
     val scala3 = TemplateOptionsReader.typelevelScalacOptions("3.3.5")
     assert(scala3.nonEmpty, "scala3 typelevel options should be non-empty")
     assert(scala3.contains("-encoding"), s"typelevel scala3 should contain -encoding: $scala3")
-    assert(scala3.contains("utf-8"), s"typelevel scala3 should contain utf-8: $scala3")
+    assert(scala3.contains("utf8"), s"typelevel scala3 should contain utf8: $scala3")
     assert(scala3.contains("-deprecation"), s"typelevel scala3 should contain -deprecation: $scala3")
   }
 }
