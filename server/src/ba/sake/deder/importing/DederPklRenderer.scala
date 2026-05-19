@@ -3,7 +3,7 @@ package ba.sake.deder.importing
 import ba.sake.deder.config.DederProject
 
 object DederPklRenderer {
-  val DederVersion = "v0.9.0"
+  val DederVersion = "v0.10.0"
 
   private enum ScalaVersionCtx:
     case Placeholder
@@ -740,13 +740,13 @@ object DederPklRenderer {
     else "CreateScalaModules"
   }
 
+  // scalaModules now appends scalaVersion itself, so the id parameter is always
+  // the clean builder var name (consistent with CreateCrossModules).
   private def crossVersionIdWithPlaceholder(g: ModuleGroup, builderType: String): String =
-    if (builderType == "CreateCrossModules") s"${g.builderVarName}"
-    else s"${g.builderVarName}-\\(sv)"
+    s"${g.builderVarName}"
 
   private def crossVersionIdWithLiteral(g: ModuleGroup, builderType: String, scalaVersion: String): String =
-    if (builderType == "CreateCrossModules") s"${g.builderVarName}"
-    else s"${g.builderVarName}-$scalaVersion"
+    s"${g.builderVarName}"
 
   private def renderGroupBody(
       modulesByPlatform: Map[String, ModuleDef],
@@ -1218,9 +1218,9 @@ object DederPklRenderer {
             val idPattern = s"$name$plat$testSuffix"
             s"""${name}Modules.find((m) -> m.id == "$idPattern-\\(sv)")"""
           case _ =>
-            // id: {name}-\(sv){-test}  e.g. msc_common-3.7.4-test
-            val idPattern = s"$name-\\(sv)$testSuffix"
-            s"""${name}Modules.find((m) -> m.id == "$idPattern")"""
+            // id: {name}{-test}-{version}  e.g. msc_common-test-2.13.18
+            val idPattern = s"$name$testSuffix"
+            s"""${name}Modules.find((m) -> m.id == "$idPattern-\\(sv)")"""
         }
       case ScalaVersionCtx.Literal(ownerVersion) =>
         val targetVersion = ref.targetScalaVersion.getOrElse(ownerVersion)
@@ -1230,8 +1230,8 @@ object DederPklRenderer {
             val idWithVersion = s"$name$plat$testSuffix-$targetVersion"
             s"""${name}Modules.find((m) -> m.id == "$idWithVersion")"""
           case _ =>
-            // id: {name}-{version}{-test}  e.g. msc_common-2.13.18-test
-            val idWithVersion = s"$name-$targetVersion$testSuffix"
+            // id: {name}{-test}-{version}  e.g. msc_common-test-2.13.18
+            val idWithVersion = s"$name$testSuffix-$targetVersion"
             s"""${name}Modules.find((m) -> m.id == "$idWithVersion")"""
         }
     }

@@ -27,6 +27,4 @@ case class ImportSummary(
       }
     }
   }
-
-  private def formatWarning(w: ImportWarning): String = ""
 }
