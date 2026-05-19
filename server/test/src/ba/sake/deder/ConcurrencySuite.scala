@@ -6,9 +6,10 @@ import ba.sake.deder.config.DederProject.ModuleType
 
 class ConcurrencySuite extends munit.FunSuite {
 
-  private val testProjectDir = os.pwd / "server/test/resources/sample-projects/multi"
+  private var testProjectDir: os.Path = scala.compiletime.uninitialized
 
   override def beforeAll(): Unit = {
+    testProjectDir = os.pwd / "server/test/resources/sample-projects/multi"
     System.setProperty("DEDER_PROJECT_ROOT_DIR", testProjectDir.toString)
   }
 
