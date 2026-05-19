@@ -709,12 +709,19 @@ object DederPklRenderer {
         if (sharedVersionListName.isEmpty)
           s"local const $versionsListName = ${versionsFor(g).map(v => s""""$v"""").mkString("List(", ", ", ")")}\n\n"
         else ""
+      val builderIdProps = {
+        val idLine = s"""      id = "${crossVersionIdWithPlaceholder(g, builderType)}""""
+        val testIdLine = Option.when(builderType == "CreateScalaModules")(
+          s"""      testId = "${crossVersionTestIdWithPlaceholder(g)}""""
+        )
+        Seq(Some(idLine), testIdLine).flatten.mkString("\n")
+      }
 
       s"""${versionsDecl}local const ${g.builderVarName}Modules = $versionsListName
                |  .map((sv) ->
                |    new $builderType {
                |      root = "${g.root}"
-               |      id = "${crossVersionIdWithPlaceholder(g, builderType)}"
+               |$builderIdProps
                |      layout = "${g.layout.toString.toLowerCase.replace("_", "-")}"
                |$body
                |    }.get.all
@@ -740,13 +747,15 @@ object DederPklRenderer {
     else "CreateScalaModules"
   }
 
-  // scalaModules now appends scalaVersion itself, so the id parameter is always
-  // the clean builder var name (consistent with CreateCrossModules).
   private def crossVersionIdWithPlaceholder(g: ModuleGroup, builderType: String): String =
-    s"${g.builderVarName}"
+    builderType match {
+      case "CreateScalaModules" => s"${g.builderVarName}-jvm-\\(sv)"
+      case "CreateCrossModules" => g.builderVarName
+      case other                => throw new IllegalArgumentException(s"Unexpected builder type: $other")
+    }
 
-  private def crossVersionIdWithLiteral(g: ModuleGroup, builderType: String, scalaVersion: String): String =
-    s"${g.builderVarName}"
+  private def crossVersionTestIdWithPlaceholder(g: ModuleGroup): String =
+    s"${g.builderVarName}-jvm-test-\\(sv)"
 
   private def renderGroupBody(
       modulesByPlatform: Map[String, ModuleDef],
@@ -1207,36 +1216,27 @@ object DederPklRenderer {
     if (targetGroup == null || targetGroup.crossScalaVersions.isEmpty) {
       return refString(ref)
     }
-    val builderType = if (targetGroup != null) builderTypeFor(targetGroup) else "CreateScalaModules"
-    val plat = if (ref.targetPlatform == "main") "" else s"-${ref.targetPlatform}"
+    val builderType = builderTypeFor(targetGroup)
+    val plat = builderType match {
+      case "CreateScalaModules" =>
+        "-jvm"
+      case "CreateCrossModules" =>
+        ref.targetPlatform match {
+          case "main" | "jvm" => "-jvm"
+          case other          => s"-$other"
+        }
+      case other =>
+        throw new IllegalArgumentException(s"Unexpected builder type: $other")
+    }
     val testSuffix = if (ref.isTest) "-test" else ""
     scalaVersionCtx match {
       case ScalaVersionCtx.Placeholder =>
-        builderType match {
-          case "CreateCrossModules" =>
-            // id: {name}{-plat}{-test}-\(sv)  e.g. myapp-jvm-test-3.7.4
-            val idPattern = s"$name$plat$testSuffix"
-            s"""${name}Modules.find((m) -> m.id == "$idPattern-\\(sv)")"""
-          case _ =>
-            // id: {name}{-test}-{version}  e.g. msc_common-test-2.13.18
-            val idPattern = s"$name$testSuffix"
-            s"""${name}Modules.find((m) -> m.id == "$idPattern-\\(sv)")"""
-        }
+        val idPattern = s"$name$plat$testSuffix"
+        s"""${name}Modules.find((m) -> m.id == "$idPattern-\\(sv)")"""
       case ScalaVersionCtx.Literal(ownerVersion) =>
         val targetVersion = ref.targetScalaVersion.getOrElse(ownerVersion)
-        builderType match {
-          case "CreateCrossModules" =>
-            // id: {name}{-plat}{-test}-{version}  e.g. myapp-jvm-test-3.7.4
-            val idWithVersion = s"$name$plat$testSuffix-$targetVersion"
-            s"""${name}Modules.find((m) -> m.id == "$idWithVersion")"""
-          case _ =>
-            // id: {name}{-test}-{version}  e.g. msc_common-test-2.13.18
-            val idWithVersion = s"$name$testSuffix-$targetVersion"
-            s"""${name}Modules.find((m) -> m.id == "$idWithVersion")"""
-        }
+        val idWithVersion = s"$name$plat$testSuffix-$targetVersion"
+        s"""${name}Modules.find((m) -> m.id == "$idWithVersion")"""
     }
   }
 }
-
-// TEMP DEBUG
-private def _dbg(msg: String): Unit = println(s"[SUPPRESS] $msg")
