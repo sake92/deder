@@ -644,7 +644,7 @@ const function scalaModules(
   let (baseId = if (_id != null) _id else _root.replaceAll("/", "-"))
     new {
       main = (_template) {
-        id = baseId
+        id = "\(baseId)-\(_template.scalaVersion)"
         root = _root
         sources = new Listing {
           cfg.mainScalaSrcBase
@@ -661,7 +661,7 @@ const function scalaModules(
         resources = cfg.mainResources
       }
       test = (_testTemplate) {
-        id = "\(baseId)-test"
+        id = "\(baseId)-test-\(_template.scalaVersion)"
         root = "\(_root)\(cfg.testRootSuffix)"
         sources = new Listing {
           cfg.testScalaSrcBase

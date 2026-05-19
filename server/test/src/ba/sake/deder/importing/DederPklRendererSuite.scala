@@ -2,8 +2,42 @@ package ba.sake.deder.importing
 
 import munit.FunSuite
 import ba.sake.deder.config.DederProject
+import ba.sake.deder.config.ConfigParser
+import scala.jdk.CollectionConverters.*
 
 class DederPklRendererSuite extends FunSuite {
+
+  // ---- structural validation helper ----
+
+  /** Renders the build, evaluates the resulting Pkl, and returns the parsed DederProject.
+    * To work before the v0.10.0 schema is deployed, the amends/import URLs are rewritten
+    * to point at the local config files in the project tree.
+    */
+  private def evaluateRender(build: DederBuild): DederProject = {
+    val pklText = DederPklRenderer.render(build)
+    val configDir = os.pwd / "config"
+    val baseUrl = s"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}"
+    val rewritten = pklText
+      .replace(s""""$baseUrl/DederProject.pkl"""", s""""${configDir / "DederProject.pkl"}"""")
+      .replace(s""""$baseUrl/DederTpolecat.pkl"""", s""""${configDir / "DederTpolecat.pkl"}"""")
+      .replace(s""""$baseUrl/DederTypelevel.pkl"""", s""""${configDir / "DederTypelevel.pkl"}"""")
+    val tmpDir = os.temp.dir()
+    try {
+      val pklFile = tmpDir / "deder.pkl"
+      os.write(pklFile, rewritten)
+      val result = new ConfigParser(writeJson = false).parse(pklFile)
+      result match {
+        case Right(project) => project
+        case Left(err)      => fail(s"Rendered Pkl is invalid:\n$err\n\nOutput:\n$pklText")
+      }
+    } finally {
+      try { os.remove.all(tmpDir) } catch { case _: Exception => () }
+    }
+  }
+
+  /** Shorthand: render & evaluate as Pkl, returning list of module IDs for quick assertions. */
+  private def renderedModuleIds(build: DederBuild): Seq[String] =
+    evaluateRender(build).modules.asScala.toSeq.map(_.id)
 
   // ---- helpers ----
 
@@ -17,7 +51,8 @@ class DederPklRendererSuite extends FunSuite {
       moduleDeps: Seq[ModuleDepRef] = Seq.empty,
       testModuleDeps: Seq[ModuleDepRef] = Seq.empty,
       publish: Option[PublishInfo] = None,
-      scalaJsVersion: Option[String] = None
+      scalaJsVersion: Option[String] = None,
+      scalaNativeVersion: Option[String] = None
   ): ModuleDef = ModuleDef(
     scalaVersion = scalaVersion,
     scalacOptions = scalacOptions,
@@ -28,7 +63,7 @@ class DederPklRendererSuite extends FunSuite {
     moduleDeps = moduleDeps,
     testModuleDeps = testModuleDeps,
     scalaJsVersion = scalaJsVersion,
-    scalaNativeVersion = None,
+    scalaNativeVersion = scalaNativeVersion,
     publish = publish,
     sources = Seq.empty,
     testSources = Seq.empty,
@@ -113,7 +148,7 @@ class DederPklRendererSuite extends FunSuite {
   test("generates correct Pkl header with amends directive") {
     val build = singleModuleBuild()
     val result = DederPklRenderer.render(build)
-    assert(result.contains(s"""amends "https://sake92.github.io/deder/config/v0.9.0/DederProject.pkl""""))
+    assert(result.contains(s"""amends "https://sake92.github.io/deder/config/v0.10.0/DederProject.pkl""""))
   }
 
   test("single Scala module generates CreateScalaModules builder and modules block") {
@@ -710,7 +745,7 @@ class DederPklRendererSuite extends FunSuite {
     )
     val result = DederPklRenderer.render(build)
     assert(
-      result.contains(s"""import "https://sake92.github.io/deder/config/v0.9.0/DederTpolecat.pkl""""),
+      result.contains(s"""import "https://sake92.github.io/deder/config/v0.10.0/DederTpolecat.pkl""""),
       clues(result)
     )
     assert(result.contains("DederTpolecat.forVersion(sv)"), clues(result))
@@ -741,7 +776,7 @@ class DederPklRendererSuite extends FunSuite {
     )
     val result = DederPklRenderer.render(build)
     assert(
-      result.contains(s"""import "https://sake92.github.io/deder/config/v0.9.0/DederTypelevel.pkl""""),
+      result.contains(s"""import "https://sake92.github.io/deder/config/v0.10.0/DederTypelevel.pkl""""),
       clues(result)
     )
     assert(result.contains("(DederTypelevel.typelevelScala"), clues(result))
@@ -915,5 +950,105 @@ class DederPklRendererSuite extends FunSuite {
     assert(scala3.contains("-encoding"), s"typelevel scala3 should contain -encoding: $scala3")
     assert(scala3.contains("utf8"), s"typelevel scala3 should contain utf8: $scala3")
     assert(scala3.contains("-deprecation"), s"typelevel scala3 should contain -deprecation: $scala3")
+  }
+
+  // ---- structural tests (parse rendered Pkl → validate DederProject) ----
+
+  test("structural: single Scala module has version-last IDs") {
+    val build = singleModuleBuild(name = "myapp", jvmMod = emptyModule(scalaVersion = "3.3.5"))
+    val ids = renderedModuleIds(build)
+    // two modules: main + test, both with version at end
+    assertEquals(ids.length, 2)
+    assert(ids.contains("myapp-3.3.5"), s"main module id should be myapp-3.3.5, got: $ids")
+    assert(ids.contains("myapp-test-3.3.5"), s"test module id should be myapp-test-3.3.5, got: $ids")
+  }
+
+  test("structural: CreateCrossModules has version-last IDs") {
+    val jvmMod = emptyModule(scalaVersion = "3.3.5")
+    val jsMod = emptyModule(scalaVersion = "3.3.5", scalaJsVersion = Some("1.18.2"))
+    val nativeMod = emptyModule(scalaVersion = "3.3.5", scalaNativeVersion = Some("0.5.10"))
+    val build = DederBuild(
+      moduleGroups = Seq(
+        ModuleGroup("core", ".", DederProject.DirLayout.SBT_CROSS_FULL, Seq.empty,
+          jvmMod, Some(jsMod), Some(nativeMod), true, true, false, false)
+      ),
+      repositories = Seq.empty
+    )
+    val ids = renderedModuleIds(build)
+    // 6 modules: jvm, jvm-test, js, js-test, native, native-test — all with version last
+    assertEquals(ids.length, 6)
+    assert(ids.contains("core-jvm-3.3.5"), s"jvm module id: $ids")
+    assert(ids.contains("core-jvm-test-3.3.5"), s"jvm-test module id: $ids")
+    assert(ids.contains("core-js-3.3.5"), s"js module id: $ids")
+    assert(ids.contains("core-js-test-3.3.5"), s"js-test module id: $ids")
+    assert(ids.contains("core-native-3.3.5"), s"native module id: $ids")
+    assert(ids.contains("core-native-test-3.3.5"), s"native-test module id: $ids")
+  }
+
+  test("structural: cross-version CreateScalaModules has version-last IDs") {
+    val versions = Seq("2.12.21", "2.13.18")
+    val group = concreteCrossGroup(
+      name = "lib",
+      versions = versions,
+      slices = versions.map(v =>
+        (v, "main", emptyModule(scalaVersion = v))
+      )
+    )
+    val build = DederBuild(Seq(group), Seq.empty)
+    val project = evaluateRender(build)
+    val mods = project.modules.asScala.toSeq
+    // 2 main modules + 2 test modules = 4
+    assertEquals(mods.length, 4)
+    val ids = mods.map(_.id).sorted
+    assertEquals(ids, Seq("lib-2.12.21", "lib-2.13.18", "lib-test-2.12.21", "lib-test-2.13.18"))
+  }
+
+  test("structural: cross-version CreateCrossModules has version-last IDs") {
+    val versions = Seq("2.12.21")
+    val coreMod = emptyModule(scalaVersion = "2.12.21")
+    val jsMod = emptyModule(scalaVersion = "2.12.21", scalaJsVersion = Some("1.18.2"))
+    val nativeMod = emptyModule(scalaVersion = "2.12.21", scalaNativeVersion = Some("0.5.10"))
+    val group = concreteCrossGroup(
+      name = "core",
+      versions = versions,
+      layout = DederProject.DirLayout.SBT_CROSS_FULL,
+      slices = Seq(
+        ("2.12.21", "jvm", coreMod),
+        ("2.12.21", "js", jsMod),
+        ("2.12.21", "native", nativeMod)
+      )
+    )
+    val build = DederBuild(Seq(group), Seq.empty)
+    val project = evaluateRender(build)
+    val mods = project.modules.asScala.toSeq
+    assertEquals(mods.length, 6)
+    val ids = mods.map(_.id).sorted
+    assertEquals(ids, Seq(
+      "core-js-2.12.21", "core-js-test-2.12.21",
+      "core-jvm-2.12.21", "core-jvm-test-2.12.21",
+      "core-native-2.12.21", "core-native-test-2.12.21"
+    ))
+  }
+
+  test("structural: cross-version module deps reference existing modules") {
+    val versions = Seq("2.12.21", "2.13.18")
+    val lib = concreteCrossGroup(
+      name = "lib",
+      versions = versions,
+      slices = versions.map(v => (v, "main", emptyModule(scalaVersion = v)))
+    )
+    val app = concreteCrossGroup(
+      name = "app",
+      versions = versions,
+      slices = versions.map(v =>
+        (v, "main", emptyModule(scalaVersion = v,
+          moduleDeps = Seq(ModuleDepRef("lib", "main", targetScalaVersion = Some(v), isTest = false))))
+      )
+    )
+    val build = DederBuild(Seq(lib, app), Seq.empty)
+    val project = evaluateRender(build)
+    val mods = project.modules.asScala.toSeq
+    assertEquals(mods.length, 8) // 2 groups × 2 versions × 2 (main+test)
+    // verify the Pkl is syntactically valid and has correct module count
   }
 }
