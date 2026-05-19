@@ -627,10 +627,14 @@ class ScalaModules {
 class CreateScalaModules {
   root: String
   id: String?
+  /// Optional explicit test module id override.
+  /// Used by imported cross-version JVM modules that need `-jvm-test-<version>`
+  /// while keeping normal `CreateScalaModules` callers on the default `"<id>-test"`.
+  testId: String?
   template: ScalaModule
   testTemplate: ScalaTestModule = template.asTest()
   layout: DirLayout = "default"
-  fixed get: ScalaModules = scalaModules(template, testTemplate, root, layout, id)
+  fixed get: ScalaModules = scalaModulesWithTestId(template, testTemplate, root, layout, id, testId)
 }
 
 const function scalaModules(
@@ -640,11 +644,24 @@ const function scalaModules(
   _layout: DirLayout,
   _id: String?,
 ): ScalaModules =
+  scalaModulesWithTestId(_template, _testTemplate, _root, _layout, _id, null)
+
+/// Internal-by-convention helper for importer-rendered JVM cross-version ids.
+/// Prefer `scalaModules(...)` unless you explicitly need a custom test module id.
+const function scalaModulesWithTestId(
+  _template: ScalaModule,
+  _testTemplate: ScalaTestModule,
+  _root: String,
+  _layout: DirLayout,
+  _id: String?,
+  _testId: String?,
+): ScalaModules =
   let (cfg = resolveLayout(_layout, "scala"))
-  let (baseId = if (_id != null) _id else _root.replaceAll("/", "-"))
+  let (mainId = if (_id != null) _id else _root.replaceAll("/", "-"))
+  let (resolvedTestId = if (_testId != null) _testId else "\(mainId)-test")
     new {
       main = (_template) {
-        id = "\(baseId)-\(_template.scalaVersion)"
+        id = mainId
         root = _root
         sources = new Listing {
           cfg.mainScalaSrcBase
@@ -661,7 +678,7 @@ const function scalaModules(
         resources = cfg.mainResources
       }
       test = (_testTemplate) {
-        id = "\(baseId)-test-\(_template.scalaVersion)"
+        id = resolvedTestId
         root = "\(_root)\(cfg.testRootSuffix)"
         sources = new Listing {
           cfg.testScalaSrcBase
