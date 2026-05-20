@@ -57,7 +57,7 @@
    <pre><code class="language-properties hljs" data-highlighted="yes"><span class="hljs-attr">localPath</span>=<span class="hljs-string">myprojects/deder/out/server/assembly.dest/out.jar</span>
 <span class="hljs-attr">workerThreads</span>=<span class="hljs-string">32</span>
 <span class="hljs-attr">logLevel</span>=<span class="hljs-string">debug</span>
-<span class="hljs-attr">JAVA_OPTS</span>=<span class="hljs-string">-javaagent:otel.jar -Dotel.service.name=deder-server -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317</span>
+<span class="hljs-attr">JAVA_OPTS</span>=<span class="hljs-string">-javaagent:otel.jar -Dotel.service.name=my-project -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317</span>
 </code></pre>
    <p>If you make changes to it, make sure you restart server manually:</p>
    <pre><code class="language-shell hljs" data-highlighted="yes">deder shutdown
