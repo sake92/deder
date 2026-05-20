@@ -138,10 +138,12 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     }
 
   private val skipAssemblyEntry: String => Boolean = { name =>
+    // skip .tasty files (only needed for incremental compilation, not at runtime)
+    val isTasty = name.endsWith(".tasty")
     // skip signature files to avoid "invalid signature file" errors when running the assembly jar
     val lower = name.toLowerCase
     val isSignatureFile = lower.endsWith(".sf") || lower.endsWith(".rsa") || lower.endsWith(".dsa")
-    lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("meta-inf/manifest.mf"))
+    isTasty || (lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("meta-inf/manifest.mf")))
   }
 
   val assemblyDepsTask = CachedTaskBuilder
