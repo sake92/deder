@@ -117,9 +117,16 @@ class PluginLoader(
           logger.debug(s"Loaded plugin '$pluginId'")
           logger.debug(s"Plugin config Pkl text: $configText")
           val params = PluginTasksParams(configText, coreTasksApi)
-          val tasks = plugin.tasks(params).toOption.toSeq.flatten
-          logger.debug(s"Plugin '$pluginId' contributed ${tasks.size} tasks: ${tasks.map(_.name).mkString(", ")}")
-          Right(LoadedPlugin(plugin, configText, tasks, pluginClassLoader))
+          plugin.tasks(params) match {
+            case Left(err) =>
+              logger.warn(s"Failed to get tasks from plugin '$pluginId': $err")
+              closeClassLoaderQuietly(pluginClassLoader)
+              Left(s"Failed to get tasks from plugin '$pluginId': $err")
+            case Right(tasks) =>
+              // TODO validate task names, check for duplicates across plugins, etc
+              logger.debug(s"Plugin '$pluginId' contributed ${tasks.size} tasks: ${tasks.map(_.name).mkString(", ")}")
+              Right(LoadedPlugin(plugin, configText, tasks, pluginClassLoader))
+          }
         case None =>
           closeClassLoaderQuietly(pluginClassLoader)
           Left(
@@ -130,26 +137,22 @@ class PluginLoader(
     } catch {
       case NonFatal(e) =>
         closeClassLoaderQuietly(pluginClassLoader)
-        val msg = s"Failed to load plugin '$pluginId': ${e.getMessage}"
+        val msg = s"Failed to load plugin '$pluginId'"
         logger.error(msg, e)
         Left(msg)
       // NonFatal(_) doesnt cover these class loading errors:
       case e: java.util.ServiceConfigurationError =>
         closeClassLoaderQuietly(pluginClassLoader)
-        val msg = s"Failed to load plugin '$pluginId': ${e.getMessage}"
+        val msg = s"Failed to load plugin '$pluginId'"
         logger.error(msg, e)
         Left(msg)
       case e: LinkageError =>
         closeClassLoaderQuietly(pluginClassLoader)
-        val msg = s"Failed to load plugin '$pluginId': ${e.getMessage}"
+        val msg = s"Failed to load plugin '$pluginId'"
         logger.error(msg, e)
         Left(msg)
     }
   }
-
-  private def closeClassLoaderQuietly(pluginClassLoader: URLClassLoader): Unit =
-    try pluginClassLoader.close()
-    catch case NonFatal(_) => ()
 
 }
 
@@ -159,11 +162,14 @@ case class LoadedPlugin(
     tasks: Seq[AbstractTask[?]],
     classLoader: URLClassLoader
 ) {
-  def closeClassLoaderQuietly(): Unit =
-    try classLoader.close()
-    catch case NonFatal(_) => ()
+  def closeClassLoader(): Unit =
+    closeClassLoaderQuietly(classLoader)
 }
 
 case class PluginsLoadResult(
     loadedPlugins: Seq[LoadedPlugin]
 )
+
+private def closeClassLoaderQuietly(pluginClassLoader: URLClassLoader): Unit =
+  try pluginClassLoader.close()
+  catch case NonFatal(_) => ()
