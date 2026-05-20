@@ -175,6 +175,20 @@ facts {
     && result.test.id == "myproject-test"
   }
 
+  ["scalaModules explicit test id override"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
+    local result = DederProject.scalaModulesWithTestId(
+      mod,
+      mod.asTest(),
+      ".",
+      "default",
+      "myproject-jvm-3.7.4",
+      "myproject-jvm-test-3.7.4",
+    )
+    result.main.id == "myproject-jvm-3.7.4"
+    && result.test.id == "myproject-jvm-test-3.7.4"
+  }
+
   ["scalaModules id null uses root"] {
     local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
     local result = DederProject.scalaModules(mod, mod.asTest(), "sub/dir", "default", null)
@@ -188,7 +202,23 @@ facts {
     local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
     local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), ".", "default", "myapp")
     result.jvm.id == "myapp-jvm-3.7.4"
+    && result.jvm_test.id == "myapp-jvm-test-3.7.4"
     && result.js.id == "myapp-js-3.7.4"
+    && result.js_test.id == "myapp-js-test-3.7.4"
+    && result.native.id == "myapp-native-3.7.4"
     && result.native_test.id == "myapp-native-test-3.7.4"
+  }
+
+  ["crossModules id null uses root"] {
+    local scalaMod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
+    local jsMod = (scalaMod.asJs()) { scalaJsVersion = "1.18.2" }
+    local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
+    local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), "sub/dir", "default", null)
+    result.jvm.id == "sub-dir-jvm-3.7.4"
+    && result.jvm_test.id == "sub-dir-jvm-test-3.7.4"
+    && result.js.id == "sub-dir-js-3.7.4"
+    && result.js_test.id == "sub-dir-js-test-3.7.4"
+    && result.native.id == "sub-dir-native-3.7.4"
+    && result.native_test.id == "sub-dir-native-test-3.7.4"
   }
 }

@@ -12,8 +12,9 @@ import dependency.ScalaVersion
 import ba.sake.deder.deps.Dependency
 import java.io.File
 import javax.tools.ToolProvider
+import com.typesafe.scalalogging.StrictLogging
 
-class PublishTasks(coreTasks: CoreTasks) {
+class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
 
   val versionTask = TaskBuilder
     .make[String](name = "version", category = "Publishing")
@@ -137,10 +138,12 @@ class PublishTasks(coreTasks: CoreTasks) {
     }
 
   private val skipAssemblyEntry: String => Boolean = { name =>
+    // skip .tasty files (only needed for incremental compilation, not at runtime)
+    val isTasty = name.endsWith(".tasty")
     // skip signature files to avoid "invalid signature file" errors when running the assembly jar
     val lower = name.toLowerCase
     val isSignatureFile = lower.endsWith(".sf") || lower.endsWith(".rsa") || lower.endsWith(".dsa")
-    lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("meta-inf/manifest.mf"))
+    isTasty || (lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("meta-inf/manifest.mf")))
   }
 
   val assemblyDepsTask = CachedTaskBuilder
@@ -154,7 +157,17 @@ class PublishTasks(coreTasks: CoreTasks) {
     .dependsOn(coreTasks.allDependenciesTask)
     .build { ctx =>
       val (_, mandatoryDependencies, dependencies) = ctx.depResults
-      val depsJars = ctx.dependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
+      val depsJars = {
+        val t0 = System.currentTimeMillis()
+        val span = OTEL.TRACER.spanBuilder("assemblyDeps.fetchFiles").startSpan()
+        try {
+          val jars = ctx.dependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
+          logger.info(s"assemblyDeps.fetchFiles: ${jars.size} jars fetched in ${System.currentTimeMillis() - t0}ms")
+          jars
+        } finally {
+          span.end()
+        }
+      }
       os.makeDir.all(ctx.out)
       val depsJarPath = ctx.out / "deps.jar"
       JarUtils.mergeJars(depsJarPath, depsJars, JarManifest.Default, skipAssemblyEntry)
@@ -172,6 +185,7 @@ class PublishTasks(coreTasks: CoreTasks) {
     .dependsOn(allJarsTask)
     .build { ctx =>
       val (manifestEntries, assemblyDepsJar, allModulesJars) = ctx.depResults
+      val t0 = System.currentTimeMillis()
       os.makeDir.all(ctx.out)
       val mergedJar = ctx.out / "mergedJar.jar"
       JarUtils.mergeJars(
@@ -187,14 +201,23 @@ class PublishTasks(coreTasks: CoreTasks) {
           val shadeRulesFile = jm.shadeRulesFile
           if (shadeRulesFile != null) {
             val moduleRoot = DederGlobals.projectRootDir / jm.root
-            Some(JarUtils.resolveShadeRules(Some(shadeRulesFile), moduleRoot))
+            val rules = JarUtils.resolveShadeRules(Some(shadeRulesFile), moduleRoot)
+            if (rules.nonEmpty) Some(rules) else None
           } else {
             None
           }
         case _ => None
       }
       
-      JarUtils.createAssemblyJar(resultJarPath, mergedJar, shadeRulesOpt)
+      shadeRulesOpt match {
+        case Some(_) =>
+          JarUtils.createAssemblyJar(resultJarPath, mergedJar, shadeRulesOpt)
+        case None =>
+          // no shading needed, just rename the merged jar
+          logger.info(s"assemblyTask: skipping shade (no rules), using merged jar directly")
+          os.move.over(mergedJar, resultJarPath)
+      }
+      logger.info(s"assemblyTask: total elapsed ${System.currentTimeMillis() - t0}ms for module ${ctx.module.id}")
       resultJarPath
     }
 

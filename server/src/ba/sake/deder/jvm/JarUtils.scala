@@ -11,6 +11,9 @@ import scala.collection.mutable
 import com.eed3si9n.jarjarabrams.{ShadeRule, Shader, ShadeTarget}
 import com.typesafe.scalalogging.StrictLogging
 import scala.io.Source
+import ba.sake.deder.OTEL
+import scala.util.Using
+import java.util.zip.Deflater
 
 object JarUtils extends StrictLogging{
 
@@ -84,57 +87,86 @@ object JarUtils extends StrictLogging{
   }
 
   def mergeJars(resultJarPath: os.Path, jarPaths: Seq[os.Path], manifest: JarManifest, skip: String => Boolean): Unit = {
-    val out = new JarOutputStream(Files.newOutputStream(resultJarPath.toNIO), manifest.build)
-    val seenEntries = mutable.Set[String]()
-    def skipEntry(name: String) = skip(name)
-    // map of concatenated files (like services)
-    val concatBuffers = mutable.Map[String, ByteArrayOutputStream]()
-    for jarPath <- jarPaths do {
-      val jin = new JarInputStream(Files.newInputStream(jarPath.toNIO))
-      var entry = jin.getNextJarEntry
-      while (entry != null) {
-        val name = entry.getName
-        if skipEntry(name) then {
-          ()
-        } else if (name.startsWith("META-INF/services/")) {
-          // STRATEGY: CONCATENATE
-          // TODO need to deduplicate entries INSIDE the files as well, e.g. for service providers
-          val baos = concatBuffers.getOrElseUpdate(name, new ByteArrayOutputStream())
-          jin.transferTo(baos)
-          baos.write("\n".getBytes) // Ensure a newline between merges
-        } else if (!seenEntries.contains(name)) {
-          // STRATEGY: FIRST-WINS / DEDUPLICATE
-          out.putNextEntry(new JarEntry(name))
-          jin.transferTo(out)
-          out.closeEntry()
-          seenEntries += name
+    val span = OTEL.TRACER.spanBuilder("JarUtils.mergeJars").startSpan()
+    val t0 = System.currentTimeMillis()
+    val totalSize = jarPaths.map(p => if (os.exists(p)) os.size(p) else 0L).sum
+    span.setAttribute("jar.count", jarPaths.size)
+    span.setAttribute("jar.totalSizeMB", totalSize / 1024 / 1024)
+    logger.info(s"mergeJars: starting with ${jarPaths.size} jars (${totalSize / 1024 / 1024} MB total)")
+    try {
+      val fos = Files.newOutputStream(resultJarPath.toNIO)
+      val bos = new BufferedOutputStream(fos, 65536) // 64KB buffer
+      val out = new JarOutputStream(bos, manifest.build)
+      out.setLevel(Deflater.BEST_SPEED) // faster compression at cost of slightly larger output
+      val seenEntries = mutable.Set[String]()
+      def skipEntry(name: String) = skip(name)
+      // map of concatenated files (like services)
+      val concatBuffers = mutable.Map[String, ByteArrayOutputStream]()
+      for jarPath <- jarPaths do {
+        val jin = new JarInputStream(Files.newInputStream(jarPath.toNIO))
+        var entry = jin.getNextJarEntry
+        while (entry != null) {
+          val name = entry.getName
+          if skipEntry(name) then {
+            ()
+          } else if (name.startsWith("META-INF/services/")) {
+            // STRATEGY: CONCATENATE
+            // TODO need to deduplicate entries INSIDE the files as well, e.g. for service providers
+            val baos = concatBuffers.getOrElseUpdate(name, new ByteArrayOutputStream())
+            jin.transferTo(baos)
+            baos.write("\n".getBytes) // Ensure a newline between merges
+          } else if (!seenEntries.contains(name)) {
+            // STRATEGY: FIRST-WINS / DEDUPLICATE
+            out.putNextEntry(new JarEntry(name))
+            jin.transferTo(out)
+            out.closeEntry()
+            seenEntries += name
+          }
+          entry = jin.getNextJarEntry
         }
-        entry = jin.getNextJarEntry
+        jin.close()
       }
-      jin.close()
-    }
 
-    // write out all the concatenated files
-    for ((name, baos) <- concatBuffers) {
-      out.putNextEntry(new JarEntry(name))
-      out.write(baos.toByteArray)
-      out.closeEntry()
-    }
+      // write out all the concatenated files
+      for ((name, baos) <- concatBuffers) {
+        out.putNextEntry(new JarEntry(name))
+        out.write(baos.toByteArray)
+        out.closeEntry()
+      }
 
-    out.close()
+      out.close()
+    } finally {
+      span.end()
+    }
+    val elapsed = System.currentTimeMillis() - t0
+    val resultSize = if (os.exists(resultJarPath)) os.size(resultJarPath) / 1024 / 1024 else 0L
+    logger.info(s"mergeJars: completed in ${elapsed}ms, output=${resultSize}MB at $resultJarPath")
   }
 
   def createAssemblyJar(resultJarPath: os.Path, mergedJar: os.Path, shadeRulesOpt: Option[Seq[ShadeRule]] = None): Unit = {
+    val span = OTEL.TRACER.spanBuilder("JarUtils.createAssemblyJar").startSpan()
     val shadeRules = shadeRulesOpt.getOrElse(Seq())
-    Shader.shadeFile(
-      shadeRules,
-      mergedJar.toNIO,
-      resultJarPath.toNIO,
-      verbose = false,
-      skipManifest = true,
-      resetTimestamp = false,
-      warnOnDuplicateClass = true
-    )
+    val t0 = System.currentTimeMillis()
+    val inputSize = if (os.exists(mergedJar)) os.size(mergedJar) / 1024 / 1024 else 0L
+    span.setAttribute("shade.ruleCount", shadeRules.size)
+    span.setAttribute("jar.inputSizeMB", inputSize)
+    logger.info(s"createAssemblyJar: starting shade with ${shadeRules.size} rules on ${inputSize}MB jar")
+    try {
+      Shader.shadeFile(
+        shadeRules,
+        mergedJar.toNIO,
+        resultJarPath.toNIO,
+        verbose = false,
+        skipManifest = true,
+        resetTimestamp = false,
+        warnOnDuplicateClass = true
+      )
+    } finally {
+      span.end()
+    }
+    val elapsed = System.currentTimeMillis() - t0
+    val resultSize = if (os.exists(resultJarPath)) os.size(resultJarPath) / 1024 / 1024 else 0L
+    logger.info(s"createAssemblyJar: shading completed in ${elapsed}ms, output=${resultSize}MB")
 
   }
 

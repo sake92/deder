@@ -26,10 +26,13 @@ jobs:
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder
         run: brew install sake92/tap/deder
-      - name: Unit Test
+      - name: Install pkl
+        run: brew install pkl
+      - name: Unit + config tests
         run: |
           ./scripts/gen-config-bindings.sh
           deder exec -t test -m server-test -m test-common-test
+          pkl test config/DederProjectTest.pkl
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v6
         if: success() || failure() # always run even if the previous step fails
