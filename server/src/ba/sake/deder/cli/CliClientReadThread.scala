@@ -51,11 +51,25 @@ class CliClientReadThread(
       val requestId = message.getRequestId
 
       val t1 = new Thread(() => {
-        val span = OTEL.TRACER
-          .spanBuilder(s"cli.${message.getClass.getSimpleName.toLowerCase}")
+        val (spanName, extraAttrs) = message match {
+          case exec: CliClientMessage.Exec =>
+            val taskName = {
+              val idx = exec.args.indexOf("-t")
+              if (idx >= 0 && idx + 1 < exec.args.size) exec.args(idx + 1) else ""
+            }
+            val moduleIds = exec.args.zipWithIndex
+              .collect { case (arg, i) if arg == "-m" && i + 1 < exec.args.size => exec.args(i + 1) }
+              .mkString(",")
+            (s"cli.exec.$taskName", Seq("cli.task" -> taskName, "cli.moduleIds" -> moduleIds))
+          case _ =>
+            (s"cli.${message.getClass.getSimpleName.toLowerCase}", Seq.empty)
+        }
+        val spanBuilder = OTEL.TRACER
+          .spanBuilder(spanName)
           .setAttribute("clientId", clientId)
           .setAttribute("request.id", requestId)
-          .startSpan()
+        extraAttrs.foreach { case (k, v) => spanBuilder.setAttribute(k, v) }
+        val span = spanBuilder.startSpan()
         Using.resource(span.makeCurrent()) { scope =>
           try {
             handler.handle(clientId, requestId, message)

@@ -199,14 +199,22 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
           val shadeRulesFile = jm.shadeRulesFile
           if (shadeRulesFile != null) {
             val moduleRoot = DederGlobals.projectRootDir / jm.root
-            Some(JarUtils.resolveShadeRules(Some(shadeRulesFile), moduleRoot))
+            val rules = JarUtils.resolveShadeRules(Some(shadeRulesFile), moduleRoot)
+            if (rules.nonEmpty) Some(rules) else None
           } else {
             None
           }
         case _ => None
       }
       
-      JarUtils.createAssemblyJar(resultJarPath, mergedJar, shadeRulesOpt)
+      shadeRulesOpt match {
+        case Some(_) =>
+          JarUtils.createAssemblyJar(resultJarPath, mergedJar, shadeRulesOpt)
+        case None =>
+          // no shading needed, just rename the merged jar
+          logger.info(s"assemblyTask: skipping shade (no rules), using merged jar directly")
+          os.move.over(mergedJar, resultJarPath)
+      }
       logger.info(s"assemblyTask: total elapsed ${System.currentTimeMillis() - t0}ms for module ${ctx.module.id}")
       resultJarPath
     }

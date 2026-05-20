@@ -13,6 +13,7 @@ import com.typesafe.scalalogging.StrictLogging
 import scala.io.Source
 import ba.sake.deder.OTEL
 import scala.util.Using
+import java.util.zip.Deflater
 
 object JarUtils extends StrictLogging{
 
@@ -93,7 +94,10 @@ object JarUtils extends StrictLogging{
     span.setAttribute("jar.totalSizeMB", totalSize / 1024 / 1024)
     logger.info(s"mergeJars: starting with ${jarPaths.size} jars (${totalSize / 1024 / 1024} MB total)")
     try {
-      val out = new JarOutputStream(Files.newOutputStream(resultJarPath.toNIO), manifest.build)
+      val fos = Files.newOutputStream(resultJarPath.toNIO)
+      val bos = new BufferedOutputStream(fos, 65536) // 64KB buffer
+      val out = new JarOutputStream(bos, manifest.build)
+      out.setLevel(Deflater.BEST_SPEED) // faster compression at cost of slightly larger output
       val seenEntries = mutable.Set[String]()
       def skipEntry(name: String) = skip(name)
       // map of concatenated files (like services)
