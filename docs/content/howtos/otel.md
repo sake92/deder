@@ -44,7 +44,7 @@ After starting your OTEL collector, you need to configure the Deder server to us
 curl -L -o otel.jar https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/latest/download/opentelemetry-javaagent.jar
 
 # set the agent options in .deder/server.properties:
-JAVA_OPTS=-javaagent:path/to/otel.jar -Dotel.service.name=deder-server -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
+JAVA_OPTS=-javaagent:path/to/otel.jar -Dotel.service.name=my-project -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
 
 # see examples/multi/.deder/server.properties for reference
 ```

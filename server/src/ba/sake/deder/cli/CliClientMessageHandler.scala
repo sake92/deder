@@ -10,6 +10,8 @@ import ba.sake.tupson.toJson
 import ba.sake.deder.*
 import ba.sake.deder.importing.Importer
 
+// TODO create separate handleHelpMessage etc methods
+// TODO add OTEL spans for each command handling, with attributes for command name, args, execution time, success/failure, etc
 class CliClientMessageHandler(
     projectState: DederProjectState,
     serverMessages: BlockingQueue[CliServerMessage],

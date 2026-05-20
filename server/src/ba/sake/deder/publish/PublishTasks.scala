@@ -12,8 +12,9 @@ import dependency.ScalaVersion
 import ba.sake.deder.deps.Dependency
 import java.io.File
 import javax.tools.ToolProvider
+import com.typesafe.scalalogging.StrictLogging
 
-class PublishTasks(coreTasks: CoreTasks) {
+class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
 
   val versionTask = TaskBuilder
     .make[String](name = "version", category = "Publishing")
@@ -154,7 +155,17 @@ class PublishTasks(coreTasks: CoreTasks) {
     .dependsOn(coreTasks.allDependenciesTask)
     .build { ctx =>
       val (_, mandatoryDependencies, dependencies) = ctx.depResults
-      val depsJars = ctx.dependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
+      val depsJars = {
+        val t0 = System.currentTimeMillis()
+        val span = OTEL.TRACER.spanBuilder("assemblyDeps.fetchFiles").startSpan()
+        try {
+          val jars = ctx.dependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
+          logger.info(s"assemblyDeps.fetchFiles: ${jars.size} jars fetched in ${System.currentTimeMillis() - t0}ms")
+          jars
+        } finally {
+          span.end()
+        }
+      }
       os.makeDir.all(ctx.out)
       val depsJarPath = ctx.out / "deps.jar"
       JarUtils.mergeJars(depsJarPath, depsJars, JarManifest.Default, skipAssemblyEntry)
@@ -172,6 +183,7 @@ class PublishTasks(coreTasks: CoreTasks) {
     .dependsOn(allJarsTask)
     .build { ctx =>
       val (manifestEntries, assemblyDepsJar, allModulesJars) = ctx.depResults
+      val t0 = System.currentTimeMillis()
       os.makeDir.all(ctx.out)
       val mergedJar = ctx.out / "mergedJar.jar"
       JarUtils.mergeJars(
@@ -195,6 +207,7 @@ class PublishTasks(coreTasks: CoreTasks) {
       }
       
       JarUtils.createAssemblyJar(resultJarPath, mergedJar, shadeRulesOpt)
+      logger.info(s"assemblyTask: total elapsed ${System.currentTimeMillis() - t0}ms for module ${ctx.module.id}")
       resultJarPath
     }
 
