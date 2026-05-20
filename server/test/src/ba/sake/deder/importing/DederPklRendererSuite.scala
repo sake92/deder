@@ -551,6 +551,33 @@ class DederPklRendererSuite extends FunSuite {
     assert(m374.scalacOptions.asScala.toSeq.contains("-Werror"))
   }
 
+  test("typelevel placeholder helpers use positional amend calls for cross-platform templates") {
+    val testDep = dep("org.scalameta", "munit", "1.2.1", crossVersion = "binary")
+    val build = DederBuild(
+      moduleGroups = Seq(
+        ModuleGroup("core", ".", DederProject.DirLayout.SBT_CROSS_FULL, Seq("2.13.18", "3.7.4"),
+          emptyModule(scalaVersion = "3.3.5"),
+          Some(emptyModule(scalaVersion = "3.3.5", scalaJsVersion = Some("1.18.2"), testDeps = Seq(testDep))),
+          Some(emptyModule(scalaVersion = "3.3.5", scalaNativeVersion = Some("0.5.10"), testDeps = Seq(testDep))),
+          true, true, usesTpolecat = false, usesTypelevel = true)
+      ),
+      repositories = Seq.empty
+    )
+
+    val rendered = DederPklRenderer.render(build)
+
+    assert(rendered.contains("""testTemplate = (DederTypelevel.testForVersion(sv)) {"""))
+    assert(rendered.contains("""jsTemplate = (DederTypelevel.jsForVersion(sv, "1.18.2")) {"""))
+    assert(rendered.contains("""jsTestTemplate = (DederTypelevel.jsTestForVersion(sv, "1.18.2")) {"""))
+    assert(rendered.contains("""nativeTemplate = (DederTypelevel.nativeForVersion(sv, "0.5.10")) {"""))
+    assert(rendered.contains("""nativeTestTemplate = (DederTypelevel.nativeTestForVersion(sv, "0.5.10")) {"""))
+    assert(!rendered.contains("""DederTypelevel.jsForVersion(sv, scalaJsVersion = "1.18.2")"""))
+    assert(!rendered.contains("""DederTypelevel.jsTestForVersion(sv, scalaJsVersion = "1.18.2")"""))
+    assert(!rendered.contains("""DederTypelevel.nativeForVersion(sv, scalaNativeVersion = "0.5.10")"""))
+    assert(!rendered.contains("""DederTypelevel.nativeTestForVersion(sv, scalaNativeVersion = "0.5.10")"""))
+    assert(rendered.contains("""local const coreModules = coreScalaVersions"""))
+  }
+
   // ---- basePomSettings ----
 
   test("shared basePomSettings when multiple modules share same publish info") {

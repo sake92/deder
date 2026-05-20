@@ -137,9 +137,7 @@ object DederPklRenderer {
             case "NativeTest"  => "nativeTestForVersion"
           }
           val args = platformVersion match {
-            case Some(v) =>
-              val platParam = if (slot.contains("Native")) "scalaNativeVersion" else "scalaJsVersion"
-              s"""sv, $platParam = "$v""""
+            case Some(v) => s"""sv, "$v""""
             case None => "sv"
           }
           s"${templateModuleName(g)}.$helperName($args)"
@@ -675,7 +673,7 @@ object DederPklRenderer {
                 Some(jsVersion)
               )
               val depsStr = renderDeps(m.testDeps, indent = 6)
-              s"  jsTestTemplate = $amendExpr {\n$depsStr  }"
+              s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
             } else ""
           }
           .getOrElse("")
@@ -692,7 +690,7 @@ object DederPklRenderer {
                 Some(nativeVersion)
               )
               val depsStr = renderDeps(m.testDeps, indent = 6)
-              s"  nativeTestTemplate = $amendExpr {\n$depsStr  }"
+              s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
             } else ""
           }
           .getOrElse("")
@@ -820,7 +818,7 @@ object DederPklRenderer {
               Some(jsVersion)
             )
             val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  jsTestTemplate = $amendExpr {\n$depsStr  }"
+            s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
           } else ""
         }
         .getOrElse("")
@@ -838,7 +836,7 @@ object DederPklRenderer {
               Some(nativeVersion)
             )
             val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  nativeTestTemplate = $amendExpr {\n$depsStr  }"
+            s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
           } else ""
         }
         .getOrElse("")
@@ -1237,6 +1235,3 @@ object DederPklRenderer {
     }
   }
 }
-
-// TEMP DEBUG
-private def _dbg(msg: String): Unit = println(s"[SUPPRESS] $msg")

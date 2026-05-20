@@ -219,6 +219,145 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         )
     }
 
+    test("falls back to the only exported slice when inter-project deps cross scala patch versions") {
+        val root = os.pwd / "target" / "sbt-project-analyzer-suite" / "snowplow-repro"
+        val compatibility = baseModule(
+            id = "compatibility",
+            base = (root / "compatibility").toString,
+            name = "msc_compatibility",
+            scalaVersion = "2.13.18",
+            interProjectDeps = Seq(
+                InterProjectDependencyExport("schemaDdlSubschema", "test->test;compile->compile"),
+            ),
+        )
+        val schemaDdlSubschema = baseModule(
+            id = "schemaDdlSubschema",
+            base = (root / "schema-ddl-subschema").toString,
+            name = "schema_ddl_subschema",
+            scalaVersion = "2.13.17",
+        )
+        val analyzer = new SbtProjectAnalyzer(noopLogger)
+        val build = analyzer.analyze(IndexedSeq(compatibility, schemaDdlSubschema))
+        val compatibilityGroup = build.moduleGroups.find(_.builderVarName == "msc_compatibility").get
+
+        assertEquals(
+            concreteModule(compatibilityGroup, "2.13.18", "main").module.moduleDeps,
+            Seq(ModuleDepRef("schema_ddl_subschema", "main", targetScalaVersion = Some("2.13.17"), isTest = false))
+        )
+        assertEquals(
+            concreteModule(compatibilityGroup, "2.13.18", "main").module.testModuleDeps,
+            Seq(ModuleDepRef("schema_ddl_subschema", "main", targetScalaVersion = Some("2.13.17"), isTest = true))
+        )
+        assert(
+            build.moduleGroups.map(_.builderVarName).indexOf("schema_ddl_subschema") <
+                build.moduleGroups.map(_.builderVarName).indexOf("msc_compatibility")
+        )
+
+        val rendered = DederPklRenderer.render(build)
+        assert(rendered.contains("schema_ddl_subschema.main"))
+    }
+
+    test("does not fall back when multiple exported slices exist and none matches") {
+        val root = os.pwd / "target" / "sbt-project-analyzer-suite" / "no-fallback-guard"
+        val depender = baseModule(
+            id = "depender",
+            base = (root / "depender").toString,
+            name = "depender",
+            scalaVersion = "2.12.19",
+            interProjectDeps = Seq(
+                InterProjectDependencyExport("library", "test->test;compile->compile"),
+            ),
+        )
+        val library213 = baseModule(
+            id = "library",
+            base = (root / "library").toString,
+            name = "library",
+            scalaVersion = "2.13.15",
+        )
+        val library3 = baseModule(
+            id = "library",
+            base = (root / "library").toString,
+            name = "library",
+            scalaVersion = "3.3.5",
+        )
+        val analyzer = new SbtProjectAnalyzer(noopLogger)
+        val build = analyzer.analyze(IndexedSeq(depender, library213, library3))
+        val dependerGroup = build.moduleGroups.find(_.builderVarName == "depender").get
+
+        assertEquals(concreteModule(dependerGroup, "2.12.19", "main").module.moduleDeps, Seq.empty)
+        assertEquals(concreteModule(dependerGroup, "2.12.19", "main").module.testModuleDeps, Seq.empty)
+    }
+
+    test("does not fall back when multiple refs exist for the same project and scala version") {
+        val root = os.pwd / "target" / "sbt-project-analyzer-suite" / "no-fallback-same-version"
+        val depender = baseModule(
+            id = "depender",
+            base = (root / "depender").toString,
+            name = "depender",
+            scalaVersion = "2.12.19",
+            interProjectDeps = Seq(
+                InterProjectDependencyExport("library", "test->test;compile->compile"),
+            ),
+        )
+        val libraryJvm = baseModule(
+            id = "library",
+            base = (root / "library" / "jvm").toString,
+            name = "libraryJVM",
+            scalaVersion = "3.3.5",
+            plugins = Seq("ScalaJSCrossPlugin"),
+        )
+        val libraryJs = baseModule(
+            id = "library",
+            base = (root / "library" / "js").toString,
+            name = "libraryJS",
+            scalaVersion = "3.3.5",
+            plugins = Seq("ScalaJSCrossPlugin"),
+        )
+        val analyzer = new SbtProjectAnalyzer(noopLogger)
+        withDirs(Seq(root / "library" / "jvm", root / "library" / "js")) {
+            val build = analyzer.analyze(IndexedSeq(depender, libraryJvm, libraryJs))
+            val dependerGroup = build.moduleGroups.find(_.builderVarName == "depender").get
+
+            assertEquals(concreteModule(dependerGroup, "2.12.19", "main").module.moduleDeps, Seq.empty)
+            assertEquals(concreteModule(dependerGroup, "2.12.19", "main").module.testModuleDeps, Seq.empty)
+        }
+    }
+
+    test("does not exact-match when multiple refs share the same project and scala version") {
+        val root = os.pwd / "target" / "sbt-project-analyzer-suite" / "no-exact-match-same-version"
+        val depender = baseModule(
+            id = "depender",
+            base = (root / "depender").toString,
+            name = "depender",
+            scalaVersion = "3.3.5",
+            interProjectDeps = Seq(
+                InterProjectDependencyExport("library", "test->test;compile->compile"),
+            ),
+        )
+        val libraryJvm = baseModule(
+            id = "library",
+            base = (root / "library" / "jvm").toString,
+            name = "libraryJVM",
+            scalaVersion = "3.3.5",
+            plugins = Seq("ScalaJSCrossPlugin"),
+        )
+        val libraryJs = baseModule(
+            id = "library",
+            base = (root / "library" / "js").toString,
+            name = "libraryJS",
+            scalaVersion = "3.3.5",
+            plugins = Seq("ScalaJSCrossPlugin"),
+        )
+        val analyzer = new SbtProjectAnalyzer(noopLogger)
+        withDirs(Seq(root / "library" / "jvm", root / "library" / "js")) {
+            val build = analyzer.analyze(IndexedSeq(depender, libraryJvm, libraryJs))
+            val dependerGroup = build.moduleGroups.find(_.builderVarName == "depender").get
+
+            assertEquals(concreteModule(dependerGroup, "3.3.5", "main").module.moduleDeps, Seq.empty)
+            assertEquals(concreteModule(dependerGroup, "3.3.5", "main").module.testModuleDeps, Seq.empty)
+        }
+    }
+
     test("counts actual concrete slices when version-platform matrix is sparse") {
         val dep213Jvm = DependencyExport(
             organization = "org.example", name = "core-jvm-213", revision = "1.0.0",

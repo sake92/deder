@@ -33,6 +33,14 @@ class SbtProjectAnalyzer(
     // Build group infos and global id mapping
     val groupInfos = grouped.map(buildGroupInfo)
     val globalIdMap: Map[(String, String), ResolvedModuleRef] = groupInfos.flatMap(_.sbtIdToRef).toMap
+    val refsByProject: Map[String, Seq[(String, ResolvedModuleRef)]] =
+      groupInfos.flatMap(gi => gi.concreteExports.map(ce =>
+        ce.sbtProjectId -> (ce.scalaVersion -> ResolvedModuleRef(
+          targetGroup = gi.builderVarName,
+          targetPlatform = ce.platform,
+          targetScalaVersion = ce.scalaVersion
+        ))
+      )).groupBy(_._1).view.mapValues(_.map(_._2)).toMap
 
     serverNotificationsLogger.add(
       ServerNotification.logInfo(
@@ -41,7 +49,7 @@ class SbtProjectAnalyzer(
     )
 
     // ---- Topological sort ----
-    val sortedGroups = topoSort(groupInfos, globalIdMap)
+    val sortedGroups = topoSort(groupInfos, globalIdMap, refsByProject)
     serverNotificationsLogger.add(
       ServerNotification.logInfo(
         s"Sorted order: ${sortedGroups.map(_.builderVarName).mkString(", ")}"
@@ -54,6 +62,7 @@ class SbtProjectAnalyzer(
           concreteExport.exportedModule,
           concreteExport.scalaVersion,
           globalIdMap,
+          refsByProject,
           layout = gi.layout,
           isJs = concreteExport.platform == "js",
           isNative = concreteExport.platform == "native"
@@ -155,13 +164,15 @@ class SbtProjectAnalyzer(
     val baseName = if (isCross) rawName.replaceFirst("(?i)jvm$", "") else rawName
     val builderVarName = baseName.replaceAll("[.-]", "_").replaceAll("[^a-zA-Z0-9_]", "")
 
-    val sbtIdToRef = concreteExports.map { concreteExport =>
-      (concreteExport.sbtProjectId, concreteExport.scalaVersion) -> ResolvedModuleRef(
-        targetGroup = builderVarName,
-        targetPlatform = concreteExport.platform,
-        targetScalaVersion = concreteExport.scalaVersion
-      )
-    }.toMap
+    val sbtIdToRef = concreteExports
+      .groupBy(concreteExport => (concreteExport.sbtProjectId, concreteExport.scalaVersion))
+      .collect { case (key, Seq(concreteExport)) =>
+        key -> ResolvedModuleRef(
+          targetGroup = builderVarName,
+          targetPlatform = concreteExport.platform,
+          targetScalaVersion = concreteExport.scalaVersion
+        )
+      }
 
     GroupInfo(
       builderVarName,
@@ -181,6 +192,7 @@ class SbtProjectAnalyzer(
       pe: ExportedProjectExportFile,
       dependerScalaVersion: String,
       idMap: Map[(String, String), ResolvedModuleRef],
+      refsByProject: Map[String, Seq[(String, ResolvedModuleRef)]],
       layout: DederProject.DirLayout,
       isJs: Boolean = false,
       isNative: Boolean = false
@@ -188,12 +200,12 @@ class SbtProjectAnalyzer(
     val (compileDeps, pluginDeps, testDeps, filteredCount) = partitionDeps(pe)
     val moduleDeps = pe.interProjectDependencies
       .filter(ipde => ipde.configuration == "default" || ipde.configuration.contains("compile"))
-      .flatMap(ipde => idMap.get((ipde.project, dependerScalaVersion)))
+      .flatMap(ipde => resolveInterProjectRef(ipde.project, dependerScalaVersion, idMap, refsByProject))
       .map(ref => refToModuleDepRef(ref, isTest = false))
       .distinct
     val testModuleDeps = pe.interProjectDependencies
       .filter(ipde => ipde.configuration.contains("test"))
-      .flatMap(ipde => idMap.get((ipde.project, dependerScalaVersion)))
+      .flatMap(ipde => resolveInterProjectRef(ipde.project, dependerScalaVersion, idMap, refsByProject))
       .map(ref => refToModuleDepRef(ref, isTest = true))
       .distinct
 
@@ -305,7 +317,11 @@ class SbtProjectAnalyzer(
 
   // ---- Topological sort ----
 
-  private def topoSort(groups: Seq[GroupInfo], idMap: Map[(String, String), ResolvedModuleRef]): Seq[GroupInfo] = {
+  private def topoSort(
+      groups: Seq[GroupInfo],
+      idMap: Map[(String, String), ResolvedModuleRef],
+      refsByProject: Map[String, Seq[(String, ResolvedModuleRef)]]
+  ): Seq[GroupInfo] = {
     val builderNames = groups.map(_.builderVarName).toSet
     val nameToGroup = groups.map(g => g.builderVarName -> g).toMap
 
@@ -314,7 +330,9 @@ class SbtProjectAnalyzer(
         .flatMap { concreteExport =>
           concreteExport.exportedModule.interProjectDependencies
             .filter(ipde => ipde.configuration == "default" || ipde.configuration.contains("compile"))
-            .flatMap(ipde => idMap.get((ipde.project, concreteExport.scalaVersion)))
+            .flatMap(ipde =>
+              resolveInterProjectRef(ipde.project, concreteExport.scalaVersion, idMap, refsByProject)
+            )
             .map(_.targetGroup)
         }
         .filter(builderNames.contains)
@@ -354,6 +372,18 @@ class SbtProjectAnalyzer(
     val rawSegment = os.Path(pe.base).last
     if rawSegment.startsWith(".") then rawSegment.tail else rawSegment
   }
+
+  private def resolveInterProjectRef(
+      projectId: String,
+      dependerScalaVersion: String,
+      idMap: Map[(String, String), ResolvedModuleRef],
+      refsByProject: Map[String, Seq[(String, ResolvedModuleRef)]]
+  ): Option[ResolvedModuleRef] =
+    idMap.get((projectId, dependerScalaVersion)).orElse {
+      refsByProject.get(projectId).flatMap { refs =>
+        Option.when(refs.size == 1)(refs.head._2)
+      }
+    }
 }
 
 object SbtProjectAnalyzer {
