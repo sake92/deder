@@ -5,13 +5,14 @@ import java.nio.channels.*
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.BlockingQueue
 import scala.jdk.CollectionConverters.*
+import scala.util.chaining.*
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.toJson
 import ba.sake.deder.*
 import ba.sake.deder.importing.Importer
+import io.opentelemetry.api.trace.StatusCode
+import ba.sake.deder.OTEL
 
-// TODO create separate handleHelpMessage etc methods
-// TODO add OTEL spans for each command handling, with attributes for command name, args, execution time, success/failure, etc
 class CliClientMessageHandler(
     projectState: DederProjectState,
     serverMessages: BlockingQueue[CliServerMessage],
@@ -24,90 +25,135 @@ class CliClientMessageHandler(
       message: CliClientMessage
   ): Unit = {
     message match {
-      case m: CliClientMessage.Help =>
-        val defaultHelpText =
-          """Deder Build Tool Help:
-            |
-            |Available commands:
-            |  version                 Show client and server versions
-            |  modules [options]       List modules
-            |  tasks [options]         List tasks
-            |  plan [options]          Show execution plan for a task
-            |  exec [options]          Execute a task
-            |  clean [options]         Clean modules
-            |  bsp install             Generate BSP configuration for this project
-            |  bsp                     Start BSP server for this project
-            |  import [options]        Import from other build tool
-            |  complete [options]      Generate shell completion script
-            |  shutdown                Shutdown the server
-            |
-            |Use help -c <command> for more details about each command.
-            |""".stripMargin
+      case m: CliClientMessage.Help     => handleHelp(clientId, requestId, m)
+      case m: CliClientMessage.Version  => handleVersion(clientId, requestId)
+      case m: CliClientMessage.Modules  => handleModules(clientId, requestId, m)
+      case m: CliClientMessage.Tasks    => handleTasks(clientId, requestId, m)
+      case m: CliClientMessage.Plan     => handlePlan(clientId, requestId, m)
+      case m: CliClientMessage.Exec     => handleExec(clientId, requestId, m)
+      case m: CliClientMessage.Cancel   => handleCancel(clientId, requestId, m)
+      case m: CliClientMessage.Clean    => handleClean(clientId, requestId, m)
+      case m: CliClientMessage.Import   => handleImport(clientId, requestId, m)
+      case m: CliClientMessage.Complete => handleComplete(clientId, requestId, m)
+      case m: CliClientMessage.Shutdown => handleShutdown(clientId, m)
+    }
+  }
 
-        mainargs.Parser[DederCliHelpOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-          case Left(_) =>
-            serverMessages.put(CliServerMessage.Output(defaultHelpText))
-          case Right(cliOptions) =>
-            cliOptions.command match {
-              case "version" =>
-                serverMessages.put(CliServerMessage.Output("Shows the Deder version."))
-              case "modules" =>
-                serverMessages.put(
-                  CliServerMessage.Output(mainargs.Parser[DederCliModulesOptions].helpText())
-                )
-              case "tasks" =>
-                serverMessages.put(
-                  CliServerMessage.Output(mainargs.Parser[DederCliTasksOptions].helpText())
-                )
-              case "plan" =>
-                serverMessages.put(
-                  CliServerMessage.Output(mainargs.Parser[DederCliPlanOptions].helpText())
-                )
-              case "exec" =>
-                serverMessages.put(
-                  CliServerMessage.Output(mainargs.Parser[DederCliExecOptions].helpText())
-                )
-              case "clean" =>
-                serverMessages.put(
-                  CliServerMessage.Output(mainargs.Parser[DederCliCleanOptions].helpText())
-                )
-              case "import" =>
-                serverMessages.put(
-                  CliServerMessage.Output(mainargs.Parser[DederCliImportOptions].helpText())
-                )
-              case "complete" =>
-                serverMessages.put(
-                  CliServerMessage.Output(mainargs.Parser[DederCliCompleteOptions].helpText())
-                )
-              case "shutdown" =>
-                serverMessages.put(CliServerMessage.Output("Shuts down the Deder server."))
-              case _ =>
-                serverMessages.put(CliServerMessage.Output(defaultHelpText))
-            }
-        }
-        serverMessages.put(CliServerMessage.Exit(0))
-      case m: CliClientMessage.Version =>
-        serverMessages.put(CliServerMessage.Output(s"Server version: ${DederGlobals.version}"))
-        serverMessages.put(CliServerMessage.Exit(0))
-      case m: CliClientMessage.Modules =>
-        if m.args == Seq("--help") || m.args == Seq("-h") then
-          serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliModulesOptions].helpText()))
-          serverMessages.put(CliServerMessage.Exit(0))
-        else
-          mainargs.Parser[DederCliModulesOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-            case Left(error) =>
-              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-              serverMessages.put(CliServerMessage.Exit(1))
-            case Right(cliOptions) =>
-              projectState.readState(useLastGood = false) match {
-                case Left(error) =>
-                  serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+  private def handleHelp(clientId: Int, requestId: String, m: CliClientMessage.Help): Unit = {
+    OTEL.withSpan("cli.help")(
+      _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+    ) { span =>
+      val defaultHelpText =
+        """Deder Build Tool Help:
+          |
+          |Available commands:
+          |  version                 Show client and server versions
+          |  modules [options]       List modules
+          |  tasks [options]         List tasks
+          |  plan [options]          Show execution plan for a task
+          |  exec [options]          Execute a task
+          |  clean [options]         Clean modules
+          |  bsp install             Generate BSP configuration for this project
+          |  bsp                     Start BSP server for this project
+          |  import [options]        Import from other build tool
+          |  complete [options]      Generate shell completion script
+          |  shutdown                Shutdown the server
+          |
+          |Use help -c <command> for more details about each command.
+          |""".stripMargin
+
+      mainargs.Parser[DederCliHelpOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+        case Left(_) =>
+          serverMessages.put(CliServerMessage.Output(defaultHelpText))
+        case Right(cliOptions) =>
+          span.setAttribute("cli.command", cliOptions.command)
+          cliOptions.command match {
+            case "version" =>
+              serverMessages.put(CliServerMessage.Output("Shows the Deder version."))
+            case "modules" =>
+              serverMessages.put(
+                CliServerMessage.Output(mainargs.Parser[DederCliModulesOptions].helpText())
+              )
+            case "tasks" =>
+              serverMessages.put(
+                CliServerMessage.Output(mainargs.Parser[DederCliTasksOptions].helpText())
+              )
+            case "plan" =>
+              serverMessages.put(
+                CliServerMessage.Output(mainargs.Parser[DederCliPlanOptions].helpText())
+              )
+            case "exec" =>
+              serverMessages.put(
+                CliServerMessage.Output(mainargs.Parser[DederCliExecOptions].helpText())
+              )
+            case "clean" =>
+              serverMessages.put(
+                CliServerMessage.Output(mainargs.Parser[DederCliCleanOptions].helpText())
+              )
+            case "import" =>
+              serverMessages.put(
+                CliServerMessage.Output(mainargs.Parser[DederCliImportOptions].helpText())
+              )
+            case "complete" =>
+              serverMessages.put(
+                CliServerMessage.Output(mainargs.Parser[DederCliCompleteOptions].helpText())
+              )
+            case "shutdown" =>
+              serverMessages.put(CliServerMessage.Output("Shuts down the Deder server."))
+            case _ =>
+              serverMessages.put(CliServerMessage.Output(defaultHelpText))
+          }
+      }
+      serverMessages.put(CliServerMessage.Exit(0))
+    }
+  }
+
+  private def handleVersion(clientId: Int, requestId: String): Unit = {
+    OTEL.withSpan("cli.version")(
+      _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+    ) { _ =>
+      serverMessages.put(CliServerMessage.Output(s"Server version: ${DederGlobals.version}"))
+      serverMessages.put(CliServerMessage.Exit(0))
+    }
+  }
+
+  private def handleModules(clientId: Int, requestId: String, m: CliClientMessage.Modules): Unit = {
+    if m.args == Seq("--help") || m.args == Seq("-h") then
+      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliModulesOptions].helpText()))
+      serverMessages.put(CliServerMessage.Exit(0))
+    else
+      mainargs.Parser[DederCliModulesOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+        case Left(error) =>
+          OTEL.withSpan("cli.modules")(
+            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+          ) { span =>
+            span.setStatus(StatusCode.ERROR)
+            span.setAttribute("error", error)
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          }
+        case Right(cliOptions) =>
+          OTEL.withSpan("cli.modules")(
+            _.setAttribute("clientId", clientId)
+             .setAttribute("request.id", requestId)
+             .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
+             .setAttribute("cli.depthDown", cliOptions.depthDown)
+             .setAttribute("cli.depthUp", cliOptions.depthUp)
+          ) { span =>
+            projectState.readState(useLastGood = false) match {
+              case Left(error) =>
+                span.setStatus(StatusCode.ERROR)
+                span.setAttribute("error", error)
+                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
+              case Right(state) =>
+                if cliOptions.depthDown < 0 || cliOptions.depthUp < 0 then {
+                  val errMsg = "--depth-down and --depth-up must be non-negative"
+                  span.setStatus(StatusCode.ERROR)
+                  span.setAttribute("error", errMsg)
+                  serverMessages.put(CliServerMessage.Log(errMsg, LogLevel.ERROR))
                   serverMessages.put(CliServerMessage.Exit(1))
-                case Right(state) =>
-                  if cliOptions.depthDown < 0 || cliOptions.depthUp < 0 then {
-                    serverMessages.put(CliServerMessage.Log("--depth-down and --depth-up must be non-negative", LogLevel.ERROR))
-                    serverMessages.put(CliServerMessage.Exit(1))
-                  } else {
+                } else {
                   val fullGraph = state.tasksResolver.modulesGraph
                   val graphToRender =
                     if cliOptions.modules.isEmpty && cliOptions.depthDown == Int.MaxValue && cliOptions.depthUp == Int.MaxValue
@@ -128,7 +174,6 @@ class CliClientMessageHandler(
                                   s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
                               Left(msg)
                             case Right(ids) =>
-                              // ids come from allModules, so modulesMap always contains them
                               Right(ids.flatMap(id => state.tasksResolver.modulesMap.get(id)))
                           }
                       focalResult.map { focalModules =>
@@ -142,6 +187,8 @@ class CliClientMessageHandler(
                     }
                   graphToRender match {
                     case Left(errorMsg) =>
+                      span.setStatus(StatusCode.ERROR)
+                      span.setAttribute("error", errorMsg)
                       serverMessages.put(CliServerMessage.Log(errorMsg, LogLevel.ERROR))
                       serverMessages.put(CliServerMessage.Exit(1))
                     case Right(graph) =>
@@ -159,291 +206,405 @@ class CliClientMessageHandler(
                       }
                       serverMessages.put(CliServerMessage.Exit(0))
                   }
-                  }
-              }
+                }
+            }
           }
-      case m: CliClientMessage.Tasks =>
-        if m.args == Seq("--help") || m.args == Seq("-h") then
-          serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliTasksOptions].helpText()))
-          serverMessages.put(CliServerMessage.Exit(0))
-        else
-          mainargs.Parser[DederCliTasksOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-            case Left(error) =>
-              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-              serverMessages.put(CliServerMessage.Exit(1))
-            case Right(cliOptions) =>
-              projectState.readState(useLastGood = true) match {
-                case Left(error) =>
-                  serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-                  serverMessages.put(CliServerMessage.Exit(1))
-                case Right(state) =>
-                  if cliOptions.json.value then {
-                    val taskNamesPerModule = state.tasksResolver.publicTaskInstancesPerModule.map { case (moduleId, tasks) =>
-                      moduleId -> tasks.map(_.task.name)
-                    }
-                    serverMessages.put(CliServerMessage.Output(taskNamesPerModule.toJson))
-                    serverMessages.put(CliServerMessage.Exit(0))
-                  } else if cliOptions.dot.value then {
-                    val dot =
-                      GraphUtils.generateDOT(
-                        state.tasksResolver.publicTaskInstancesGraph,
-                        v => v.id,
-                        v => Map("label" -> v.id)
-                      )
-                    serverMessages.put(CliServerMessage.Output(dot))
-                    serverMessages.put(CliServerMessage.Exit(0))
-                  } else if cliOptions.mermaid.value then {
-                    val mermaid =
-                      GraphUtils.generateMermaidWithSubgraphs(
-                        state.tasksResolver.publicTaskInstancesGraph,
-                        state.tasksResolver.publicTaskInstancesPerModule,
-                        v => v.id,
-                        v => v.task.name
-                      )
-                    serverMessages.put(CliServerMessage.Output(mermaid))
-                    serverMessages.put(CliServerMessage.Exit(0))
-                  } else {
-                    val modules = cliOptions.module match {
-                      case Some(moduleId) =>
-                        state.tasksResolver.allModules.filter(_.id == moduleId)
-                      case None =>
-                        state.tasksResolver.allModules
-                    }
-                    val sortedModules = modules.sortBy(_.id)
-                    val categoryOrder = Seq(
-                      "Build", "Configuration", "Dependencies", "Verification",
-                      "Run", "Publishing", "REPL", "Scala.js", "Scala Native", "GraalVM"
-                    )
-                    val modulesWithTasks = sortedModules.map { module =>
-                      val moduleTasks = state.tasksResolver.publicTaskInstancesPerModule(module.id).map(_.task)
-                      val grouped = moduleTasks.groupBy(t => if t.category.isEmpty then "Other" else t.category)
-                      val sortedCategories = categoryOrder.filter(grouped.contains) ++
-                        grouped.keys.filterNot(categoryOrder.contains).toSeq.sorted
-                      val categoryLines = sortedCategories.flatMap { cat =>
-                        val taskNames = grouped(cat).map(_.name).sorted
-                        Seq(s"  ${cat}:") ++ taskNames.map(t => s"    ${t}")
-                      }
-                      s"${module.id}:\n${categoryLines.mkString("\n")}"
-                    }
-                    serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
-                    serverMessages.put(CliServerMessage.Exit(0))
-                  }
-              }
-          }
+      }
+  }
 
-      case m: CliClientMessage.Plan =>
-        if m.args == Seq("--help") || m.args == Seq("-h") then
-          serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliPlanOptions].helpText()))
-          serverMessages.put(CliServerMessage.Exit(0))
-        else
-          mainargs.Parser[DederCliPlanOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-            case Left(error) =>
-              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-              serverMessages.put(CliServerMessage.Exit(1))
-            case Right(cliOptions) =>
-              projectState.readState(useLastGood = true) match {
-                case Left(error) =>
-                  serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-                  serverMessages.put(CliServerMessage.Exit(1))
-                case Right(state) =>
-                  val selectedModuleIds =
-                    if cliOptions.modules.isEmpty then state.tasksResolver.allModules.map(_.id)
-                    else WildcardUtils.getMatchesOrRecommendations(state.tasksResolver.allModules.map(_.id), cliOptions.modules) match {
-                      case Left(recommendations) =>
-                        val msg =
-                          if recommendations.isEmpty then s"No modules found for selectors: ${cliOptions.modules.mkString(", ")}"
-                          else s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
-                        serverMessages.put(CliServerMessage.Log(msg, LogLevel.ERROR))
-                        serverMessages.put(CliServerMessage.Exit(1))
-                        return
-                      case Right(ids) => ids
+  private def handleTasks(clientId: Int, requestId: String, m: CliClientMessage.Tasks): Unit = {
+    if m.args == Seq("--help") || m.args == Seq("-h") then
+      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliTasksOptions].helpText()))
+      serverMessages.put(CliServerMessage.Exit(0))
+    else
+      mainargs.Parser[DederCliTasksOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+        case Left(error) =>
+          OTEL.withSpan("cli.tasks")(
+            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+          ) { span =>
+            span.setStatus(StatusCode.ERROR)
+            span.setAttribute("error", error)
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          }
+        case Right(cliOptions) =>
+          OTEL.withSpan("cli.tasks")(
+            _.setAttribute("clientId", clientId)
+             .setAttribute("request.id", requestId)
+             .pipe(b => cliOptions.module.fold(b)(m => b.setAttribute("cli.module", m)))
+          ) { span =>
+            projectState.readState(useLastGood = true) match {
+              case Left(error) =>
+                span.setStatus(StatusCode.ERROR)
+                span.setAttribute("error", error)
+                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
+              case Right(state) =>
+                if cliOptions.json.value then {
+                  val taskNamesPerModule = state.tasksResolver.publicTaskInstancesPerModule.map { case (moduleId, tasks) =>
+                    moduleId -> tasks.map(_.task.name)
+                  }
+                  serverMessages.put(CliServerMessage.Output(taskNamesPerModule.toJson))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                } else if cliOptions.dot.value then {
+                  val dot =
+                    GraphUtils.generateDOT(
+                      state.tasksResolver.publicTaskInstancesGraph,
+                      v => v.id,
+                      v => Map("label" -> v.id)
+                    )
+                  serverMessages.put(CliServerMessage.Output(dot))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                } else if cliOptions.mermaid.value then {
+                  val mermaid =
+                    GraphUtils.generateMermaidWithSubgraphs(
+                      state.tasksResolver.publicTaskInstancesGraph,
+                      state.tasksResolver.publicTaskInstancesPerModule,
+                      v => v.id,
+                      v => v.task.name
+                    )
+                  serverMessages.put(CliServerMessage.Output(mermaid))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                } else {
+                  val modules = cliOptions.module match {
+                    case Some(moduleId) =>
+                      state.tasksResolver.allModules.filter(_.id == moduleId)
+                    case None =>
+                      state.tasksResolver.allModules
+                  }
+                  val sortedModules = modules.sortBy(_.id)
+                  val categoryOrder = Seq(
+                    "Build", "Configuration", "Dependencies", "Verification",
+                    "Run", "Publishing", "REPL", "Scala.js", "Scala Native", "GraalVM"
+                  )
+                  val modulesWithTasks = sortedModules.map { module =>
+                    val moduleTasks = state.tasksResolver.publicTaskInstancesPerModule(module.id).map(_.task)
+                    val grouped = moduleTasks.groupBy(t => if t.category.isEmpty then "Other" else t.category)
+                    val sortedCategories = categoryOrder.filter(grouped.contains) ++
+                      grouped.keys.filterNot(categoryOrder.contains).toSeq.sorted
+                    val categoryLines = sortedCategories.flatMap { cat =>
+                      val taskNames = grouped(cat).map(_.name).sorted
+                      Seq(s"  ${cat}:") ++ taskNames.map(t => s"    ${t}")
                     }
-                  state.executionPlanner.getTaskInstances(selectedModuleIds, cliOptions.task) match {
+                    s"${module.id}:\n${categoryLines.mkString("\n")}"
+                  }
+                  serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
+                  serverMessages.put(CliServerMessage.Exit(0))
+                }
+            }
+          }
+      }
+  }
+
+  private def handlePlan(clientId: Int, requestId: String, m: CliClientMessage.Plan): Unit = {
+    if m.args == Seq("--help") || m.args == Seq("-h") then
+      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliPlanOptions].helpText()))
+      serverMessages.put(CliServerMessage.Exit(0))
+    else
+      mainargs.Parser[DederCliPlanOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+        case Left(error) =>
+          OTEL.withSpan("cli.plan")(
+            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+          ) { span =>
+            span.setStatus(StatusCode.ERROR)
+            span.setAttribute("error", error)
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          }
+        case Right(cliOptions) =>
+          OTEL.withSpan("cli.plan")(
+            _.setAttribute("clientId", clientId)
+             .setAttribute("request.id", requestId)
+             .setAttribute("cli.task", cliOptions.task)
+             .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
+          ) { span =>
+            projectState.readState(useLastGood = true) match {
+              case Left(error) =>
+                span.setStatus(StatusCode.ERROR)
+                span.setAttribute("error", error)
+                serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
+              case Right(state) =>
+                val selectedModuleIds =
+                  if cliOptions.modules.isEmpty then state.tasksResolver.allModules.map(_.id)
+                  else WildcardUtils.getMatchesOrRecommendations(state.tasksResolver.allModules.map(_.id), cliOptions.modules) match {
                     case Left(recommendations) =>
                       val msg =
-                        if recommendations.isEmpty then s"No '${cliOptions.task}' tasks found"
-                        else s"No '${cliOptions.task}' tasks found, did you mean: ${recommendations.mkString(", ")} ?"
+                        if recommendations.isEmpty then s"No modules found for selectors: ${cliOptions.modules.mkString(", ")}"
+                        else s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
+                      span.setStatus(StatusCode.ERROR)
+                      span.setAttribute("error", msg)
                       serverMessages.put(CliServerMessage.Log(msg, LogLevel.ERROR))
                       serverMessages.put(CliServerMessage.Exit(1))
-                    case Right(validModuleTasks) =>
-                      val validModuleIds = validModuleTasks.map(_._1)
-                      val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(validModuleIds, cliOptions.task)
-                      // projectPublic produces a subset of tasksExecSubgraph (public tasks only),
-                      // so all its vertices are guaranteed to be in stageByTask below.
-                      val publicSubgraph = GraphUtils.projectPublic(tasksExecSubgraph, !_.task.internal)
-                      if cliOptions.json.value then {
-                        val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
-                        val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
-                        serverMessages.put(CliServerMessage.Output(publicStages.map(_.map(_.id)).toJson))
-                      } else if cliOptions.dot.value then {
-                        val dot = GraphUtils.generateDOT(publicSubgraph, v => v.id, v => Map("label" -> v.id))
-                        serverMessages.put(CliServerMessage.Output(dot))
-                      } else if cliOptions.mermaid.value then {
-                        val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
-                        val stageByTask = tasksExecStages.zipWithIndex
-                          .flatMap { case (stage, stageIdx) =>
-                            stage.map(_ -> stageIdx)
-                          }
-                          .toMap
-                        val stageClassDefs = publicSubgraph.vertexSet().asScala.map(stageByTask).toSet.toSeq.sorted
-                          .map { stageIdx =>
-                            s"stage$stageIdx" -> CliClientMessageHandler.planMermaidStagePalette(
-                              stageIdx % CliClientMessageHandler.planMermaidStagePalette.length
-                            )
-                          }
-                          .toMap
-                        val groups = publicSubgraph.vertexSet().asScala.toSeq.groupBy(_.moduleId)
-                        val mermaid =
-                          GraphUtils.generateMermaidWithSubgraphs(
-                            publicSubgraph,
-                            groups,
-                            v => v.id,
-                            v => s"${v.task.name} (#${stageByTask(v)})",
-                            extraLines = Seq("%% #0 = evaluated first stage"),
-                            vertexCssClassProvider = v => Some(s"stage${stageByTask(v)}"),
-                            classDefs = stageClassDefs
-                          )
-                        serverMessages.put(CliServerMessage.Output(mermaid))
-                      } else {
-                        val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
-                        val stagesStr = tasksExecStages.zipWithIndex
-                          .flatMap { case (stage, idx) =>
-                            val publicStage = stage.filter(!_.task.internal)
-                            Option.when(publicStage.nonEmpty)(
-                              s"Stage #${idx}:\n" + publicStage.map(ti => s"  ${ti.id}").mkString("\n")
-                            )
-                          }
-                          .mkString("\n")
-                        serverMessages.put(CliServerMessage.Output(stagesStr))
-                      }
-                      serverMessages.put(CliServerMessage.Exit(0))
+                      return
+                    case Right(ids) => ids
                   }
-              }
-          }
-      case m: CliClientMessage.Exec =>
-        if m.args == Seq("--help") || m.args == Seq("-h") then
-          serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliExecOptions].helpText()))
-          serverMessages.put(CliServerMessage.Exit(0))
-        else
-          mainargs.Parser[DederCliExecOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-            case Left(error) =>
-              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-              serverMessages.put(CliServerMessage.Exit(1))
-            case Right(cliOptions) =>
-              val notificationCallback: ServerNotification => Unit = {
-                case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
-                // skip
-                case sn =>
-                  CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
-              }
-              val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
-              val argss =
-                if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail
-                else cliOptions.args.value
-              projectState.executeCLI(
-                clientId,
-                requestId,
-                cliOptions.modules,
-                cliOptions.task,
-                args = argss,
-                serverNotificationsLogger,
-                json = cliOptions.json.value,
-                startWatch = cliOptions.watch.value,
-                exitOnEnd = !cliOptions.watch.value,
-                clientParams = CliClientParams(m.envVars)
-              )
-          }
-      case m: CliClientMessage.Cancel =>
-        projectState.cancelRequest(m.requestId)
-        serverMessages.put(CliServerMessage.Exit(130))
-      case m: CliClientMessage.Clean =>
-        if m.args == Seq("--help") || m.args == Seq("-h") then
-          serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliCleanOptions].helpText()))
-          serverMessages.put(CliServerMessage.Exit(0))
-        else
-          mainargs.Parser[DederCliCleanOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-            case Left(error) =>
-              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-              serverMessages.put(CliServerMessage.Exit(1))
-            case Right(cliOptions) =>
-              val success = cliOptions.task match {
-                case Some(taskName) =>
-                  projectState.cleanTasks(cliOptions.modules, taskName)
-                case None =>
-                  projectState.cleanModules(cliOptions.modules)
-              }
-              serverMessages.put(CliServerMessage.Exit(if success then 0 else 1))
-          }
-      case m: CliClientMessage.Import =>
-        if m.args == Seq("--help") || m.args == Seq("-h") then
-          serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliImportOptions].helpText()))
-          serverMessages.put(CliServerMessage.Exit(0))
-        else
-          mainargs.Parser[DederCliImportOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-            case Left(error) =>
-              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-              serverMessages.put(CliServerMessage.Exit(1))
-            case Right(cliOptions) =>
-              val notificationCallback: ServerNotification => Unit = { sn =>
-                CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
-              }
-              val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
-              val importer = new Importer(serverNotificationsLogger)
-              try {
-                importer.doImport(cliOptions.from)
-                serverMessages.put(CliServerMessage.Exit(0))
-              } catch {
-                case e: Exception =>
-                  serverMessages.put(CliServerMessage.Log(e.getMessage, LogLevel.ERROR))
-                  serverMessages.put(CliServerMessage.Exit(1))
-              }
-          }
-      case m: CliClientMessage.Complete =>
-        if m.args == Seq("--help") || m.args == Seq("-h") then
-          serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliCompleteOptions].helpText()))
-          serverMessages.put(CliServerMessage.Exit(0))
-        else
-          mainargs.Parser[DederCliCompleteOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
-            case Left(error) =>
-              serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
-              serverMessages.put(CliServerMessage.Exit(1))
-            case Right(cliOptions) =>
-              val res = if cliOptions.output.value then {
-                cliOptions.shell match {
-                  case ShellType.bash       => TabCompleter.bashScript
-                  case ShellType.zsh        => TabCompleter.zshScript
-                  case ShellType.fish       => TabCompleter.fishScript
-                  case ShellType.powershell => TabCompleter.powershellScript
+                state.executionPlanner.getTaskInstances(selectedModuleIds, cliOptions.task) match {
+                  case Left(recommendations) =>
+                    val msg =
+                      if recommendations.isEmpty then s"No '${cliOptions.task}' tasks found"
+                      else s"No '${cliOptions.task}' tasks found, did you mean: ${recommendations.mkString(", ")} ?"
+                    span.setStatus(StatusCode.ERROR)
+                    span.setAttribute("error", msg)
+                    serverMessages.put(CliServerMessage.Log(msg, LogLevel.ERROR))
+                    serverMessages.put(CliServerMessage.Exit(1))
+                  case Right(validModuleTasks) =>
+                    val validModuleIds = validModuleTasks.map(_._1)
+                    val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(validModuleIds, cliOptions.task)
+                    val publicSubgraph = GraphUtils.projectPublic(tasksExecSubgraph, !_.task.internal)
+                    if cliOptions.json.value then {
+                      val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
+                      val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
+                      serverMessages.put(CliServerMessage.Output(publicStages.map(_.map(_.id)).toJson))
+                    } else if cliOptions.dot.value then {
+                      val dot = GraphUtils.generateDOT(publicSubgraph, v => v.id, v => Map("label" -> v.id))
+                      serverMessages.put(CliServerMessage.Output(dot))
+                    } else if cliOptions.mermaid.value then {
+                      val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
+                      val stageByTask = tasksExecStages.zipWithIndex
+                        .flatMap { case (stage, stageIdx) =>
+                          stage.map(_ -> stageIdx)
+                        }
+                        .toMap
+                      val stageClassDefs = publicSubgraph.vertexSet().asScala.map(stageByTask).toSet.toSeq.sorted
+                        .map { stageIdx =>
+                          s"stage$stageIdx" -> CliClientMessageHandler.planMermaidStagePalette(
+                            stageIdx % CliClientMessageHandler.planMermaidStagePalette.length
+                          )
+                        }
+                        .toMap
+                      val groups = publicSubgraph.vertexSet().asScala.toSeq.groupBy(_.moduleId)
+                      val mermaid =
+                        GraphUtils.generateMermaidWithSubgraphs(
+                          publicSubgraph,
+                          groups,
+                          v => v.id,
+                          v => s"${v.task.name} (#${stageByTask(v)})",
+                          extraLines = Seq("%% #0 = evaluated first stage"),
+                          vertexCssClassProvider = v => Some(s"stage${stageByTask(v)}"),
+                          classDefs = stageClassDefs
+                        )
+                      serverMessages.put(CliServerMessage.Output(mermaid))
+                    } else {
+                      val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
+                      val stagesStr = tasksExecStages.zipWithIndex
+                        .flatMap { case (stage, idx) =>
+                          val publicStage = stage.filter(!_.task.internal)
+                          Option.when(publicStage.nonEmpty)(
+                            s"Stage #${idx}:\n" + publicStage.map(ti => s"  ${ti.id}").mkString("\n")
+                          )
+                        }
+                        .mkString("\n")
+                      serverMessages.put(CliServerMessage.Output(stagesStr))
+                    }
+                    serverMessages.put(CliServerMessage.Exit(0))
                 }
-              } else {
-                val tabCompletions =
-                  projectState.getTabCompletions(
-                    cliOptions.commandLine.getOrElse(""),
-                    cliOptions.cursorPos.getOrElse(-1)
-                  )
-                tabCompletions.mkString(" ")
-              }
-              serverMessages.put(CliServerMessage.Output(res))
-              serverMessages.put(CliServerMessage.Exit(0))
+            }
           }
-      case _: CliClientMessage.Shutdown =>
-        logger.info(s"Client $clientId requested server shutdown.")
-        serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
-        serverMessages.put(CliServerMessage.Exit(0, serverShuttingDown = true))
-        Thread.sleep(100) // let the messages be sent to CLI client
+      }
+  }
 
-        // Stop accepting new CLI connections immediately — prevents new clients from
-        // connecting to this dying server during the flush sleep below
-        cliServer.stopAccepting()
+  private def handleExec(clientId: Int, requestId: String, m: CliClientMessage.Exec): Unit = {
+    if m.args == Seq("--help") || m.args == Seq("-h") then
+      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliExecOptions].helpText()))
+      serverMessages.put(CliServerMessage.Exit(0))
+    else
+      mainargs.Parser[DederCliExecOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+        case Left(error) =>
+          OTEL.withSpan("cli.exec")(
+            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+          ) { span =>
+            span.setStatus(StatusCode.ERROR)
+            span.setAttribute("error", error)
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          }
+        case Right(cliOptions) =>
+          OTEL.withSpan(s"cli.exec.${cliOptions.task}")(
+            _.setAttribute("clientId", clientId)
+             .setAttribute("request.id", requestId)
+             .setAttribute("cli.task", cliOptions.task)
+             .setAttribute("cli.moduleIds", cliOptions.modules.mkString(","))
+             .setAttribute("cli.watch", cliOptions.watch.value)
+             .setAttribute("cli.json", cliOptions.json.value)
+          ) { _ =>
+            val notificationCallback: ServerNotification => Unit = {
+              case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
+              // skip
+              case sn =>
+                CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
+            }
+            val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
+            val argss =
+              if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail
+              else cliOptions.args.value
+            projectState.executeCLI(
+              clientId,
+              requestId,
+              cliOptions.modules,
+              cliOptions.task,
+              args = argss,
+              serverNotificationsLogger,
+              json = cliOptions.json.value,
+              startWatch = cliOptions.watch.value,
+              exitOnEnd = !cliOptions.watch.value,
+              clientParams = CliClientParams(m.envVars)
+            )
+          }
+      }
+  }
 
-        // Release the server lock BEFORE BSP flush sleep so a new server process can
-        // start immediately (the client's reconnection loop spawns a server only once)
-        projectState.releaseServerLock()
+  private def handleCancel(clientId: Int, requestId: String, m: CliClientMessage.Cancel): Unit = {
+    OTEL.withSpan("cli.cancel")(
+      _.setAttribute("clientId", clientId)
+       .setAttribute("request.id", requestId)
+       .setAttribute("cli.targetRequestId", m.requestId)
+    ) { _ =>
+      projectState.cancelRequest(m.requestId)
+      serverMessages.put(CliServerMessage.Exit(130))
+    }
+  }
 
-        // Notify BSP clients — they now have time to disconnect while the new server starts
-        projectState.notifyBspClientsShuttingDown()
-        Thread.sleep(500) // flush window for BSP clients to process disconnect
-        projectState.shutdown()
+  private def handleClean(clientId: Int, requestId: String, m: CliClientMessage.Clean): Unit = {
+    if m.args == Seq("--help") || m.args == Seq("-h") then
+      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliCleanOptions].helpText()))
+      serverMessages.put(CliServerMessage.Exit(0))
+    else
+      mainargs.Parser[DederCliCleanOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+        case Left(error) =>
+          OTEL.withSpan("cli.clean")(
+            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+          ) { span =>
+            span.setStatus(StatusCode.ERROR)
+            span.setAttribute("error", error)
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          }
+        case Right(cliOptions) =>
+          OTEL.withSpan("cli.clean")(
+            _.setAttribute("clientId", clientId)
+             .setAttribute("request.id", requestId)
+             .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
+             .pipe(b => cliOptions.task.fold(b)(t => b.setAttribute("cli.task", t)))
+          ) { span =>
+            val success = cliOptions.task match {
+              case Some(taskName) =>
+                projectState.cleanTasks(cliOptions.modules, taskName)
+              case None =>
+                projectState.cleanModules(cliOptions.modules)
+            }
+            if !success then
+              span.setStatus(StatusCode.ERROR)
+              span.setAttribute("error", "clean operation failed")
+            serverMessages.put(CliServerMessage.Exit(if success then 0 else 1))
+          }
+      }
+  }
+
+  private def handleImport(clientId: Int, requestId: String, m: CliClientMessage.Import): Unit = {
+    if m.args == Seq("--help") || m.args == Seq("-h") then
+      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliImportOptions].helpText()))
+      serverMessages.put(CliServerMessage.Exit(0))
+    else
+      mainargs.Parser[DederCliImportOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+        case Left(error) =>
+          OTEL.withSpan("cli.import")(
+            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+          ) { span =>
+            span.setStatus(StatusCode.ERROR)
+            span.setAttribute("error", error)
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          }
+        case Right(cliOptions) =>
+          OTEL.withSpan("cli.import")(
+            _.setAttribute("clientId", clientId)
+             .setAttribute("request.id", requestId)
+             .setAttribute("cli.from", cliOptions.from.toString)
+          ) { span =>
+            val notificationCallback: ServerNotification => Unit = { sn =>
+              CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
+            }
+            val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
+            val importer = new Importer(serverNotificationsLogger)
+            try {
+              importer.doImport(cliOptions.from)
+              serverMessages.put(CliServerMessage.Exit(0))
+            } catch {
+              case e: Exception =>
+                span.setStatus(StatusCode.ERROR)
+                span.setAttribute("error", e.getMessage)
+                serverMessages.put(CliServerMessage.Log(e.getMessage, LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
+            }
+          }
+      }
+  }
+
+  private def handleComplete(clientId: Int, requestId: String, m: CliClientMessage.Complete): Unit = {
+    if m.args == Seq("--help") || m.args == Seq("-h") then
+      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliCompleteOptions].helpText()))
+      serverMessages.put(CliServerMessage.Exit(0))
+    else
+      mainargs.Parser[DederCliCompleteOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+        case Left(error) =>
+          OTEL.withSpan("cli.complete")(
+            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+          ) { span =>
+            span.setStatus(StatusCode.ERROR)
+            span.setAttribute("error", error)
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          }
+        case Right(cliOptions) =>
+          OTEL.withSpan("cli.complete")(
+            _.setAttribute("clientId", clientId)
+             .setAttribute("request.id", requestId)
+             .setAttribute("cli.shell", cliOptions.shell.toString)
+             .pipe(b => cliOptions.commandLine.fold(b)(c => b.setAttribute("cli.commandLine", c)))
+          ) { _ =>
+            val res = if cliOptions.output.value then {
+              cliOptions.shell match {
+                case ShellType.bash       => TabCompleter.bashScript
+                case ShellType.zsh        => TabCompleter.zshScript
+                case ShellType.fish       => TabCompleter.fishScript
+                case ShellType.powershell => TabCompleter.powershellScript
+              }
+            } else {
+              val tabCompletions =
+                projectState.getTabCompletions(
+                  cliOptions.commandLine.getOrElse(""),
+                  cliOptions.cursorPos.getOrElse(-1)
+                )
+              tabCompletions.mkString(" ")
+            }
+            serverMessages.put(CliServerMessage.Output(res))
+            serverMessages.put(CliServerMessage.Exit(0))
+          }
+      }
+  }
+
+  private def handleShutdown(clientId: Int, m: CliClientMessage.Shutdown): Unit = {
+    OTEL.withSpan("cli.shutdown")(
+      _.setAttribute("clientId", clientId)
+    ) { _ =>
+      logger.info(s"Client $clientId requested server shutdown.")
+      serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
+      serverMessages.put(CliServerMessage.Exit(0, serverShuttingDown = true))
+      Thread.sleep(100) // let the messages be sent to CLI client
+
+      // Stop accepting new CLI connections immediately — prevents new clients from
+      // connecting to this dying server during the flush sleep below
+      cliServer.stopAccepting()
+
+      // Release the server lock BEFORE BSP flush sleep so a new server process can
+      // start immediately (the client's reconnection loop spawns a server only once)
+      projectState.releaseServerLock()
+
+      // Notify BSP clients — they now have time to disconnect while the new server starts
+      projectState.notifyBspClientsShuttingDown()
+      Thread.sleep(500) // flush window for BSP clients to process disconnect
+      projectState.shutdown()
     }
   }
 }
