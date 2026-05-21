@@ -7,9 +7,6 @@ import java.util.concurrent.BlockingQueue
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.*
 import ba.sake.deder.DederProjectState
-import ba.sake.deder.OTEL
-import scala.util.Using
-import io.opentelemetry.api.trace.StatusCode
 
 class CliClientReadThread(
     projectState: DederProjectState,
@@ -51,24 +48,15 @@ class CliClientReadThread(
       val requestId = message.getRequestId
 
       val t1 = new Thread(() => {
-        val span = OTEL.TRACER
-          .spanBuilder(s"cli.${message.getClass.getSimpleName.toLowerCase}")
-          .setAttribute("clientId", clientId)
-          .setAttribute("request.id", requestId)
-          .startSpan()
-        Using.resource(span.makeCurrent()) { scope =>
-          try {
-            handler.handle(clientId, requestId, message)
-          } catch {
-            case e: IOException =>
-            // all good, client disconnected...
-            case e: Throwable =>
-              span.recordException(e)
-              span.setStatus(StatusCode.ERROR)
-              logger.error(s"Unhandled error processing message from client $clientId", e)
-              serverMessages.put(CliServerMessage.Log(s"Internal error: ${e.getMessage}", LogLevel.ERROR))
-              serverMessages.put(CliServerMessage.Exit(1))
-          } finally span.end()
+        try {
+          handler.handle(clientId, requestId, message)
+        } catch {
+          case e: IOException =>
+          // all good, client disconnected...
+          case e: Throwable =>
+            logger.error(s"Unhandled error processing message from client $clientId", e)
+            serverMessages.put(CliServerMessage.Log(s"Internal error: ${e.getMessage}", LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
         }
       })
       // run in another thread so we can cancel it if needed

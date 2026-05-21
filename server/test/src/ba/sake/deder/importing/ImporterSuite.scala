@@ -7,13 +7,14 @@ import ba.sake.deder.cli.ImportBuildTool
 class ImporterSuite extends FunSuite {
 
   private val testProjectDir = os.temp.dir(prefix = "deder-import-test-")
+  private var originalProjectRootDir: String = scala.compiletime.uninitialized
 
   override def beforeAll(): Unit = {
+    originalProjectRootDir = System.getProperty("DEDER_PROJECT_ROOT_DIR")
     System.setProperty("DEDER_PROJECT_ROOT_DIR", testProjectDir.toString)
   }
 
   override def afterAll(): Unit = {
-    System.clearProperty("DEDER_PROJECT_ROOT_DIR")
     try os.remove.all(testProjectDir)
     catch case _: Exception => ()
   }

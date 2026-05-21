@@ -137,9 +137,7 @@ object DederPklRenderer {
             case "NativeTest"  => "nativeTestForVersion"
           }
           val args = platformVersion match {
-            case Some(v) =>
-              val platParam = if (slot.contains("Native")) "scalaNativeVersion" else "scalaJsVersion"
-              s"""sv, $platParam = "$v""""
+            case Some(v) => s"""sv, "$v""""
             case None => "sv"
           }
           s"${templateModuleName(g)}.$helperName($args)"
@@ -497,7 +495,17 @@ object DederPklRenderer {
       val scalacOptDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.scalacOptions }
       val javacOptDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.javacOptions }
       val depsDeltas: Map[String, Seq[DepDef]] = rawDeltas.map { (v, d) => v -> d.deps }
-      val pluginDepsDeltas: Map[String, Seq[DepDef]] = rawDeltas.map { (v, d) => v -> d.scalacPluginDeps }
+      val pluginDiffedSlices = slices.map { slice =>
+        val diffedModules = slice.modulesByPlatform.map { (platform, module) =>
+          platform -> module.copy(
+            scalacPluginDeps = diffTemplatePluginDeps(module.scalacPluginDeps, g, slice.scalaVersion)
+          )
+        }
+        slice.copy(modulesByPlatform = diffedModules)
+      }
+      val pluginDiffedCommon = computeCommonProps(pluginDiffedSlices)
+      val pluginDepsDeltas: Map[String, Seq[DepDef]] =
+        computeVersionDeltas(pluginDiffedSlices, pluginDiffedCommon).map { (v, d) => v -> d.scalacPluginDeps }
       val srcDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.sources }
       val resDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.resources }
       val modDepDeltas: Map[String, Seq[ModuleDepRef]] = rawDeltas.map { (v, d) => v -> d.moduleDeps }
@@ -554,15 +562,8 @@ object DederPklRenderer {
         if (common.deps.nonEmpty || depsDeltas.values.exists(_.nonEmpty))
           Some(renderDepsWithWhens(common.deps, depsDeltas, indent = 4))
         else None,
-        if (
-          !suppressPluginDepsDeltas(
-            common.scalacPluginDeps,
-            pluginDepsDeltas,
-            g,
-            slices.exists(_.scalaVersion.startsWith("2"))
-          ) && (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty))
-        )
-          Some(renderPluginDepsWithWhens(common.scalacPluginDeps, pluginDepsDeltas, indent = 4))
+        if (pluginDiffedCommon.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty))
+          Some(renderPluginDepsWithWhens(pluginDiffedCommon.scalacPluginDeps, pluginDepsDeltas, indent = 4))
         else None,
         if (common.sources.nonEmpty || srcDeltas.values.exists(_.nonEmpty))
           Some(renderStringListWithWhens("sources", common.sources, srcDeltas, indent = 4))
@@ -675,7 +676,7 @@ object DederPklRenderer {
                 Some(jsVersion)
               )
               val depsStr = renderDeps(m.testDeps, indent = 6)
-              s"  jsTestTemplate = $amendExpr {\n$depsStr  }"
+              s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
             } else ""
           }
           .getOrElse("")
@@ -692,7 +693,7 @@ object DederPklRenderer {
                 Some(nativeVersion)
               )
               val depsStr = renderDeps(m.testDeps, indent = 6)
-              s"  nativeTestTemplate = $amendExpr {\n$depsStr  }"
+              s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
             } else ""
           }
           .getOrElse("")
@@ -709,12 +710,19 @@ object DederPklRenderer {
         if (sharedVersionListName.isEmpty)
           s"local const $versionsListName = ${versionsFor(g).map(v => s""""$v"""").mkString("List(", ", ", ")")}\n\n"
         else ""
+      val builderIdProps = {
+        val idLine = s"""      id = "${crossVersionIdWithPlaceholder(g, builderType)}""""
+        val testIdLine = Option.when(builderType == "CreateScalaModules")(
+          s"""      testId = "${crossVersionTestIdWithPlaceholder(g)}""""
+        )
+        Seq(Some(idLine), testIdLine).flatten.mkString("\n")
+      }
 
       s"""${versionsDecl}local const ${g.builderVarName}Modules = $versionsListName
                |  .map((sv) ->
                |    new $builderType {
                |      root = "${g.root}"
-               |      id = "${crossVersionIdWithPlaceholder(g, builderType)}"
+               |$builderIdProps
                |      layout = "${g.layout.toString.toLowerCase.replace("_", "-")}"
                |$body
                |    }.get.all
@@ -740,13 +748,15 @@ object DederPklRenderer {
     else "CreateScalaModules"
   }
 
-  // scalaModules now appends scalaVersion itself, so the id parameter is always
-  // the clean builder var name (consistent with CreateCrossModules).
   private def crossVersionIdWithPlaceholder(g: ModuleGroup, builderType: String): String =
-    s"${g.builderVarName}"
+    builderType match {
+      case "CreateScalaModules" => s"${g.builderVarName}-jvm-\\(sv)"
+      case "CreateCrossModules" => g.builderVarName
+      case other                => throw new IllegalArgumentException(s"Unexpected builder type: $other")
+    }
 
-  private def crossVersionIdWithLiteral(g: ModuleGroup, builderType: String, scalaVersion: String): String =
-    s"${g.builderVarName}"
+  private def crossVersionTestIdWithPlaceholder(g: ModuleGroup): String =
+    s"${g.builderVarName}-jvm-test-\\(sv)"
 
   private def renderGroupBody(
       modulesByPlatform: Map[String, ModuleDef],
@@ -820,7 +830,7 @@ object DederPklRenderer {
               Some(jsVersion)
             )
             val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  jsTestTemplate = $amendExpr {\n$depsStr  }"
+            s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
           } else ""
         }
         .getOrElse("")
@@ -838,7 +848,7 @@ object DederPklRenderer {
               Some(nativeVersion)
             )
             val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  nativeTestTemplate = $amendExpr {\n$depsStr  }"
+            s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
           } else ""
         }
         .getOrElse("")
@@ -890,8 +900,7 @@ object DederPklRenderer {
       Some(renderSourceDirs(m.sources, indent = 4)).filter(_.nonEmpty),
       Some(renderResourceDirs(m.resources, indent = 4)).filter(_.nonEmpty),
       Some(renderDeps(m.deps, indent = 4)).filter(_.nonEmpty),
-      if (suppressPluginDeps(m.scalacPluginDeps, g, m.scalaVersion)) None
-      else Some(renderPluginDeps(m.scalacPluginDeps, indent = 4)).filter(_.nonEmpty),
+      Some(renderPluginDeps(diffTemplatePluginDeps(m.scalacPluginDeps, g, m.scalaVersion), indent = 4)).filter(_.nonEmpty),
       Some(renderModuleDepsPkl(m.moduleDeps, indent = 4, scalaVersionCtx, groupLookup)).filter(_.nonEmpty),
       m.publish.map(p => renderPublishInfo(p, indent = 4, useBase = hasSharedPomBase)).filter(_.nonEmpty)
     ).flatten.mkString("\n")
@@ -953,10 +962,13 @@ object DederPklRenderer {
     val testDepsStr =
       if (jvmModule.testDeps.nonEmpty) renderDeps(jvmModule.testDeps, indent = 6)
       else """    deps { "org.scalameta::munit:1.2.1" }"""
+    val testPluginDeps = diffTemplatePluginDeps(jvmModule.scalacPluginDeps, g, jvmModule.scalaVersion)
+    val testPluginDepsStr = renderPluginDeps(testPluginDeps, indent = 6)
     s"""  testTemplate = ($amendExpr) {
        |$scalaVersionLine
        |$testModuleDepsStr
        |$testDepsStr
+       |$testPluginDepsStr
        |  }""".stripMargin
   }
 
@@ -1003,28 +1015,17 @@ object DederPklRenderer {
       opts.forall(javacDefaults.contains) &&
       deltas.values.forall(_.forall(javacDefaults.contains))
 
-  /** Suppress scalacPluginDeps when the typelevel template already provides them. */
+  /** Typelevel Scala 2 templates already define these plugins. */
   private val pluginDefaults = Set(
     "com.olegpy" -> "better-monadic-for",
     "org.typelevel" -> "kind-projector"
   )
-  private def suppressPluginDeps(deps: Seq[DepDef], g: ModuleGroup, scalaVersion: String): Boolean = {
-    if (!g.usesTypelevel) return false
-    if (deps.isEmpty) return false
-    if (scalaVersion.startsWith("3")) return false
-    deps.forall(d => pluginDefaults.contains(d.organization -> d.name))
-  }
-  private def suppressPluginDepsDeltas(
-      deps: Seq[DepDef],
-      deltas: Map[String, Seq[DepDef]],
-      g: ModuleGroup,
-      hasScala2: Boolean
-  ): Boolean = {
-    if (!g.usesTypelevel) return false
-    if (deps.isEmpty && deltas.values.forall(_.isEmpty)) return false
-    if (!hasScala2) return false
-    deps.forall(d => pluginDefaults.contains(d.organization -> d.name)) &&
-    deltas.values.forall(_.forall(d => pluginDefaults.contains(d.organization -> d.name)))
+  private def templateProvidedPluginCoords(g: ModuleGroup, scalaVersion: String): Set[(String, String)] =
+    if (g.usesTypelevel && scalaVersion.startsWith("2")) pluginDefaults else Set.empty
+
+  private def diffTemplatePluginDeps(deps: Seq[DepDef], g: ModuleGroup, scalaVersion: String): Seq[DepDef] = {
+    val templatePlugins = templateProvidedPluginCoords(g, scalaVersion)
+    deps.filterNot(d => templatePlugins.contains(d.organization -> d.name))
   }
 
   private def renderJavacOptions(opts: Seq[String], indent: Int): String = {
@@ -1207,36 +1208,27 @@ object DederPklRenderer {
     if (targetGroup == null || targetGroup.crossScalaVersions.isEmpty) {
       return refString(ref)
     }
-    val builderType = if (targetGroup != null) builderTypeFor(targetGroup) else "CreateScalaModules"
-    val plat = if (ref.targetPlatform == "main") "" else s"-${ref.targetPlatform}"
+    val builderType = builderTypeFor(targetGroup)
+    val plat = builderType match {
+      case "CreateScalaModules" =>
+        "-jvm"
+      case "CreateCrossModules" =>
+        ref.targetPlatform match {
+          case "main" | "jvm" => "-jvm"
+          case other          => s"-$other"
+        }
+      case other =>
+        throw new IllegalArgumentException(s"Unexpected builder type: $other")
+    }
     val testSuffix = if (ref.isTest) "-test" else ""
     scalaVersionCtx match {
       case ScalaVersionCtx.Placeholder =>
-        builderType match {
-          case "CreateCrossModules" =>
-            // id: {name}{-plat}{-test}-\(sv)  e.g. myapp-jvm-test-3.7.4
-            val idPattern = s"$name$plat$testSuffix"
-            s"""${name}Modules.find((m) -> m.id == "$idPattern-\\(sv)")"""
-          case _ =>
-            // id: {name}{-test}-{version}  e.g. msc_common-test-2.13.18
-            val idPattern = s"$name$testSuffix"
-            s"""${name}Modules.find((m) -> m.id == "$idPattern-\\(sv)")"""
-        }
+        val idPattern = s"$name$plat$testSuffix"
+        s"""${name}Modules.find((m) -> m.id == "$idPattern-\\(sv)")"""
       case ScalaVersionCtx.Literal(ownerVersion) =>
         val targetVersion = ref.targetScalaVersion.getOrElse(ownerVersion)
-        builderType match {
-          case "CreateCrossModules" =>
-            // id: {name}{-plat}{-test}-{version}  e.g. myapp-jvm-test-3.7.4
-            val idWithVersion = s"$name$plat$testSuffix-$targetVersion"
-            s"""${name}Modules.find((m) -> m.id == "$idWithVersion")"""
-          case _ =>
-            // id: {name}{-test}-{version}  e.g. msc_common-test-2.13.18
-            val idWithVersion = s"$name$testSuffix-$targetVersion"
-            s"""${name}Modules.find((m) -> m.id == "$idWithVersion")"""
-        }
+        val idWithVersion = s"$name$plat$testSuffix-$targetVersion"
+        s"""${name}Modules.find((m) -> m.id == "$idWithVersion")"""
     }
   }
 }
-
-// TEMP DEBUG
-private def _dbg(msg: String): Unit = println(s"[SUPPRESS] $msg")

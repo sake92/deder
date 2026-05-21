@@ -3,13 +3,15 @@
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - init like giter8, autoimport from sbt?
-- assembly still slowish
 - periodic flush in forked tests, every 1s?
+- max timeout when waiting for lock and bail out, report to bsp??
 
+- imported test module should also get compiler plugins
 - import from other maven effective POM etc
 - import from other mill
 - import from other gradle
 
+- hmm, when i manually kill server, if there was a BSP req in flight, metals doesnt get response #wack
 
 - run pkldoc on each tag, and publish to ghpages
 https://pkl-lang.org/main/current/pkl-doc/index.html

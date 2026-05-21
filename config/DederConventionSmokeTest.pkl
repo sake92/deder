@@ -1,0 +1,103 @@
+amends "pkl:test"
+
+import "DederTypelevel.pkl" as Typelevel
+import "DederTpolecat.pkl" as Tpolecat
+
+facts {
+  ["DederTypelevel loads directly"] {
+    Typelevel.typelevelScala3.id == "dummy-typelevel-base"
+  }
+
+  ["DederTypelevel forVersion"] {
+    local v3 = Typelevel.forVersion("3.7.4")
+    local v213 = Typelevel.forVersion("2.13.18")
+    local v212 = Typelevel.forVersion("2.12.20")
+    v3.scalaVersion == "3.0.0"
+    v213.scalaVersion == "2.13.0"
+    v212.scalaVersion == "2.12.0"
+  }
+
+  ["DederTypelevel testForVersion"] {
+    local test = Typelevel.testForVersion("3.7.4")
+    local test212 = Typelevel.testForVersion("2.12.20")
+    test.scalaVersion == "3.7.4"
+    test212.scalaVersion == "2.12.20"
+  }
+
+  ["DederTypelevel jsForVersion"] {
+    local js = Typelevel.jsForVersion("3.7.4", "1.19.0")
+    local js212 = Typelevel.jsForVersion("2.12.20", "1.19.0")
+    js.scalaVersion == "3.7.4"
+    js.scalaJsVersion == "1.19.0"
+    js212.scalaVersion == "2.12.20"
+    js212.scalaJsVersion == "1.19.0"
+  }
+
+  ["DederTypelevel jsTestForVersion"] {
+    local jsTest = Typelevel.jsTestForVersion("3.7.4", "1.19.0")
+    jsTest.scalaVersion == "3.7.4"
+    jsTest.scalaJsVersion == "1.19.0"
+  }
+
+  ["DederTypelevel nativeForVersion"] {
+    local native = Typelevel.nativeForVersion("2.13.18", "0.5.8")
+    native.scalaVersion == "2.13.18"
+    native.scalaNativeVersion == "0.5.8"
+  }
+
+  ["DederTypelevel nativeTestForVersion"] {
+    local nativeTest = Typelevel.nativeTestForVersion("2.13.18", "0.5.8")
+    nativeTest.scalaVersion == "2.13.18"
+    nativeTest.scalaNativeVersion == "0.5.8"
+  }
+
+  ["DederTpolecat loads directly"] {
+    Tpolecat.tpolecatScala3.id == "dummy-tpolecat-base"
+  }
+
+  ["DederTpolecat forVersion"] {
+    local v3 = Tpolecat.forVersion("3.7.4")
+    local v213 = Tpolecat.forVersion("2.13.18")
+    local v212 = Tpolecat.forVersion("2.12.20")
+    v3.scalaVersion == "3.0.0"
+    v213.scalaVersion == "2.13.0"
+    v212.scalaVersion == "2.12.0"
+  }
+
+  ["DederTpolecat testForVersion"] {
+    local test = Tpolecat.testForVersion("3.7.4")
+    local test212 = Tpolecat.testForVersion("2.12.20")
+    test.scalaVersion == "3.7.4"
+    test212.scalaVersion == "2.12.20"
+  }
+
+  ["DederTpolecat jsForVersion"] {
+    local js = Tpolecat.jsForVersion("3.7.4", "1.19.0")
+    local js212 = Tpolecat.jsForVersion("2.12.20", "1.19.0")
+    js.scalaVersion == "3.7.4"
+    js.scalaJsVersion == "1.19.0"
+    js212.scalaVersion == "2.12.20"
+    js212.scalaJsVersion == "1.19.0"
+  }
+
+  ["DederTpolecat jsTestForVersion"] {
+    local jsTest = Tpolecat.jsTestForVersion("3.7.4", "1.19.0")
+    jsTest.scalaVersion == "3.7.4"
+    jsTest.scalaJsVersion == "1.19.0"
+  }
+
+  ["DederTpolecat nativeForVersion"] {
+    local native = Tpolecat.nativeForVersion("2.13.18", "0.5.8")
+    local native212 = Tpolecat.nativeForVersion("2.12.20", "0.5.8")
+    native.scalaVersion == "2.13.18"
+    native.scalaNativeVersion == "0.5.8"
+    native212.scalaVersion == "2.12.20"
+    native212.scalaNativeVersion == "0.5.8"
+  }
+
+  ["DederTpolecat nativeTestForVersion"] {
+    local nativeTest = Tpolecat.nativeTestForVersion("2.13.18", "0.5.8")
+    nativeTest.scalaVersion == "2.13.18"
+    nativeTest.scalaNativeVersion == "0.5.8"
+  }
+}

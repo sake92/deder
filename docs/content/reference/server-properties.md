@@ -11,7 +11,7 @@ Example:
 localPath=myprojects/deder/.deder/out/server/assembly/out.jar
 workerThreads=32
 logLevel=debug
-JAVA_OPTS=-javaagent:otel.jar -Dotel.service.name=deder-server -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
+JAVA_OPTS=-javaagent:otel.jar -Dotel.service.name=my-project -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
 ```
 
 
