@@ -537,7 +537,7 @@ class DederPklRendererSuite extends FunSuite {
     )
     val result = DederPklRenderer.render(build)
     // header check is a string assertion (format-sensitive)
-    assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.10.0/DederTpolecat.pkl""""))
+    assert(result.contains(s"""import "https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederTpolecat.pkl""""))
     assert(result.contains("DederTpolecat.forVersion(sv)"))
     val mods = renderedModules(build)
     val libMod = scalaMod(findBy("lib-jvm-2.13.18", mods))
@@ -555,7 +555,7 @@ class DederPklRendererSuite extends FunSuite {
       repositories = Seq.empty
     )
     val result = DederPklRenderer.render(build)
-    assert(result.contains(s"""import "https://sake92.github.io/deder/config/v0.10.0/DederTypelevel.pkl""""))
+    assert(result.contains(s"""import "https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederTypelevel.pkl""""))
     assert(result.contains("(DederTypelevel.typelevelScala"))
     val mods = renderedModules(build)
     val libMod = scalaMod(findModule("lib", mods))
@@ -796,7 +796,7 @@ class DederPklRendererSuite extends FunSuite {
   test("generates correct Pkl header with amends directive") {
     val build = singleModuleBuild()
     val result = DederPklRenderer.render(build)
-    assert(result.contains(s"""amends "https://sake92.github.io/deder/config/v0.10.0/DederProject.pkl""""))
+    assert(result.contains(s"""amends "https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederProject.pkl""""))
   }
 
   // ---- TemplateOptionsReader tests (test the reader, not the renderer) ----
