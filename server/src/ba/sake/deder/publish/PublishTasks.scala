@@ -143,7 +143,8 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     // skip signature files to avoid "invalid signature file" errors when running the assembly jar
     val lower = name.toLowerCase
     val isSignatureFile = lower.endsWith(".sf") || lower.endsWith(".rsa") || lower.endsWith(".dsa")
-    isTasty || (lower.startsWith("meta-inf/") && (isSignatureFile || lower.endsWith("meta-inf/manifest.mf")))
+    val isManifest = lower.endsWith("manifest.mf")
+    isTasty || (lower.startsWith("meta-inf/") && (isSignatureFile || isManifest))
   }
 
   val assemblyDepsTask = CachedTaskBuilder
