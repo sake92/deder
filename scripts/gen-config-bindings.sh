@@ -3,26 +3,27 @@ set -euo pipefail
 
 echo "Generating Java config bindings from PKL files..."
 
-# generate to temp dir to avoid touching unchanged files (triggers watcher → cache invalidation)
-TMP_SRC="config/src.tmp"
-rm -rf "$TMP_SRC"
+### PKL codegen
+# use temp dir to avoid touching unchanged files (triggers watcher → cache invalidation)
+# and to map the folder structure to flat-style
+TMP_GEN="config/tmp_gen"
+rm -rf "$TMP_GEN"
 
 if [ ! -f pkl-codegen-java ]; then
     curl -L -o pkl-codegen-java https://github.com/apple/pkl/releases/download/0.30.2/pkl-codegen-java
 fi
 chmod +x pkl-codegen-java
-./pkl-codegen-java config/DederProject.pkl config/DederCredentials.pkl config/DederTpolecat.pkl config/DederTypelevel.pkl -o "$TMP_SRC"
+./pkl-codegen-java config/DederProject.pkl config/DederCredentials.pkl config/DederTpolecat.pkl config/DederTypelevel.pkl -o "$TMP_GEN"
 
-# move java files directly under src
-mv "$TMP_SRC/java/"* "$TMP_SRC/"
-rmdir "$TMP_SRC/java"
+rsync -rc --delete --no-t "$TMP_GEN/java/ba" config/src/
+
 # normalize .properties files: strip timestamp comment for deterministic output and caching
-find "$TMP_SRC" -name "*.properties" -exec sed -i '/^#/d' {} \;
-# sync generated sources: only overwrite files whose content actually changed
-rsync -rc --delete --no-t "$TMP_SRC/" config/src/
-rm -rf "$TMP_SRC"
+find "$TMP_GEN/resources" -name "*.properties" -exec sed -i '/^#/d' {} \;
+rsync -rc --delete --no-t "$TMP_GEN/resources/" config/resources/
 
-# Bundle all .pkl files (except *Test.pkl) as Pkl module-path classpath resources
+rm -rf "$TMP_GEN"
+
+### Bundle all .pkl files (except *Test.pkl) as Pkl module-path classpath resources
 mkdir -p config/resources/ba/sake/deder/config
 for pklfile in config/*.pkl; do
     basename=$(basename "$pklfile")

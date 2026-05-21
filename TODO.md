@@ -6,6 +6,7 @@
 - periodic flush in forked tests, every 1s?
 - max timeout when waiting for lock and bail out, report to bsp??
 
+- imported test module should also get compiler plugins
 - import from other maven effective POM etc
 - import from other mill
 - import from other gradle
