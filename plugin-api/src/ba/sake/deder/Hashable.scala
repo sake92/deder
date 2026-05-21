@@ -16,7 +16,9 @@ trait Hashable[T] {
 // Instances defined directly in object Hashable (and in type companions) take priority.
 private trait HashableLowPriority {
   given [T](using rw: JsonRW[T]): Hashable[T] with {
-    def hashStr(value: T): String = HashUtils.hashStr(value.toJson)
+    def hashStr(value: T): String =
+      val json = value.toJson(spaces = 0, sort = true) // canonical JSON for consistent hashing
+      HashUtils.hashStr(json)
   }
 }
 

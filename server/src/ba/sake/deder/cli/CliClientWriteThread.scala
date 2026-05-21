@@ -23,7 +23,9 @@ class CliClientWriteThread(
       while running do {
         // newline delimited JSON messages
         val message = serverMessages.take()
-        outputStream.write((message.toJson + '\n').getBytes(StandardCharsets.UTF_8))
+        // very important to have ZERO SPACES/NEWLINES!!!
+        val jsonMessage = message.toJson(spaces = 0, sort = false)
+        outputStream.write((jsonMessage + '\n').getBytes(StandardCharsets.UTF_8))
         running = !message.isInstanceOf[CliServerMessage.Exit] // to exit this thread..
       }
     } catch {

@@ -12,7 +12,6 @@ import scala.util.Using
 import org.typelevel.jawn.ast.{CanonicalRenderer, JValue}
 import com.typesafe.scalalogging.StrictLogging
 import io.opentelemetry.api.trace.StatusCode
-import ba.sake.tupson.toJson
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
