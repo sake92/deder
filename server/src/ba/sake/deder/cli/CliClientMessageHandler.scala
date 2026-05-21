@@ -135,10 +135,10 @@ class CliClientMessageHandler(
         case Right(cliOptions) =>
           OTEL.withSpan("cli.modules")(
             _.setAttribute("clientId", clientId)
-             .setAttribute("request.id", requestId)
-             .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
-             .setAttribute("cli.depthDown", cliOptions.depthDown)
-             .setAttribute("cli.depthUp", cliOptions.depthUp)
+              .setAttribute("request.id", requestId)
+              .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
+              .setAttribute("cli.depthDown", cliOptions.depthDown)
+              .setAttribute("cli.depthUp", cliOptions.depthUp)
           ) { span =>
             projectState.readState(useLastGood = false) match {
               case Left(error) =>
@@ -170,8 +170,7 @@ class CliClientMessageHandler(
                               val msg =
                                 if recommendations.isEmpty then
                                   s"No modules found for selectors: ${cliOptions.modules.mkString(", ")}"
-                                else
-                                  s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
+                                else s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
                               Left(msg)
                             case Right(ids) =>
                               Right(ids.flatMap(id => state.tasksResolver.modulesMap.get(id)))
@@ -194,7 +193,9 @@ class CliClientMessageHandler(
                     case Right(graph) =>
                       val filteredModules = graph.vertexSet().asScala.toSeq.sortBy(_.id)
                       if cliOptions.json.value then {
-                        serverMessages.put(CliServerMessage.Output(filteredModules.map(_.id).toJson))
+                        serverMessages.put(
+                          CliServerMessage.Output(filteredModules.map(_.id).toJson(spaces = 0, sort = false))
+                        )
                       } else if cliOptions.dot.value then {
                         val dot = GraphUtils.generateDOT(graph, v => v.id, v => Map("label" -> v.id))
                         serverMessages.put(CliServerMessage.Output(dot))
@@ -230,8 +231,8 @@ class CliClientMessageHandler(
         case Right(cliOptions) =>
           OTEL.withSpan("cli.tasks")(
             _.setAttribute("clientId", clientId)
-             .setAttribute("request.id", requestId)
-             .pipe(b => cliOptions.module.fold(b)(m => b.setAttribute("cli.module", m)))
+              .setAttribute("request.id", requestId)
+              .pipe(b => cliOptions.module.fold(b)(m => b.setAttribute("cli.module", m)))
           ) { span =>
             projectState.readState(useLastGood = true) match {
               case Left(error) =>
@@ -241,10 +242,11 @@ class CliClientMessageHandler(
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
                 if cliOptions.json.value then {
-                  val taskNamesPerModule = state.tasksResolver.publicTaskInstancesPerModule.map { case (moduleId, tasks) =>
-                    moduleId -> tasks.map(_.task.name)
+                  val taskNamesPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
+                    case (moduleId, tasks) =>
+                      moduleId -> tasks.map(_.task.name)
                   }
-                  serverMessages.put(CliServerMessage.Output(taskNamesPerModule.toJson))
+                  serverMessages.put(CliServerMessage.Output(taskNamesPerModule.toJson(spaces = 0, sort = false)))
                   serverMessages.put(CliServerMessage.Exit(0))
                 } else if cliOptions.dot.value then {
                   val dot =
@@ -274,8 +276,16 @@ class CliClientMessageHandler(
                   }
                   val sortedModules = modules.sortBy(_.id)
                   val categoryOrder = Seq(
-                    "Build", "Configuration", "Dependencies", "Verification",
-                    "Run", "Publishing", "REPL", "Scala.js", "Scala Native", "GraalVM"
+                    "Build",
+                    "Configuration",
+                    "Dependencies",
+                    "Verification",
+                    "Run",
+                    "Publishing",
+                    "REPL",
+                    "Scala.js",
+                    "Scala Native",
+                    "GraalVM"
                   )
                   val modulesWithTasks = sortedModules.map { module =>
                     val moduleTasks = state.tasksResolver.publicTaskInstancesPerModule(module.id).map(_.task)
@@ -314,9 +324,9 @@ class CliClientMessageHandler(
         case Right(cliOptions) =>
           OTEL.withSpan("cli.plan")(
             _.setAttribute("clientId", clientId)
-             .setAttribute("request.id", requestId)
-             .setAttribute("cli.task", cliOptions.task)
-             .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
+              .setAttribute("request.id", requestId)
+              .setAttribute("cli.task", cliOptions.task)
+              .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
           ) { span =>
             projectState.readState(useLastGood = true) match {
               case Left(error) =>
@@ -327,18 +337,23 @@ class CliClientMessageHandler(
               case Right(state) =>
                 val selectedModuleIds =
                   if cliOptions.modules.isEmpty then state.tasksResolver.allModules.map(_.id)
-                  else WildcardUtils.getMatchesOrRecommendations(state.tasksResolver.allModules.map(_.id), cliOptions.modules) match {
-                    case Left(recommendations) =>
-                      val msg =
-                        if recommendations.isEmpty then s"No modules found for selectors: ${cliOptions.modules.mkString(", ")}"
-                        else s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
-                      span.setStatus(StatusCode.ERROR)
-                      span.setAttribute("error", msg)
-                      serverMessages.put(CliServerMessage.Log(msg, LogLevel.ERROR))
-                      serverMessages.put(CliServerMessage.Exit(1))
-                      return
-                    case Right(ids) => ids
-                  }
+                  else
+                    WildcardUtils.getMatchesOrRecommendations(
+                      state.tasksResolver.allModules.map(_.id),
+                      cliOptions.modules
+                    ) match {
+                      case Left(recommendations) =>
+                        val msg =
+                          if recommendations.isEmpty then
+                            s"No modules found for selectors: ${cliOptions.modules.mkString(", ")}"
+                          else s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
+                        span.setStatus(StatusCode.ERROR)
+                        span.setAttribute("error", msg)
+                        serverMessages.put(CliServerMessage.Log(msg, LogLevel.ERROR))
+                        serverMessages.put(CliServerMessage.Exit(1))
+                        return
+                      case Right(ids) => ids
+                    }
                 state.executionPlanner.getTaskInstances(selectedModuleIds, cliOptions.task) match {
                   case Left(recommendations) =>
                     val msg =
@@ -355,18 +370,24 @@ class CliClientMessageHandler(
                     if cliOptions.json.value then {
                       val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                       val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
-                      serverMessages.put(CliServerMessage.Output(publicStages.map(_.map(_.id)).toJson))
+                      serverMessages.put(
+                        CliServerMessage.Output(publicStages.map(_.map(_.id)).toJson(spaces = 0, sort = false))
+                      )
                     } else if cliOptions.dot.value then {
                       val dot = GraphUtils.generateDOT(publicSubgraph, v => v.id, v => Map("label" -> v.id))
                       serverMessages.put(CliServerMessage.Output(dot))
                     } else if cliOptions.mermaid.value then {
                       val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
-                      val stageByTask = tasksExecStages.zipWithIndex
-                        .flatMap { case (stage, stageIdx) =>
-                          stage.map(_ -> stageIdx)
-                        }
-                        .toMap
-                      val stageClassDefs = publicSubgraph.vertexSet().asScala.map(stageByTask).toSet.toSeq.sorted
+                      val stageByTask = tasksExecStages.zipWithIndex.flatMap { case (stage, stageIdx) =>
+                        stage.map(_ -> stageIdx)
+                      }.toMap
+                      val stageClassDefs = publicSubgraph
+                        .vertexSet()
+                        .asScala
+                        .map(stageByTask)
+                        .toSet
+                        .toSeq
+                        .sorted
                         .map { stageIdx =>
                           s"stage$stageIdx" -> CliClientMessageHandler.planMermaidStagePalette(
                             stageIdx % CliClientMessageHandler.planMermaidStagePalette.length
@@ -422,11 +443,11 @@ class CliClientMessageHandler(
         case Right(cliOptions) =>
           OTEL.withSpan(s"cli.exec.${cliOptions.task}")(
             _.setAttribute("clientId", clientId)
-             .setAttribute("request.id", requestId)
-             .setAttribute("cli.task", cliOptions.task)
-             .setAttribute("cli.moduleIds", cliOptions.modules.mkString(","))
-             .setAttribute("cli.watch", cliOptions.watch.value)
-             .setAttribute("cli.json", cliOptions.json.value)
+              .setAttribute("request.id", requestId)
+              .setAttribute("cli.task", cliOptions.task)
+              .setAttribute("cli.moduleIds", cliOptions.modules.mkString(","))
+              .setAttribute("cli.watch", cliOptions.watch.value)
+              .setAttribute("cli.json", cliOptions.json.value)
           ) { _ =>
             val notificationCallback: ServerNotification => Unit = {
               case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
@@ -457,8 +478,8 @@ class CliClientMessageHandler(
   private def handleCancel(clientId: Int, requestId: String, m: CliClientMessage.Cancel): Unit = {
     OTEL.withSpan("cli.cancel")(
       _.setAttribute("clientId", clientId)
-       .setAttribute("request.id", requestId)
-       .setAttribute("cli.targetRequestId", m.requestId)
+        .setAttribute("request.id", requestId)
+        .setAttribute("cli.targetRequestId", m.requestId)
     ) { _ =>
       projectState.cancelRequest(m.requestId)
       serverMessages.put(CliServerMessage.Exit(130))
@@ -483,9 +504,9 @@ class CliClientMessageHandler(
         case Right(cliOptions) =>
           OTEL.withSpan("cli.clean")(
             _.setAttribute("clientId", clientId)
-             .setAttribute("request.id", requestId)
-             .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
-             .pipe(b => cliOptions.task.fold(b)(t => b.setAttribute("cli.task", t)))
+              .setAttribute("request.id", requestId)
+              .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
+              .pipe(b => cliOptions.task.fold(b)(t => b.setAttribute("cli.task", t)))
           ) { span =>
             val success = cliOptions.task match {
               case Some(taskName) =>
@@ -519,8 +540,8 @@ class CliClientMessageHandler(
         case Right(cliOptions) =>
           OTEL.withSpan("cli.import")(
             _.setAttribute("clientId", clientId)
-             .setAttribute("request.id", requestId)
-             .setAttribute("cli.from", cliOptions.from.toString)
+              .setAttribute("request.id", requestId)
+              .setAttribute("cli.from", cliOptions.from.toString)
           ) { span =>
             val notificationCallback: ServerNotification => Unit = { sn =>
               CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
@@ -532,6 +553,7 @@ class CliClientMessageHandler(
               serverMessages.put(CliServerMessage.Exit(0))
             } catch {
               case e: Exception =>
+                logger.error("Import failed", e)
                 span.setStatus(StatusCode.ERROR)
                 span.setAttribute("error", e.getMessage)
                 serverMessages.put(CliServerMessage.Log(e.getMessage, LogLevel.ERROR))
@@ -559,9 +581,9 @@ class CliClientMessageHandler(
         case Right(cliOptions) =>
           OTEL.withSpan("cli.complete")(
             _.setAttribute("clientId", clientId)
-             .setAttribute("request.id", requestId)
-             .setAttribute("cli.shell", cliOptions.shell.toString)
-             .pipe(b => cliOptions.commandLine.fold(b)(c => b.setAttribute("cli.commandLine", c)))
+              .setAttribute("request.id", requestId)
+              .setAttribute("cli.shell", cliOptions.shell.toString)
+              .pipe(b => cliOptions.commandLine.fold(b)(c => b.setAttribute("cli.commandLine", c)))
           ) { _ =>
             val res = if cliOptions.output.value then {
               cliOptions.shell match {

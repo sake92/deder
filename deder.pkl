@@ -4,6 +4,13 @@ amends "https://sake92.github.io/deder/config/v0.9.1/DederProject.pkl"
 
 local const scalaVer = "3.7.4"
 
+local const versions = new {
+  osLib = "0.11.6"
+  tupson = "0.20.0"
+  commonsCodec = "1.20.0"
+  scalaLogging = "3.9.5"
+}
+
 local const sonatypeRepo = new SonatypeCentralRepo {
   id = "sonatype"
 }
@@ -51,8 +58,8 @@ local const testCommonModules =
       scalaVersion = scalaVer
       publish = false
       deps {
-        "ba.sake::tupson:0.18.0"
-        "com.lihaoyi::os-lib:0.11.6"
+        "ba.sake::tupson:\(versions.tupson)"
+        "com.lihaoyi::os-lib:\(versions.osLib)"
         "org.scala-sbt:test-interface:1.0"
         "com.lihaoyi::fansi:0.5.1"
       }
@@ -86,13 +93,14 @@ local const pluginApi = new ScalaModule {
   publishTo = sonatypeRepo
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
   deps {
-    "ba.sake::tupson:0.18.0"
-    "com.lihaoyi::os-lib:0.11.6"
-    "commons-codec:commons-codec:1.20.0"
-    "org.scala-sbt:compiler-interface:1.11.0"
-    "com.typesafe.scala-logging::scala-logging:3.9.5"
+    "ba.sake::tupson:\(versions.tupson)"
+    "com.lihaoyi::os-lib:\(versions.osLib)"
+    "commons-codec:commons-codec:\(versions.commonsCodec)"
+    "com.typesafe.scala-logging::scala-logging:\(versions.scalaLogging)"
+    "ch.qos.logback:logback-classic:1.5.23"
     "io.get-coursier::dependency:0.3.2"
     "io.get-coursier::dependency-interface:0.3.2"
+    "io.opentelemetry:opentelemetry-api:1.58.0"
   }
 }
 
@@ -116,9 +124,8 @@ local const serverModules =
       deps {
         "org.jgrapht:jgrapht-core:1.5.2"
         "org.jgrapht:jgrapht-io:1.5.2"
-        "ba.sake::tupson:0.18.0"
-        "com.lihaoyi::os-lib-watch:0.11.6"
-        "commons-codec:commons-codec:1.20.0"
+        "com.lihaoyi::os-lib-watch:\(versions.osLib)"
+        "commons-codec:commons-codec:\(versions.commonsCodec)"
         "org.scala-sbt:zinc_2.13:1.11.0"
         "org.scala-sbt:compiler-interface:1.11.0"
         "io.get-coursier::dependency:0.3.2"
@@ -126,14 +133,9 @@ local const serverModules =
         "io.get-coursier:interface:1.0.25"
         "com.lihaoyi::mainargs:0.7.8"
         "io.github.classgraph:classgraph:4.8.184"
-        "org.scala-sbt:test-interface:1.0"
         "ch.epfl.scala:bsp4j:2.2.0-M2"
         "com.github.blemale::scaffeine:5.3.0"
-        "com.typesafe.scala-logging::scala-logging:3.9.5"
-        "io.opentelemetry:opentelemetry-api:1.58.0"
-        "ch.qos.logback:logback-classic:1.5.23"
         "com.eed3si9n.jarjarabrams::jarjar-abrams-core:1.16.0"
-        "com.lihaoyi::fansi:0.5.1"
         // withDottyCompat → _2.13 artifacts
         "org.scala-js:scalajs-linker_2.13:1.20.2"
         "org.scala-js:scalajs-sbt-test-adapter_2.13:1.20.2"
@@ -180,8 +182,6 @@ local const integrationTest = new ScalaTestModule {
   moduleDeps { serverModules.main }
   deps {
     "org.scalameta::munit:1.2.1"
-    "com.lihaoyi::os-lib:0.11.6"
-    "ba.sake::tupson:0.18.0"
   }
   junitXmlReport {
     enabled = true

@@ -1,5 +1,6 @@
 
 # Misc
+- replace jackson with avaje jsonb
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - init like giter8, autoimport from sbt?

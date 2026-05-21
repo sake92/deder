@@ -1,33 +1,10 @@
 package ba.sake.deder
 
 import ba.sake.tupson.JsonRW
-import org.typelevel.jawn.ast.*
 
-// TODO derives JsonRW after tupson update
 case class TaskResult[T](
     value: T,
     inputsHash: String,
     outputHash: String
-)
+)derives JsonRW
 
-object TaskResult {
-  given TaskResultRW[T](using tRW: JsonRW[T]): JsonRW[TaskResult[T]] = new JsonRW {
-    def parse(path: String, jValue: JValue): TaskResult[T] =
-      jValue match {
-        case JObject(o) =>
-          val value = tRW.parse(path, o("value"))
-          val inputsHash = JsonRW[String].parse(path, o("inputsHash"))
-          val outputHash = JsonRW[String].parse(path, o("outputHash"))
-          TaskResult(value, inputsHash, outputHash)
-        case other => sys.error(s"Cannot parse TaskResult from $other")
-      }
-
-    def write(value: TaskResult[T]): JValue =
-      val map = Map(
-        "value" -> tRW.write(value.value),
-        "inputsHash" -> JsonRW[String].write(value.inputsHash),
-        "outputHash" -> JsonRW[String].write(value.outputHash)
-      )
-      JsonRW[Map[String, JValue]].write(map)
-  }
-}

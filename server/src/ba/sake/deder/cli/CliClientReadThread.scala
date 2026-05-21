@@ -43,6 +43,7 @@ class CliClientReadThread(
         try messageJson.parseJson[CliClientMessage]
         catch {
           case e: TupsonException =>
+            logger.error(s"Failed to parse message from client $clientId: $messageJson", e)
             CliClientMessage.Help(Seq.empty)
         }
       val requestId = message.getRequestId
@@ -52,7 +53,8 @@ class CliClientReadThread(
           handler.handle(clientId, requestId, message)
         } catch {
           case e: IOException =>
-          // all good, client disconnected...
+            // probably client disconnected... but log just in case..
+            logger.error(s"IO error processing message from client $clientId, probably client disconnected", e)
           case e: Throwable =>
             logger.error(s"Unhandled error processing message from client $clientId", e)
             serverMessages.put(CliServerMessage.Log(s"Internal error: ${e.getMessage}", LogLevel.ERROR))
