@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Task Reference | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#task-reference">Task Reference</a>
+         <ul>
+          <li><a href="#build">Build</a></li>
+          <li><a href="#configuration">Configuration</a></li>
+          <li><a href="#dependencies">Dependencies</a></li>
+          <li><a href="#verification">Verification</a></li>
+          <li><a href="#run">Run</a></li>
+          <li><a href="#publishing">Publishing</a></li>
+          <li><a href="#repl">REPL</a></li>
+          <li><a href="#scalajs">Scala.js</a></li>
+          <li><a href="#scala-native">Scala Native</a></li>
+          <li><a href="#graalvm">GraalVM</a></li>
+          <li><a href="#other">Other</a></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="task-reference">Task Reference<a href="#task-reference" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Deder's built-in tasks are grouped into categories that broadly match the CLI (<code>deder tasks</code>). Most tasks can be invoked with <code>deder exec -t &lt;task&gt; -m &lt;module&gt;</code>.</p>
+   <blockquote>
+    <p><strong>Note:</strong> A small number of public tasks have no category assigned in source and therefore appear under <strong>Other</strong> in <code>deder tasks</code> output. They are collected in the <a href="#other">Other</a> section at the bottom of this page.</p>
+   </blockquote>
+   <blockquote>
+    <p><strong>Caching:</strong> whether a task is <em>cached</em> (skipped when inputs are unchanged) or <em>always runs</em> is documented in <a href="https://sake92.github.io/deder/reference/caching.html">Task caching</a>.</p>
+   </blockquote>
+   <hr>
+   <h2 id="build">Build<a href="#build" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>These tasks compile source code and manage the compile output directory.</p>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>compile</code></td>
+      <td>all</td>
+      <td>Invokes Zinc to compile Scala/Java sources. Always runs (Zinc handles incremental compilation internally).</td>
+     </tr>
+     <tr>
+      <td><code>classes</code></td>
+      <td>all</td>
+      <td>Returns the class output directory for the module. Always runs.</td>
+     </tr>
+     <tr>
+      <td><code>semanticdb</code></td>
+      <td>all</td>
+      <td>Returns the SemanticDB output directory for the module. Always runs.</td>
+     </tr>
+    </tbody>
+   </table>
+   <hr>
+   <h2 id="configuration">Configuration<a href="#configuration" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Configuration tasks read values from <code>deder.pkl</code> and are the building blocks for higher-level tasks. They are useful in <code>deder plan</code> output and can be inspected directly.</p>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>sources</code></td>
+      <td>all</td>
+      <td>Returns the list of configured source root directories.</td>
+     </tr>
+     <tr>
+      <td><code>sourceFiles</code></td>
+      <td>all</td>
+      <td>Returns all <code>.scala</code>/<code>.java</code> source files found under the source roots. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>generatedSources</code></td>
+      <td>all</td>
+      <td>Returns the directory for annotation-processor-generated sources.</td>
+     </tr>
+     <tr>
+      <td><code>resources</code></td>
+      <td>all</td>
+      <td>Returns the list of configured resource root directories.</td>
+     </tr>
+     <tr>
+      <td><code>javaHome</code></td>
+      <td>all</td>
+      <td>Returns the configured JDK home path (<code>javaHome</code> in <code>deder.pkl</code>), or <code>None</code>.</td>
+     </tr>
+     <tr>
+      <td><code>javaVersion</code></td>
+      <td>all</td>
+      <td>Returns the configured <code>--release</code> target version for <code>javac</code>.</td>
+     </tr>
+     <tr>
+      <td><code>javacOptions</code></td>
+      <td>all</td>
+      <td>Returns the <code>javacOptions</code> list from <code>deder.pkl</code>.</td>
+     </tr>
+     <tr>
+      <td><code>scalacOptions</code></td>
+      <td>Scala</td>
+      <td>Returns the <code>scalacOptions</code> list from <code>deder.pkl</code>.</td>
+     </tr>
+     <tr>
+      <td><code>scalaVersion</code></td>
+      <td>Scala</td>
+      <td>Returns the Scala version configured for the module.</td>
+     </tr>
+     <tr>
+      <td><code>jvmOptions</code></td>
+      <td>all</td>
+      <td>Returns the <code>jvmOptions</code> list from <code>deder.pkl</code> (passed to <code>java</code> on <code>run</code> / <code>test</code>).</td>
+     </tr>
+     <tr>
+      <td><code>semanticdbEnabled</code></td>
+      <td>all</td>
+      <td>Returns whether SemanticDB generation is enabled for the module.</td>
+     </tr>
+     <tr>
+      <td><code>javaSemanticdbVersion</code></td>
+      <td>all</td>
+      <td>Returns the <code>semanticdb-javac</code> version to use.</td>
+     </tr>
+     <tr>
+      <td><code>scalaSemanticdbVersion</code></td>
+      <td>Scala</td>
+      <td>Returns the <code>semanticdb-scalac</code> (Scala 2) or built-in (Scala 3) SemanticDB version. Cached.</td>
+     </tr>
+    </tbody>
+   </table>
+   <hr>
+   <h2 id="dependencies">Dependencies<a href="#dependencies" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Dependency tasks resolve and fetch Maven/Ivy coordinates declared in <code>deder.pkl</code>.</p>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>deps</code></td>
+      <td>all</td>
+      <td>Returns the raw dependency declarations from <code>deder.pkl</code>.</td>
+     </tr>
+     <tr>
+      <td><code>compileOnlyDeps</code></td>
+      <td>all</td>
+      <td>Returns compile-only dependency declarations (excluded from the runtime classpath).</td>
+     </tr>
+     <tr>
+      <td><code>repositories</code></td>
+      <td>all</td>
+      <td>Returns the effective list of Maven repositories (user-configured + defaults).</td>
+     </tr>
+     <tr>
+      <td><code>compileClasspath</code></td>
+      <td>all</td>
+      <td>Resolves and fetches all JARs needed for compilation. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>scalacPluginDeps</code></td>
+      <td>Scala</td>
+      <td>Returns Scalac plugin dependency declarations from <code>deder.pkl</code>.</td>
+     </tr>
+     <tr>
+      <td><code>scalacPlugins</code></td>
+      <td>Scala</td>
+      <td>Fetches the Scalac plugin JARs. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>javacAnnotationProcessorDeps</code></td>
+      <td>all</td>
+      <td>Returns annotation-processor dependency declarations from <code>deder.pkl</code>.</td>
+     </tr>
+     <tr>
+      <td><code>javacAnnotationProcessors</code></td>
+      <td>all</td>
+      <td>Fetches the annotation-processor JARs. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>compilerDeps</code></td>
+      <td>all</td>
+      <td>Returns the Scala compiler dependency coordinates for the configured <code>scalaVersion</code> (used by Scala-based tasks). Cached.</td>
+     </tr>
+    </tbody>
+   </table>
+   <hr>
+   <h2 id="verification">Verification<a href="#verification" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>test</code></td>
+      <td><code>JAVA_TEST</code>, <code>SCALA_TEST</code></td>
+      <td>Runs tests in a forked JVM. Supports test-suite and test-name filters as task arguments. Always runs.</td>
+     </tr>
+     <tr>
+      <td><code>testInMemory</code></td>
+      <td><code>JAVA_TEST</code>, <code>SCALA_TEST</code></td>
+      <td>Runs tests in the server's own JVM (no fork). Faster but shares the server classpath. Always runs.</td>
+     </tr>
+     <tr>
+      <td><code>testClasses</code></td>
+      <td><code>JAVA_TEST</code>, <code>SCALA_TEST</code>, <code>SCALA_JS_TEST</code>, <code>SCALA_NATIVE_TEST</code></td>
+      <td>Discovers test classes and test frameworks from the compiled classes. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>fix</code></td>
+      <td>Scala, Scala.js &amp; Scala Native (incl. test variants)</td>
+      <td>Runs Scalafix rewrites on source files. Always runs.</td>
+     </tr>
+     <tr>
+      <td><code>fixCheck</code></td>
+      <td>Scala, Scala.js &amp; Scala Native (incl. test variants)</td>
+      <td>Runs Scalafix in check-only mode (fails if rewrites would be needed). Always runs.</td>
+     </tr>
+    </tbody>
+   </table>
+   <p><strong>Test filtering examples:</strong></p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t test -m mymodule-test                 # all tests in module
+deder exec -t test -m mymodule-test com.example.%   # suites matching prefix
+deder exec -t test -m mymodule-test com.example.FooSuite#test1  # single test
+</code></pre>
+   <hr>
+   <h2 id="run">Run<a href="#run" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>run</code></td>
+      <td>all</td>
+      <td>Runs the module's configured (or auto-detected) main class in a forked process. Supports <code>--watch</code>. Always runs.</td>
+     </tr>
+     <tr>
+      <td><code>runMain</code></td>
+      <td>all</td>
+      <td>Runs an explicitly named main class. Pass the class name as the first task argument. Always runs.</td>
+     </tr>
+     <tr>
+      <td><code>runMvnApp</code></td>
+      <td>all</td>
+      <td>Runs a named Maven application entry point declared in <code>mvnApps</code> in <code>deder.pkl</code>. Built-in apps: <code>fmt</code> and <code>fmtCheck</code> (Scalafmt, Scala modules only). Always runs.</td>
+     </tr>
+     <tr>
+      <td><code>runClasspath</code></td>
+      <td>all</td>
+      <td>Resolves the full runtime classpath. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>mainClasses</code></td>
+      <td>all</td>
+      <td>Discovers all classes with a <code>main</code> method. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>mainClass</code></td>
+      <td>all</td>
+      <td>Returns the explicitly configured <code>mainClass</code> from <code>deder.pkl</code>.</td>
+     </tr>
+     <tr>
+      <td><code>finalMainClass</code></td>
+      <td>all</td>
+      <td>Returns the resolved main class: explicit config wins, falls back to the single discovered main. Cached.</td>
+     </tr>
+    </tbody>
+   </table>
+   <p><strong>Examples:</strong></p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t run -m myapp
+deder exec -t run -m myapp --watch
+deder exec -t runMain -m myapp com.example.AltMain
+deder exec -t runMvnApp -m myapp fmt      # format with Scalafmt
+deder exec -t runMvnApp -m myapp fmtCheck # check formatting
+</code></pre>
+   <hr>
+   <h2 id="publishing">Publishing<a href="#publishing" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Publishing tasks build JARs, assemble uber-JARs, and publish Maven artifacts.</p>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>jar</code></td>
+      <td>all</td>
+      <td>Builds a regular module JAR (compiled classes + resources + manifest). Cached.</td>
+     </tr>
+     <tr>
+      <td><code>allJars</code></td>
+      <td>all</td>
+      <td>Collects the JARs from this module and all its transitive module dependencies. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>assemblyDeps</code></td>
+      <td><code>JAVA</code>, <code>JAVA_TEST</code>, <code>SCALA</code>, <code>SCALA_TEST</code></td>
+      <td>Resolves and merges all dependency JARs into a single fat dependency JAR consumed by <code>assembly</code>. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>assembly</code></td>
+      <td><code>JAVA</code>, <code>JAVA_TEST</code>, <code>SCALA</code>, <code>SCALA_TEST</code></td>
+      <td>Builds an uber-JAR (all classes + all dependency JARs merged). Optionally applies jarjar shading rules. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>moduleDepsPomSettings</code></td>
+      <td>all</td>
+      <td>Collects POM settings from this module and its direct module dependencies, used when generating the POM for publishing. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>sourcesJar</code></td>
+      <td>all</td>
+      <td>Builds a <code>-sources.jar</code>. Only produced when <code>pomSettings</code> is configured. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>javadocJar</code></td>
+      <td>all</td>
+      <td>Builds a <code>-javadoc.jar</code>. Only produced when <code>pomSettings</code> is configured. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>publishArtifacts</code></td>
+      <td>all</td>
+      <td>Assembles all artifacts (JAR, sources JAR, Javadoc JAR, POM XML) into a staging directory ready for publishing. Only produces output when <code>pomSettings</code> is configured. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>version</code></td>
+      <td>all</td>
+      <td>Returns the resolved module version: <code>pomSettings.version</code> if set, otherwise auto-detected from git tags (SemVer). Always runs.</td>
+     </tr>
+     <tr>
+      <td><code>finalManifest</code></td>
+      <td>all</td>
+      <td>Merges <code>manifest</code> config with the resolved main class and version. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>publishLocal</code></td>
+      <td>all</td>
+      <td>Publishes the module to the local Maven repository (<code>~/.m2/repository</code>) or configured <code>publishLocalTo</code> path. Requires <code>publish = true</code> in <code>deder.pkl</code>. Always runs.</td>
+     </tr>
+     <tr>
+      <td><code>publish</code></td>
+      <td>all</td>
+      <td>Publishes the module to a remote Maven repository. Requires publish credentials (<code>publishTo</code>) in config/credentials. Always runs.</td>
+     </tr>
+    </tbody>
+   </table>
+   <p><strong>Examples:</strong></p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t assembly -m myapp
+java -jar .deder/out/myapp/assembly/out.jar
+
+deder exec -t publishLocal -m mylib
+deder exec -t publish -m mylib
+</code></pre>
+   <blockquote>
+    <p>For jar shading (<code>assembly</code> only), set <code>shadeRulesFile</code> on the module in <code>deder.pkl</code> to point to a jarjar rules file.</p>
+   </blockquote>
+   <hr>
+   <h2 id="repl">REPL<a href="#repl" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>replDeps</code></td>
+      <td>all</td>
+      <td>Returns the Scala REPL/compiler dependency coordinates for the configured <code>scalaVersion</code>. Returns an empty list for non-Scala modules. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>replJars</code></td>
+      <td>all</td>
+      <td>Fetches the JAR files listed in <code>replDeps</code>. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>repl</code></td>
+      <td><code>JAVA</code>, <code>JAVA_TEST</code>, <code>SCALA</code>, <code>SCALA_TEST</code></td>
+      <td>Starts an interactive REPL with the module's runtime classpath. Scala modules get a Scala REPL; Java modules get <code>jshell</code>. Always runs.</td>
+     </tr>
+    </tbody>
+   </table>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t repl -m mymodule
+</code></pre>
+   <hr>
+   <h2 id="scalajs">Scala.js<a href="#scalajs" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>All tasks in this section apply to modules of type <code>SCALA_JS</code> or <code>SCALA_JS_TEST</code>.</p>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>fastLinkJs</code></td>
+      <td><code>SCALA_JS</code>, <code>SCALA_JS_TEST</code></td>
+      <td>Links JS in fast/development mode (no full optimisation). Cached.</td>
+     </tr>
+     <tr>
+      <td><code>fullLinkJs</code></td>
+      <td><code>SCALA_JS</code>, <code>SCALA_JS_TEST</code></td>
+      <td>Links JS with full optimisation (production mode). Cached.</td>
+     </tr>
+     <tr>
+      <td><code>linkJs</code></td>
+      <td><code>SCALA_JS</code>, <code>SCALA_JS_TEST</code></td>
+      <td>Links JS with the mode configured in <code>deder.pkl</code> (delegates to <code>fastLinkJs</code> or <code>fullLinkJs</code>). Cached.</td>
+     </tr>
+     <tr>
+      <td><code>runJs</code></td>
+      <td><code>SCALA_JS</code></td>
+      <td>Runs the linked JS output with Node.js. Always runs.</td>
+     </tr>
+     <tr>
+      <td><code>test</code></td>
+      <td><code>SCALA_JS_TEST</code></td>
+      <td>Runs Scala.js tests via Node.js. Always runs.</td>
+     </tr>
+    </tbody>
+   </table>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t fastLinkJs -m myjsmodule
+deder exec -t runJs -m myjsmodule
+deder exec -t test -m myjsmodule-test
+</code></pre>
+   <hr>
+   <h2 id="scala-native">Scala Native<a href="#scala-native" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>All tasks in this section apply to modules of type <code>SCALA_NATIVE</code> or <code>SCALA_NATIVE_TEST</code>.</p>
+   <blockquote>
+    <p><strong>Note:</strong> <code>fastNativeLink</code>, <code>fullNativeLink</code>, and <code>runNative</code> have no category in source and appear under <strong>Other</strong> in <code>deder tasks</code> output; they are listed in the <a href="#other">Other</a> section below.</p>
+   </blockquote>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>nativeLink</code></td>
+      <td><code>SCALA_NATIVE</code>, <code>SCALA_NATIVE_TEST</code></td>
+      <td>Links a native binary with the mode configured in <code>deder.pkl</code>. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>test</code></td>
+      <td><code>SCALA_NATIVE_TEST</code></td>
+      <td>Runs Scala Native tests. Always runs.</td>
+     </tr>
+    </tbody>
+   </table>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t nativeLink -m mynativemodule       # mode from config
+deder exec -t test -m mynativemodule-test
+</code></pre>
+   <hr>
+   <h2 id="graalvm">GraalVM<a href="#graalvm" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>GraalVM tasks apply to <code>JAVA</code> and <code>SCALA</code> modules that have a <code>graalvm { }</code> block in <code>deder.pkl</code>.</p>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>graalvmHome</code></td>
+      <td><code>JAVA</code>, <code>SCALA</code></td>
+      <td>Returns the GraalVM installation path (<code>graalvm.graalvmHome</code> in config, or <code>$GRAALVM_HOME</code> env var).</td>
+     </tr>
+     <tr>
+      <td><code>nativeImageOptions</code></td>
+      <td><code>JAVA</code>, <code>SCALA</code></td>
+      <td>Returns the extra <code>native-image</code> CLI flags from <code>graalvm.nativeImageOptions</code> in <code>deder.pkl</code>.</td>
+     </tr>
+     <tr>
+      <td><code>nativeIncludedResourcesOptions</code></td>
+      <td><code>JAVA</code>, <code>SCALA</code></td>
+      <td>Scans the module's resource directories and returns the <code>-H:IncludeResources=…</code> option for <code>native-image</code>. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>graalvmReachabilityMetadataOptions</code></td>
+      <td><code>JAVA</code>, <code>SCALA</code></td>
+      <td>Downloads the GraalVM reachability-metadata archive and returns the <code>-H:ConfigurationFileDirectories=…</code> flags for matching dependencies. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>graalvmNativeImage</code></td>
+      <td><code>JAVA</code>, <code>SCALA</code></td>
+      <td>Compiles the module to a native executable using <code>native-image</code>. Downloads and applies GraalVM reachability metadata automatically. Cached.</td>
+     </tr>
+    </tbody>
+   </table>
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t graalvmNativeImage -m myapp
+.deder/out/myapp/graalvmNativeImage/native-executable
+</code></pre>
+   <blockquote>
+    <p>Add a <code>graalvm { }</code> block to the module in <code>deder.pkl</code> with at minimum <code>graalvmHome</code> (or set the <code>$GRAALVM_HOME</code> environment variable) to enable these tasks.</p>
+   </blockquote>
+   <hr>
+   <h2 id="other">Other<a href="#other" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>These tasks have no category assigned in source and therefore appear under <strong>Other</strong> in <code>deder tasks</code> output.</p>
+   <table>
+    <thead>
+     <tr>
+      <th>Task</th>
+      <th>Module types</th>
+      <th>What it does</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>manifest</code></td>
+      <td>all</td>
+      <td>Returns the <code>manifest</code> settings from <code>deder.pkl</code>.</td>
+     </tr>
+     <tr>
+      <td><code>pomSettings</code></td>
+      <td>all</td>
+      <td>Returns the resolved POM settings (group ID, artifact ID with Scala suffix, version).</td>
+     </tr>
+     <tr>
+      <td><code>fastNativeLink</code></td>
+      <td><code>SCALA_NATIVE</code>, <code>SCALA_NATIVE_TEST</code></td>
+      <td>Links a native binary in fast/debug mode. Cached.</td>
+     </tr>
+     <tr>
+      <td><code>fullNativeLink</code></td>
+      <td><code>SCALA_NATIVE</code>, <code>SCALA_NATIVE_TEST</code></td>
+      <td>Links a native binary with full optimisation (release mode). Cached.</td>
+     </tr>
+     <tr>
+      <td><code>runNative</code></td>
+      <td><code>SCALA_NATIVE</code></td>
+      <td>Runs the fast-linked native binary. Always runs.</td>
+     </tr>
+    </tbody>
+   </table>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/reference/repositories.html">⬅️ Repositories</a> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/testing.html">Testing ➡️</a>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>

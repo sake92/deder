@@ -71,6 +71,11 @@
     <li>Maven Central.</li>
     <li>The local Ivy2 cache (<code>~/.ivy2/local</code>).</li>
    </ol>
+   <p>For a full local-publish flow, see:</p>
+   <ul>
+    <li><a href="https://sake92.github.io/deder/tutorials/publishing.html#publish-to-local-maven-repository">Publishing Tutorial</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/dependencies.html#using-dependencies-from-publishlocal">Dependencies how-to</a></li>
+   </ul>
    <p>"Custom first" means lookups for internal artifacts resolve against your Nexus before Deder hits Maven Central — faster on a LAN, no 404 noise, no leaking internal <code>groupId</code>s to the public repo.</p>
    <h2 id="disabling-default-repositories">Disabling default repositories<a href="#disabling-default-repositories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>For air-gapped or strict-internal-only setups, turn off the defaults:</p>
@@ -81,6 +86,13 @@
 includeDefaultRepos = false
 </code></pre>
    <p>Deder will refuse to load the project if <code>includeDefaultRepos = false</code> and <code>repositories</code> is empty.</p>
+   <p>If you disable defaults and still want to consume artifacts from <code>publishLocal</code>, add your local Maven repo explicitly:</p>
+   <pre><code class="language-pkl">repositories {
+  new MavenRepository { url = "file:///home/your-user/.m2/repository" }
+}
+
+includeDefaultRepos = false
+</code></pre>
    <h2 id="local-directories">Local directories<a href="#local-directories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Use a <code>file://</code> URL with a Maven-layout directory:</p>
    <pre><code class="language-pkl">repositories {
@@ -95,7 +107,7 @@ includeDefaultRepos = false
    </ul>
    <p>See <a href="https://get-coursier.io/docs/other-credentials">Coursier's credentials documentation</a> for syntax.</p>
    <div role="group">
-    <a role="button" href="https://sake92.github.io/deder/reference/server-properties.html">⬅️ Server Properties</a> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/testing.html">Testing ➡️</a>
+    <a role="button" href="https://sake92.github.io/deder/reference/server-properties.html">⬅️ Server Properties</a> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/tasks.html">Tasks ➡️</a>
    </div>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>

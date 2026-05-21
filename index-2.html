@@ -57,19 +57,18 @@
     <div></div>
    </div>
    <h1 id="deder">Deder<a href="#deder" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <p>Deder is a config-based, concurrent-first, client-server build tool for JVM projects (Java and Scala).
-    <br>
-    It uses <a href="https://pkl-lang.org/">Pkl</a> for configuration, providing type safety, IDE support, and powerful abstraction capabilities.</p>
+   <p>Deder is a config-based, concurrent-first, client-server build tool for JVM projects (Java and Scala). It uses <a href="https://pkl-lang.org/">Pkl</a> for configuration, providing type safety, IDE support, and powerful abstraction capabilities.</p>
+   <blockquote>
+    <p><strong>New here?</strong> Start with the <a href="https://sake92.github.io/deder/tutorials/installation.html">Installation</a> tutorial, then follow the <a href="https://sake92.github.io/deder/tutorials/quickstart.html">Quickstart</a>. Already set up? Browse the <a href="https://sake92.github.io/deder/reference/cheatsheet.html">Cheatsheet</a> for a quick command reference.</p>
+   </blockquote>
    <h2 id="key-concepts">Key Concepts<a href="#key-concepts" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p><strong>Project</strong> is the root directory where your build configuration lives (usually the git repo root).</p>
    <p><strong>Modules</strong> are subprojects within your project (like <code>common</code>, <code>frontend</code>, <code>backend</code>, etc.). They can depend on each other, forming a directed acyclic graph (DAG).</p>
-   <p><strong>Tasks</strong> are operations that can be performed on modules (like <code>compile</code>, <code>run</code>, <code>test</code>). Each module type has a predefined set of tasks available.
-    <br>
-    They also form a directed acyclic graph (DAG).</p>
+   <p><strong>Tasks</strong> are operations that can be performed on modules (like <code>compile</code>, <code>run</code>, <code>test</code>). Each module type has a predefined set of tasks available. They also form a directed acyclic graph (DAG).</p>
    <h2 id="site-map">Site Map<a href="#site-map" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <ul>
     <li>
-     <p><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></p>
+     <p><a href="https://sake92.github.io/deder/tutorials">Tutorials</a> — step-by-step guides to get things working</p>
      <ul>
       <li><a href="https://sake92.github.io/deder/tutorials/installation.html">Installation</a></li>
       <li><a href="https://sake92.github.io/deder/tutorials/quickstart.html">Quickstart</a></li>
@@ -81,16 +80,17 @@
      </ul>
     </li>
     <li>
-     <p><a href="https://sake92.github.io/deder/howtos">How Tos</a></p>
+     <p><a href="https://sake92.github.io/deder/howtos">How Tos</a> — goal-oriented recipes for specific tasks</p>
      <ul>
       <li><a href="https://sake92.github.io/deder/howtos/dependencies.html">Adding dependencies</a></li>
       <li><a href="https://sake92.github.io/deder/howtos/env-vars.html">Environment variables and JVM options</a></li>
       <li><a href="https://sake92.github.io/deder/howtos/mvn-apps.html">Invoking Maven applications</a></li>
       <li><a href="https://sake92.github.io/deder/howtos/otel.html">OTEL tracing/logging/metrics</a></li>
+      <li><a href="https://sake92.github.io/deder/howtos/plugins.html">Plugins</a></li>
      </ul>
     </li>
     <li>
-     <p><a href="https://sake92.github.io/deder/reference">Reference</a></p>
+     <p><a href="https://sake92.github.io/deder/reference">Reference</a> — complete descriptions of commands, config, and built-in tasks</p>
      <ul>
       <li><a href="https://sake92.github.io/deder/reference/cheatsheet.html">Cheatsheet</a></li>
       <li><a href="https://sake92.github.io/deder/reference/architecture.html">Architecture</a></li>
@@ -98,11 +98,12 @@
       <li><a href="https://sake92.github.io/deder/reference/files-layout.html">Files layout</a></li>
       <li><a href="https://sake92.github.io/deder/reference/server-properties.html">Server Properties</a></li>
       <li><a href="https://sake92.github.io/deder/reference/repositories.html">Repositories</a></li>
+      <li><a href="https://sake92.github.io/deder/reference/tasks.html">Tasks</a></li>
       <li><a href="https://sake92.github.io/deder/reference/testing.html">Testing</a></li>
      </ul>
     </li>
     <li>
-     <p><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></p>
+     <p><a href="https://sake92.github.io/deder/philosophy">Philosophy</a> — design rationale and background reading</p>
      <ul>
       <li><a href="https://sake92.github.io/deder/philosophy/design.html">Design Philosophy</a></li>
       <li><a href="https://sake92.github.io/deder/philosophy/why-pkl.html">Why Pkl?</a></li>
