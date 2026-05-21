@@ -55,9 +55,6 @@
     <div></div>
    </div>
    <h1 id="cheatsheet">Cheatsheet<a href="#cheatsheet" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <blockquote>
-    <p>For the full task inventory with descriptions, see the <a href="https://sake92.github.io/deder/reference/tasks.html">Task Reference</a>.</p>
-   </blockquote>
    <pre><code class="language-shell hljs" data-highlighted="yes">deder version
 <span class="hljs-meta prompt_">
 # </span><span class="language-bash">shutdown server</span>
@@ -142,8 +139,8 @@ deder exec -t fix
 deder exec -t fixCheck
 <span class="hljs-meta prompt_">
 # </span><span class="language-bash">format with scalafmt</span>
-deder exec -t runMvnApp -m mymodule fmt
-deder exec -t runMvnApp -m mymodule fmtCheck
+deder exec -t runMvnApp fmt
+deder exec -t runMvnApp fmtCheck
 </code></pre>
    <h2 id="custom-repositories">Custom repositories<a href="#custom-repositories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Declare extra Maven repositories in <code>deder.pkl</code>:</p>

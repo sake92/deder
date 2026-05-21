@@ -51,17 +51,19 @@
     <div></div>
    </div>
    <h1 id="server-properties-file">Server Properties File<a href="#server-properties-file" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <p>You can use <code>.deder/server.properties</code> to specify server properties when the client starts it. Example:</p>
-   <pre><code class="language-properties hljs" data-highlighted="yes"><span class="hljs-attr">localPath</span>=<span class="hljs-string">myprojects/deder/.deder/out/server/assembly/out.jar</span>
+   <p>You can use <code>.deder/server.properties</code> file to specify the server properties when client starts it.
+    <br>
+    Example</p>
+   <pre><code class="language-properties hljs" data-highlighted="yes"><span class="hljs-attr">localPath</span>=<span class="hljs-string">myprojects/deder/out/server/assembly.dest/out.jar</span>
 <span class="hljs-attr">workerThreads</span>=<span class="hljs-string">32</span>
 <span class="hljs-attr">logLevel</span>=<span class="hljs-string">debug</span>
 <span class="hljs-attr">JAVA_OPTS</span>=<span class="hljs-string">-javaagent:otel.jar -Dotel.service.name=my-project -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317</span>
 </code></pre>
-   <p>If you make changes to it, make sure you restart the server manually:</p>
+   <p>If you make changes to it, make sure you restart server manually:</p>
    <pre><code class="language-shell hljs" data-highlighted="yes">deder shutdown
-deder version
+deder
 </code></pre>
-   <p>Available properties:</p>
+   <p>Availabel properties:</p>
    <ul>
     <li><code>logLevel</code> - log level used for server log at <code>.deder/logs/server.log</code>, one of <code>ERROR</code>, <code>WARNING</code>, <code>INFO</code>, <code>DEBUG</code>, <code>TRACE</code></li>
     <li><code>workerThreads</code> - number of threads to use for executing tasks</li>
