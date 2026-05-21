@@ -495,7 +495,17 @@ object DederPklRenderer {
       val scalacOptDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.scalacOptions }
       val javacOptDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.javacOptions }
       val depsDeltas: Map[String, Seq[DepDef]] = rawDeltas.map { (v, d) => v -> d.deps }
-      val pluginDepsDeltas: Map[String, Seq[DepDef]] = rawDeltas.map { (v, d) => v -> d.scalacPluginDeps }
+      val pluginDiffedSlices = slices.map { slice =>
+        val diffedModules = slice.modulesByPlatform.map { (platform, module) =>
+          platform -> module.copy(
+            scalacPluginDeps = diffTemplatePluginDeps(module.scalacPluginDeps, g, slice.scalaVersion)
+          )
+        }
+        slice.copy(modulesByPlatform = diffedModules)
+      }
+      val pluginDiffedCommon = computeCommonProps(pluginDiffedSlices)
+      val pluginDepsDeltas: Map[String, Seq[DepDef]] =
+        computeVersionDeltas(pluginDiffedSlices, pluginDiffedCommon).map { (v, d) => v -> d.scalacPluginDeps }
       val srcDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.sources }
       val resDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.resources }
       val modDepDeltas: Map[String, Seq[ModuleDepRef]] = rawDeltas.map { (v, d) => v -> d.moduleDeps }
@@ -552,15 +562,8 @@ object DederPklRenderer {
         if (common.deps.nonEmpty || depsDeltas.values.exists(_.nonEmpty))
           Some(renderDepsWithWhens(common.deps, depsDeltas, indent = 4))
         else None,
-        if (
-          !suppressPluginDepsDeltas(
-            common.scalacPluginDeps,
-            pluginDepsDeltas,
-            g,
-            slices.exists(_.scalaVersion.startsWith("2"))
-          ) && (common.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty))
-        )
-          Some(renderPluginDepsWithWhens(common.scalacPluginDeps, pluginDepsDeltas, indent = 4))
+        if (pluginDiffedCommon.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty))
+          Some(renderPluginDepsWithWhens(pluginDiffedCommon.scalacPluginDeps, pluginDepsDeltas, indent = 4))
         else None,
         if (common.sources.nonEmpty || srcDeltas.values.exists(_.nonEmpty))
           Some(renderStringListWithWhens("sources", common.sources, srcDeltas, indent = 4))
@@ -897,8 +900,7 @@ object DederPklRenderer {
       Some(renderSourceDirs(m.sources, indent = 4)).filter(_.nonEmpty),
       Some(renderResourceDirs(m.resources, indent = 4)).filter(_.nonEmpty),
       Some(renderDeps(m.deps, indent = 4)).filter(_.nonEmpty),
-      if (suppressPluginDeps(m.scalacPluginDeps, g, m.scalaVersion)) None
-      else Some(renderPluginDeps(m.scalacPluginDeps, indent = 4)).filter(_.nonEmpty),
+      Some(renderPluginDeps(diffTemplatePluginDeps(m.scalacPluginDeps, g, m.scalaVersion), indent = 4)).filter(_.nonEmpty),
       Some(renderModuleDepsPkl(m.moduleDeps, indent = 4, scalaVersionCtx, groupLookup)).filter(_.nonEmpty),
       m.publish.map(p => renderPublishInfo(p, indent = 4, useBase = hasSharedPomBase)).filter(_.nonEmpty)
     ).flatten.mkString("\n")
@@ -960,10 +962,13 @@ object DederPklRenderer {
     val testDepsStr =
       if (jvmModule.testDeps.nonEmpty) renderDeps(jvmModule.testDeps, indent = 6)
       else """    deps { "org.scalameta::munit:1.2.1" }"""
+    val testPluginDeps = diffTemplatePluginDeps(jvmModule.scalacPluginDeps, g, jvmModule.scalaVersion)
+    val testPluginDepsStr = renderPluginDeps(testPluginDeps, indent = 6)
     s"""  testTemplate = ($amendExpr) {
        |$scalaVersionLine
        |$testModuleDepsStr
        |$testDepsStr
+       |$testPluginDepsStr
        |  }""".stripMargin
   }
 
@@ -1010,28 +1015,17 @@ object DederPklRenderer {
       opts.forall(javacDefaults.contains) &&
       deltas.values.forall(_.forall(javacDefaults.contains))
 
-  /** Suppress scalacPluginDeps when the typelevel template already provides them. */
+  /** Typelevel Scala 2 templates already define these plugins. */
   private val pluginDefaults = Set(
     "com.olegpy" -> "better-monadic-for",
     "org.typelevel" -> "kind-projector"
   )
-  private def suppressPluginDeps(deps: Seq[DepDef], g: ModuleGroup, scalaVersion: String): Boolean = {
-    if (!g.usesTypelevel) return false
-    if (deps.isEmpty) return false
-    if (scalaVersion.startsWith("3")) return false
-    deps.forall(d => pluginDefaults.contains(d.organization -> d.name))
-  }
-  private def suppressPluginDepsDeltas(
-      deps: Seq[DepDef],
-      deltas: Map[String, Seq[DepDef]],
-      g: ModuleGroup,
-      hasScala2: Boolean
-  ): Boolean = {
-    if (!g.usesTypelevel) return false
-    if (deps.isEmpty && deltas.values.forall(_.isEmpty)) return false
-    if (!hasScala2) return false
-    deps.forall(d => pluginDefaults.contains(d.organization -> d.name)) &&
-    deltas.values.forall(_.forall(d => pluginDefaults.contains(d.organization -> d.name)))
+  private def templateProvidedPluginCoords(g: ModuleGroup, scalaVersion: String): Set[(String, String)] =
+    if (g.usesTypelevel && scalaVersion.startsWith("2")) pluginDefaults else Set.empty
+
+  private def diffTemplatePluginDeps(deps: Seq[DepDef], g: ModuleGroup, scalaVersion: String): Seq[DepDef] = {
+    val templatePlugins = templateProvidedPluginCoords(g, scalaVersion)
+    deps.filterNot(d => templatePlugins.contains(d.organization -> d.name))
   }
 
   private def renderJavacOptions(opts: Seq[String], indent: Int): String = {

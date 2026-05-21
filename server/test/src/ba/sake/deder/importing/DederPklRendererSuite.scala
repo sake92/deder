@@ -245,12 +245,24 @@ class DederPklRendererSuite extends FunSuite {
     assert(!test.deps.asScala.toSeq.contains("org.jsoup:jsoup:1.21.1"))
   }
 
-  test("compiler plugin deps appear in scalacPluginDeps on main module only") {
+  test("compiler plugin deps appear in scalacPluginDeps on both main and test modules") {
     val pluginD = dep("org.wartremover", "wartremover", "3.5.0", crossVersion = "full")
     val mod = emptyModule(scalacPluginDeps = Seq(pluginD))
     val build = singleModuleBuild(jvmMod = mod)
     val main = scalaMod(findModule("myapp", renderedModules(build)))
+    val test = scalaMod(findModule("myapp-test", renderedModules(build)))
     assert(main.scalacPluginDeps.asScala.toSeq.contains("org.wartremover:::wartremover:3.5.0"))
+    assert(test.scalacPluginDeps.asScala.toSeq.contains("org.wartremover:::wartremover:3.5.0"))
+  }
+
+  test("regular test template explicitly emits compiler plugin deps") {
+    val pluginD = dep("org.wartremover", "wartremover", "3.5.0", crossVersion = "full")
+    val mod = emptyModule(scalacPluginDeps = Seq(pluginD))
+    val build = singleModuleBuild(jvmMod = mod)
+
+    val rendered = DederPklRenderer.render(build)
+    assert(rendered.contains("""testTemplate = (template.asTest()) {"""))
+    assertEquals("scalacPluginDeps \\{".r.findAllIn(rendered).length, 2)
   }
 
   test("test deps appear on test module only") {
@@ -607,6 +619,127 @@ class DederPklRendererSuite extends FunSuite {
     assert(!rendered.contains("""DederTypelevel.nativeForVersion(sv, scalaNativeVersion = "0.5.10")"""))
     assert(!rendered.contains("""DederTypelevel.nativeTestForVersion(sv, scalaNativeVersion = "0.5.10")"""))
     assert(rendered.contains("""local const coreModules = coreScalaVersions"""))
+  }
+
+  test("typelevel templates keep compiler plugin deps on test modules") {
+    val pluginD = dep("org.wartremover", "wartremover", "3.5.0", crossVersion = "full")
+    val build = DederBuild(
+      moduleGroups = Seq(
+        ModuleGroup(
+          builderVarName = "core",
+          root = ".",
+          layout = DederProject.DirLayout.SBT,
+          crossScalaVersions = Seq.empty,
+          jvmModule = emptyModule(scalacPluginDeps = Seq(pluginD)),
+          jsModule = None,
+          nativeModule = None,
+          hasJsModule = false,
+          hasNativeModule = false,
+          usesTpolecat = false,
+          usesTypelevel = true
+        )
+      ),
+      repositories = Seq.empty
+    )
+
+    val modules = renderedModules(build)
+    val main = scalaMod(findModule("core", modules))
+    val test = scalaMod(findModule("core-test", modules))
+
+    assert(main.scalacPluginDeps.asScala.toSeq.contains("org.wartremover:::wartremover:3.5.0"))
+    assert(test.scalacPluginDeps.asScala.toSeq.contains("org.wartremover:::wartremover:3.5.0"))
+  }
+
+  test("tpolecat templates keep compiler plugin deps on test modules") {
+    val pluginD = dep("org.wartremover", "wartremover", "3.5.0", crossVersion = "full")
+    val build = DederBuild(
+      moduleGroups = Seq(
+        ModuleGroup(
+          builderVarName = "core",
+          root = ".",
+          layout = DederProject.DirLayout.SBT,
+          crossScalaVersions = Seq.empty,
+          jvmModule = emptyModule(scalacPluginDeps = Seq(pluginD)),
+          jsModule = None,
+          nativeModule = None,
+          hasJsModule = false,
+          hasNativeModule = false,
+          usesTpolecat = true,
+          usesTypelevel = false
+        )
+      ),
+      repositories = Seq.empty
+    )
+
+    val modules = renderedModules(build)
+    val main = scalaMod(findModule("core", modules))
+    val test = scalaMod(findModule("core-test", modules))
+
+    assert(main.scalacPluginDeps.asScala.toSeq.contains("org.wartremover:::wartremover:3.5.0"))
+    assert(test.scalacPluginDeps.asScala.toSeq.contains("org.wartremover:::wartremover:3.5.0"))
+  }
+
+  test("typelevel test template does not re-emit predefined scala2 plugins") {
+    val betterMonadicFor = dep("com.olegpy", "better-monadic-for", "0.3.1", crossVersion = "binary")
+    val kindProjector = dep("org.typelevel", "kind-projector", "0.13.3", crossVersion = "full")
+    val build = DederBuild(
+      moduleGroups = Seq(
+        ModuleGroup(
+          builderVarName = "core",
+          root = ".",
+          layout = DederProject.DirLayout.SBT,
+          crossScalaVersions = Seq.empty,
+          jvmModule = emptyModule(
+            scalaVersion = "2.13.15",
+            scalacPluginDeps = Seq(betterMonadicFor, kindProjector)
+          ),
+          jsModule = None,
+          nativeModule = None,
+          hasJsModule = false,
+          hasNativeModule = false,
+          usesTpolecat = false,
+          usesTypelevel = true
+        )
+      ),
+      repositories = Seq.empty
+    )
+
+    val rendered = DederPklRenderer.render(build)
+    assert(rendered.contains("""testTemplate = (DederTypelevel.typelevelScala213Test) {"""))
+    assert(!rendered.contains("""testTemplate = (DederTypelevel.typelevelScala213Test) {
+       |    scalaVersion = "2.13.15"
+       |    deps { "org.scalameta::munit:1.2.1" }
+       |    scalacPluginDeps {""".stripMargin))
+  }
+
+  test("typelevel emits only plugins missing from template defaults") {
+    val defaultPlugin = dep("org.typelevel", "kind-projector", "0.13.3", crossVersion = "full")
+    val missingPlugin = dep("org.wartremover", "wartremover", "3.5.0", crossVersion = "full")
+    val build = DederBuild(
+      moduleGroups = Seq(
+        ModuleGroup(
+          builderVarName = "core",
+          root = ".",
+          layout = DederProject.DirLayout.SBT,
+          crossScalaVersions = Seq.empty,
+          jvmModule = emptyModule(
+            scalaVersion = "2.13.15",
+            scalacPluginDeps = Seq(defaultPlugin, missingPlugin)
+          ),
+          jsModule = None,
+          nativeModule = None,
+          hasJsModule = false,
+          hasNativeModule = false,
+          usesTpolecat = false,
+          usesTypelevel = true
+        )
+      ),
+      repositories = Seq.empty
+    )
+
+    val rendered = DederPklRenderer.render(build)
+    assert(rendered.contains("org.wartremover:::wartremover:3.5.0"))
+    assert(!rendered.contains("org.typelevel:::kind-projector:0.13.3"))
   }
 
   // ---- basePomSettings ----
