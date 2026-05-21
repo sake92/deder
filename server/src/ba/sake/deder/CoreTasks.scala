@@ -77,9 +77,9 @@ class CoreTasks() extends StrictLogging {
     )
     .build { ctx => ctx.out }
 
-  /** Aggregates per-module source-generator output dirs (TaskKind.SourceGenerator).
-   *  Plugin-contributed source generators are picked up automatically.
-   */
+  /** Aggregates per-module source-generator output dirs (TaskKind.SourceGenerator). Plugin-contributed source
+    * generators are picked up automatically.
+    */
   val allGeneratedSourcesTask = FanInTask[os.Path](
     name = "allGeneratedSources",
     collectKind = TaskKind.SourceGenerator,
@@ -98,14 +98,17 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(allGeneratedSourcesTask)
     .build { ctx =>
       val dirs = ctx.depResults._1
-      dirs.flatMap { d =>
-        if os.exists(d) then
-          os.walk(
-            d,
-            skip = p => os.isFile(p) && !(p.ext == "scala" || p.ext == "java")
-          ).filter(os.isFile)
-        else Seq.empty
-      }.map(DederPath(_)).sortBy(_.path.toString)
+      dirs
+        .flatMap { d =>
+          if os.exists(d) then
+            os.walk(
+              d,
+              skip = p => os.isFile(p) && !(p.ext == "scala" || p.ext == "java")
+            ).filter(os.isFile)
+          else Seq.empty
+        }
+        .map(DederPath(_))
+        .sortBy(_.path.toString)
     }
 
   /** Aggregates per-module resource-generator output dirs (TaskKind.ResourceGenerator). */
@@ -205,10 +208,8 @@ class CoreTasks() extends StrictLogging {
       val repoList = Seq.newBuilder[String]
       repoList ++= userRepos
       if includeDefaults then
-        if userRepos.nonEmpty then
-          repoList += "Maven Central + Ivy2 local (defaults)"
-        else
-          repoList += "Maven Central + Ivy2 local (defaults, no custom repos configured)"
+        if userRepos.nonEmpty then repoList += "Maven Central + Ivy2 local (defaults)"
+        else repoList += "Maven Central + Ivy2 local (defaults, no custom repos configured)"
       repoList.result()
     },
     category = "Dependencies"
@@ -593,14 +594,25 @@ class CoreTasks() extends StrictLogging {
         allDeps.map(d => Dependency.make(d, scalaVersion)),
         Some(ctx.notifications)
       )
-      // Only pass JARs that are actual compiler plugins (contain plugin.properties).
+      // Only pass JARs that are actual compiler plugins,
+      // contain scalac-plugin.xml (scala2) or plugin.properties (scala3)
       // Coursier resolves transitive deps regardless; this filters them out.
       allJars.filter { jar =>
-        scala.util.Try {
-          val zf = new java.util.zip.ZipFile(jar.toIO)
-          try zf.getEntry("plugin.properties") != null
-          finally zf.close()
-        }.getOrElse(false)
+        val zf = new java.util.zip.ZipFile(jar.toIO)
+        val res =
+          try zf.getEntry("scalac-plugin.xml") != null || zf.getEntry("plugin.properties") != null
+          catch {
+            case _: java.util.zip.ZipException =>
+              logger.warn(
+                s"Failed to read JAR file ${jar.toString} as zip, skipping scalac plugin detection for this file"
+              )
+              false
+          } finally zf.close()
+        if !res then
+          logger.warn(
+            s"JAR file ${jar.toString} does not appear to be a scalac plugin (missing scalac-plugin.xml or plugin.properties), skipping"
+          )
+        res
       }
     }
 
@@ -696,9 +708,9 @@ class CoreTasks() extends StrictLogging {
       val classesDir = ctx.out / os.up / "classes"
 
       // fetch compileOnly deps and add them to the compile classpath
-      val compileOnlyJars = if compileOnlyDeps.nonEmpty then
-        ctx.dependencyResolver.fetchFiles(compileOnlyDeps, Some(ctx.notifications))
-      else Seq.empty
+      val compileOnlyJars =
+        if compileOnlyDeps.nonEmpty then ctx.dependencyResolver.fetchFiles(compileOnlyDeps, Some(ctx.notifications))
+        else Seq.empty
       val fullCompileClasspath = (compileClasspath ++ compileOnlyJars).distinct
 
       JdkUtils.checkCompat(JdkUtils.getVersion(scala.util.Properties.javaSpecVersion), scalaVersion)
@@ -770,11 +782,12 @@ class CoreTasks() extends StrictLogging {
           .map(p => s"-Xplugin:${p.toString}") ++ platformSpecificScalacOptions ++ semanticDbScalacOpts
 
       val compileOrder = (ctx.module: @unchecked) match {
-        case m: JavaModule => m.compileOrder match {
-          case ConfigCompileOrder.JAVA_THEN_SCALA => CompileOrder.JavaThenScala
-          case ConfigCompileOrder.SCALA_THEN_JAVA => CompileOrder.ScalaThenJava
-          case ConfigCompileOrder.MIXED          => CompileOrder.Mixed
-        }
+        case m: JavaModule =>
+          m.compileOrder match {
+            case ConfigCompileOrder.JAVA_THEN_SCALA => CompileOrder.JavaThenScala
+            case ConfigCompileOrder.SCALA_THEN_JAVA => CompileOrder.ScalaThenJava
+            case ConfigCompileOrder.MIXED           => CompileOrder.Mixed
+          }
       }
 
       ZincCompilersCache
@@ -1147,7 +1160,9 @@ class CoreTasks() extends StrictLogging {
             testParallelism = testParallelism,
             maxTestForks = maxTestForks
           )
-          JUnitXmlReportWriter.outputDir(ctx.module, forkedRun.runDir).foreach(JUnitXmlReportWriter.writeReports(forkedRun.results, _))
+          JUnitXmlReportWriter
+            .outputDir(ctx.module, forkedRun.runDir)
+            .foreach(JUnitXmlReportWriter.writeReports(forkedRun.results, _))
           forkedRun.results
         }
       },
@@ -1204,10 +1219,8 @@ class CoreTasks() extends StrictLogging {
           if scalaVersion.startsWith("3.") then
             // scala3-repl is a separate artifact only from 3.8+; older 3.x include the REPL in scala3-compiler
             val minorVersion = scalaVersion.split("\\.").lift(1).flatMap(_.toIntOption).getOrElse(0)
-            if minorVersion >= 8 then
-              Seq(Dependency.make(s"org.scala-lang::scala3-repl:${scalaVersion}", scalaVersion))
-            else
-              Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion))
+            if minorVersion >= 8 then Seq(Dependency.make(s"org.scala-lang::scala3-repl:${scalaVersion}", scalaVersion))
+            else Seq(Dependency.make(s"org.scala-lang::scala3-compiler:${scalaVersion}", scalaVersion))
           else
             Seq(
               Dependency.make(s"org.scala-lang:scala-compiler:${scalaVersion}", scalaVersion),
