@@ -4,7 +4,7 @@
 
 Config based, concurrent-first, client-server JVM build tool.
 
-:construction: Work in progress, expect rough edges and breaking changes.  
+:construction: Work in progress, expect rough edges and breaking changes.
 
 Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 
@@ -33,13 +33,13 @@ Deder is used in some of my OSS projects:
 - *module* is a "subproject", like `common`/`frontend`/`app`..
 - *task* is something you can run on a module, like `compile`/`test`/`run`/`assembly`..
 
-The [examples](examples) folder has working projects that show you how to use Deder to build, cross-build, test, publish, use ScalaJS and ScalaNative etc.
+The [examples](examples) folder has working projects that show you how to use Deder to build, cross-build, test, publish, and use Scala.js / Scala Native.
 
 ## Installation
 
 Deder needs JDK 21+.
 
-### MacOS and Linux (Homebrew)
+### macOS and Linux (Homebrew)
 
 ```shell
 brew tap sake92/tap
@@ -56,102 +56,26 @@ scoop install deder
 ### Manual installation
 
 1. download `deder-client.jar` (or a native version) from [early release](https://github.com/sake92/deder/releases/tag/early-access)
-1. rename it to just `deder` 
+1. rename it to just `deder`
 1. do `chmod +x deder`
 1. put it in `PATH`
 
 
-## Example commands
+## Common commands
 
 ```shell
-################ basic commands
-# prints help
-deder
-
-# prints version
-deder version
-
-# shutdown server
-deder shutdown
-
-
-################ import existing sbt project
-# autodetects build tool (currently sbt via build.sbt)
-deder import
-# explicit override (use e.g. when autodetection fails)
-deder import --from sbt
-
-################ install shell completions
-deder complete -s bash -o > ~/.local/share/bash-completion/completions/deder
-# open another shell to test it
-# also supports zsh, fish, powershell
-
-################ explore the build
-# list modules
-# supports flags: --json, --dot, --mermaid
-deder modules
-
-################
-# list tasks
-# supports flags: --json, --dot, --mermaid
-deder tasks
-
-################
-# print execution plan for a task
-# supports flags: --json, --dot, --mermaid
-deder plan -t compileClasspath -m common 
-deder plan -t compileClasspath -m uber  --mermaid > uberCompileClasspath.mermaid
-
-################ run tasks
-# by default executes compile on all modules
-deder exec
-
-# execute "compile" task explicitly, on all modules
-deder exec -t compile
-# compile the "common" module
-deder exec -t compile -m common
-# compile modules that start with "uber"
-deder exec -t compile -m uber%
-# compile modules that start with "uber", except "uber-test"
-deder exec -t compile -m uber% -m ~uber-test
-
-# run the "uber" module
-deder exec -t run -m uber
-
-# execute "run" in watch mode
-deder exec -t run -m frontend --watch
-# even in multiple terminals at the same time!!!
-deder exec -t run -m backend --watch
-
-# generate an "uber" jar, assembly of all deps and your code
-deder exec -t assembly -m uber
-java -jar .deder/out/uber/assembly/out.jar
-
-# execute all tests on all test modules
-deder exec -t test
-# execute tests on "uber-test" module
-deder exec -t test -m uber-test
-# execute a specific test suite
-deder exec -t test uber.MyTestSuite1
-# execute test suites that start with "uber"
-deder exec -t test uber.%
-# execute specific test called "test1" in suite uber.MyTestSuite1
-deder exec -t test uber.MyTestSuite1#test1
-# execute tests not starting with "uber", negation
-deder exec -t test ~uber.%
-
-################ Misc
-# write BSP config file
-deder bsp install
-
-# fix with scalafix
-deder exec -t fix
-deder exec -t fixCheck
-
-# format with scalafmt
-deder exec -t runMvnApp fmt
-deder exec -t runMvnApp fmtCheck
+deder exec                          # compile all modules (default task)
+deder exec -t compile -m common     # compile a specific module
+deder exec -t test                  # run all tests
+deder exec -t test -m mymod-test    # run tests for one module
+deder exec -t assembly -m app       # build an uber JAR
+deder exec -t run -m app --watch    # run with file-watching
+deder import                        # import project from sbt
+deder bsp install                   # write BSP config for IDE import
+deder shutdown                      # stop the background server
 ```
+
+For the full command reference see the [Cheatsheet](https://sake92.github.io/deder/reference/cheatsheet.html).
 
 ## IDE setup
 
@@ -169,8 +93,13 @@ If you work on server code, after you build it you can run `./reset.sh` in examp
 
 
 
+## Plugins
+
+Deder supports custom tasks via a plugin API.
+See the [Plugins how-to](https://sake92.github.io/deder/howtos/plugins.html) to get started.
+
 ## Contributing
 
-See [dev docs](docs/dev/README.md) for how to build Deder locally, run integration tests, setup tracing etc.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build Deder locally, run integration tests, setup tracing etc.
 
- 
+

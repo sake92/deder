@@ -5,23 +5,23 @@ title: Server Properties File
 
 # {{page.title}}
 
-You can use `.deder/server.properties` file to specify the server properties when client starts it.  
-Example
+You can use `.deder/server.properties` to specify server properties when the client starts it.
+Example:
 ```properties
-localPath=myprojects/deder/out/server/assembly.dest/out.jar
+localPath=myprojects/deder/.deder/out/server/assembly/out.jar
 workerThreads=32
 logLevel=debug
 JAVA_OPTS=-javaagent:otel.jar -Dotel.service.name=deder-server -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
 ```
 
 
-If you make changes to it, make sure you restart server manually:
+If you make changes to it, make sure you restart the server manually:
 ```shell
 deder shutdown
-deder
+deder version
 ```
 
-Availabel properties:
+Available properties:
 - `logLevel` - log level used for server log at `.deder/logs/server.log`, one of `ERROR`, `WARNING`, `INFO`, `DEBUG`, `TRACE`
 - `workerThreads` - number of threads to use for executing tasks
 - `maxConcurrentTestForks` - maximum number of forked test JVMs alive server-wide at any one time. Optional; defaults to the number of available CPU cores. Per-module `maxTestForks` is capped by this.

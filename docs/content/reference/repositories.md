@@ -28,6 +28,11 @@ Repositories are tried in this order:
 3. Maven Central.
 4. The local Ivy2 cache (`~/.ivy2/local`).
 
+For a full local-publish flow, see:
+
+- [Publishing Tutorial](/tutorials/publishing.html#publish-to-local-maven-repository)
+- [Dependencies how-to](/howtos/dependencies.html#using-dependencies-from-publishlocal)
+
 "Custom first" means lookups for internal artifacts resolve against your
 Nexus before Deder hits Maven Central — faster on a LAN, no 404 noise, no
 leaking internal `groupId`s to the public repo.
@@ -46,6 +51,17 @@ includeDefaultRepos = false
 
 Deder will refuse to load the project if `includeDefaultRepos = false` and
 `repositories` is empty.
+
+If you disable defaults and still want to consume artifacts from `publishLocal`,
+add your local Maven repo explicitly:
+
+```pkl
+repositories {
+  new MavenRepository { url = "file:///home/your-user/.m2/repository" }
+}
+
+includeDefaultRepos = false
+```
 
 ## Local directories
 

@@ -5,6 +5,8 @@ title: Cheatsheet
 
 # {{page.title}}
 
+> For the full task inventory with descriptions, see the [Task Reference](/reference/tasks.html).
+
 ```shell
 deder version
 
@@ -90,8 +92,8 @@ deder exec -t fix
 deder exec -t fixCheck
 
 # format with scalafmt
-deder exec -t runMvnApp fmt
-deder exec -t runMvnApp fmtCheck
+deder exec -t runMvnApp -m mymodule fmt
+deder exec -t runMvnApp -m mymodule fmtCheck
 ```
 
 ## Custom repositories

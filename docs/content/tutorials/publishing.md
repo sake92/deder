@@ -41,6 +41,9 @@ local const mylibrary = new ScalaModule {
       url = "git@github.com:myuser/deder-example-library.git"
     }
   }
+  publishTo = new SonatypeCentralRepo {
+    id = "sonatype-central"
+  }
 }
 
 modules {
@@ -48,56 +51,73 @@ modules {
 }
 ```
 
-All this information is necessary for publishing to Maven repositories.  
+All this information is necessary for publishing to Maven repositories.
 See the official [Sonatype Central Repository documentation](https://central.sonatype.org/publish/requirements/#required-pom-metadata/) for more details.
 
 ### Git driven versioning
 
-You can also use git driven versioning to automatically set the version based on your git tags.  
+You can also use git driven versioning to automatically set the version based on your git tags.
 To do this, you need **remove the version** from `pomSettings`.
 Deder will automatically set the version based on the latest semver-based git tag (with optional `v` prefix).
 
 - `1.0.0` -> `1.0.0`
 - `v1.0.0` -> `1.0.0`
-- `1.0.0` with uncommited changes -> `1.0.1-SNAPSHOT`
-- `1.0.0` with few commited changes -> `1.0.1-SNAPSHOT`
+- `1.0.0` with uncommitted changes -> `1.0.1-SNAPSHOT`
+- `1.0.0` with a few committed changes -> `1.0.1-SNAPSHOT`
 
 ## Publish to Local Maven Repository
 
 To publish to your local `.m2` repository, run the following command:
-```bash
+```shell
 deder exec -t publishLocal
 ```
 
 > For `publishLocal` purposes, only `groupId`, `artifactId`, `version`, `name` are needed.
 
-After running this command, you can find the published artifact in your local `.m2` repository, located at `~/.m2/repository/com/example/deder-example-library_3/0.0.1-SNAPSHOT/`.  
+After running this command, you can find the published artifact in your local `.m2` repository, located at `~/.m2/repository/com/example/deder-example-library_3/0.0.1-SNAPSHOT/`.
 Then you can use it in other projects by adding the dependency:
-```scala
-// deder
-"com.example::deder-example-library:0.0.1-SNAPSHOT"
-// sbt
-libraryDependencies += "com.example" %% "deder-example-library" % "0.0.1-SNAPSHOT"
-// mill
-mvn"com.example::deder-example-library:0.0.1-SNAPSHOT"
+```pkl
+deps {
+  "com.example::deder-example-library:0.0.1-SNAPSHOT"
+}
 ```
+
+If you also use sbt or Mill in other projects, use their equivalent dependency syntax for the same coordinate.
+
+By default, Deder resolves from `~/.m2/repository`, so this works without extra repository configuration.
+If you set `includeDefaultRepos = false`, add your local Maven repo explicitly:
+
+```pkl
+repositories {
+  new MavenRepository { url = "file:///home/your-user/.m2/repository" }
+}
+
+includeDefaultRepos = false
+```
+
+See also:
+
+- [Custom Repositories](/reference/repositories.html)
+- [Dependencies how-to](/howtos/dependencies.html)
 
 
 ## Publish to Sonatype Maven Central
 
-To publish to Sonatype Maven Central, you need to set the following environment variables:
-```bash
-export DEDER_PGP_PASSPHRASE="..."
-export DEDER_PGP_SECRET="..."
-export DEDER_SONATYPE_PASSWORD="..."
-export DEDER_SONATYPE_USERNAME="..."
+To publish to Sonatype Maven Central, credentials can come from env vars following the pattern
+`DEDER_<PUBLISH_TO_ID>_<FIELD>` (uppercased, `-` replaced with `_`).
+With `id = "sonatype-central"`, set:
+```shell
+export DEDER_SONATYPE_CENTRAL_USERNAME="..."
+export DEDER_SONATYPE_CENTRAL_PASSWORD="..."
+export DEDER_SONATYPE_CENTRAL_PGP_SECRET="..."
+export DEDER_SONATYPE_CENTRAL_PGP_PASSPHRASE="..."
 ```
 
-If this is your first time publishing to Sonatype, you need to create an account and set up your PGP keys.  
-You can follow the  [sbt-ci-release documentation](https://github.com/sbt/sbt-ci-release?tab=readme-ov-file#sonatype/) for detailed instructions on how to do it.  
+If this is your first time publishing to Sonatype, you need to create an account and set up your PGP keys.
+You can follow the  [sbt-ci-release documentation](https://github.com/sbt/sbt-ci-release?tab=readme-ov-file#sonatype/) for detailed instructions on how to do it.
 
 Then you can run the following command to publish your library:
-```bash
+```shell
 deder exec -t publish
 ```
 

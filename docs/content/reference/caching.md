@@ -11,56 +11,9 @@ Deder caches task outputs on disk so tasks whose inputs haven't changed don't re
 
 ### Cached vs always-run tasks
 
-The lists below are accurate as of deder 0.3.4. To verify against current source, grep `server/src` for `CachedTaskBuilder` (cached) and `= TaskBuilder` (always-run).
+Whether a task is *cached* or *always runs* is noted in the [Task Reference](/reference/tasks.html) — that page is the authoritative inventory.
 
-**Cached** (skip when inputs unchanged):
-
-| Task | What it produces |
-|---|---|
-| `sourceFiles` | List of source file paths |
-| `dependencies` | Direct module dependencies |
-| `allDependencies` | Dependencies including transitive |
-| `mandatoryDependencies` | Dependencies that must be present |
-| `compileClasspath` | Classpath used for compilation |
-| `allClassesDirs` | Class output directories across modules |
-| `compilerDeps` | Compiler dependency resolution |
-| `compilerJars` | Resolved compiler JARs |
-| `scalacPlugins` | Scalac plugin JARs |
-| `javacAnnotationProcessors` | Annotation processor JARs |
-| `scalaSemanticdbVersion` | Resolved SemanticDB version |
-| `runClasspath` | Classpath used at runtime |
-| `mainClasses` | Discovered main classes |
-| `finalMainClass` | Selected main class |
-| `testClasses` | Test class discovery |
-| `fastLinkJs` | Scala.js fast link output |
-| `nativeLink` | Scala Native link output |
-| `jar` | Module JAR |
-| `allJars` | Aggregated JARs |
-| `sourcesJar` | Sources JAR |
-| `javadocJar` | Javadoc JAR |
-| `assembly` | Uber JAR |
-| `finalManifestSettings` | Resolved JAR manifest settings |
-| `moduleDepsPomSettings` | POM dep settings |
-| `publishArtifacts` | Artifact set to publish |
-
-**Always runs:**
-
-| Task | What it does |
-|---|---|
-| `generatedSources` | Runs source generators |
-| `classes` | Resolves module class output directory |
-| `semanticdbDir` | Resolves SemanticDB output directory |
-| `compile` | Invokes Zinc |
-| `run` | Runs the module |
-| `runMain` | Runs a specified main class |
-| `runMvnApp` | Runs a Maven-application entry point |
-| `fix` | Runs Scalafix |
-| `fixCheck` | Runs Scalafix in check mode |
-| `test` | Runs tests |
-| `testJs` | Runs Scala.js tests |
-| `testNative` | Runs Scala Native tests |
-| `publishLocal` | Publishes to local Ivy repository |
-| `publish` | Publishes to remote repository |
+To verify against source, grep `server/src` for `CachedTaskBuilder` (cached). Always-run tasks extend `TaskImpl` — this includes `TaskBuilder`-constructed tasks as well as `ConfigValueTask` (config reads) and `SourceFileTask`/`SourceFilesTask` (source-file tracking).
 
 `compile` is "always runs" from deder's perspective, but Zinc skips unchanged sources internally — so unchanged compilations are still cheap even without deder-level caching.
 
@@ -129,6 +82,6 @@ Explicit instances live in `server/src/ba/sake/deder/Hashable.scala`: `Int`, `St
 
 ### Known limitations
 
-- **Transitive dep hashing is first-level only.** `inputsHash` folds in `depResults ++ transitiveResults.headOption` (see `Task.scala:217`). A change deep in the dep chain that doesn't surface in a first-level output won't invalidate downstream cache.
+- **Transitive dep hashing is first-level only.** `inputsHash` folds in `depResults ++ transitiveResults.headOption` (see `plugin-api/src/ba/sake/deder/Task.scala`). A change deep in the dep chain that doesn't surface in a first-level output won't invalidate downstream cache.
 - **No `changed`-based short-circuiting.** A `CachedTask` reporting `changed = false` doesn't stop downstream tasks from running; the flag is only surfaced in task results for reporting.
 - **`Hashable[os.Path]` throws on non-file non-directory existing paths** (e.g. sockets). Missing paths return `""`.

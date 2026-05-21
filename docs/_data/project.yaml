@@ -28,6 +28,8 @@ references:
     url: "/reference/server-properties.html"
   - label: "Repositories"
     url: "/reference/repositories.html"
+  - label: "Tasks"
+    url: "/reference/tasks.html"
   - label: "Testing"
     url: "/reference/testing.html"
 
@@ -40,6 +42,8 @@ howtos:
     url: "/howtos/mvn-apps.html"
   - label: "OTEL tracing/logging/metrics"
     url: "/howtos/otel.html"
+  - label: "Plugins"
+    url: "/howtos/plugins.html"
 
 philosophies:
   - label: "Design Philosophy"
