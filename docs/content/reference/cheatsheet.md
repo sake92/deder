@@ -19,12 +19,12 @@ deder clean                      # clean all modules
 deder clean -m mymodule          # clean specific module
 deder clean -m mod1 -m mod2      # clean multiple modules
 deder clean -m mod%              # clean modules matching wildcard
-deder clean -m mod% -m ~mod-test  # exclude module from wildcard match (~ negates)
+deder clean -m mod% -m ~mod-test # exclude module from wildcard match (~ negates)
 deder clean -t compile           # clean compile task on all modules
 deder clean -m mymodule -t test  # clean test task on specific module
 
-deder import                          # autodetect build tool (sbt via build.sbt)
-deder import --from sbt                # explicit override
+deder import                          # autodetect build tool
+deder import --from sbt               # explicit override
 
 ################ install shell completions
 deder complete -s bash -o > ~/.local/share/bash-completion/completions/deder
@@ -104,7 +104,7 @@ Declare extra Maven repositories in `deder.pkl`:
 repositories {
   new MavenRepository { url = "https://nexus.example.com/releases/" }
 }
-# includeDefaultRepos = false  # air-gapped mode
+# includeDefaultRepos = false  # force empty default repos, no local .m2 and Maven Central
 ```
 
 See [Repositories](/reference/repositories.html) for details.

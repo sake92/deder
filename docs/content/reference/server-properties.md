@@ -9,6 +9,7 @@ You can use `.deder/server.properties` to specify server properties when the cli
 Example:
 ```properties
 localPath=myprojects/deder/.deder/out/server/assembly/out.jar
+testRunnerLocalPath=myprojects/deder/.deder/out/test-runner/assembly/out.jar
 workerThreads=32
 logLevel=debug
 JAVA_OPTS=-javaagent:otel.jar -Dotel.service.name=my-project -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
