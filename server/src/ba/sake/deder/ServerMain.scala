@@ -161,6 +161,14 @@ object ServerMain extends StrictLogging {
       catch { case _: Exception => }
     })
 
+    Runtime.getRuntime.addShutdownHook(new Thread(() => {
+      logger.warn("JVM shutdown hook fired — best-effort BSP request cancellation")
+      try projectState.notifyBspClientsShuttingDown()
+      catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP clients during shutdown hook: ${e.getMessage}") }
+      try Thread.sleep(300) // short flush window for cancelled responses
+      catch { case _: InterruptedException => }
+    }))
+
     cliServer = DederCliServer(projectState)
     val cliServerThread = new Thread(() => cliServer.nn.start(), "DederCliServer")
     cliServerThread.start()
@@ -327,14 +335,6 @@ object ServerMain extends StrictLogging {
       serverLockHandle = handle
       serverFileLock = lock
     }
-
-    Runtime.getRuntime.addShutdownHook(new Thread(() => {
-      logger.warn("JVM shutdown hook fired — best-effort BSP request cancellation")
-      try projectState.notifyBspClientsShuttingDown()
-      catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP clients during shutdown hook: ${e.getMessage}") }
-      try Thread.sleep(300) // short flush window for cancelled responses
-      catch { case _: InterruptedException => }
-    }))
 
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
       logger.warn("JVM shutdown hook fired (unexpected exit) — releasing lock as safety net")
