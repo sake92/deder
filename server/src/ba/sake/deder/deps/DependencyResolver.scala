@@ -106,19 +106,21 @@ class DependencyResolver(val repositories: Seq[CsRepository]) extends Dependency
       val files = fetchResult.getFiles.asScala.map(f => os.Path(f.toPath)).toSeq
       
       // Build DepNode for each resolved dependency
-      val depNodes = resolvedDeps.zipWithIndex.map { (dep, idx) =>
-        val file = if idx < files.size then files(idx) else os.Path("")
-        val sizeBytes = if os.exists(file) then os.size(file) else 0L
-        
-        DepNode(
-          org = dep.getModule.getOrganization,
-          name = dep.getModule.getName,
-          version = dep.getVersion,
-          filePath = file.toString(),
-          fileSizeBytes = sizeBytes,
-          depth = 0,
-          parents = Seq.empty
-        )
+      val depNodes = resolvedDeps.zipWithIndex.flatMap { (dep, idx) =>
+        if idx < files.size then {
+          val file = files(idx)
+          val sizeBytes = if os.exists(file) then os.size(file) else 0L
+           
+          Some(DepNode(
+            org = dep.getModule.getOrganization,
+            name = dep.getModule.getName,
+            version = dep.getVersion,
+            filePath = file.toString,
+            fileSizeBytes = sizeBytes,
+            depth = 0,
+            parents = Seq.empty
+          ))
+        } else None
       }
       
       // Identify version conflicts
