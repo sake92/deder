@@ -98,7 +98,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
       summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
     )
 
-  val all: Seq[Task[?, ?]] = Seq(
+  val all: Seq[Task[?, ?, ?]] = Seq(
     fastNativeLinkTask,
     fullNativeLinkTask,
     nativeLinkTask,

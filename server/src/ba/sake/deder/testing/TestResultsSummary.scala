@@ -1,7 +1,33 @@
 package ba.sake.deder.testing
 
 import java.time.Duration
-import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
+import ba.sake.deder.{ServerNotification, ServerNotificationsLogger, PlainTextWritable, Summarizable}
+import ba.sake.tupson.JsonRW
+
+case class TestSummary(
+    total: Int,
+    passed: Int,
+    failed: Int,
+    errors: Int,
+    skipped: Int,
+    duration: Long,
+    success: Boolean,
+    failedTestNames: Seq[String]
+) derives JsonRW
+
+object TestSummary:
+  given PlainTextWritable[TestSummary] with
+    def write(s: TestSummary): String =
+      val statusIcon = if s.success then "PASS" else "FAIL"
+      val totalFailed = s.failed + s.errors
+      val parts = scala.collection.mutable.ListBuffer.empty[String]
+      parts += s"${s.passed} passed"
+      if totalFailed > 0 then parts += s"$totalFailed failed"
+      if s.skipped > 0 then parts += s"${s.skipped} skipped"
+      parts += s"${s.total} total"
+      val timeStr = java.time.Duration.ofMillis(s.duration).toString
+        .replace("PT", "").replace("S", "s").replace("M", "m").replace("H", "h").toLowerCase
+      s"$statusIcon: ${parts.mkString(", ")} | $timeStr"
 
 object TestResultsSummary {
   def summarize(
@@ -59,4 +85,27 @@ object TestResultsSummary {
     if parts.size == 1 && passed == total then parts.head
     else (parts :+ s"$total total").mkString(", ")
   }
+
+  given Summarizable[DederTestResults, TestSummary] with
+    def summarize(results: Seq[(String, DederTestResults)]): TestSummary =
+      val merged = DederTestResults(
+        total = results.map(_._2.total).sum,
+        passed = results.map(_._2.passed).sum,
+        failed = results.map(_._2.failed).sum,
+        errors = results.map(_._2.errors).sum,
+        skipped = results.map(_._2.skipped).sum,
+        duration = results.map(_._2.duration).sum,
+        failedTestNames = results.flatMap(_._2.failedTestNames),
+        suites = results.flatMap(_._2.suites).sortBy(_.name)
+      )
+      TestSummary(
+        total = merged.total,
+        passed = merged.passed,
+        failed = merged.failed,
+        errors = merged.errors,
+        skipped = merged.skipped,
+        duration = merged.duration,
+        success = merged.success,
+        failedTestNames = merged.failedTestNames
+      )
 }

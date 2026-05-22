@@ -1286,7 +1286,7 @@ class CoreTasks() extends StrictLogging {
     }
 
   // order matters for dependency resolution!!
-  val all: Seq[Task[?, ?]] = Seq(
+  val all: Seq[Task[?, ?, ?]] = Seq(
     sourcesTask,
     sourceFilesTask,
     generatedSourcesTask,

@@ -9,6 +9,7 @@ import scala.util.chaining.*
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.toJson
 import ba.sake.deder.*
+import ba.sake.deder.cli.OutputFormatting.render
 import ba.sake.deder.importing.Importer
 import io.opentelemetry.api.trace.StatusCode
 import ba.sake.deder.OTEL
@@ -133,6 +134,12 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
+          if cliOptions.json.value then
+            serverMessages.put(CliServerMessage.Log("Warning: --json is deprecated, use --format json", LogLevel.WARNING))
+          if cliOptions.dot.value then
+            serverMessages.put(CliServerMessage.Log("Warning: --dot is deprecated, use --format dot", LogLevel.WARNING))
+          if cliOptions.mermaid.value then
+            serverMessages.put(CliServerMessage.Log("Warning: --mermaid is deprecated, use --format mermaid", LogLevel.WARNING))
           OTEL.withSpan("cli.modules")(
             _.setAttribute("clientId", clientId)
               .setAttribute("request.id", requestId)
@@ -192,19 +199,14 @@ class CliClientMessageHandler(
                       serverMessages.put(CliServerMessage.Exit(1))
                     case Right(graph) =>
                       val filteredModules = graph.vertexSet().asScala.toSeq.sortBy(_.id)
-                      if cliOptions.json.value then {
-                        serverMessages.put(
-                          CliServerMessage.Output(filteredModules.map(_.id).toJson(spaces = 0, sort = false))
-                        )
-                      } else if cliOptions.dot.value then {
-                        val dot = GraphUtils.generateDOT(graph, v => v.id, v => Map("label" -> v.id))
-                        serverMessages.put(CliServerMessage.Output(dot))
-                      } else if cliOptions.mermaid.value then {
-                        val mermaid = GraphUtils.generateMermaid(graph, v => v.id, v => v.id)
-                        serverMessages.put(CliServerMessage.Output(mermaid))
-                      } else {
-                        serverMessages.put(CliServerMessage.Output(filteredModules.map(_.id).mkString("\n")))
-                      }
+                      val output = cliOptions.format match
+                        case GraphOutputFormat.PlainText | GraphOutputFormat.Json =>
+                          render(filteredModules.map(_.id))(using cliOptions.format, summon[ba.sake.tupson.JsonRW[Seq[String]]])
+                        case GraphOutputFormat.Dot =>
+                          GraphUtils.generateDOT(graph, v => v.id, v => Map("label" -> v.id))
+                        case GraphOutputFormat.Mermaid =>
+                          GraphUtils.generateMermaid(graph, v => v.id, v => v.id)
+                      serverMessages.put(CliServerMessage.Output(output))
                       serverMessages.put(CliServerMessage.Exit(0))
                   }
                 }
@@ -229,6 +231,12 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
+          if cliOptions.json.value then
+            serverMessages.put(CliServerMessage.Log("Warning: --json is deprecated, use --format json", LogLevel.WARNING))
+          if cliOptions.dot.value then
+            serverMessages.put(CliServerMessage.Log("Warning: --dot is deprecated, use --format dot", LogLevel.WARNING))
+          if cliOptions.mermaid.value then
+            serverMessages.put(CliServerMessage.Log("Warning: --mermaid is deprecated, use --format mermaid", LogLevel.WARNING))
           OTEL.withSpan("cli.tasks")(
             _.setAttribute("clientId", clientId)
               .setAttribute("request.id", requestId)
@@ -241,66 +249,68 @@ class CliClientMessageHandler(
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
-                if cliOptions.json.value then {
-                  val taskNamesPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
-                    case (moduleId, tasks) =>
-                      moduleId -> tasks.map(_.task.name)
-                  }
-                  serverMessages.put(CliServerMessage.Output(taskNamesPerModule.toJson(spaces = 0, sort = false)))
-                  serverMessages.put(CliServerMessage.Exit(0))
-                } else if cliOptions.dot.value then {
-                  val dot =
-                    GraphUtils.generateDOT(
-                      state.tasksResolver.publicTaskInstancesGraph,
-                      v => v.id,
-                      v => Map("label" -> v.id)
-                    )
-                  serverMessages.put(CliServerMessage.Output(dot))
-                  serverMessages.put(CliServerMessage.Exit(0))
-                } else if cliOptions.mermaid.value then {
-                  val mermaid =
-                    GraphUtils.generateMermaidWithSubgraphs(
-                      state.tasksResolver.publicTaskInstancesGraph,
-                      state.tasksResolver.publicTaskInstancesPerModule,
-                      v => v.id,
-                      v => v.task.name
-                    )
-                  serverMessages.put(CliServerMessage.Output(mermaid))
-                  serverMessages.put(CliServerMessage.Exit(0))
-                } else {
-                  val modules = cliOptions.module match {
-                    case Some(moduleId) =>
-                      state.tasksResolver.allModules.filter(_.id == moduleId)
-                    case None =>
-                      state.tasksResolver.allModules
-                  }
-                  val sortedModules = modules.sortBy(_.id)
-                  val categoryOrder = Seq(
-                    "Build",
-                    "Configuration",
-                    "Dependencies",
-                    "Verification",
-                    "Run",
-                    "Publishing",
-                    "REPL",
-                    "Scala.js",
-                    "Scala Native",
-                    "GraalVM"
-                  )
-                  val modulesWithTasks = sortedModules.map { module =>
-                    val moduleTasks = state.tasksResolver.publicTaskInstancesPerModule(module.id).map(_.task)
-                    val grouped = moduleTasks.groupBy(t => if t.category.isEmpty then "Other" else t.category)
-                    val sortedCategories = categoryOrder.filter(grouped.contains) ++
-                      grouped.keys.filterNot(categoryOrder.contains).toSeq.sorted
-                    val categoryLines = sortedCategories.flatMap { cat =>
-                      val taskNames = grouped(cat).map(_.name).sorted
-                      Seq(s"  ${cat}:") ++ taskNames.map(t => s"    ${t}")
+                cliOptions.format match
+                  case GraphOutputFormat.Json =>
+                    val taskNamesPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
+                      case (moduleId, tasks) =>
+                        moduleId -> tasks.map(_.task.name)
                     }
-                    s"${module.id}:\n${categoryLines.mkString("\n")}"
-                  }
-                  serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
-                  serverMessages.put(CliServerMessage.Exit(0))
-                }
+                    serverMessages.put(CliServerMessage.Output(
+                      render(taskNamesPerModule)(using cliOptions.format, summon[ba.sake.tupson.JsonRW[Map[String, Seq[String]]]])
+                    ))
+                    serverMessages.put(CliServerMessage.Exit(0))
+                  case GraphOutputFormat.Dot =>
+                    val dot =
+                      GraphUtils.generateDOT(
+                        state.tasksResolver.publicTaskInstancesGraph,
+                        v => v.id,
+                        v => Map("label" -> v.id)
+                      )
+                    serverMessages.put(CliServerMessage.Output(dot))
+                    serverMessages.put(CliServerMessage.Exit(0))
+                  case GraphOutputFormat.Mermaid =>
+                    val mermaid =
+                      GraphUtils.generateMermaidWithSubgraphs(
+                        state.tasksResolver.publicTaskInstancesGraph,
+                        state.tasksResolver.publicTaskInstancesPerModule,
+                        v => v.id,
+                        v => v.task.name
+                      )
+                    serverMessages.put(CliServerMessage.Output(mermaid))
+                    serverMessages.put(CliServerMessage.Exit(0))
+                  case GraphOutputFormat.PlainText =>
+                    val modules = cliOptions.module match {
+                      case Some(moduleId) =>
+                        state.tasksResolver.allModules.filter(_.id == moduleId)
+                      case None =>
+                        state.tasksResolver.allModules
+                    }
+                    val sortedModules = modules.sortBy(_.id)
+                    val categoryOrder = Seq(
+                      "Build",
+                      "Configuration",
+                      "Dependencies",
+                      "Verification",
+                      "Run",
+                      "Publishing",
+                      "REPL",
+                      "Scala.js",
+                      "Scala Native",
+                      "GraalVM"
+                    )
+                    val modulesWithTasks = sortedModules.map { module =>
+                      val moduleTasks = state.tasksResolver.publicTaskInstancesPerModule(module.id).map(_.task)
+                      val grouped = moduleTasks.groupBy(t => if t.category.isEmpty then "Other" else t.category)
+                      val sortedCategories = categoryOrder.filter(grouped.contains) ++
+                        grouped.keys.filterNot(categoryOrder.contains).toSeq.sorted
+                      val categoryLines = sortedCategories.flatMap { cat =>
+                        val taskNames = grouped(cat).map(_.name).sorted
+                        Seq(s"  ${cat}:") ++ taskNames.map(t => s"    ${t}")
+                      }
+                      s"${module.id}:\n${categoryLines.mkString("\n")}"
+                    }
+                    serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
+                    serverMessages.put(CliServerMessage.Exit(0))
             }
           }
       }
@@ -322,6 +332,12 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
+          if cliOptions.json.value then
+            serverMessages.put(CliServerMessage.Log("Warning: --json is deprecated, use --format json", LogLevel.WARNING))
+          if cliOptions.dot.value then
+            serverMessages.put(CliServerMessage.Log("Warning: --dot is deprecated, use --format dot", LogLevel.WARNING))
+          if cliOptions.mermaid.value then
+            serverMessages.put(CliServerMessage.Log("Warning: --mermaid is deprecated, use --format mermaid", LogLevel.WARNING))
           OTEL.withSpan("cli.plan")(
             _.setAttribute("clientId", clientId)
               .setAttribute("request.id", requestId)
@@ -367,57 +383,57 @@ class CliClientMessageHandler(
                     val validModuleIds = validModuleTasks.map(_._1)
                     val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(validModuleIds, cliOptions.task)
                     val publicSubgraph = GraphUtils.projectPublic(tasksExecSubgraph, !_.task.internal)
-                    if cliOptions.json.value then {
-                      val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
-                      val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
-                      serverMessages.put(
-                        CliServerMessage.Output(publicStages.map(_.map(_.id)).toJson(spaces = 0, sort = false))
-                      )
-                    } else if cliOptions.dot.value then {
-                      val dot = GraphUtils.generateDOT(publicSubgraph, v => v.id, v => Map("label" -> v.id))
-                      serverMessages.put(CliServerMessage.Output(dot))
-                    } else if cliOptions.mermaid.value then {
-                      val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
-                      val stageByTask = tasksExecStages.zipWithIndex.flatMap { case (stage, stageIdx) =>
-                        stage.map(_ -> stageIdx)
-                      }.toMap
-                      val stageClassDefs = publicSubgraph
-                        .vertexSet()
-                        .asScala
-                        .map(stageByTask)
-                        .toSet
-                        .toSeq
-                        .sorted
-                        .map { stageIdx =>
-                          s"stage$stageIdx" -> CliClientMessageHandler.planMermaidStagePalette(
-                            stageIdx % CliClientMessageHandler.planMermaidStagePalette.length
+                    cliOptions.format match
+                      case GraphOutputFormat.Json =>
+                        val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
+                        val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
+                        serverMessages.put(CliServerMessage.Output(
+                          render(publicStages.map(_.map(_.id)))(using cliOptions.format, summon[ba.sake.tupson.JsonRW[Seq[Seq[String]]]])
+                        ))
+                      case GraphOutputFormat.Dot =>
+                        val dot = GraphUtils.generateDOT(publicSubgraph, v => v.id, v => Map("label" -> v.id))
+                        serverMessages.put(CliServerMessage.Output(dot))
+                      case GraphOutputFormat.Mermaid =>
+                        val tasksExecStages2 = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
+                        val stageByTask = tasksExecStages2.zipWithIndex.flatMap { case (stage, stageIdx) =>
+                          stage.map(_ -> stageIdx)
+                        }.toMap
+                        val stageClassDefs = publicSubgraph
+                          .vertexSet()
+                          .asScala
+                          .map(stageByTask)
+                          .toSet
+                          .toSeq
+                          .sorted
+                          .map { stageIdx =>
+                            s"stage$stageIdx" -> CliClientMessageHandler.planMermaidStagePalette(
+                              stageIdx % CliClientMessageHandler.planMermaidStagePalette.length
+                            )
+                          }
+                          .toMap
+                        val groups = publicSubgraph.vertexSet().asScala.toSeq.groupBy(_.moduleId)
+                        val mermaid =
+                          GraphUtils.generateMermaidWithSubgraphs(
+                            publicSubgraph,
+                            groups,
+                            v => v.id,
+                            v => s"${v.task.name} (#${stageByTask(v)})",
+                            extraLines = Seq("%% #0 = evaluated first stage"),
+                            vertexCssClassProvider = v => Some(s"stage${stageByTask(v)}"),
+                            classDefs = stageClassDefs
                           )
-                        }
-                        .toMap
-                      val groups = publicSubgraph.vertexSet().asScala.toSeq.groupBy(_.moduleId)
-                      val mermaid =
-                        GraphUtils.generateMermaidWithSubgraphs(
-                          publicSubgraph,
-                          groups,
-                          v => v.id,
-                          v => s"${v.task.name} (#${stageByTask(v)})",
-                          extraLines = Seq("%% #0 = evaluated first stage"),
-                          vertexCssClassProvider = v => Some(s"stage${stageByTask(v)}"),
-                          classDefs = stageClassDefs
-                        )
-                      serverMessages.put(CliServerMessage.Output(mermaid))
-                    } else {
-                      val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
-                      val stagesStr = tasksExecStages.zipWithIndex
-                        .flatMap { case (stage, idx) =>
-                          val publicStage = stage.filter(!_.task.internal)
-                          Option.when(publicStage.nonEmpty)(
-                            s"Stage #${idx}:\n" + publicStage.map(ti => s"  ${ti.id}").mkString("\n")
-                          )
-                        }
-                        .mkString("\n")
-                      serverMessages.put(CliServerMessage.Output(stagesStr))
-                    }
+                        serverMessages.put(CliServerMessage.Output(mermaid))
+                      case GraphOutputFormat.PlainText =>
+                        val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
+                        val stagesStr = tasksExecStages.zipWithIndex
+                          .flatMap { case (stage, idx) =>
+                            val publicStage = stage.filter(!_.task.internal)
+                            Option.when(publicStage.nonEmpty)(
+                              s"Stage #${idx}:\n" + publicStage.map(ti => s"  ${ti.id}").mkString("\n")
+                            )
+                          }
+                          .mkString("\n")
+                        serverMessages.put(CliServerMessage.Output(stagesStr))
                     serverMessages.put(CliServerMessage.Exit(0))
                 }
             }
@@ -441,13 +457,16 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
+          if cliOptions.json.value then
+            serverMessages.put(CliServerMessage.Log("Warning: --json is deprecated, use --format json", LogLevel.WARNING))
+          RequestContext.outputFormat.set(cliOptions.format)
           OTEL.withSpan(s"cli.exec.${cliOptions.task}")(
             _.setAttribute("clientId", clientId)
               .setAttribute("request.id", requestId)
               .setAttribute("cli.task", cliOptions.task)
               .setAttribute("cli.moduleIds", cliOptions.modules.mkString(","))
               .setAttribute("cli.watch", cliOptions.watch.value)
-              .setAttribute("cli.json", cliOptions.json.value)
+              .setAttribute("cli.format", cliOptions.format.toString)
           ) { _ =>
             val notificationCallback: ServerNotification => Unit = {
               case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
@@ -466,7 +485,6 @@ class CliClientMessageHandler(
               cliOptions.task,
               args = argss,
               serverNotificationsLogger,
-              json = cliOptions.json.value,
               startWatch = cliOptions.watch.value,
               exitOnEnd = !cliOptions.watch.value,
               clientParams = CliClientParams(m.envVars)

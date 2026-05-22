@@ -19,7 +19,7 @@ class InternalTaskSuite extends munit.FunSuite {
    *   - publicTaskInstancesGraph bridges edges over it
    *   - taskInstancesPerModule still includes it (exec still works)
    */
-  private def buildWithInternalTask(): (TasksResolver, Task[?, ?]) = {
+  private def buildWithInternalTask(): (TasksResolver, Task[?, ?, ?]) = {
     val configParser = ConfigParser(writeJson = false)
     val projectConfig = configParser.parse(testProjectsDir / "multi" / "deder.pkl")
       .getOrElse(fail("Failed to parse deder.pkl config"))

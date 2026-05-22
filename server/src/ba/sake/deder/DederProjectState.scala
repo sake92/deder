@@ -9,14 +9,15 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
 import scala.util.control.NonFatal
 import scala.util.Using
-import org.typelevel.jawn.ast.{CanonicalRenderer, JValue}
 import com.typesafe.scalalogging.StrictLogging
 import io.opentelemetry.api.trace.StatusCode
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
+import ba.sake.deder.cli.OutputFormatting.render
 import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
 import ba.sake.deder.plugin.{LoadedPlugin, PluginLoader, PluginLoaderApi}
+import ba.sake.tupson.JsonRW
 
 class DederProjectState(
     tasksRegistry: TasksRegistry,
@@ -102,7 +103,7 @@ class DederProjectState(
             val pluginLoader = PluginLoader(coreTasksApi, dependencyResolver)
             loadedPlugins = pluginLoader.load(loadedPlugins, configFile, newConfig).loadedPlugins
             // TODO prepend plugin id to task name to avoid conflicts?
-            val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?]])
+            val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?, ?]])
             val effectiveRegistry = TasksRegistry(baseTasks ++ pluginTasks)
             val tasksResolver = TasksResolver(newConfig, effectiveRegistry)
             val executionPlanner =
@@ -130,7 +131,6 @@ class DederProjectState(
       args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean = false,
-      json: Boolean = false,
       startWatch: Boolean = false,
       exitOnEnd: Boolean = true,
       clientParams: CliClientParams
@@ -189,20 +189,13 @@ class DederProjectState(
         // summarize across modules (only when >1 module)
         if results.nonEmpty then {
           val task = results.head.taskInstance.task
-          val moduleResults = results.sortBy(_.taskInstance.moduleId).map(r => (r.taskInstance.module, r.res))
-          task.summarizeUnsafe(moduleResults, serverNotificationsLogger)
-        }
-        if json then {
-          val jsonValues = results.map { res =>
-            val moduleId = res.taskInstance.moduleId
-            val taskInstance = res.taskInstance
-            val taskRes = res.res
-            val jsonRes = taskInstance.task.rw.write(taskRes.asInstanceOf[taskInstance.task.Res])
-            (moduleId, jsonRes)
-          }.toMap
-          val jsonRW = summon[ba.sake.tupson.JsonRW[Map[String, JValue]]]
-          val jsonRes = CanonicalRenderer.render(jsonRW.write(jsonValues))
-          serverNotificationsLogger.add(ServerNotification.Output(jsonRes))
+          val moduleResults = results.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.res)
+          // Render cross-module summary in the chosen output format
+          val summary = task.summarizeValueUnsafe(moduleResults)
+          val format = RequestContext.outputFormat.get()
+          given JsonRW[Any] = task.summaryJsonRw.asInstanceOf[JsonRW[Any]]
+          val output = render(summary)(using format, summon)
+          serverNotificationsLogger.add(ServerNotification.Output(output))
         }
         if startWatch then {
           relevantModuleAndTasks.foreach { case (moduleId, taskInstance) =>
@@ -216,7 +209,7 @@ class DederProjectState(
                   args,
                   serverNotificationsLogger,
                   useLastGood,
-                  json,
+                  RequestContext.outputFormat.get(),
                   affectingSourceFileTasks,
                   affectingConfigValueTasks,
                   clientParams
@@ -241,7 +234,7 @@ class DederProjectState(
 
   def executeTask[T](
       moduleId: String,
-      task: Task[T, ?],
+      task: Task[T, ?, ?],
       args: Seq[String],
       serverNotificationsLogger: ServerNotificationsLogger,
       watch: Boolean = false,
@@ -549,6 +542,7 @@ class DederProjectState(
           s"Config value dependencies of watched task ${watchedTask.taskInstance.id} have changed, re-executing..."
         )
         val requestId = UUID.randomUUID().toString
+        RequestContext.outputFormat.set(watchedTask.format)
         executeCLI(
           watchedTask.clientId,
           requestId,
@@ -557,7 +551,6 @@ class DederProjectState(
           watchedTask.args,
           watchedTask.serverNotificationsLogger,
           watchedTask.useLastGood,
-          watchedTask.json,
           startWatch = false,
           exitOnEnd = false,
           clientParams = watchedTask.clientParams
@@ -640,7 +633,7 @@ case class WatchedTaskData(
     args: Seq[String],
     serverNotificationsLogger: ServerNotificationsLogger,
     useLastGood: Boolean,
-    json: Boolean,
+    format: OutputFormat,
     affectingSourceFileTasks: Set[TaskInstance],
     affectingConfigValueTasks: Set[TaskInstance],
     clientParams: CliClientParams
