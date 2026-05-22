@@ -3,9 +3,7 @@ package ba.sake.deder
 trait PlainTextWritable[T]:
   def write(value: T): String
 
-object PlainTextWritable:
-  /** Low-priority catch-all: returns empty string for any T. */
-  given default[T]: PlainTextWritable[T] = _ => ""
+object PlainTextWritable extends PlainTextWritableLowPriority:
 
   given PlainTextWritable[String] = s => s
   given PlainTextWritable[Int] = _.toString
@@ -25,3 +23,7 @@ object PlainTextWritable:
   given [T: PlainTextWritable]: PlainTextWritable[Seq[T]] with
     def write(value: Seq[T]): String =
       value.map(summon[PlainTextWritable[T]].write).mkString("\n")
+
+trait PlainTextWritableLowPriority:
+  /** Low-priority catch-all: returns empty string for any T. */
+  given default[T]: PlainTextWritable[T] = _ => ""

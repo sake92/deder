@@ -11,9 +11,9 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
   test("deder should compile scalajs project") {
     withTestProject("sample-projects/scalajs") { projectPath =>
       locally {
-        val dederOutputJson = executeDederCommand(projectPath, "exec", "-m", "frontend", "-t", "compileClasspath", "--json").out.text()
-        val dederOutput = dederOutputJson.parseJson[Map[String, List[String]]]
-        val frontendCompileClasspath = dederOutput("frontend")
+        val dederOutputJson = executeDederCommand(projectPath, "exec", "-m", "frontend", "-t", "compileClasspath", "--format", "json").out.text()
+        val dederOutput = dederOutputJson.parseJson[Map[String, Map[String, List[String]]]]
+        val frontendCompileClasspath = dederOutput("results")("frontend")
         assert(frontendCompileClasspath(0).endsWith("/.deder/out/frontend/classes"))
         assert(frontendCompileClasspath.exists(_.contains("scala3-library_sjs1_3-3.7.1.jar")))
         assert(frontendCompileClasspath.exists(_.contains("scalajs-library_2.13-1.20.2.jar")))
