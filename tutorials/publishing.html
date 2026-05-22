@@ -86,11 +86,9 @@ local const mylibrary = new ScalaModule {
       }
     }
     scm {
-      url = "git@github.com:myuser/deder-example-library.git"
+      url = "https://github.com/myuser/mylib"
+      connection = "scm:git:git://github.com/myuser/mylib.git"
     }
-  }
-  publishTo = new SonatypeCentralRepo {
-    id = "sonatype-central"
   }
 }
 
@@ -98,9 +96,12 @@ modules {
   mylibrary
 }
 </code></pre>
-   <p>All this information is necessary for publishing to Maven repositories. See the official <a href="https://central.sonatype.org/publish/requirements/#required-pom-metadata/">Sonatype Central Repository documentation</a> for more details.</p>
+   <p>All this information is necessary for publishing to Maven Central. See the official <a href="https://central.sonatype.org/publish/requirements/#required-pom-metadata/">Sonatype Central Repository documentation</a> for more details.</p>
+   <blockquote>
+    <p>You could publish to another repo by setting <code>publishTo</code></p>
+   </blockquote>
    <h3 id="git-driven-versioning">Git driven versioning<a href="#git-driven-versioning" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
-   <p>You can also use git driven versioning to automatically set the version based on your git tags. To do this, you need <strong>remove the version</strong> from <code>pomSettings</code>. Deder will automatically set the version based on the latest semver-based git tag (with optional <code>v</code> prefix).</p>
+   <p>You can also use git driven versioning to automatically set the version based on your git tags. To do this, you need to <strong>remove the version</strong> from <code>pomSettings</code>. Deder will automatically set the version based on the latest semver-based git tag (with optional <code>v</code> prefix).</p>
    <ul>
     <li><code>1.0.0</code> -&gt; <code>1.0.0</code></li>
     <li><code>v1.0.0</code> -&gt; <code>1.0.0</code></li>
@@ -133,11 +134,11 @@ includeDefaultRepos = false
     <li><a href="https://sake92.github.io/deder/howtos/dependencies.html">Dependencies how-to</a></li>
    </ul>
    <h2 id="publish-to-sonatype-maven-central">Publish to Sonatype Maven Central<a href="#publish-to-sonatype-maven-central" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <p>To publish to Sonatype Maven Central, credentials can come from env vars following the pattern <code>DEDER_&lt;PUBLISH_TO_ID&gt;_&lt;FIELD&gt;</code> (uppercased, <code>-</code> replaced with <code>_</code>). With <code>id = "sonatype-central"</code>, set:</p>
-   <pre><code class="language-shell hljs" data-highlighted="yes">export DEDER_SONATYPE_CENTRAL_USERNAME="..."
-export DEDER_SONATYPE_CENTRAL_PASSWORD="..."
-export DEDER_SONATYPE_CENTRAL_PGP_SECRET="..."
-export DEDER_SONATYPE_CENTRAL_PGP_PASSPHRASE="..."
+   <p>To publish to Sonatype Maven Central, credentials can come from env vars following the pattern <code>DEDER_&lt;PUBLISH_TO_ID&gt;_&lt;FIELD&gt;</code> (uppercased, <code>-</code> replaced with <code>_</code>). With <code>id = "sonatype"</code> (default one), set these:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">export DEDER_SONATYPE_USERNAME="..."
+export DEDER_SONATYPE_PASSWORD="..."
+export DEDER_SONATYPE_PGP_SECRET="..."
+export DEDER_SONATYPE_PGP_PASSPHRASE="..."
 </code></pre>
    <p>If this is your first time publishing to Sonatype, you need to create an account and set up your PGP keys. You can follow the <a href="https://github.com/sbt/sbt-ci-release?tab=readme-ov-file#sonatype/">sbt-ci-release documentation</a> for detailed instructions on how to do it.</p>
    <p>Then you can run the following command to publish your library:</p>
