@@ -46,6 +46,7 @@ class DederBspServer(
 
   private case class InFlightCompilation(
       modulesBeingCompiled: Set[String],
+      primaryOriginId: String,
       compileFuture: CompletableFuture[CompileResult],
       pendingRequests: ConcurrentLinkedQueue[PendingRequest]
   )
@@ -440,7 +441,12 @@ class DederBspServer(
     if activeEntries.isEmpty then {
       // Scenario A: No overlap — start a new compilation
       val compileFuture = createCompileFuture(params, requestedModules)
-      val inFlight = InFlightCompilation(requestedModules, compileFuture, new ConcurrentLinkedQueue[PendingRequest]())
+      val inFlight = InFlightCompilation(
+        requestedModules,
+        params.getOriginId,
+        compileFuture,
+        new ConcurrentLinkedQueue[PendingRequest]()
+      )
       requestedModules.foreach { modId =>
         inFlightCompilations.put(modId, inFlight)
       }
@@ -456,7 +462,12 @@ class DederBspServer(
     } else {
       // Scenario B-prime: Partial overlap — proceed normally (will block on TaskInstance locks)
       val compileFuture = createCompileFuture(params, requestedModules)
-      val inFlight = InFlightCompilation(requestedModules, compileFuture, new ConcurrentLinkedQueue[PendingRequest]())
+      val inFlight = InFlightCompilation(
+        requestedModules,
+        params.getOriginId,
+        compileFuture,
+        new ConcurrentLinkedQueue[PendingRequest]()
+      )
       requestedModules.foreach { modId =>
         inFlightCompilations.put(modId, inFlight)
       }
@@ -958,7 +969,37 @@ class DederBspServer(
   def initiateShutdown(): Unit = {
     logger.info("Initiating BSP server shutdown (CLI shutdown requested)...")
     running.set(false)
-    try { onExit() } catch { case _: Exception => }
+    cancelInFlightCompilationsOnShutdown()
+    val closeThread = new Thread(
+      () => {
+        try Thread.sleep(200) // give JSON-RPC layer a brief window to flush cancelled responses
+        catch {
+          case _: InterruptedException =>
+        }
+        try { onExit() } catch { case _: Exception => }
+      },
+      "bsp-shutdown-close"
+    )
+    closeThread.setDaemon(true)
+    closeThread.start()
+  }
+
+  private def cancelInFlightCompilationsOnShutdown(): Unit = {
+    val inFlightSnapshot = inFlightCompilations.values().asScala.toSet
+    inFlightSnapshot.foreach { inFlight =>
+      Option(inFlight.primaryOriginId).filter(_.nonEmpty).foreach(projectState.cancelRequest)
+      inFlight.pendingRequests.asScala.foreach { pr =>
+        Option(pr.originId).filter(_.nonEmpty).foreach(projectState.cancelRequest)
+      }
+      if !inFlight.compileFuture.isDone then
+        inFlight.compileFuture.complete(cancelledCompileResult(inFlight.primaryOriginId))
+    }
+  }
+
+  private def cancelledCompileResult(originId: String): CompileResult = {
+    val cancelled = new CompileResult(StatusCode.CANCELLED)
+    cancelled.setOriginId(originId)
+    cancelled
   }
 
   private def ensureRunning(): Unit = {

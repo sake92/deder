@@ -107,8 +107,10 @@ object ServerMain extends StrictLogging {
 
       // 2. Release server lock (may already be released via early callback — idempotent)
       logger.info("Releasing server lock...")
-      try { serverFileLock.release() } catch { case _: Exception => }
-      try { serverLockHandle.close() } catch { case _: Exception => }
+      try { serverFileLock.release() }
+      catch { case _: Exception => }
+      try { serverLockHandle.close() }
+      catch { case _: Exception => }
 
       // 3. Close sockets so new connections go to the new server process
       if (cliServer != null) cliServer.nn.stop()
@@ -143,13 +145,20 @@ object ServerMain extends StrictLogging {
     val allTasks =
       coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
-    val projectState = DederProjectState(tasksRegistry, maxInactiveSeconds, tasksExecutorService, onShutdown,
-        configFile = DederGlobals.projectRootDir / "deder.pkl")
+    val projectState = DederProjectState(
+      tasksRegistry,
+      maxInactiveSeconds,
+      tasksExecutorService,
+      onShutdown,
+      configFile = DederGlobals.projectRootDir / "deder.pkl"
+    )
 
     // Wire up early lock release for fast shutdown+restart
     projectState.setReleaseServerLock(() => {
-      try { serverFileLock.release() } catch { case _: Exception => }
-      try { serverLockHandle.close() } catch { case _: Exception => }
+      try { serverFileLock.release() }
+      catch { case _: Exception => }
+      try { serverLockHandle.close() }
+      catch { case _: Exception => }
     })
 
     cliServer = DederCliServer(projectState)
@@ -167,71 +176,78 @@ object ServerMain extends StrictLogging {
     loadGitignore()
 
     // Run file watcher on a dedicated daemon thread so it can be interrupted during shutdown
-    watcherThread = new Thread(() => {
-      try {
-        os.watch.watch(
-          roots = Seq(projectRoot),
-          onEvent = paths =>
-            try {
-              if paths.exists(isServerConfigFile) then
-                logger.debug(
-                  s"Server configuration file changed: ${paths}, you need to shutdown the server with 'deder shutdown' and start it again!"
-                )
-              else if paths.exists(isProjectConfigFile) then
-                logger.debug(s"Configuration file changed: ${paths}, reloading project...")
-                projectState.reloadProject()
-              else if paths.exists(p => p == projectRoot / ".gitignore") then
-                logger.debug(s".gitignore changed, reloading...")
-                loadGitignore()
-              else if paths.exists(isTaskTriggerCandidate) then
-                val candidates = paths.filter(isTaskTriggerCandidate)
-                if candidates.nonEmpty then {
-                  accumulatedChangedPaths.addAll(candidates.asJava)
-                  debounceLock.synchronized {
-                    pendingDebounce.foreach(_.cancel(false))
-                    pendingDebounce = Some(debounceScheduler.schedule(
-                      new Runnable {
-                        def run(): Unit = {
-                          val snapshot = {
-                            val iter = accumulatedChangedPaths.iterator()
-                            val buf = Set.newBuilder[os.Path]
-                            while iter.hasNext do
-                              buf += iter.next()
-                              iter.remove()
-                            buf.result()
-                          }
-                          if snapshot.nonEmpty then {
-                            logger.debug(s"Debounce fired, triggering tasks for ${snapshot.size} changed paths: ${snapshot.take(3).mkString(", ")}...")
-                            projectState.triggerFileWatchedTasks(snapshot)
-                          }
-                          debounceLock.synchronized { pendingDebounce = None }
-                        }
-                      },
-                      watchDebounceMs,
-                      java.util.concurrent.TimeUnit.MILLISECONDS
-                    ))
+    watcherThread = new Thread(
+      () => {
+        try {
+          os.watch.watch(
+            roots = Seq(projectRoot),
+            onEvent = paths =>
+              try {
+                if paths.exists(isServerConfigFile) then
+                  logger.debug(
+                    s"Server configuration file changed: ${paths}, you need to shutdown the server with 'deder shutdown' and start it again!"
+                  )
+                else if paths.exists(isProjectConfigFile) then
+                  logger.debug(s"Configuration file changed: ${paths}, reloading project...")
+                  projectState.reloadProject()
+                else if paths.exists(p => p == projectRoot / ".gitignore") then
+                  logger.debug(s".gitignore changed, reloading...")
+                  loadGitignore()
+                else if paths.exists(isTaskTriggerCandidate) then
+                  val candidates = paths.filter(isTaskTriggerCandidate)
+                  if candidates.nonEmpty then {
+                    accumulatedChangedPaths.addAll(candidates.asJava)
+                    debounceLock.synchronized {
+                      pendingDebounce.foreach(_.cancel(false))
+                      pendingDebounce = Some(
+                        debounceScheduler.schedule(
+                          new Runnable {
+                            def run(): Unit = {
+                              val snapshot = {
+                                val iter = accumulatedChangedPaths.iterator()
+                                val buf = Set.newBuilder[os.Path]
+                                while iter.hasNext do
+                                  buf += iter.next()
+                                  iter.remove()
+                                buf.result()
+                              }
+                              if snapshot.nonEmpty then {
+                                logger.debug(
+                                  s"Debounce fired, triggering tasks for ${snapshot.size} changed paths: ${snapshot.take(3).mkString(", ")}..."
+                                )
+                                projectState.triggerFileWatchedTasks(snapshot)
+                              }
+                              debounceLock.synchronized { pendingDebounce = None }
+                            }
+                          },
+                          watchDebounceMs,
+                          java.util.concurrent.TimeUnit.MILLISECONDS
+                        )
+                      )
+                    }
                   }
-                }
-            } catch {
-              case _: InterruptedException => throw new InterruptedException // propagate to exit watcher loop
-              case NonFatal(_) =>
-              // ignore, config might be bad, tasks might fail, etc
+              } catch {
+                case _: InterruptedException => throw new InterruptedException // propagate to exit watcher loop
+                case NonFatal(_)             =>
+                // ignore, config might be bad, tasks might fail, etc
+              },
+            filter = p => {
+              val segs = p.relativeTo(DederGlobals.projectRootDir).segments.toSeq
+              val firstSeg = segs.headOption.getOrElse("")
+              val isDederSubdir =
+                firstSeg == ".deder" && segs.lift(1).exists(FileWatchUtils.ignoredDederSubdirs.contains)
+              val isDevDir = FileWatchUtils.ignoredDirNames.contains(firstSeg)
+              !(isDederSubdir || isDevDir)
             }
-          ,
-          filter = p => {
-            val segs = p.relativeTo(DederGlobals.projectRootDir).segments.toSeq
-            val firstSeg = segs.headOption.getOrElse("")
-            val isDederSubdir = firstSeg == ".deder" && segs.lift(1).exists(FileWatchUtils.ignoredDederSubdirs.contains)
-            val isDevDir = FileWatchUtils.ignoredDirNames.contains(firstSeg)
-            !(isDederSubdir || isDevDir)
-          }
-        )
-      } catch {
-        case _: InterruptedException => logger.info("File watcher interrupted, stopping...")
-        case NonFatal(e) => logger.error(s"File watcher error: ${e.getMessage}", e)
-      }
-      ()
-    }, "file-watcher")
+          )
+        } catch {
+          case _: InterruptedException => logger.info("File watcher interrupted, stopping...")
+          case NonFatal(e)             => logger.error(s"File watcher error: ${e.getMessage}", e)
+        }
+        ()
+      },
+      "file-watcher"
+    )
     watcherThread.setDaemon(true)
     watcherThread.start()
     watcherThread.join()
@@ -239,14 +255,18 @@ object ServerMain extends StrictLogging {
 
   private def stopFileWatcher(): Unit = {
     logger.info("Stopping file watcher...")
-    try { watcherThread.interrupt() } catch { case _: Exception => }
-    try { watcherThread.join(3000) } catch { case _: Exception => }
+    try { watcherThread.interrupt() }
+    catch { case _: Exception => }
+    try { watcherThread.join(3000) }
+    catch { case _: Exception => }
   }
 
   private def stopDebounceScheduler(): Unit = {
     logger.info("Stopping debounce scheduler...")
-    try { debounceScheduler.shutdownNow() } catch { case _: Exception => }
-    try { debounceScheduler.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS) } catch { case _: Exception => }
+    try { debounceScheduler.shutdownNow() }
+    catch { case _: Exception => }
+    try { debounceScheduler.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS) }
+    catch { case _: Exception => }
   }
 
   private def acquireServerLock(projectRoot: os.Path): Unit = {
@@ -309,9 +329,19 @@ object ServerMain extends StrictLogging {
     }
 
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
+      logger.warn("JVM shutdown hook fired — best-effort BSP request cancellation")
+      try projectState.notifyBspClientsShuttingDown()
+      catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP clients during shutdown hook: ${e.getMessage}") }
+      try Thread.sleep(300) // short flush window for cancelled responses
+      catch { case _: InterruptedException => }
+    }))
+
+    Runtime.getRuntime.addShutdownHook(new Thread(() => {
       logger.warn("JVM shutdown hook fired (unexpected exit) — releasing lock as safety net")
-      try { serverFileLock.release() } catch { case _: Exception => }
-      try { serverLockHandle.close() } catch { case _: Exception => }
+      try { serverFileLock.release() }
+      catch { case _: Exception => }
+      try { serverLockHandle.close() }
+      catch { case _: Exception => }
     }))
   }
 
@@ -330,6 +360,9 @@ object ServerMain extends StrictLogging {
   private def isDederArtifact(p: os.Path): Boolean =
     FileWatchUtils.isDederArtifact(p, DederGlobals.projectRootDir)
 
+  private def isDevArtifact(p: os.Path): Boolean =
+    FileWatchUtils.isDevArtifact(p, DederGlobals.projectRootDir)
+
   private def loadGitignore(): Unit = {
     val gitignoreFile = DederGlobals.projectRootDir / ".gitignore"
     gitignorePatterns = FileWatchUtils.readGitignorePatterns(gitignoreFile)
@@ -342,6 +375,4 @@ object ServerMain extends StrictLogging {
     FileWatchUtils.isIgnoredByGitignore(relativePath, isDir, gitignorePatterns)
   }
 
-  private def isDevArtifact(p: os.Path): Boolean =
-    FileWatchUtils.isDevArtifact(p, DederGlobals.projectRootDir)
 }

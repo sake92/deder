@@ -494,6 +494,39 @@ class BspResilienceSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("manual kill during in-flight compile returns CANCELLED instead of hanging") {
+    val testDir = os.pwd / "tmp" / s"bsp-kill-inflight-${System.currentTimeMillis()}"
+    try {
+      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
+      val lines = os.read.lines(testDir / "deder.pkl")
+      os.write.over(
+        testDir / "deder.pkl",
+        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
+      )
+      writeServerProperties(testDir)
+      executeDederCommand(testDir, "bsp", "install")
+
+      withBspSession(testDir) { (buildServer, capturingClient, _) =>
+        capturingClient.clear()
+
+        val params = new CompileParams(List(targetId(testDir, "common")).asJava)
+        params.setOriginId("test-kill-inflight")
+        val future = buildServer.buildTargetCompile(params)
+
+        val started = capturingClient.awaitTaskStart(timeout = 30.seconds)
+        assert(started.isDefined, "compile should start before manual kill")
+
+        val pid = os.read(testDir / ".deder/server.lock").trim
+        os.proc("kill", "-TERM", pid).call(cwd = testDir)
+
+        val result = future.get(60, TimeUnit.SECONDS)
+        assertEquals(result.getStatusCode, StatusCode.CANCELLED)
+      }
+    } finally {
+      executeDederCommand(testDir, "shutdown")
+    }
+  }
+
   private def baseUri(testDir: os.Path) = testDir.toNIO.toUri.toString
 
   private def targetId(testDir: os.Path, module: String) =
