@@ -248,10 +248,13 @@ open class JavaModule extends DederModule {
   publish: Boolean = true
   pomSettings: PomSettings?
   /// The repository to publish artifacts to.
-  /// The `id` must match a key in `~/.deder/credentials.pkl`.
+  /// Default is Sonatype Central (stable releases).
+  /// You can use env vars or `~/.deder/credentials.pkl` to avoid hardcoding sensitive credentials in this config file.
+  /// The env vars have format of DEDER_<PUBLISH_REPO_ID>_<CREDENTIAL_KEY>, e.g. DEDER_SONATYPE_USERNAME for a SonatypeCentralRepo with id "sonatype".
+  /// The `id` can have a matching key in `~/.deder/credentials.pkl`.
   /// Use `SonatypeCentralRepo` for Sonatype Central (releases), `SonatypeSnapshotRepo` for snapshots,
   /// or `MavenRepo` for any other repository.
-  publishTo: PublishRepo?
+  publishTo: PublishRepo? = new SonatypeCentralRepo { id = "sonatype" }
   /// Custom local Maven repository folder for the `publishLocal` task.
   /// When set, artifacts are published to this folder instead of the default `~/.m2/repository`.
   /// Accepts a relative path (resolved against the project root) or an absolute path.
@@ -643,8 +646,7 @@ const function scalaModules(
   _root: String,
   _layout: DirLayout,
   _id: String?,
-): ScalaModules =
-  scalaModulesWithTestId(_template, _testTemplate, _root, _layout, _id, null)
+): ScalaModules = scalaModulesWithTestId(_template, _testTemplate, _root, _layout, _id, null)
 
 /// Internal-by-convention helper for importer-rendered JVM cross-version ids.
 /// Prefer `scalaModules(...)` unless you explicitly need a custom test module id.
