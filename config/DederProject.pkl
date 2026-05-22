@@ -201,9 +201,9 @@ class JUnitXmlReportSettings {
   outputDir: String?
 }
 
-class MvnApp {
-  /// Maven dependency coordinate, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
-  dep: String(!isEmpty)
+open class MvnApp {
+  /// Maven dependencies, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
+  deps: Listing<String> = new Listing { }
   /// Fully qualified main class to run
   mainClass: String(!isEmpty)
   /// Arguments to pass to the main class when running the app. Can also be provided at runtime via `deder exec -t runMvnApp <name> -- [args...]`, which will be appended to these defaults.

@@ -965,16 +965,16 @@ class CoreTasks() extends StrictLogging {
       }
       val autoMvnAppsMap: Map[String, DederProject.MvnApp] = ctx.module match {
         case m: ScalaModule =>
-          val scalafmtDep = "org.scalameta:scalafmt-cli_2.13:3.10.7"
+          val scalafmtDeps = List("org.scalameta:scalafmt-cli_2.13:3.10.7")
           val scalafmtMain = "org.scalafmt.cli.Cli"
           Map(
-            "fmt" -> DederProject.MvnApp(scalafmtDep, scalafmtMain, sourcePaths.asJava),
-            "fmtCheck" -> DederProject.MvnApp(scalafmtDep, scalafmtMain, (Seq("--check") ++ sourcePaths).asJava)
+            "fmt" -> DederProject.MvnApp(scalafmtDeps.asJava, scalafmtMain, sourcePaths.asJava),
+            "fmtCheck" -> DederProject.MvnApp(scalafmtDeps.asJava, scalafmtMain, (Seq("--check") ++ sourcePaths).asJava)
           )
         case _ => Map.empty
       }
-      val effectiveMap = (userMvnAppsMap ++ autoMvnAppsMap).map { case (name, tc) =>
-        name -> (tc.dep, tc.mainClass, tc.args.asScala.toSeq)
+      val effectiveMap = (userMvnAppsMap ++ autoMvnAppsMap).map { case (name, app) =>
+        name -> (app.deps.asScala.toSeq, app.mainClass, app.args.asScala.toSeq)
       }
 
       val mvnAppName = ctx.args.headOption.getOrElse(
@@ -983,9 +983,11 @@ class CoreTasks() extends StrictLogging {
         )
       )
       effectiveMap.get(mvnAppName) match {
-        case Some((dep, mainClass, args)) =>
-          val dependency = Dependency.make(dep, scalaVersion)
-          val jars = ctx.dependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
+        case Some((deps, mainClass, args)) =>
+          val dependencies = deps.map(Dependency.make(_, scalaVersion))
+          logger.info(s"Resolving dependencies for maven app '${mvnAppName}': ${dependencies.map(_.toString).mkString(", ")}")
+          val jars = ctx.dependencyResolver.fetchFiles(dependencies, Some(ctx.notifications))
+          logger.info(s"Resolved jars for maven app '${mvnAppName}': ${jars.map(_.toString).mkString(", ")}")
           val cp = jars.map(_.toString).mkString(File.pathSeparator)
           val commandArgs = args ++ ctx.args.tail
           val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, mainClass) ++ commandArgs

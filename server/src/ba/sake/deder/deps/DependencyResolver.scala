@@ -12,8 +12,9 @@ import coursierapi.{MavenRepository as CsMavenRepository, Repository as CsReposi
 import dependency.api.ops.*
 import ba.sake.deder.{OTEL, ServerNotificationsLogger}
 import ba.sake.deder.ServerNotification
+import com.typesafe.scalalogging.StrictLogging
 
-class DependencyResolver(val repositories: Seq[CsRepository]) extends DependencyResolverApi {
+class DependencyResolver(val repositories: Seq[CsRepository]) extends DependencyResolverApi with StrictLogging {
 
   // In-process cache for resolved file paths, keyed by sorted dependency
   // coordinates. Scoped to this resolver instance, so repos implicitly key
@@ -54,25 +55,28 @@ class DependencyResolver(val repositories: Seq[CsRepository]) extends Dependency
       dependencies: Seq[Dependency],
       notifications: Option[ServerNotificationsLogger] = None
   ): Seq[os.Path] = {
-    if dependencies.isEmpty then return Seq.empty
-    val coursierDeps = dependencies.map(_.applied.toCs)
-    val key = DependencyResolver.depsCacheKey(coursierDeps)
-    fetchFilesCache.get(
-      key,
-      _ => {
-        val span = OTEL.TRACER
-          .spanBuilder("DependencyResolver.fetchFiles")
-          .setAttribute("deps.count", dependencies.size.toLong)
-          .startSpan()
-        try doFetch(coursierDeps, notifications).getFiles.asScala.map(f => os.Path(f.toPath)).toSeq
-        finally span.end()
-      }
-    )
+    if dependencies.isEmpty then Seq.empty
+    else {
+      val coursierDeps = dependencies.map(_.applied.toCs)
+      val key = DependencyResolver.depsCacheKey(coursierDeps)
+      fetchFilesCache.get(
+        key,
+        _ => {
+          val span = OTEL.TRACER
+            .spanBuilder("DependencyResolver.fetchFiles")
+            .setAttribute("deps.count", dependencies.size.toLong)
+            .startSpan()
+          try doFetch(coursierDeps, notifications).getFiles.asScala.map(f => os.Path(f.toPath)).toSeq
+          finally span.end()
+        }
+      )
+    }
   }
 
   def fetchFile(dependency: Dependency): os.Path =
     fetchFiles(Seq(dependency)).head
 
+  // used from GraalVM tasks
   def resolveTransitiveCoordinates(
       dependencies: Seq[Dependency],
       notifications: Option[ServerNotificationsLogger] = None
@@ -93,14 +97,11 @@ object DependencyResolver {
   private[deder] def depsCacheKey(dependencies: Seq[CoursierDependency]): String =
     dependencies.map(_.toString).sorted.mkString(",")
 
-  /** Assemble the final ordered repo list from user-declared repos + the
-    * `includeDefaultRepos` flag.
+  /** Assemble the final ordered repo list from user-declared repos + the `includeDefaultRepos` flag.
     *
-    *   - `includeDefaultRepos = true`, user repos empty or not →
-    *     `user ++ [~/.m2/repository] ++ Coursier defaults`.
+    *   - `includeDefaultRepos = true`, user repos empty or not → `user ++ [~/.m2/repository] ++ Coursier defaults`.
     *   - `includeDefaultRepos = false`, user repos non-empty → `user`.
-    *   - `includeDefaultRepos = false`, user repos empty → throws
-    *     `IllegalArgumentException`.
+    *   - `includeDefaultRepos = false`, user repos empty → throws `IllegalArgumentException`.
     */
   def assembleRepositories(
       userRepoUrls: Seq[String],

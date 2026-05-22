@@ -1,0 +1,420 @@
+└─ ba.sake:openapi4s-cli_2.13:0.6.4
+   ├─ ba.sake:openapi4s_2.13:0.6.4
+   │  ├─ ba.sake:regenesca_2.13:0.6.3
+   │  │  ├─ ch.epfl.scala:scalafix-core_2.13:0.14.2
+   │  │  │  ├─ com.googlecode.java-diff-utils:diffutils:1.3.0
+   │  │  │  ├─ org.scala-lang:scala-library:2.13.16
+   │  │  │  ├─ org.scala-lang.modules:scala-collection-compat_2.13:2.13.0
+   │  │  │  │  └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │  ├─ org.scalameta:metaconfig-typesafe-config_2.13:0.15.0
+   │  │  │  │  ├─ com.typesafe:config:1.4.3
+   │  │  │  │  ├─ org.scala-lang:scala-library:2.13.16
+   │  │  │  │  └─ org.scalameta:metaconfig-core_2.13:0.15.0
+   │  │  │  │     ├─ org.scala-lang:scala-library:2.13.16
+   │  │  │  │     ├─ org.scala-lang:scala-reflect:2.13.16
+   │  │  │  │     │  └─ org.scala-lang:scala-library:2.13.16
+   │  │  │  │     ├─ org.scala-lang.modules:scala-collection-compat_2.13:2.13.0
+   │  │  │  │     │  └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │  │     ├─ org.scalameta:metaconfig-pprint_2.13:0.15.0
+   │  │  │  │     │  ├─ com.lihaoyi:fansi_2.13:0.5.0
+   │  │  │  │     │  │  ├─ com.lihaoyi:sourcecode_2.13:[33m0.4.0 -> 0.4.2[0m
+   │  │  │  │     │  │  │  └─ org.scala-lang:scala-library:[33m2.13.8 -> 2.13.16[0m
+   │  │  │  │     │  │  └─ org.scala-lang:scala-library:[33m2.13.8 -> 2.13.16[0m
+   │  │  │  │     │  ├─ org.scala-lang:scala-compiler:2.13.16
+   │  │  │  │     │  │  ├─ io.github.java-diff-utils:java-diff-utils:4.15
+   │  │  │  │     │  │  ├─ org.jline:jline:3.27.1
+   │  │  │  │     │  │  ├─ org.scala-lang:scala-library:2.13.16
+   │  │  │  │     │  │  └─ org.scala-lang:scala-reflect:2.13.16
+   │  │  │  │     │  │     └─ org.scala-lang:scala-library:2.13.16
+   │  │  │  │     │  ├─ org.scala-lang:scala-library:2.13.16
+   │  │  │  │     │  └─ org.scala-lang:scala-reflect:2.13.16
+   │  │  │  │     │     └─ org.scala-lang:scala-library:2.13.16
+   │  │  │  │     └─ org.typelevel:paiges-core_2.13:0.4.4
+   │  │  │  │        └─ org.scala-lang:scala-library:[33m2.13.14 -> 2.13.16[0m
+   │  │  │  ├─ org.scalameta:scalameta_2.13:4.13.1.1
+   │  │  │  │  ├─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │  │  └─ org.scalameta:parsers_2.13:4.13.1.1
+   │  │  │  │     ├─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │  │     └─ org.scalameta:trees_2.13:4.13.1.1
+   │  │  │  │        ├─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │  │        ├─ org.scalameta:common_2.13:4.13.1.1
+   │  │  │  │        │  ├─ com.lihaoyi:sourcecode_2.13:0.4.2
+   │  │  │  │        │  │  └─ org.scala-lang:scala-library:[33m2.13.8 -> 2.13.16[0m
+   │  │  │  │        │  └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │  │        └─ org.scalameta:io_2.13:4.13.1.1
+   │  │  │  │           └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │  └─ org.scalameta:semanticdb-shared_2.13:4.13.1.1
+   │  │  │     ├─ com.thesamet.scalapb:scalapb-runtime_2.13:0.11.15
+   │  │  │     │  ├─ com.google.protobuf:protobuf-java:3.19.6
+   │  │  │     │  ├─ com.thesamet.scalapb:lenses_2.13:0.11.15
+   │  │  │     │  │  ├─ org.scala-lang:scala-library:[33m2.13.12 -> 2.13.16[0m
+   │  │  │     │  │  └─ org.scala-lang.modules:scala-collection-compat_2.13:[31m2.11.0 -> 2.13.0 (possible incompatibility)[0m
+   │  │  │     │  │     └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │     │  ├─ org.scala-lang:scala-library:[33m2.13.12 -> 2.13.16[0m
+   │  │  │     │  └─ org.scala-lang.modules:scala-collection-compat_2.13:[31m2.11.0 -> 2.13.0 (possible incompatibility)[0m
+   │  │  │     │     └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │     ├─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │     ├─ org.scala-lang:scalap:2.13.13
+   │  │  │     │  └─ org.scala-lang:scala-compiler:[33m2.13.13 -> 2.13.16[0m
+   │  │  │     │     ├─ io.github.java-diff-utils:java-diff-utils:4.15
+   │  │  │     │     ├─ org.jline:jline:3.27.1
+   │  │  │     │     ├─ org.scala-lang:scala-library:2.13.16
+   │  │  │     │     └─ org.scala-lang:scala-reflect:2.13.16
+   │  │  │     │        └─ org.scala-lang:scala-library:2.13.16
+   │  │  │     └─ org.scalameta:scalameta_2.13:4.13.1.1
+   │  │  │        ├─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │        └─ org.scalameta:parsers_2.13:4.13.1.1
+   │  │  │           ├─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │           └─ org.scalameta:trees_2.13:4.13.1.1
+   │  │  │              ├─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │              ├─ org.scalameta:common_2.13:4.13.1.1
+   │  │  │              │  ├─ com.lihaoyi:sourcecode_2.13:0.4.2
+   │  │  │              │  │  └─ org.scala-lang:scala-library:[33m2.13.8 -> 2.13.16[0m
+   │  │  │              │  └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  │              └─ org.scalameta:io_2.13:4.13.1.1
+   │  │  │                 └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │  ├─ org.scala-lang:scala-library:[33m2.13.15 -> 2.13.16[0m
+   │  │  └─ org.scalameta:scalameta_2.13:[31m4.9.9 -> 4.13.1.1 (possible incompatibility)[0m
+   │  │     ├─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │     └─ org.scalameta:parsers_2.13:4.13.1.1
+   │  │        ├─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │        └─ org.scalameta:trees_2.13:4.13.1.1
+   │  │           ├─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │           ├─ org.scalameta:common_2.13:4.13.1.1
+   │  │           │  ├─ com.lihaoyi:sourcecode_2.13:0.4.2
+   │  │           │  │  └─ org.scala-lang:scala-library:[33m2.13.8 -> 2.13.16[0m
+   │  │           │  └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  │           └─ org.scalameta:io_2.13:4.13.1.1
+   │  │              └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   │  ├─ io.swagger.parser.v3:swagger-parser:2.1.24
+   │  │  ├─ commons-io:commons-io:2.17.0
+   │  │  ├─ io.swagger.parser.v3:swagger-parser-v2-converter:2.1.24
+   │  │  │  ├─ io.swagger:swagger-compat-spec-parser:1.0.72
+   │  │  │  │  ├─ com.github.java-json-tools:json-patch:1.13
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  ├─ com.github.java-json-tools:jackson-coreutils:2.0
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  ├─ com.github.java-json-tools:msg-simple:1.2
+   │  │  │  │  │  │  │  ├─ com.github.java-json-tools:btf:1.3
+   │  │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  └─ com.github.java-json-tools:msg-simple:1.2
+   │  │  │  │  │     ├─ com.github.java-json-tools:btf:1.3
+   │  │  │  │  │     │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │     └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  ├─ com.github.java-json-tools:json-schema-validator:2.2.14
+   │  │  │  │  │  ├─ com.github.java-json-tools:jackson-coreutils-equivalence:1.0
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  ├─ com.github.java-json-tools:jackson-coreutils:2.0
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  │  ├─ com.github.java-json-tools:msg-simple:1.2
+   │  │  │  │  │  │  │  │  ├─ com.github.java-json-tools:btf:1.3
+   │  │  │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  └─ com.google.guava:guava:[31m28.2-android -> 32.1.3-android (possible incompatibility)[0m
+   │  │  │  │  │  │     ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │     ├─ com.google.errorprone:error_prone_annotations:2.21.1
+   │  │  │  │  │  │     ├─ com.google.guava:failureaccess:1.0.1
+   │  │  │  │  │  │     ├─ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+   │  │  │  │  │  │     ├─ com.google.j2objc:j2objc-annotations:2.8
+   │  │  │  │  │  │     └─ org.checkerframework:checker-qual:3.37.0
+   │  │  │  │  │  ├─ com.github.java-json-tools:json-schema-core:1.2.14
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  ├─ com.github.java-json-tools:jackson-coreutils:2.0
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  │  ├─ com.github.java-json-tools:msg-simple:1.2
+   │  │  │  │  │  │  │  │  ├─ com.github.java-json-tools:btf:1.3
+   │  │  │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  ├─ com.github.java-json-tools:jackson-coreutils-equivalence:1.0
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  │  ├─ com.github.java-json-tools:jackson-coreutils:2.0
+   │  │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  │  │  ├─ com.github.java-json-tools:msg-simple:1.2
+   │  │  │  │  │  │  │  │  │  ├─ com.github.java-json-tools:btf:1.3
+   │  │  │  │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  │  └─ com.google.guava:guava:[31m28.2-android -> 32.1.3-android (possible incompatibility)[0m
+   │  │  │  │  │  │  │     ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  │     ├─ com.google.errorprone:error_prone_annotations:2.21.1
+   │  │  │  │  │  │  │     ├─ com.google.guava:failureaccess:1.0.1
+   │  │  │  │  │  │  │     ├─ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+   │  │  │  │  │  │  │     ├─ com.google.j2objc:j2objc-annotations:2.8
+   │  │  │  │  │  │  │     └─ org.checkerframework:checker-qual:3.37.0
+   │  │  │  │  │  │  ├─ com.github.java-json-tools:uri-template:0.10
+   │  │  │  │  │  │  │  ├─ com.github.java-json-tools:msg-simple:1.2
+   │  │  │  │  │  │  │  │  ├─ com.github.java-json-tools:btf:1.3
+   │  │  │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  │  │  └─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  │  ├─ com.google.code.findbugs:jsr305:[31m2.0.1 -> 3.0.2 (possible incompatibility)[0m
+   │  │  │  │  │  │  │  └─ com.google.guava:guava:[31m28.1-android -> 32.1.3-android (possible incompatibility)[0m
+   │  │  │  │  │  │  │     ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  │     ├─ com.google.errorprone:error_prone_annotations:2.21.1
+   │  │  │  │  │  │  │     ├─ com.google.guava:failureaccess:1.0.1
+   │  │  │  │  │  │  │     ├─ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+   │  │  │  │  │  │  │     ├─ com.google.j2objc:j2objc-annotations:2.8
+   │  │  │  │  │  │  │     └─ org.checkerframework:checker-qual:3.37.0
+   │  │  │  │  │  │  ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  ├─ com.google.guava:guava:[31m28.2-android -> 32.1.3-android (possible incompatibility)[0m
+   │  │  │  │  │  │  │  ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  │  ├─ com.google.errorprone:error_prone_annotations:2.21.1
+   │  │  │  │  │  │  │  ├─ com.google.guava:failureaccess:1.0.1
+   │  │  │  │  │  │  │  ├─ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+   │  │  │  │  │  │  │  ├─ com.google.j2objc:j2objc-annotations:2.8
+   │  │  │  │  │  │  │  └─ org.checkerframework:checker-qual:3.37.0
+   │  │  │  │  │  │  └─ org.mozilla:rhino:1.7.7.2
+   │  │  │  │  │  ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  ├─ com.google.guava:guava:[31m28.2-android -> 32.1.3-android (possible incompatibility)[0m
+   │  │  │  │  │  │  ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  ├─ com.google.errorprone:error_prone_annotations:2.21.1
+   │  │  │  │  │  │  ├─ com.google.guava:failureaccess:1.0.1
+   │  │  │  │  │  │  ├─ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+   │  │  │  │  │  │  ├─ com.google.j2objc:j2objc-annotations:2.8
+   │  │  │  │  │  │  └─ org.checkerframework:checker-qual:3.37.0
+   │  │  │  │  │  ├─ com.googlecode.libphonenumber:libphonenumber:8.11.1
+   │  │  │  │  │  ├─ joda-time:joda-time:2.10.5
+   │  │  │  │  │  └─ net.sf.jopt-simple:jopt-simple:5.0.4
+   │  │  │  │  ├─ io.swagger:swagger-core:1.6.14
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.16.2
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  │  │  ├─ com.google.guava:guava:32.1.3-android
+   │  │  │  │  │  │  ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  ├─ com.google.errorprone:error_prone_annotations:2.21.1
+   │  │  │  │  │  │  ├─ com.google.guava:failureaccess:1.0.1
+   │  │  │  │  │  │  ├─ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+   │  │  │  │  │  │  ├─ com.google.j2objc:j2objc-annotations:2.8
+   │  │  │  │  │  │  └─ org.checkerframework:checker-qual:3.37.0
+   │  │  │  │  │  ├─ io.swagger:swagger-models:1.6.14
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  ├─ io.swagger:swagger-annotations:1.6.14
+   │  │  │  │  │  │  └─ org.slf4j:slf4j-api:2.0.9
+   │  │  │  │  │  ├─ jakarta.xml.bind:jakarta.xml.bind-api:2.3.3
+   │  │  │  │  │  │  └─ jakarta.activation:jakarta.activation-api:1.2.2
+   │  │  │  │  │  ├─ javax.validation:validation-api:1.1.0.Final
+   │  │  │  │  │  ├─ org.apache.commons:commons-lang3:[31m3.14.0 -> 3.17.0 (possible incompatibility)[0m
+   │  │  │  │  │  ├─ org.slf4j:slf4j-api:2.0.9
+   │  │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  │  ├─ io.swagger:swagger-parser:1.0.72
+   │  │  │  │  │  ├─ commons-io:commons-io:[31m2.15.1 -> 2.17.0 (possible incompatibility)[0m
+   │  │  │  │  │  ├─ io.swagger:swagger-core:1.6.14
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.16.2
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  │  │  │  ├─ com.google.guava:guava:32.1.3-android
+   │  │  │  │  │  │  │  ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  │  ├─ com.google.errorprone:error_prone_annotations:2.21.1
+   │  │  │  │  │  │  │  ├─ com.google.guava:failureaccess:1.0.1
+   │  │  │  │  │  │  │  ├─ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+   │  │  │  │  │  │  │  ├─ com.google.j2objc:j2objc-annotations:2.8
+   │  │  │  │  │  │  │  └─ org.checkerframework:checker-qual:3.37.0
+   │  │  │  │  │  │  ├─ io.swagger:swagger-models:1.6.14
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  ├─ io.swagger:swagger-annotations:1.6.14
+   │  │  │  │  │  │  │  └─ org.slf4j:slf4j-api:2.0.9
+   │  │  │  │  │  │  ├─ jakarta.xml.bind:jakarta.xml.bind-api:2.3.3
+   │  │  │  │  │  │  │  └─ jakarta.activation:jakarta.activation-api:1.2.2
+   │  │  │  │  │  │  ├─ javax.validation:validation-api:1.1.0.Final
+   │  │  │  │  │  │  ├─ org.apache.commons:commons-lang3:[31m3.14.0 -> 3.17.0 (possible incompatibility)[0m
+   │  │  │  │  │  │  ├─ org.slf4j:slf4j-api:2.0.9
+   │  │  │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  │  │  ├─ io.swagger:swagger-parser-safe-url-resolver:1.0.72
+   │  │  │  │  │  │  └─ commons-io:commons-io:[31m2.15.1 -> 2.17.0 (possible incompatibility)[0m
+   │  │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  │  └─ org.apache.httpcomponents:httpclient:4.5.14
+   │  │  │  │     ├─ commons-codec:commons-codec:1.11
+   │  │  │  │     ├─ commons-logging:commons-logging:1.2
+   │  │  │  │     └─ org.apache.httpcomponents:httpcore:4.4.16
+   │  │  │  ├─ io.swagger:swagger-core:1.6.14
+   │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  ├─ com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  │  ├─ com.google.guava:guava:32.1.3-android
+   │  │  │  │  │  ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  ├─ com.google.errorprone:error_prone_annotations:2.21.1
+   │  │  │  │  │  ├─ com.google.guava:failureaccess:1.0.1
+   │  │  │  │  │  ├─ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+   │  │  │  │  │  ├─ com.google.j2objc:j2objc-annotations:2.8
+   │  │  │  │  │  └─ org.checkerframework:checker-qual:3.37.0
+   │  │  │  │  ├─ io.swagger:swagger-models:1.6.14
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  ├─ io.swagger:swagger-annotations:1.6.14
+   │  │  │  │  │  └─ org.slf4j:slf4j-api:2.0.9
+   │  │  │  │  ├─ jakarta.xml.bind:jakarta.xml.bind-api:2.3.3
+   │  │  │  │  │  └─ jakarta.activation:jakarta.activation-api:1.2.2
+   │  │  │  │  ├─ org.apache.commons:commons-lang3:[31m3.14.0 -> 3.17.0 (possible incompatibility)[0m
+   │  │  │  │  ├─ org.slf4j:slf4j-api:2.0.9
+   │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  ├─ io.swagger:swagger-parser:1.0.72
+   │  │  │  │  ├─ commons-io:commons-io:[31m2.15.1 -> 2.17.0 (possible incompatibility)[0m
+   │  │  │  │  ├─ io.swagger:swagger-core:1.6.14
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.16.2
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  │  │  ├─ com.google.guava:guava:32.1.3-android
+   │  │  │  │  │  │  ├─ com.google.code.findbugs:jsr305:3.0.2
+   │  │  │  │  │  │  ├─ com.google.errorprone:error_prone_annotations:2.21.1
+   │  │  │  │  │  │  ├─ com.google.guava:failureaccess:1.0.1
+   │  │  │  │  │  │  ├─ com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+   │  │  │  │  │  │  ├─ com.google.j2objc:j2objc-annotations:2.8
+   │  │  │  │  │  │  └─ org.checkerframework:checker-qual:3.37.0
+   │  │  │  │  │  ├─ io.swagger:swagger-models:1.6.14
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  ├─ io.swagger:swagger-annotations:1.6.14
+   │  │  │  │  │  │  └─ org.slf4j:slf4j-api:2.0.9
+   │  │  │  │  │  ├─ jakarta.xml.bind:jakarta.xml.bind-api:2.3.3
+   │  │  │  │  │  │  └─ jakarta.activation:jakarta.activation-api:1.2.2
+   │  │  │  │  │  ├─ javax.validation:validation-api:1.1.0.Final
+   │  │  │  │  │  ├─ org.apache.commons:commons-lang3:[31m3.14.0 -> 3.17.0 (possible incompatibility)[0m
+   │  │  │  │  │  ├─ org.slf4j:slf4j-api:2.0.9
+   │  │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  │  ├─ io.swagger:swagger-parser-safe-url-resolver:1.0.72
+   │  │  │  │  │  └─ commons-io:commons-io:[31m2.15.1 -> 2.17.0 (possible incompatibility)[0m
+   │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  ├─ io.swagger.core.v3:swagger-models:2.2.26
+   │  │  │  │  └─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  ├─ io.swagger.parser.v3:swagger-parser-core:2.1.24
+   │  │  │  │  └─ io.swagger.core.v3:swagger-models:2.2.26
+   │  │  │  │     └─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  └─ io.swagger.parser.v3:swagger-parser-v3:2.1.24
+   │  │  │     ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │     │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │     ├─ com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.16.2
+   │  │  │     │  ├─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │     │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │     │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │     │  └─ org.yaml:snakeyaml:2.3
+   │  │  │     ├─ commons-io:commons-io:2.17.0
+   │  │  │     ├─ io.swagger.core.v3:swagger-core:2.2.26
+   │  │  │     │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │     │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │     │  ├─ com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.16.2
+   │  │  │     │  │  ├─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │     │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │     │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │     │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │     │  ├─ com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.2
+   │  │  │     │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     │  │  ├─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │     │  │  └─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │     │  │     ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     │  │     └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │     │  ├─ io.swagger.core.v3:swagger-annotations:2.2.26
+   │  │  │     │  ├─ io.swagger.core.v3:swagger-models:2.2.26
+   │  │  │     │  │  └─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     │  ├─ org.apache.commons:commons-lang3:3.17.0
+   │  │  │     │  ├─ org.slf4j:slf4j-api:2.0.9
+   │  │  │     │  └─ org.yaml:snakeyaml:2.3
+   │  │  │     ├─ io.swagger.core.v3:swagger-models:2.2.26
+   │  │  │     │  └─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     ├─ io.swagger.parser.v3:swagger-parser-core:2.1.24
+   │  │  │     │  └─ io.swagger.core.v3:swagger-models:2.2.26
+   │  │  │     │     └─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │     ├─ io.swagger.parser.v3:swagger-parser-safe-url-resolver:2.1.24
+   │  │  │     │  └─ commons-io:commons-io:2.17.0
+   │  │  │     └─ org.yaml:snakeyaml:2.3
+   │  │  ├─ io.swagger.parser.v3:swagger-parser-v3:2.1.24
+   │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  ├─ com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.16.2
+   │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  ├─ commons-io:commons-io:2.17.0
+   │  │  │  ├─ io.swagger.core.v3:swagger-core:2.2.26
+   │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  ├─ com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  │  ├─ com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │  ├─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-databind:2.16.2
+   │  │  │  │  │     ├─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  │     └─ com.fasterxml.jackson.core:jackson-core:2.16.2
+   │  │  │  │  ├─ io.swagger.core.v3:swagger-annotations:2.2.26
+   │  │  │  │  ├─ io.swagger.core.v3:swagger-models:2.2.26
+   │  │  │  │  │  └─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  │  ├─ jakarta.validation:jakarta.validation-api:2.0.2
+   │  │  │  │  ├─ jakarta.xml.bind:jakarta.xml.bind-api:2.3.3
+   │  │  │  │  │  └─ jakarta.activation:jakarta.activation-api:1.2.2
+   │  │  │  │  ├─ org.apache.commons:commons-lang3:3.17.0
+   │  │  │  │  ├─ org.slf4j:slf4j-api:2.0.9
+   │  │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  │  ├─ io.swagger.core.v3:swagger-models:2.2.26
+   │  │  │  │  └─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  ├─ io.swagger.parser.v3:swagger-parser-core:2.1.24
+   │  │  │  │  └─ io.swagger.core.v3:swagger-models:2.2.26
+   │  │  │  │     └─ com.fasterxml.jackson.core:jackson-annotations:2.16.2
+   │  │  │  ├─ io.swagger.parser.v3:swagger-parser-safe-url-resolver:2.1.24
+   │  │  │  │  └─ commons-io:commons-io:2.17.0
+   │  │  │  └─ org.yaml:snakeyaml:2.3
+   │  │  └─ org.yaml:snakeyaml:2.3
+   │  ├─ org.apache.commons:commons-text:1.12.0
+   │  │  └─ org.apache.commons:commons-lang3:[31m3.14.0 -> 3.17.0 (possible incompatibility)[0m
+   │  └─ org.scala-lang:scala-library:[33m2.13.15 -> 2.13.16[0m
+   ├─ com.lihaoyi:mainargs_2.13:0.7.6
+   │  ├─ org.scala-lang:scala-library:[33m2.13.10 -> 2.13.16[0m
+   │  └─ org.scala-lang.modules:scala-collection-compat_2.13:[31m2.12.0 -> 2.13.0 (possible incompatibility)[0m
+   │     └─ org.scala-lang:scala-library:[33m2.13.13 -> 2.13.16[0m
+   └─ org.scala-lang:scala-library:[33m2.13.15 -> 2.13.16[0m

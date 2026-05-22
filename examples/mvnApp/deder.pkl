@@ -1,0 +1,46 @@
+amends "../../config/DederProject.pkl"
+//amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+
+local class Openapi4sMvnApp extends MvnApp {
+  moduleRoot: String
+  deps {
+    "ba.sake:openapi4s-cli_2.13:0.7.0"
+  }
+  mainClass = "ba.sake.openapi4s.cli.OpenApi4sMain"
+  openApi4sModels = "tupson"
+  openApi4sFramework = "sharaf"
+  openApi4sFile = "\(moduleRoot)/resources/openapi.json"
+  openApi4sTargetDir = "\(moduleRoot)/src"
+  openApi4sPackage: String
+  args {
+    "--models"
+    openApi4sModels
+    "--framework"
+    openApi4sFramework
+    "--url"
+    openApi4sFile
+    "--baseFolder"
+    openApi4sTargetDir
+    "--basePackage"
+    openApi4sPackage
+  }
+}
+
+local const myApi = new ScalaModule {
+  local self = this
+  id = "myApi"
+  scalaVersion = "3.7.4"
+  deps {
+    "ba.sake::sharaf-undertow:0.13.0"
+  }
+  mvnApps {
+    ["openapi4s"] = new Openapi4sMvnApp {
+      moduleRoot = self.root
+      openApi4sPackage = "com.example.api"
+    }
+  }
+}
+
+modules {
+  myApi
+}
