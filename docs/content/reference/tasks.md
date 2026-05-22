@@ -111,13 +111,13 @@ deder exec -t runMvnApp -m myapp fmtCheck # check formatting
 
 ---
 
-## Publishing
+## Publishing and Bundling
 
 Publishing tasks build JARs, assemble uber-JARs, and publish Maven artifacts.
 
 | Task | Module types | What it does |
 |---|---|---|
-| `jar` | all | Builds a regular module JAR (compiled classes + resources + manifest). Cached. |
+| `jar` | all | Builds a regular JAR (compiled classes + resources + manifest). Cached. |
 | `allJars` | all | Collects the JARs from this module and all its transitive module dependencies. Cached. |
 | `assemblyDeps` | `JAVA`, `JAVA_TEST`, `SCALA`, `SCALA_TEST` | Resolves and merges all dependency JARs into a single fat dependency JAR consumed by `assembly`. Cached. |
 | `assembly` | `JAVA`, `JAVA_TEST`, `SCALA`, `SCALA_TEST` | Builds an uber-JAR (all classes + all dependency JARs merged). Optionally applies jarjar shading rules. Cached. |

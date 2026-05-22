@@ -1130,7 +1130,7 @@ class DederBspServer(
   private def tryExecuteTask[T](
       serverNotificationsLogger: ServerNotificationsLogger,
       moduleId: String,
-      task: Task[T, ?],
+      task: Task[T, ?, ?],
       args: Seq[String] = Seq.empty
   )(fallback: => T): T =
     try executeTask(serverNotificationsLogger, moduleId, task, args)
@@ -1139,7 +1139,7 @@ class DederBspServer(
   private def tryExecuteTask[T](
       serverNotificationsLogger: ServerNotificationsLogger,
       moduleId: String,
-      task: Task[T, ?],
+      task: Task[T, ?, ?],
       args: Seq[String],
       originId: String
   )(onError: TaskEvaluationException => Unit): Unit =
@@ -1149,7 +1149,7 @@ class DederBspServer(
   private def executeTask[T](
       serverNotificationsLogger: ServerNotificationsLogger,
       moduleId: String,
-      task: Task[T, ?],
+      task: Task[T, ?, ?],
       args: Seq[String] = Seq.empty,
       originId: String = null
   ): T =

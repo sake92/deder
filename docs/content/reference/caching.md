@@ -82,6 +82,5 @@ Explicit instances live in `server/src/ba/sake/deder/Hashable.scala`: `Int`, `St
 
 ### Known limitations
 
-- **Transitive dep hashing is first-level only.** `inputsHash` folds in `depResults ++ transitiveResults.headOption` (see `plugin-api/src/ba/sake/deder/Task.scala`). A change deep in the dep chain that doesn't surface in a first-level output won't invalidate downstream cache.
-- **No `changed`-based short-circuiting.** A `CachedTask` reporting `changed = false` doesn't stop downstream tasks from running; the flag is only surfaced in task results for reporting.
+- **Transitive dep hashing is first-level only.** A change deep in the dep chain doesn't necessarily invalidate downstream cache. Only if the direct task deps results have changed, the cached task will be reevaluated
 - **`Hashable[os.Path]` throws on non-file non-directory existing paths** (e.g. sockets). Missing paths return `""`.

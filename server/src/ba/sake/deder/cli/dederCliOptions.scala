@@ -2,10 +2,31 @@ package ba.sake.deder.cli
 
 import mainargs.*
 import ba.sake.deder.ServerNotification.LogLevel
+import ba.sake.deder.{ExecOutputFormat, GraphOutputFormat}
 
 given TokensReader.Simple[LogLevel] with {
   def shortName = "logLevel"
   def read(strs: Seq[String]) = Right(LogLevel.valueOf(strs.head.toUpperCase))
+}
+
+given TokensReader.Simple[ExecOutputFormat] with {
+  def shortName = "execFormat"
+  def read(strs: Seq[String]) = strs.head.toLowerCase match {
+    case "plain" => Right(ExecOutputFormat.PlainText)
+    case "json"  => Right(ExecOutputFormat.Json)
+    case other   => Left(s"Invalid format '$other'. Must be plain or json.")
+  }
+}
+
+given TokensReader.Simple[GraphOutputFormat] with {
+  def shortName = "graphFormat"
+  def read(strs: Seq[String]) = strs.head.toLowerCase match {
+    case "plain"   => Right(GraphOutputFormat.PlainText)
+    case "json"    => Right(GraphOutputFormat.Json)
+    case "dot"     => Right(GraphOutputFormat.Dot)
+    case "mermaid" => Right(GraphOutputFormat.Mermaid)
+    case other     => Left(s"Invalid format '$other'. Must be plain, json, dot, or mermaid.")
+  }
 }
 
 @main
@@ -22,24 +43,28 @@ case class DederCliModulesOptions(
     depthDown: Int = Int.MaxValue,
     @arg(doc = "Max hops following reverse-dependency edges (upstream). Default: unlimited")
     depthUp: Int = Int.MaxValue,
-    @arg(doc = "Output result as JSON")
-    json: Flag,
-    @arg(doc = "Output result as DOT graph")
-    dot: Flag,
-    @arg(doc = "Output result as Mermaid graph")
-    mermaid: Flag
+    @arg(doc = "Output format: plain, json, dot, or mermaid")
+    format: GraphOutputFormat = GraphOutputFormat.PlainText,
+    @arg(doc = "Deprecated: use --format json")
+    json: Flag = Flag(),
+    @arg(doc = "Deprecated: use --format dot")
+    dot: Flag = Flag(),
+    @arg(doc = "Deprecated: use --format mermaid")
+    mermaid: Flag = Flag()
 )
 
 @main("tasks command", "List tasks per module")
 case class DederCliTasksOptions(
     @arg(doc = "Filter tasks by Module ID", short = 'm')
     module: Option[String],
-    @arg(doc = "Output result as JSON")
-    json: Flag,
-    @arg(doc = "Output result as DOT graph")
-    dot: Flag,
-    @arg(doc = "Output result as Mermaid graph")
-    mermaid: Flag
+    @arg(doc = "Output format: plain, json, dot, or mermaid")
+    format: GraphOutputFormat = GraphOutputFormat.PlainText,
+    @arg(doc = "Deprecated: use --format json")
+    json: Flag = Flag(),
+    @arg(doc = "Deprecated: use --format dot")
+    dot: Flag = Flag(),
+    @arg(doc = "Deprecated: use --format mermaid")
+    mermaid: Flag = Flag()
 )
 
 @main("plan command", "Plan for task execution in a module")
@@ -48,12 +73,14 @@ case class DederCliPlanOptions(
     modules: Seq[String], // cant have a default... :/
     @arg(doc = "The task to plan", short = 't')
     task: String,
-    @arg(doc = "Output result as JSON")
-    json: Flag,
-    @arg(doc = "Output result as DOT graph")
-    dot: Flag,
-    @arg(doc = "Output result as Mermaid graph")
-    mermaid: Flag
+    @arg(doc = "Output format: plain, json, dot, or mermaid")
+    format: GraphOutputFormat = GraphOutputFormat.PlainText,
+    @arg(doc = "Deprecated: use --format json")
+    json: Flag = Flag(),
+    @arg(doc = "Deprecated: use --format dot")
+    dot: Flag = Flag(),
+    @arg(doc = "Deprecated: use --format mermaid")
+    mermaid: Flag = Flag()
 )
 
 @main("clean command", "Clean build artifacts for module(s)")
@@ -72,8 +99,10 @@ case class DederCliExecOptions(
     modules: Seq[String], // cant have a default... :/
     @arg(doc = "Log level", short = 'l')
     logLevel: LogLevel = LogLevel.INFO,
-    @arg(doc = "Output result as JSON")
-    json: Flag,
+    @arg(doc = "Output format: plain or json")
+    format: ExecOutputFormat = ExecOutputFormat.PlainText,
+    @arg(doc = "Deprecated: use --format json")
+    json: Flag = Flag(),
     @arg(doc = "Watch mode - re-execute task on source changes", short = 'w')
     watch: Flag,
     args: Leftover[String]

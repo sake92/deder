@@ -225,7 +225,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
       executable
     }
 
-  val all: Seq[Task[?, ?]] = Seq(
+  val all: Seq[Task[?, ?, ?]] = Seq(
     graalvmHomeTask,
     nativeImageOptionsTask,
     nativeIncludedResourcesOptionsTask,

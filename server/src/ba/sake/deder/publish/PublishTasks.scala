@@ -549,7 +549,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       ""
     }
 
-  val all: Seq[Task[?, ?]] = Seq(
+  val all: Seq[Task[?, ?, ?]] = Seq(
     versionTask,
     manifestSettingsTask,
     pomSettingsTask,

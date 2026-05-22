@@ -8,8 +8,12 @@ title: Plugins
 > **Plugin support is still evolving.** The API surface and configuration schema may change between releases.
 > Watch release notes for breaking changes.
 
-Plugins let you add custom tasks to Deder without forking the server.
-Each plugin is a JVM library that the server loads at startup via the Java ServiceLoader mechanism.
+Plugins let you add custom tasks to Deder modules.
+
+Each plugin is a JVM library that the server loads at startup via the Java ServiceLoader mechanism.  
+And it reloads them as soon as you change `deder.pkl` build, no need for restarting the server manually!
+
+Check out some official plugins in [deder-plugins repo](https://github.com/sake92/deder-plugins).
 
 ## Core moving parts
 
@@ -84,7 +88,7 @@ If you are developing inside a Deder checkout, the convenience wrapper does the 
 
 This reads `my-plugin/resources/*.pkl`, writes generated Java sources into `my-plugin/src/`, and refreshes any generated or bundled resources under `my-plugin/resources/`.
 
-### 3. Read config in `tasks(params)`
+### 3. Read config in `tasks` function
 
 ```scala
 import ba.sake.deder.*
@@ -110,25 +114,23 @@ class MyPluginImpl extends DederPluginApi:
     Right(Seq(myTask))
 ```
 
-### 4. Use typed config in `deder.pkl` (consumer project)
+### 4. Use typed config in a `deder.pkl` (consumer project)
 
-Import your plugin's Pkl module and instantiate the typed plugin class directly — no bare `new { id = ... }` block needed:
+Import your plugin's Pkl module and instantiate the typed plugin class directly:
 
 ```pkl
 amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
-import "package://example.com/my-deder-plugin@1.0.0#/MyPluginModule.pkl" as MPM
+import "https://example.github.io/myuser/my-deder-plugin/MyPluginModule.pkl" as MPM
 
 plugins {
   new MPM.MyPlugin {
-    config = new MPM.MyPluginConfig {
+    config = new {
       greeting = "Hello from typed config!"
     }
   }
 }
 ```
-
-Scala-published plugin artifacts typically use `::` coordinates (cross-published for multiple Scala versions), e.g. `"com.example::my-deder-plugin:1.0.0"`.
 
 ## Local development workflow
 
@@ -139,8 +141,4 @@ Scala-published plugin artifacts typically use `::` coordinates (cross-published
    ./scripts/gen-plugin-bindings.sh my-plugin
    ```
 2. **Build your plugin** and publish it to your local Maven repository.
-3. **Point your test project** at the local version via `deps` in `deder.pkl`.
-
-> **Deder contributors only:** If you also modified `plugin-api/` or `config/` in a local Deder checkout, publish both first:
-> `deder exec -t publishLocal -m config -m plugin-api`.
-> See [CONTRIBUTING.md](https://github.com/sake92/deder/blob/main/CONTRIBUTING.md#plugin-development) for full contributor details.
+3. **Point your test project** at the local version via `deps` in `MyPluginModule.pkl`.

@@ -11,7 +11,7 @@ This can be useful for checking formatting, generating code etc.
 ```pkl
 mvnApps = new Mapping {
   ["myapp"] = new MvnApp {
-    dep = "com.example:myapp:1.0.0"
+    deps { "com.example:myapp:1.0.0" }
     mainClass = "com.example.myapp.Main"
     args {
       // e.g. pass in some arguments to the main class
@@ -29,4 +29,7 @@ deder exec -t runMvnApp myapp -- some_additional_args
 ```
 
 Note that `some_additional_args` will be appended to the `args` defined in the `MvnApp`.
+
+See [examples/mvnApp](https://github.com/sake92/deder/blob/main/examples/mvnApp/deder.pkl) for an even more type-safe example.
+
 
