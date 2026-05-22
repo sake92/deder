@@ -119,8 +119,7 @@ deder clean -m mod% -t compile%
    <p>Explicit instances live in <code>server/src/ba/sake/deder/Hashable.scala</code>: <code>Int</code>, <code>String</code>, <code>Boolean</code>, <code>os.Path</code>, <code>Option[T]</code>, <code>Seq[T]</code>, <code>Map[K,V]</code>. A low-priority given derives <code>Hashable[T]</code> from <code>JsonRW[T]</code> by hashing the JSON string, so any config type is automatically hashable. Explicit instances take priority — <code>os.Path</code> hashes file/directory contents (recursively, with leaf names bound to child hashes) rather than the path string.</p>
    <h3 id="known-limitations">Known limitations<a href="#known-limitations" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <ul>
-    <li><strong>Transitive dep hashing is first-level only.</strong> <code>inputsHash</code> folds in <code>depResults ++ transitiveResults.headOption</code> (see <code>plugin-api/src/ba/sake/deder/Task.scala</code>). A change deep in the dep chain that doesn't surface in a first-level output won't invalidate downstream cache.</li>
-    <li><strong>No <code>changed</code>-based short-circuiting.</strong> A <code>CachedTask</code> reporting <code>changed = false</code> doesn't stop downstream tasks from running; the flag is only surfaced in task results for reporting.</li>
+    <li><strong>Transitive dep hashing is first-level only.</strong> A change deep in the dep chain doesn't necessarily invalidate downstream cache. Only if the direct task deps results have changed, the cached task will be reevaluated</li>
     <li><strong><code>Hashable[os.Path]</code> throws on non-file non-directory existing paths</strong> (e.g. sockets). Missing paths return <code>""</code>.</li>
    </ul>
    <div role="group">

@@ -49,8 +49,8 @@
            <ul>
             <li><a href="#1-define-the-pkl-schema-bundled-in-the-plugin-jar">1. Define the Pkl schema (bundled in the plugin JAR)</a></li>
             <li><a href="#2-generate-java-bindings">2. Generate Java bindings</a></li>
-            <li><a href="#3-read-config-in-tasksparams">3. Read config in tasks(params)</a></li>
-            <li><a href="#4-use-typed-config-in-dederpkl-consumer-project">4. Use typed config in deder.pkl (consumer project)</a></li>
+            <li><a href="#3-read-config-in-tasks-function">3. Read config in tasks function</a></li>
+            <li><a href="#4-use-typed-config-in-a-dederpkl-consumer-project">4. Use typed config in a deder.pkl (consumer project)</a></li>
            </ul></li>
           <li><a href="#local-development-workflow">Local development workflow</a></li>
          </ul></li>
@@ -66,7 +66,11 @@
    <blockquote>
     <p><strong>Plugin support is still evolving.</strong> The API surface and configuration schema may change between releases. Watch release notes for breaking changes.</p>
    </blockquote>
-   <p>Plugins let you add custom tasks to Deder without forking the server. Each plugin is a JVM library that the server loads at startup via the Java ServiceLoader mechanism.</p>
+   <p>Plugins let you add custom tasks to Deder modules.</p>
+   <p>Each plugin is a JVM library that the server loads at startup via the Java ServiceLoader mechanism.
+    <br>
+    And it reloads them as soon as you change <code>deder.pkl</code> build, no need for restarting the server manually!</p>
+   <p>Check out some official plugins in <a href="https://github.com/sake92/deder-plugins">deder-plugins repo</a>.</p>
    <h2 id="core-moving-parts">Core moving parts<a href="#core-moving-parts" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <table>
     <thead>
@@ -138,7 +142,7 @@ pkl-codegen-java \
    <pre><code class="language-shell hljs" data-highlighted="yes">./scripts/gen-plugin-bindings.sh my-plugin
 </code></pre>
    <p>This reads <code>my-plugin/resources/*.pkl</code>, writes generated Java sources into <code>my-plugin/src/</code>, and refreshes any generated or bundled resources under <code>my-plugin/resources/</code>.</p>
-   <h3 id="3-read-config-in-tasksparams">3. Read config in <code>tasks(params)</code><a href="#3-read-config-in-tasksparams" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <h3 id="3-read-config-in-tasks-function">3. Read config in <code>tasks</code> function<a href="#3-read-config-in-tasks-function" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <pre><code class="language-scala hljs" data-highlighted="yes"><span class="hljs-keyword">import</span> ba.sake.deder.*
 
 <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MyPluginImpl</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">DederPluginApi</span></span>:
@@ -161,32 +165,28 @@ pkl-codegen-java \
       }
     <span class="hljs-type">Right</span>(<span class="hljs-type">Seq</span>(myTask))
 </code></pre>
-   <h3 id="4-use-typed-config-in-dederpkl-consumer-project">4. Use typed config in <code>deder.pkl</code> (consumer project)<a href="#4-use-typed-config-in-dederpkl-consumer-project" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
-   <p>Import your plugin's Pkl module and instantiate the typed plugin class directly — no bare <code>new { id = ... }</code> block needed:</p>
+   <h3 id="4-use-typed-config-in-a-dederpkl-consumer-project">4. Use typed config in a <code>deder.pkl</code> (consumer project)<a href="#4-use-typed-config-in-a-dederpkl-consumer-project" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>Import your plugin's Pkl module and instantiate the typed plugin class directly:</p>
    <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
-import "package://example.com/my-deder-plugin@1.0.0#/MyPluginModule.pkl" as MPM
+import "https://example.github.io/myuser/my-deder-plugin/MyPluginModule.pkl" as MPM
 
 plugins {
   new MPM.MyPlugin {
-    config = new MPM.MyPluginConfig {
+    config = new {
       greeting = "Hello from typed config!"
     }
   }
 }
 </code></pre>
-   <p>Scala-published plugin artifacts typically use <code>::</code> coordinates (cross-published for multiple Scala versions), e.g. <code>"com.example::my-deder-plugin:1.0.0"</code>.</p>
    <h2 id="local-development-workflow">Local development workflow<a href="#local-development-workflow" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <ol>
     <li><strong>If you changed the Pkl schema</strong> — regenerate Java config bindings. In your own plugin repository use <code>pkl-codegen-java</code> directly (see <a href="#2-generate-java-bindings">§ Generate Java bindings</a> above). Inside a Deder checkout the wrapper also works:
      <pre><code class="language-shell hljs" data-highlighted="yes">./scripts/gen-plugin-bindings.sh my-plugin
 </code></pre></li>
     <li><strong>Build your plugin</strong> and publish it to your local Maven repository.</li>
-    <li><strong>Point your test project</strong> at the local version via <code>deps</code> in <code>deder.pkl</code>.</li>
+    <li><strong>Point your test project</strong> at the local version via <code>deps</code> in <code>MyPluginModule.pkl</code>.</li>
    </ol>
-   <blockquote>
-    <p><strong>Deder contributors only:</strong> If you also modified <code>plugin-api/</code> or <code>config/</code> in a local Deder checkout, publish both first: <code>deder exec -t publishLocal -m config -m plugin-api</code>. See <a href="https://github.com/sake92/deder/blob/main/CONTRIBUTING.md#plugin-development">CONTRIBUTING.md</a> for full contributor details.</p>
-   </blockquote>
    <div role="group">
     <a role="button" href="https://sake92.github.io/deder/howtos/otel.html">⬅️ OTEL tracing/logging/metrics</a> <span></span> <span></span>
    </div>

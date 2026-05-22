@@ -69,12 +69,12 @@ deder clean                      # clean all modules
 deder clean -m mymodule          # clean specific module
 deder clean -m mod1 -m mod2      # clean multiple modules
 deder clean -m mod%              # clean modules matching wildcard
-deder clean -m mod% -m ~mod-test  # exclude module from wildcard match (~ negates)
+deder clean -m mod% -m ~mod-test # exclude module from wildcard match (~ negates)
 deder clean -t compile           # clean compile task on all modules
 deder clean -m mymodule -t test  # clean test task on specific module
 
-deder import                          # autodetect build tool (sbt via build.sbt)
-deder import --from sbt                # explicit override
+deder import                          # autodetect build tool
+deder import --from sbt               # explicit override
 <span class="hljs-meta prompt_">
 #</span><span class="language-bash"><span class="hljs-comment">############### install shell completions</span></span>
 deder complete -s bash -o &gt; ~/.local/share/bash-completion/completions/deder
@@ -150,7 +150,7 @@ deder exec -t runMvnApp -m mymodule fmtCheck
    <pre><code class="language-pkl">repositories {
   new MavenRepository { url = "https://nexus.example.com/releases/" }
 }
-# includeDefaultRepos = false  # air-gapped mode
+# includeDefaultRepos = false  # force empty default repos, no local .m2 and Maven Central
 </code></pre>
    <p>See <a href="https://sake92.github.io/deder/reference/repositories.html">Repositories</a> for details.</p>
    <h2 id="dependency-exclusions">Dependency Exclusions<a href="#dependency-exclusions" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>

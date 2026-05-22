@@ -56,7 +56,7 @@
     This can be useful for checking formatting, generating code etc.</p>
    <pre><code class="language-pkl">mvnApps = new Mapping {
   ["myapp"] = new MvnApp {
-    dep = "com.example:myapp:1.0.0"
+    deps { "com.example:myapp:1.0.0" }
     mainClass = "com.example.myapp.Main"
     args {
       // e.g. pass in some arguments to the main class
@@ -70,6 +70,7 @@
    <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t runMvnApp myapp -- some_additional_args
 </code></pre>
    <p>Note that <code>some_additional_args</code> will be appended to the <code>args</code> defined in the <code>MvnApp</code>.</p>
+   <p>See <a href="https://github.com/sake92/deder/blob/main/examples/mvnApp/deder.pkl">examples/mvnApp</a> for an even more type-safe example.</p>
    <div role="group">
     <a role="button" href="https://sake92.github.io/deder/howtos/env-vars.html">⬅️ Environment variables and JVM options</a> <span></span> <a role="button" href="https://sake92.github.io/deder/howtos/otel.html">OTEL tracing/logging/metrics ➡️</a>
    </div>

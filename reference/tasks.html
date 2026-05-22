@@ -48,7 +48,7 @@
           <li><a href="#dependencies">Dependencies</a></li>
           <li><a href="#verification">Verification</a></li>
           <li><a href="#run">Run</a></li>
-          <li><a href="#publishing">Publishing</a></li>
+          <li><a href="#publishing-and-bundling">Publishing and Bundling</a></li>
           <li><a href="#repl">REPL</a></li>
           <li><a href="#scalajs">Scala.js</a></li>
           <li><a href="#scala-native">Scala Native</a></li>
@@ -337,7 +337,7 @@ deder exec -t runMvnApp -m myapp fmt      # format with Scalafmt
 deder exec -t runMvnApp -m myapp fmtCheck # check formatting
 </code></pre>
    <hr>
-   <h2 id="publishing">Publishing<a href="#publishing" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <h2 id="publishing-and-bundling">Publishing and Bundling<a href="#publishing-and-bundling" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Publishing tasks build JARs, assemble uber-JARs, and publish Maven artifacts.</p>
    <table>
     <thead>
@@ -351,7 +351,7 @@ deder exec -t runMvnApp -m myapp fmtCheck # check formatting
      <tr>
       <td><code>jar</code></td>
       <td>all</td>
-      <td>Builds a regular module JAR (compiled classes + resources + manifest). Cached.</td>
+      <td>Builds a regular JAR (compiled classes + resources + manifest). Cached.</td>
      </tr>
      <tr>
       <td><code>allJars</code></td>
