@@ -1,16 +1,14 @@
 package ba.sake.deder.deps
 
-import ba.sake.tupson.JsonRW
-
 case class DepNode(
     org: String,
     name: String,
     version: String,
-    filePath: String,
+    filePath: os.Path,
     fileSizeBytes: Long,
     depth: Int,
     parents: Seq[String]
-) derives JsonRW {
+) {
   def coordinate: String = s"$org:$name:$version"
 }
 
@@ -19,7 +17,7 @@ case class DepConflict(
     requestedVersions: Map[String, Seq[String]],
     resolvedVersion: String,
     isConflict: Boolean
-) derives JsonRW
+)
 
 case class DepTree(
     module: String,
@@ -28,6 +26,6 @@ case class DepTree(
     conflicts: Seq[DepConflict],
     totalSizeBytes: Long,
     totalUniqueSizeBytes: Long
-) derives JsonRW {
+) {
   def conflictCount: Int = conflicts.count(_.isConflict)
 }

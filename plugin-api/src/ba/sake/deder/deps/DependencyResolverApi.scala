@@ -13,4 +13,9 @@ trait DependencyResolverApi {
       dependencies: Seq[Dependency],
       notifications: Option[ba.sake.deder.ServerNotificationsLogger] = None
   ): Seq[(String, String, String)]
+
+  def buildDepTree(
+      dependencies: Seq[Dependency],
+      notifications: Option[ba.sake.deder.ServerNotificationsLogger] = None
+  ): DepTree
 }
