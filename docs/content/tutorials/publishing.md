@@ -38,11 +38,9 @@ local const mylibrary = new ScalaModule {
       }
     }
     scm {
-      url = "git@github.com:myuser/deder-example-library.git"
+      url = "https://github.com/myuser/mylib"
+      connection = "scm:git:git://github.com/myuser/mylib.git"
     }
-  }
-  publishTo = new SonatypeCentralRepo {
-    id = "sonatype-central"
   }
 }
 
@@ -51,13 +49,15 @@ modules {
 }
 ```
 
-All this information is necessary for publishing to Maven repositories.
+All this information is necessary for publishing to Maven Central.
 See the official [Sonatype Central Repository documentation](https://central.sonatype.org/publish/requirements/#required-pom-metadata/) for more details.
+
+> You could publish to another repo by setting `publishTo`
 
 ### Git driven versioning
 
 You can also use git driven versioning to automatically set the version based on your git tags.
-To do this, you need **remove the version** from `pomSettings`.
+To do this, you need to **remove the version** from `pomSettings`.
 Deder will automatically set the version based on the latest semver-based git tag (with optional `v` prefix).
 
 - `1.0.0` -> `1.0.0`
@@ -105,12 +105,12 @@ See also:
 
 To publish to Sonatype Maven Central, credentials can come from env vars following the pattern
 `DEDER_<PUBLISH_TO_ID>_<FIELD>` (uppercased, `-` replaced with `_`).
-With `id = "sonatype-central"`, set:
+With `id = "sonatype"` (default one), set these:
 ```shell
-export DEDER_SONATYPE_CENTRAL_USERNAME="..."
-export DEDER_SONATYPE_CENTRAL_PASSWORD="..."
-export DEDER_SONATYPE_CENTRAL_PGP_SECRET="..."
-export DEDER_SONATYPE_CENTRAL_PGP_PASSPHRASE="..."
+export DEDER_SONATYPE_USERNAME="..."
+export DEDER_SONATYPE_PASSWORD="..."
+export DEDER_SONATYPE_PGP_SECRET="..."
+export DEDER_SONATYPE_PGP_PASSPHRASE="..."
 ```
 
 If this is your first time publishing to Sonatype, you need to create an account and set up your PGP keys.
