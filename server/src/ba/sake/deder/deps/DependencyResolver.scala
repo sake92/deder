@@ -12,6 +12,7 @@ import coursierapi.{MavenRepository as CsMavenRepository, Repository as CsReposi
 import dependency.api.ops.*
 import ba.sake.deder.{OTEL, ServerNotificationsLogger}
 import ba.sake.deder.ServerNotification
+import ba.sake.deder.deps.{DepTree, DepNode, DepConflict}
 import com.typesafe.scalalogging.StrictLogging
 
 class DependencyResolver(val repositories: Seq[CsRepository]) extends DependencyResolverApi with StrictLogging {
@@ -89,6 +90,89 @@ class DependencyResolver(val repositories: Seq[CsRepository]) extends Dependency
         .toSeq
         .map(d => (d.getModule.getOrganization, d.getModule.getName, d.getVersion))
   }
+
+  def buildDepTree(
+      dependencies: Seq[Dependency],
+      notifications: Option[ServerNotificationsLogger] = None
+  ): DepTree = {
+    if dependencies.isEmpty then
+      emptyDepTree()
+    else {
+      val coursierDeps = dependencies.map(_.applied.toCs)
+      val fetchResult = doFetch(coursierDeps, notifications)
+      
+      // Extract resolved deps with file info
+      val resolvedDeps = fetchResult.getDependencies.asScala.toSeq
+      val files = fetchResult.getFiles.asScala.map(f => os.Path(f.toPath)).toSeq
+      
+      // Build DepNode for each resolved dependency
+      val depNodes = resolvedDeps.zipWithIndex.map { (dep, idx) =>
+        val file = if idx < files.size then files(idx) else os.Path("")
+        val sizeBytes = if os.exists(file) then os.size(file) else 0L
+        
+        DepNode(
+          org = dep.getModule.getOrganization,
+          name = dep.getModule.getName,
+          version = dep.getVersion,
+          filePath = file,
+          fileSizeBytes = sizeBytes,
+          depth = 0,
+          parents = Seq.empty
+        )
+      }
+      
+      // Identify version conflicts
+      val conflicts = detectConflicts(resolvedDeps, coursierDeps)
+      
+      // Calculate total size
+      val totalSize = depNodes.map(_.fileSizeBytes).sum
+      
+      // Direct deps are those in the original dependency list
+      val directDepCoords = coursierDeps.map(d => 
+        s"${d.getModule.getOrganization}:${d.getModule.getName}:${d.getVersion}"
+      ).toSet
+      val rootDeps = depNodes.filter(n => directDepCoords.contains(n.coordinate))
+      
+      DepTree(
+        module = "unknown",
+        allDeps = depNodes,
+        rootDeps = rootDeps,
+        conflicts = conflicts,
+        totalSizeBytes = totalSize,
+        totalUniqueSizeBytes = totalSize
+      )
+    }
+  }
+
+  private def detectConflicts(
+      resolvedDeps: Seq[coursierapi.Dependency],
+      originalDeps: Seq[coursierapi.Dependency]
+  ): Seq[DepConflict] = {
+    resolvedDeps
+      .groupBy(d => s"${d.getModule.getOrganization}:${d.getModule.getName}")
+      .map { case (coord, versionsSeq) =>
+        val versions = versionsSeq.map(_.getVersion).distinct
+        val isConflict = versions.length > 1
+        
+        DepConflict(
+          coordinate = coord,
+          requestedVersions = versions.map(_ -> Seq.empty).toMap,
+          resolvedVersion = versionsSeq.head.getVersion,
+          isConflict = isConflict
+        )
+      }
+      .toSeq
+  }
+
+  private def emptyDepTree(): DepTree =
+    DepTree(
+      module = "unknown",
+      allDeps = Seq.empty,
+      rootDeps = Seq.empty,
+      conflicts = Seq.empty,
+      totalSizeBytes = 0,
+      totalUniqueSizeBytes = 0
+    )
 }
 
 object DependencyResolver {
