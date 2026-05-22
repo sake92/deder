@@ -114,7 +114,7 @@ class DependencyResolver(val repositories: Seq[CsRepository]) extends Dependency
           org = dep.getModule.getOrganization,
           name = dep.getModule.getName,
           version = dep.getVersion,
-          filePath = file,
+          filePath = file.toString(),
           fileSizeBytes = sizeBytes,
           depth = 0,
           parents = Seq.empty
