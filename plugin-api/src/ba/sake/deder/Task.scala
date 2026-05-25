@@ -307,7 +307,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
       )
       val outputHash = Hashable[T].hashStr(res)
       val taskResult = TaskResult(res, inputsHash, outputHash)
-      os.write.over(metadataFile, taskResult.toJson, createFolders = true)
+      os.write.over(metadataFile, taskResult.toJson(spaces = 2, sort = true), createFolders = true)
       serverNotificationsLogger.add(
         ServerNotification.logDebug(s"Computed result for ${name}", Some(module.id))
       )
