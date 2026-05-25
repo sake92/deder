@@ -141,9 +141,9 @@ class CliClientMessageHandler(
           if cliOptions.mermaid.value then
             serverMessages.put(CliServerMessage.Log("Warning: --mermaid is deprecated, use --format mermaid", LogLevel.WARNING))
           val effectiveFormat =
-            if cliOptions.json.value then GraphOutputFormat.Json
-            else if cliOptions.dot.value then GraphOutputFormat.Dot
-            else if cliOptions.mermaid.value then GraphOutputFormat.Mermaid
+            if cliOptions.json.value then OutputFormat.Json
+            else if cliOptions.dot.value then OutputFormat.Dot
+            else if cliOptions.mermaid.value then OutputFormat.Mermaid
             else cliOptions.format
           OTEL.withSpan("cli.modules")(
             _.setAttribute("clientId", clientId)
@@ -205,13 +205,13 @@ class CliClientMessageHandler(
                     case Right(graph) =>
                       val filteredModules = graph.vertexSet().asScala.toSeq.sortBy(_.id)
                       val output = effectiveFormat match
-                        case GraphOutputFormat.PlainText =>
+                        case OutputFormat.PlainText =>
                           filteredModules.map(_.id).mkString("\n")
-                        case GraphOutputFormat.Json =>
+                        case OutputFormat.Json =>
                           render(filteredModules.map(_.id))(using effectiveFormat, summon[ba.sake.tupson.JsonRW[Seq[String]]])
-                        case GraphOutputFormat.Dot =>
+                        case OutputFormat.Dot =>
                           GraphUtils.generateDOT(graph, v => v.id, v => Map("label" -> v.id))
-                        case GraphOutputFormat.Mermaid =>
+                        case OutputFormat.Mermaid =>
                           GraphUtils.generateMermaid(graph, v => v.id, v => v.id)
                       serverMessages.put(CliServerMessage.Output(output))
                       serverMessages.put(CliServerMessage.Exit(0))
@@ -245,9 +245,9 @@ class CliClientMessageHandler(
           if cliOptions.mermaid.value then
             serverMessages.put(CliServerMessage.Log("Warning: --mermaid is deprecated, use --format mermaid", LogLevel.WARNING))
           val effectiveFormat =
-            if cliOptions.json.value then GraphOutputFormat.Json
-            else if cliOptions.dot.value then GraphOutputFormat.Dot
-            else if cliOptions.mermaid.value then GraphOutputFormat.Mermaid
+            if cliOptions.json.value then OutputFormat.Json
+            else if cliOptions.dot.value then OutputFormat.Dot
+            else if cliOptions.mermaid.value then OutputFormat.Mermaid
             else cliOptions.format
           OTEL.withSpan("cli.tasks")(
             _.setAttribute("clientId", clientId)
@@ -262,7 +262,7 @@ class CliClientMessageHandler(
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
                 effectiveFormat match
-                  case GraphOutputFormat.Json =>
+                  case OutputFormat.Json =>
                     val taskNamesPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
                       case (moduleId, tasks) =>
                         moduleId -> tasks.map(_.task.name)
@@ -271,7 +271,7 @@ class CliClientMessageHandler(
                       render(taskNamesPerModule)(using effectiveFormat, summon[ba.sake.tupson.JsonRW[Map[String, Seq[String]]]])
                     ))
                     serverMessages.put(CliServerMessage.Exit(0))
-                  case GraphOutputFormat.Dot =>
+                  case OutputFormat.Dot =>
                     val dot =
                       GraphUtils.generateDOT(
                         state.tasksResolver.publicTaskInstancesGraph,
@@ -280,7 +280,7 @@ class CliClientMessageHandler(
                       )
                     serverMessages.put(CliServerMessage.Output(dot))
                     serverMessages.put(CliServerMessage.Exit(0))
-                  case GraphOutputFormat.Mermaid =>
+                  case OutputFormat.Mermaid =>
                     val mermaid =
                       GraphUtils.generateMermaidWithSubgraphs(
                         state.tasksResolver.publicTaskInstancesGraph,
@@ -290,7 +290,7 @@ class CliClientMessageHandler(
                       )
                     serverMessages.put(CliServerMessage.Output(mermaid))
                     serverMessages.put(CliServerMessage.Exit(0))
-                  case GraphOutputFormat.PlainText =>
+                  case OutputFormat.PlainText =>
                     val modules = cliOptions.module match {
                       case Some(moduleId) =>
                         state.tasksResolver.allModules.filter(_.id == moduleId)
@@ -351,9 +351,9 @@ class CliClientMessageHandler(
           if cliOptions.mermaid.value then
             serverMessages.put(CliServerMessage.Log("Warning: --mermaid is deprecated, use --format mermaid", LogLevel.WARNING))
           val effectiveFormat =
-            if cliOptions.json.value then GraphOutputFormat.Json
-            else if cliOptions.dot.value then GraphOutputFormat.Dot
-            else if cliOptions.mermaid.value then GraphOutputFormat.Mermaid
+            if cliOptions.json.value then OutputFormat.Json
+            else if cliOptions.dot.value then OutputFormat.Dot
+            else if cliOptions.mermaid.value then OutputFormat.Mermaid
             else cliOptions.format
           OTEL.withSpan("cli.plan")(
             _.setAttribute("clientId", clientId)
@@ -401,16 +401,16 @@ class CliClientMessageHandler(
                     val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(validModuleIds, cliOptions.task)
                     val publicSubgraph = GraphUtils.projectPublic(tasksExecSubgraph, !_.task.internal)
                     effectiveFormat match
-                      case GraphOutputFormat.Json =>
+                      case OutputFormat.Json =>
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                         val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
                         serverMessages.put(CliServerMessage.Output(
                           render(publicStages.map(_.map(_.id)))(using effectiveFormat, summon[ba.sake.tupson.JsonRW[Seq[Seq[String]]]])
                         ))
-                      case GraphOutputFormat.Dot =>
+                      case OutputFormat.Dot =>
                         val dot = GraphUtils.generateDOT(publicSubgraph, v => v.id, v => Map("label" -> v.id))
                         serverMessages.put(CliServerMessage.Output(dot))
-                      case GraphOutputFormat.Mermaid =>
+                      case OutputFormat.Mermaid =>
                         val tasksExecStages2 = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                         val stageByTask = tasksExecStages2.zipWithIndex.flatMap { case (stage, stageIdx) =>
                           stage.map(_ -> stageIdx)
@@ -440,7 +440,7 @@ class CliClientMessageHandler(
                             classDefs = stageClassDefs
                           )
                         serverMessages.put(CliServerMessage.Output(mermaid))
-                      case GraphOutputFormat.PlainText =>
+                      case OutputFormat.PlainText =>
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                         val stagesStr = tasksExecStages.zipWithIndex
                           .flatMap { case (stage, idx) =>
@@ -477,7 +477,7 @@ class CliClientMessageHandler(
           if cliOptions.json.value then
             serverMessages.put(CliServerMessage.Log("Warning: --json is deprecated, use --format json", LogLevel.WARNING))
           val effectiveFormat =
-            if cliOptions.json.value then ExecOutputFormat.Json
+            if cliOptions.json.value then OutputFormat.Json
             else cliOptions.format
           RequestContext.outputFormat.set(effectiveFormat)
           OTEL.withSpan(s"cli.exec.${cliOptions.task}")(

@@ -196,9 +196,7 @@ class DederProjectState(
           given JsonRW[Any] = task.summaryJsonRw.asInstanceOf[JsonRW[Any]]
           given PlainTextWritable[Any] = task.summarizable.sPlainWritable.asInstanceOf[PlainTextWritable[Any]]
           val output = format match
-            case _: ExecOutputFormat.PlainText.type =>
-              summon[PlainTextWritable[Any]].write(summary)
-            case _: ExecOutputFormat.Json.type =>
+            case _: OutputFormat.Json.type =>
               summon[JsonRW[Any]].write(summary).toJson(spaces = 0, sort = false)
             case _ => summon[PlainTextWritable[Any]].write(summary)
           serverNotificationsLogger.add(ServerNotification.Output(output))

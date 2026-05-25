@@ -6,11 +6,11 @@ import ba.sake.tupson.{JsonRW, toJson}
 object OutputFormatting:
   def render[T](value: T)(using format: OutputFormat, jsonRw: JsonRW[T]): String =
     format match
-      case _: (ExecOutputFormat.PlainText.type | GraphOutputFormat.PlainText.type) =>
+      case OutputFormat.PlainText =>
         summon[PlainTextWritable[T]].write(value)
-      case _: (ExecOutputFormat.Json.type | GraphOutputFormat.Json.type) =>
+      case OutputFormat.Json =>
         summon[JsonRW[T]].write(value).toJson(spaces = 0, sort = false)
-      case GraphOutputFormat.Dot =>
+      case OutputFormat.Dot =>
         summon[DotWritable[T]].write(value)
-      case GraphOutputFormat.Mermaid =>
+      case OutputFormat.Mermaid =>
         summon[MermaidWritable[T]].write(value)

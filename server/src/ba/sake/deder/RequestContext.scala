@@ -7,6 +7,6 @@ object RequestContext {
   val id: ThreadLocal[String] = new ThreadLocal()
   val clientParams: ThreadLocal[CliClientParams] = new ThreadLocal()
   val outputFormat: ThreadLocal[OutputFormat] = new ThreadLocal[OutputFormat] {
-    override def initialValue(): OutputFormat = ExecOutputFormat.PlainText
+    override def initialValue(): OutputFormat = OutputFormat.PlainText
   }
 }

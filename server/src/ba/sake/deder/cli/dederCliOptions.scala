@@ -2,29 +2,20 @@ package ba.sake.deder.cli
 
 import mainargs.*
 import ba.sake.deder.ServerNotification.LogLevel
-import ba.sake.deder.{ExecOutputFormat, GraphOutputFormat}
+import ba.sake.deder.OutputFormat
 
 given TokensReader.Simple[LogLevel] with {
   def shortName = "logLevel"
   def read(strs: Seq[String]) = Right(LogLevel.valueOf(strs.head.toUpperCase))
 }
 
-given TokensReader.Simple[ExecOutputFormat] with {
-  def shortName = "execFormat"
+given TokensReader.Simple[OutputFormat] with {
+  def shortName = "outputFormat"
   def read(strs: Seq[String]) = strs.head.toLowerCase match {
-    case "plain" => Right(ExecOutputFormat.PlainText)
-    case "json"  => Right(ExecOutputFormat.Json)
-    case other   => Left(s"Invalid format '$other'. Must be plain or json.")
-  }
-}
-
-given TokensReader.Simple[GraphOutputFormat] with {
-  def shortName = "graphFormat"
-  def read(strs: Seq[String]) = strs.head.toLowerCase match {
-    case "plain"   => Right(GraphOutputFormat.PlainText)
-    case "json"    => Right(GraphOutputFormat.Json)
-    case "dot"     => Right(GraphOutputFormat.Dot)
-    case "mermaid" => Right(GraphOutputFormat.Mermaid)
+    case "plain"   => Right(OutputFormat.PlainText)
+    case "json"    => Right(OutputFormat.Json)
+    case "dot"     => Right(OutputFormat.Dot)
+    case "mermaid" => Right(OutputFormat.Mermaid)
     case other     => Left(s"Invalid format '$other'. Must be plain, json, dot, or mermaid.")
   }
 }
@@ -44,7 +35,7 @@ case class DederCliModulesOptions(
     @arg(doc = "Max hops following reverse-dependency edges (upstream). Default: unlimited")
     depthUp: Int = Int.MaxValue,
     @arg(doc = "Output format: plain, json, dot, or mermaid")
-    format: GraphOutputFormat = GraphOutputFormat.PlainText,
+    format: OutputFormat = OutputFormat.PlainText,
     @arg(doc = "Deprecated: use --format json")
     json: Flag = Flag(),
     @arg(doc = "Deprecated: use --format dot")
@@ -58,7 +49,7 @@ case class DederCliTasksOptions(
     @arg(doc = "Filter tasks by Module ID", short = 'm')
     module: Option[String],
     @arg(doc = "Output format: plain, json, dot, or mermaid")
-    format: GraphOutputFormat = GraphOutputFormat.PlainText,
+    format: OutputFormat = OutputFormat.PlainText,
     @arg(doc = "Deprecated: use --format json")
     json: Flag = Flag(),
     @arg(doc = "Deprecated: use --format dot")
@@ -74,7 +65,7 @@ case class DederCliPlanOptions(
     @arg(doc = "The task to plan", short = 't')
     task: String,
     @arg(doc = "Output format: plain, json, dot, or mermaid")
-    format: GraphOutputFormat = GraphOutputFormat.PlainText,
+    format: OutputFormat = OutputFormat.PlainText,
     @arg(doc = "Deprecated: use --format json")
     json: Flag = Flag(),
     @arg(doc = "Deprecated: use --format dot")
@@ -100,7 +91,7 @@ case class DederCliExecOptions(
     @arg(doc = "Log level", short = 'l')
     logLevel: LogLevel = LogLevel.INFO,
     @arg(doc = "Output format: plain or json")
-    format: ExecOutputFormat = ExecOutputFormat.PlainText,
+    format: OutputFormat = OutputFormat.PlainText,
     @arg(doc = "Deprecated: use --format json")
     json: Flag = Flag(),
     @arg(doc = "Watch mode - re-execute task on source changes", short = 'w')
