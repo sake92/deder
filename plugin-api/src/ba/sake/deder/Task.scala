@@ -208,9 +208,6 @@ sealed trait Task[T, Deps <: Tuple, S](using
   private[deder] def summarizeValueUnsafe(results: Seq[(String, Any)]): S =
     summarizable.summarize(results.asInstanceOf[Seq[(String, T)]])
 
-  /** Type-erased summary JSON writer for render(). */
-  private[deder] def summaryJsonRw: JsonRW[S] = summarizable.sJsonRw
-
   /** Type-erased success check for use by the execution engine */
   private[deder] def isResultSuccessfulUnsafe(result: Any): Boolean =
     isResultSuccessful(result.asInstanceOf[T])
