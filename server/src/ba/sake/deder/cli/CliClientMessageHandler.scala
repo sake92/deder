@@ -8,11 +8,14 @@ import scala.jdk.CollectionConverters.*
 import scala.util.boundary
 import scala.util.chaining.*
 import com.typesafe.scalalogging.StrictLogging
+import ba.sake.tupson.JsonRW
 import ba.sake.tupson.toJson
 import ba.sake.deder.*
 import ba.sake.deder.importing.Importer
 import io.opentelemetry.api.trace.StatusCode
 import ba.sake.deder.OTEL
+
+private case class TaskInfo(name: String, features: Seq[String]) derives JsonRW
 
 class CliClientMessageHandler(
     projectState: DederProjectState,
@@ -245,15 +248,17 @@ class CliClientMessageHandler(
               case Right(state) =>
                 outputFormat match
                   case OutputFormat.Json | OutputFormat.DenseJson =>
-                    val taskNamesPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
+                    val taskInfosPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
                       case (moduleId, tasks) =>
-                        moduleId -> tasks.map(_.task.name)
+                        moduleId -> tasks.map { ti =>
+                          TaskInfo(ti.task.name, ti.task.featureTags.map(_.jsonKey).toSeq)
+                        }
                     }
                     val json = outputFormat match
                       case OutputFormat.Json =>
-                        taskNamesPerModule.toJson(spaces = 2, sort = true)
+                        taskInfosPerModule.toJson(spaces = 2, sort = true)
                       case OutputFormat.DenseJson =>
-                        taskNamesPerModule.toJson(spaces = 0, sort = false)
+                        taskInfosPerModule.toJson(spaces = 0, sort = false)
                     serverMessages.put(CliServerMessage.Output(json))
                     serverMessages.put(CliServerMessage.Exit(0))
                   case OutputFormat.Dot =>
