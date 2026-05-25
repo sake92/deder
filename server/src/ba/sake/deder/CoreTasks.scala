@@ -1133,7 +1133,7 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(jvmOptionsTask)
     .dependsOn(javaHomeTask)
     .dependsOn(testClassesTask)
-    .buildWithSummary(
+    .buildSummarized[TestResultsSummary](
       execute = { ctx =>
         val (runClasspath, jvmOptions, javaHome, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
@@ -1169,7 +1169,7 @@ class CoreTasks() extends StrictLogging {
         }
       },
       isResultSuccessful = _.success,
-      summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
+      //summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
     )
 
   val testInMemoryTask = TaskBuilder
@@ -1180,7 +1180,7 @@ class CoreTasks() extends StrictLogging {
     )
     .dependsOn(runClasspathTask)
     .dependsOn(testClassesTask)
-    .buildWithSummary(
+    .buildSummarized[TestResultsSummary](
       execute = { ctx =>
         val (runClasspath, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
@@ -1204,8 +1204,7 @@ class CoreTasks() extends StrictLogging {
           results
         }
       },
-      isResultSuccessful = _.success,
-      summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
+      isResultSuccessful = _.success
     )
 
   val replDepsTask = CachedTaskBuilder

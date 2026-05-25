@@ -77,7 +77,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     )
     .dependsOn(fastNativeLinkTask)
     .dependsOn(coreTasks.testClassesTask)
-    .buildWithSummary(
+    .buildSummarized[TestResultsSummary](
       execute = { ctx =>
         val (linkedBinaryPath, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
@@ -94,8 +94,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
           results
         }
       },
-      isResultSuccessful = _.success,
-      summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
+      isResultSuccessful = _.success
     )
 
   val all: Seq[Task[?, ?, ?]] = Seq(

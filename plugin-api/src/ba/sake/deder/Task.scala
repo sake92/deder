@@ -51,6 +51,23 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       summarize = summarize,
       internal = internal
     )
+
+  def buildSummarized[S2](
+      execute: TaskExecContext[T, Deps] => T,
+      isResultSuccessful: T => Boolean = _ => true
+  )(using Summarizable[T, S2]): Task[T, Deps, S2] =
+    TaskImpl(
+      name,
+      execute,
+      taskDeps,
+      transitive,
+      singleton,
+      supportedModuleTypes,
+      category = category,
+      kind = kind,
+      isResultSuccessful = isResultSuccessful,
+      internal = internal
+    )
 }
 
 object TaskBuilder {
@@ -65,6 +82,7 @@ object TaskBuilder {
       internal: Boolean = false
   )(using Summarizable[T, MultiModuleResults[T]]): TaskBuilder[T, EmptyTuple, MultiModuleResults[T]] =
     new TaskBuilder[T, EmptyTuple, MultiModuleResults[T]](name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind, internal)
+
 }
 
 case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (

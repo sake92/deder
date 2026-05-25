@@ -4,76 +4,55 @@ import java.time.Duration
 import ba.sake.deder.{ServerNotification, ServerNotificationsLogger, PlainTextWritable, Summarizable}
 import ba.sake.tupson.JsonRW
 
-case class TestSummary(
-    total: Int,
-    passed: Int,
-    failed: Int,
-    errors: Int,
-    skipped: Int,
-    duration: Long,
+case class TestResultsSummary(
     success: Boolean,
-    failedTestNames: Seq[String]
+    suitesTotal: Int,
+    suitesFailed: Int,
+    suitesPassed: Int,
+    testsTotal: Int,
+    testsFailed: Int,
+    testsSkipped: Int,
+    testsPassed: Int,
+    duration: Long,
+    modules: Map[String, DederTestResults]
 ) derives JsonRW
 
-object TestSummary:
-  given PlainTextWritable[TestSummary] with
-    def write(s: TestSummary): String =
-      val statusIcon = if s.success then "PASS" else "FAIL"
-      val totalFailed = s.failed + s.errors
-      val parts = scala.collection.mutable.ListBuffer.empty[String]
-      parts += s"${s.passed} passed"
-      if totalFailed > 0 then parts += s"$totalFailed failed"
-      if s.skipped > 0 then parts += s"${s.skipped} skipped"
-      parts += s"${s.total} total"
-      val timeStr = java.time.Duration.ofMillis(s.duration).toString
-        .replace("PT", "").replace("S", "s").replace("M", "m").replace("H", "h").toLowerCase
-      s"$statusIcon: ${parts.mkString(", ")} | $timeStr"
-
 object TestResultsSummary {
-  def summarize(
-      results: Seq[(String, DederTestResults)],
-      notifications: ServerNotificationsLogger
-  ): Unit = {
-    val totalResults = DederTestResults(
-      total = results.map(_._2.total).sum,
-      passed = results.map(_._2.passed).sum,
-      failed = results.map(_._2.failed).sum,
-      errors = results.map(_._2.errors).sum,
-      skipped = results.map(_._2.skipped).sum,
-      duration = results.map(_._2.duration).sum,
-      failedTestNames = results.flatMap(_._2.failedTestNames),
-      suites = results.flatMap(_._2.suites).sortBy(_.name)
-    )
-    val statusIcon = if totalResults.success then "✅ PASS" else "🔴 FAIL"
-    val totalFailed = totalResults.failed + totalResults.errors
-    val suitesStr = renderCounts(totalResults.suitesPassed, totalResults.suitesFailed, 0, totalResults.suitesTotal)
-    val testsStr = renderCounts(totalResults.passed, totalFailed, totalResults.skipped, totalResults.total)
-    val timeStr = Duration.ofMillis(totalResults.duration).toPrettyString
-    val summaryLine = s"$statusIcon  Suites: $suitesStr  │  Tests: $testsStr  │  $timeStr"
-    val separator = "═" * summaryLine.length
-    notifications.add(ServerNotification.logInfo(separator))
-    notifications.add(ServerNotification.logInfo(summaryLine))
-    val interesting = results.filter { case (_, res) =>
-      val moduleFailed = res.failed + res.errors
-      moduleFailed > 0 || res.skipped > 0
+
+  given PlainTextWritable[TestResultsSummary] with {
+    def write(summary: TestResultsSummary): String = {
+      val statusIcon = if summary.success then "✅ PASS" else "🔴 FAIL"
+      val suitesStr = renderCounts(summary.suitesPassed, summary.suitesFailed, 0, summary.suitesTotal)
+      val testsStr = renderCounts(summary.testsPassed, summary.testsFailed, summary.testsSkipped, summary.testsTotal)
+      val timeStr = Duration.ofMillis(summary.duration).toPrettyString
+      val summaryLine = s"$statusIcon  Suites: $suitesStr  │  Tests: $testsStr  │  $timeStr"
+      val separator = "═" * summaryLine.length
+      // render successful modules first, then failed
+      val successfulModules =
+        summary.modules.filter { case (_, res) => res.success }.toSeq.sortBy(_._1)
+      val successfulModulesSummary = successfulModules
+        .map { case (moduleId, res) => s"  ✅ PASS $moduleId" }
+        .mkString("\n")
+      val failedModules = summary.modules.filter { case (_, res) => !res.success }.toSeq.sortBy(_._1)
+      val failedModulesSummary = failedModules
+        .map { case (moduleId, res) =>
+          val failedTestsSummary = res.failedTestNames
+            .map(testName => s"       - $testName")
+            .mkString("\n")
+          Seq(s"  🔴 FAIL $moduleId (${res.failed} failed tests)", failedTestsSummary)
+            .filter(_.trim.nonEmpty)
+            .mkString("\n")
+        }
+        .mkString("\n")
+
+      Seq(
+        separator,
+        summaryLine,
+        successfulModulesSummary,
+        failedModulesSummary,
+        separator
+      ).filter(_.trim.nonEmpty).mkString("\n")
     }
-    val (skippedOnly, hasFailed) = interesting.partition { case (_, res) =>
-      val moduleFailed = res.failed + res.errors
-      moduleFailed == 0
-    }
-    (skippedOnly ++ hasFailed).foreach { case (moduleId, res) =>
-      val moduleFailed = res.failed + res.errors
-      val icon = if res.success then "  ✅" else "  🔴"
-      val detail = Seq(
-        Option.when(moduleFailed > 0)(s"$moduleFailed failed"),
-        Option.when(res.skipped > 0)(s"${res.skipped} skipped")
-      ).flatten.mkString(", ")
-      notifications.add(ServerNotification.logInfo(s"$icon $moduleId ($detail)"))
-      res.failedTestNames.foreach { testName =>
-        notifications.add(ServerNotification.logInfo(s"       - $testName"))
-      }
-    }
-    notifications.add(ServerNotification.logInfo(separator))
   }
 
   private def renderCounts(passed: Int, failed: Int, skipped: Int, total: Int): String = {
@@ -83,29 +62,24 @@ object TestResultsSummary {
       Option.when(skipped > 0)(s"$skipped skipped")
     ).flatten
     if parts.size == 1 && passed == total then parts.head
-    else (parts :+ s"$total total").mkString(", ")
+    else (parts.appended(s"$total total")).mkString(", ")
   }
 
-  given Summarizable[DederTestResults, TestSummary] with
-    def summarize(results: Seq[(String, DederTestResults)]): TestSummary =
-      val merged = DederTestResults(
-        total = results.map(_._2.total).sum,
-        passed = results.map(_._2.passed).sum,
-        failed = results.map(_._2.failed).sum,
-        errors = results.map(_._2.errors).sum,
-        skipped = results.map(_._2.skipped).sum,
-        duration = results.map(_._2.duration).sum,
-        failedTestNames = results.flatMap(_._2.failedTestNames),
-        suites = results.flatMap(_._2.suites).sortBy(_.name)
+  given Summarizable[DederTestResults, TestResultsSummary] with
+    def summarize(resultsMap: Seq[(String, DederTestResults)]): TestResultsSummary = {
+      val allResults = resultsMap.map(_._2)
+      TestResultsSummary(
+        success = allResults.forall(_.success),
+        suitesTotal = allResults.map(_.suitesTotal).sum,
+        suitesFailed = allResults.map(_.suitesFailed).sum,
+        suitesPassed = allResults.map(_.suitesPassed).sum,
+        testsTotal = allResults.map(_.total).sum,
+        testsFailed = allResults.map(_.failed).sum,
+        testsSkipped = allResults.map(_.skipped).sum,
+        testsPassed = allResults.map(_.passed).sum,
+        duration = allResults.map(_.duration).sum,
+        modules = resultsMap.toMap
       )
-      TestSummary(
-        total = merged.total,
-        passed = merged.passed,
-        failed = merged.failed,
-        errors = merged.errors,
-        skipped = merged.skipped,
-        duration = merged.duration,
-        success = merged.success,
-        failedTestNames = merged.failedTestNames
-      )
+    }
+
 }
