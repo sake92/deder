@@ -29,7 +29,7 @@ trait BaseIntegrationSuite extends munit.FunSuite {
       testProjectPath: os.RelPath,
       serverProperties: Map[String, String] = Map.empty
   )(testCode: os.Path => Unit): Unit = {
-    val tempDir = os.pwd / "tmp" / s"${testProjectPath.last}-${System.currentTimeMillis()}"
+    val tempDir = os.pwd / "tmp" / s"${testProjectPath.last}-${System.nanoTime()}"
     try {
       stageTestProject(testProjectPath, tempDir)
       val allServerProperties = serverProperties ++ Map(

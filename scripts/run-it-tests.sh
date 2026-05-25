@@ -21,8 +21,6 @@ echo "Using plugin API version: $DEDER_PLUGIN_API_VERSION"
 
 # Publish plugin-api + config with a fixed version so the hello-plugin integration test can resolve them
 # (publishes to DEDER_TMP_M2_REPO when set, otherwise to ~/.m2)
-# Shut down the build-jars server first so VERSION env var takes effect
-deder shutdown 2>/dev/null && sleep 1 || true
 VERSION="$DEDER_PLUGIN_API_VERSION" deder exec -t publishLocal -m config -m plugin-api
 
 if [ $# -eq 0 ]; then
