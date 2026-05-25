@@ -6,10 +6,10 @@
 - init like giter8, autoimport from sbt?
 - periodic flush in forked tests, every 1s?
 - max timeout when waiting for lock and bail out, report to bsp??
-- show if task is cached in tasks list, maybe even if it's source/fanin task etc?
 - import from other maven effective POM etc
 - import from other mill
 - import from other gradle
+- sbt-updates for deps
 
 - run pkldoc on each tag, and publish to ghpages
 https://pkl-lang.org/main/current/pkl-doc/index.html

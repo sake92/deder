@@ -246,6 +246,7 @@ class CliClientMessageHandler(
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
+                // TODO handle these in a case class + typeclassess
                 outputFormat match
                   case OutputFormat.Json | OutputFormat.DenseJson =>
                     val taskInfosPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
