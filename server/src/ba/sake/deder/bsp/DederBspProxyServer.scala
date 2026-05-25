@@ -9,9 +9,13 @@ import java.nio.channels.{ServerSocketChannel, SocketChannel}
 import java.nio.file.{Files, Path, Paths}
 import java.nio.channels.Channels
 import org.eclipse.lsp4j.jsonrpc.Launcher
+import org.eclipse.lsp4j.jsonrpc.messages.Message
 import ch.epfl.scala.bsp4j.*
 import com.typesafe.scalalogging.StrictLogging
-import ba.sake.deder.{CoreTasks, DederGlobals, DederProjectState}
+import com.google.gson.{Gson, JsonParser, TypeAdapter, TypeAdapterFactory}
+import com.google.gson.reflect.TypeToken
+import com.google.gson.stream.{JsonReader, JsonWriter}
+import ba.sake.deder.{CoreTasks, DederGlobals, DederProjectState, RequestContext}
 import scala.compiletime.uninitialized
 
 class DederBspProxyServer(
@@ -49,6 +53,9 @@ class DederBspProxyServer(
             .setInput(is)
             .setLocalService(localServer)
             .setRemoteInterface(classOf[BuildClient])
+            .configureGson { gsonBuilder =>
+              gsonBuilder.registerTypeAdapterFactory(new TraceContextExtractorFactory())
+            }
             .create()
           localServer.client = launcher.getRemoteProxy
           projectState.registerBspServer(localServer)
@@ -70,4 +77,40 @@ class DederBspProxyServer(
     // Deleting here would race with a new server process that already rebound to the socket.
   }
 
+}
+
+/** Gson TypeAdapterFactory that extracts W3C traceparent from incoming BSP messages.
+  * Metals injects `_traceparent` into the `params` object of BSP requests.
+  * This factory intercepts Message deserialization, peeks at the JSON to find
+  * `_traceparent` inside `params`, stores it in [[RequestContext.traceparent]],
+  * then delegates to the standard lsp4j MessageTypeAdapter.
+  */
+private class TraceContextExtractorFactory extends TypeAdapterFactory {
+
+  override def create[T](gson: Gson, tpe: TypeToken[T]): TypeAdapter[T] = {
+    if (!classOf[Message].isAssignableFrom(tpe.getRawType)) return null
+
+    val delegate = gson.getDelegateAdapter(this, tpe)
+    new TypeAdapter[T] {
+      override def read(in: JsonReader): T = {
+        // Parse the JSON-RPC envelope into a tree to inspect params._traceparent
+        val tree = JsonParser.parseReader(in)
+        if (tree.isJsonObject()) {
+          val obj = tree.getAsJsonObject()
+          if (obj.has("params")) {
+            val params = obj.get("params")
+            if (params.isJsonObject()) {
+              val paramsObj = params.getAsJsonObject()
+              if (paramsObj.has("_traceparent")) {
+                RequestContext.traceparent.set(paramsObj.get("_traceparent").getAsString())
+              }
+            }
+          }
+        }
+        delegate.fromJsonTree(tree)
+      }
+
+      override def write(out: JsonWriter, value: T): Unit = delegate.write(out, value)
+    }
+  }
 }

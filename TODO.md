@@ -7,7 +7,6 @@
 - periodic flush in forked tests, every 1s?
 - max timeout when waiting for lock and bail out, report to bsp??
 - show if task is cached in tasks list, maybe even if it's source/fanin task etc?
-- imported test module should also get compiler plugins
 - import from other maven effective POM etc
 - import from other mill
 - import from other gradle

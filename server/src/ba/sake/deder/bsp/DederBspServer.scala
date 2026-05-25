@@ -1166,22 +1166,33 @@ class DederBspServer(
     new LogMessageParams(level, n.message)
   }
 
-  private def javaFuture[T](spanName: String, originId: Option[String] = None)(thunk: => T): CompletableFuture[T] =
+  private def javaFuture[T](spanName: String, originId: Option[String] = None)(thunk: => T): CompletableFuture[T] = {
+    // Capture W3C traceparent on the dispatch thread (ThreadLocal is lost across supplyAsync)
+    val capturedTraceparent = Option(RequestContext.traceparent.get())
     CompletableFuture.supplyAsync { () =>
+      // Propagate to the async worker thread so traced() can read it
+      capturedTraceparent.foreach(RequestContext.traceparent.set)
       traced(spanName, originId) {
         thunk
       }
     }
+  }
 
   private def traced[T](spanName: String, originId: Option[String] = None)(thunk: => T): T = {
-    val span = OTEL.TRACER
+    val spanBuilder = OTEL.TRACER
       .spanBuilder(s"bsp.${spanName}")
       .setAttribute("originId", originId.getOrElse("unknown"))
       .setAttribute("clientId", clientParams.map(_.getDisplayName).getOrElse("unknown"))
       .setAttribute("clientVersion", clientParams.map(_.getVersion).getOrElse("unknown"))
       .setAttribute("clientBspVersion", clientParams.map(_.getBspVersion).getOrElse("unknown"))
       .setAttribute("request.id", UUID.randomUUID().toString)
-      .startSpan()
+
+    // Link to Metals' parent span if traceparent is present
+    Option(RequestContext.traceparent.get()).foreach { tp =>
+      spanBuilder.setParent(OTEL.extractParentContext(tp))
+    }
+
+    val span = spanBuilder.startSpan()
     try {
       Using.resource(span.makeCurrent()) { scope =>
         thunk
@@ -1191,7 +1202,10 @@ class DederBspServer(
         span.recordException(e)
         span.setStatus(OtelStatusCode.ERROR)
         throw e
-    } finally span.end()
+    } finally {
+      RequestContext.traceparent.remove()
+      span.end()
+    }
   }
 
   extension (id: BuildTargetIdentifier) {

@@ -9,4 +9,5 @@ object RequestContext {
   val outputFormat: ThreadLocal[OutputFormat] = new ThreadLocal[OutputFormat] {
     override def initialValue(): OutputFormat = OutputFormat.PlainText
   }
+  val traceparent: ThreadLocal[String] = new ThreadLocal()
 }

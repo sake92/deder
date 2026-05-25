@@ -96,9 +96,7 @@ deder exec -t runMvnApp -m mymodule fmt
 deder exec -t runMvnApp -m mymodule fmtCheck
 
 # analyze dependency tree with size metrics and conflict detection
-deder exec -t depsTree -m mymodule              # tree format (default)
-deder exec -t depsTree -m mymodule --format flat  # flat list
-deder exec -t depsTree -m mymodule --json      # JSON output
+deder exec -t depsTree -m mymodule
 ```
 
 ## Dependency Tree Analysis
