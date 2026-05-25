@@ -1,10 +1,12 @@
 package ba.sake.deder.deps
 
 import munit.FunSuite
+import ba.sake.deder.PlainTextWritable
+import ba.sake.tupson.toJson
 
 class DepTreeSuite extends FunSuite {
 
-  test("renderTree formats single direct dependency") {
+  test("PlainTextWritable[DepTree] formats single direct dependency") {
     val node = DepNode(
       org = "org.example",
       name = "mylib",
@@ -24,13 +26,13 @@ class DepTreeSuite extends FunSuite {
       totalUniqueSizeBytes = 1024 * 100
     )
     
-    val output = DepTreeRenderer.renderTree(tree)
+    val output = summon[PlainTextWritable[DepTree]].write(tree)
     assert(output.contains("org.example:mylib:1.0.0"))
     assert(output.contains("100KB"))
     assert(output.contains("test-module"))
   }
 
-  test("renderFlat lists all dependencies sorted") {
+  test("PlainTextWritable[DepTree] renders transitive deps with tree connectors") {
     val node1 = DepNode(
       org = "org.b",
       name = "lib-b",
@@ -60,14 +62,14 @@ class DepTreeSuite extends FunSuite {
       totalUniqueSizeBytes = 3072
     )
     
-    val output = DepTreeRenderer.renderFlat(tree)
-    val lines = output.split("\n").filter(!_.isBlank)
-    val aIdx = lines.indexWhere(_.contains("org.a"))
-    val bIdx = lines.indexWhere(_.contains("org.b"))
-    assert(aIdx > 0 && bIdx > 0 && aIdx < bIdx)
+    val output = summon[PlainTextWritable[DepTree]].write(tree)
+    // tree connectors should be present
+    assert(output.contains("└──") || output.contains("├──"))
+    assert(output.contains("org.a:lib-a:1.0.0"))
+    assert(output.contains("org.b:lib-b:2.0.0"))
   }
 
-  test("renderTree highlights version conflicts") {
+  test("PlainTextWritable[DepTree] highlights version conflicts") {
     val conflict = DepConflict(
       coordinate = "org.junit:junit",
       requestedVersions = Map("4.13" -> Seq.empty, "4.12" -> Seq.empty),
@@ -94,13 +96,13 @@ class DepTreeSuite extends FunSuite {
       totalUniqueSizeBytes = 500000
     )
     
-    val output = DepTreeRenderer.renderTree(tree)
+    val output = summon[PlainTextWritable[DepTree]].write(tree)
     assert(output.contains("⚠️"))
     assert(output.contains("Version Conflicts"))
     assert(output.contains("4.13") && output.contains("4.12"))
   }
 
-  test("renderJson produces valid output") {
+  test("JsonRW[DepTree].toJson produces valid JSON") {
     val node = DepNode(
       org = "org.example",
       name = "lib",
@@ -120,7 +122,8 @@ class DepTreeSuite extends FunSuite {
       totalUniqueSizeBytes = 1024
     )
     
-    val json = DepTreeRenderer.renderJson(tree)
+    import ba.sake.tupson.JsonRW
+    val json = summon[JsonRW[DepTree]].write(tree).toJson(spaces = 2, sort = true)
     assert(json.contains("module"))
     assert(json.contains("allDeps"))
     assert(!json.isBlank)

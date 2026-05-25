@@ -22,8 +22,7 @@ import ba.sake.deder.config.DederProject.{
 }
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.deps.Dependency
-import ba.sake.deder.deps.given
-import ba.sake.deder.deps.{DepTree, DepTreeRenderer}
+import ba.sake.deder.deps.{DepTree, given}
 import ba.sake.deder.testing.*
 import ba.sake.deder.testing.forked.ForkedTestOrchestrator
 import ba.sake.deder.testing.inmemory.InMemoryTestOrchestrator
