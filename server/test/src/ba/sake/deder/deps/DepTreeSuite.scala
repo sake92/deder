@@ -29,7 +29,7 @@ class DepTreeSuite extends FunSuite {
     val output = summon[PlainTextWritable[DepTree]].write(tree)
     assert(output.contains("org.example:mylib:1.0.0"))
     assert(output.contains("100KB"))
-    assert(output.contains("test-module"))
+    assert(output.contains("Total size: 100KB"))
   }
 
   test("PlainTextWritable[DepTree] renders transitive deps with tree connectors") {

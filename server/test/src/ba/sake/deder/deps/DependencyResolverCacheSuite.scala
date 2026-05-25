@@ -1,5 +1,7 @@
 package ba.sake.deder.deps
 
+import ba.sake.deder.deps.Dependency
+
 class DependencyResolverCacheSuite extends munit.FunSuite {
 
   test("depsCacheKey is stable for same deps in different order") {
@@ -16,5 +18,22 @@ class DependencyResolverCacheSuite extends munit.FunSuite {
     val resolver = new DependencyResolver(Seq.empty)
     val result = resolver.fetchFiles(Seq.empty)
     assertEquals(result, Seq.empty)
+  }
+
+  test("buildDepTree detects requested version clashes even after resolution picks one winner") {
+    val resolver = new DependencyResolver(Seq.empty)
+    val deps = Seq(
+      Dependency.make("org.jsoup:jsoup:1.21.1", "3.7.4"),
+      Dependency.make("org.jsoup:jsoup:1.16.2", "3.7.4"),
+      Dependency.make("org.jsoup:jsoup:1.1.2", "3.7.4")
+    )
+
+    val tree = resolver.buildDepTree(deps)
+    val jsoupConflict = tree.conflicts.find(_.coordinate == "org.jsoup:jsoup")
+
+    assert(jsoupConflict.nonEmpty)
+    assert(jsoupConflict.get.isConflict)
+    assertEquals(jsoupConflict.get.requestedVersions.keySet, Set("1.21.1", "1.16.2", "1.1.2"))
+    assertEquals(jsoupConflict.get.resolvedVersion, "1.21.1")
   }
 }

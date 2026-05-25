@@ -197,20 +197,30 @@ class DependencyResolver(val repositories: Seq[CsRepository]) extends Dependency
       resolvedDeps: Seq[coursierapi.Dependency],
       originalDeps: Seq[coursierapi.Dependency]
   ): Seq[DepConflict] = {
-    resolvedDeps
+    val requestedVersionsByCoord = originalDeps
       .groupBy(d => s"${d.getModule.getOrganization}:${d.getModule.getName}")
-      .map { case (coord, versionsSeq) =>
-        val versions = versionsSeq.map(_.getVersion).distinct
-        val isConflict = versions.length > 1
-        
+      .view
+      .mapValues(_.map(_.getVersion).distinct)
+      .toMap
+
+    val resolvedVersionByCoord = resolvedDeps
+      .groupBy(d => s"${d.getModule.getOrganization}:${d.getModule.getName}")
+      .view
+      .mapValues(_.head.getVersion)
+      .toMap
+
+    (requestedVersionsByCoord.keySet ++ resolvedVersionByCoord.keySet).toSeq.sorted
+      .map { coord =>
+        val requestedVersions = requestedVersionsByCoord.getOrElse(coord, Seq.empty)
+        val resolvedVersion = resolvedVersionByCoord.getOrElse(coord, requestedVersions.headOption.getOrElse(""))
+
         DepConflict(
           coordinate = coord,
-          requestedVersions = versions.map(_ -> Seq.empty).toMap,
-          resolvedVersion = versionsSeq.head.getVersion,
-          isConflict = isConflict
+          requestedVersions = requestedVersions.map(_ -> Seq.empty).toMap,
+          resolvedVersion = resolvedVersion,
+          isConflict = requestedVersions.distinct.length > 1
         )
       }
-      .toSeq
   }
 
   private def emptyDepTree(): DepTree =

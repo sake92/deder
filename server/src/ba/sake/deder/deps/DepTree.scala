@@ -37,11 +37,9 @@ object DepTree:
   given PlainTextWritable[DepTree] with
     def write(tree: DepTree): String =
       val buf = new StringBuilder
-      buf ++= s"Dependency Tree for module: ${tree.module}\n"
       buf ++= s"Total size: ${formatBytes(tree.totalSizeBytes)}\n"
       if tree.conflicts.exists(_.isConflict) then
         buf ++= s"⚠️  Conflicts: ${tree.conflictCount}\n"
-      buf ++= "\n"
       buf ++= "Direct Dependencies:\n"
       for node <- tree.rootDeps do
         renderNodeTree(node, tree, buf, "", isLast = true)

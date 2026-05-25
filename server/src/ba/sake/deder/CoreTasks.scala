@@ -278,6 +278,7 @@ class CoreTasks() extends StrictLogging {
       (deps ++ ctx.transitiveResults.flatten.flatten).distinct
     }
 
+
   val depsTreeTask = CachedTaskBuilder
     .make[DepTree](
       name = "depsTree",
@@ -287,22 +288,8 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val allResolved = ctx.depResults._1
       val resolver = ctx.dependencyResolver
-      
-      try {
-        val tree = resolver.buildDepTree(allResolved)
-        tree.copy(module = ctx.module.id)
-      } catch {
-        case e: Exception =>
-          logger.error(s"Failed to build deps tree for ${ctx.module.id}", e)
-          DepTree(
-            module = ctx.module.id,
-            allDeps = Seq.empty,
-            rootDeps = Seq.empty,
-            conflicts = Seq.empty,
-            totalSizeBytes = 0,
-            totalUniqueSizeBytes = 0
-          )
-      }
+      val tree = resolver.buildDepTree(allResolved)
+      tree.copy(module = ctx.module.id)
     }
 
   val mandatoryDependenciesTask = CachedTaskBuilder
