@@ -100,41 +100,88 @@ class DependencyResolver(val repositories: Seq[CsRepository]) extends Dependency
     else {
       val coursierDeps = dependencies.map(_.applied.toCs)
       val fetchResult = doFetch(coursierDeps, notifications)
-      
+
       // Extract resolved deps with file info
       val resolvedDeps = fetchResult.getDependencies.asScala.toSeq
       val files = fetchResult.getFiles.asScala.map(f => os.Path(f.toPath)).toSeq
-      
+
+      // Build coord -> file size map for resolved deps
+      val coordToFile: Map[String, os.Path] = resolvedDeps
+        .zip(files)
+        .map { (dep, file) =>
+          s"${dep.getModule.getOrganization}:${dep.getModule.getName}:${dep.getVersion}" -> file
+        }
+        .toMap
+
+      // For each resolved dep, compute its transitive set by fetching it individually.
+      // Coursier uses its local disk cache for POM lookups, so individual fetches are fast.
+      val transitiveSetByCoord: Map[String, Set[String]] = resolvedDeps.flatMap { dep =>
+        val coord =
+          s"${dep.getModule.getOrganization}:${dep.getModule.getName}:${dep.getVersion}"
+        val csDep = CoursierDependency.of(dep.getModule.getOrganization, dep.getModule.getName, dep.getVersion)
+        try {
+          val transitive = doFetch(Seq(csDep))
+            .getDependencies
+            .asScala
+            .map(d => s"${d.getModule.getOrganization}:${d.getModule.getName}:${d.getVersion}")
+            .toSet - coord // exclude self
+          Some(coord -> transitive)
+        } catch {
+          case e: Exception =>
+            logger.warn(s"Could not resolve transitives for $coord: ${e.getMessage}")
+            None
+        }
+      }.toMap
+
+      // directChildren(D) = trans(D) minus all deps reachable via any intermediary in trans(D).
+      // This correctly identifies the immediate (direct) children in the dep graph.
+      val directChildrenByCoord: Map[String, Set[String]] = transitiveSetByCoord.map {
+        (coord, transitives) =>
+          val indirectTransitives = transitives.flatMap(t => transitiveSetByCoord.getOrElse(t, Set.empty))
+          coord -> (transitives -- indirectTransitives)
+      }
+
+      // Invert directChildren map to get parents for each dep
+      val parentMap: Map[String, Seq[String]] = {
+        val m = scala.collection.mutable.Map[String, List[String]]()
+        for (parentCoord, children) <- directChildrenByCoord do
+          for childCoord <- children do
+            m.updateWith(childCoord) {
+              case None           => Some(List(parentCoord))
+              case Some(existing) => Some((parentCoord :: existing).distinct)
+            }
+        m.view.mapValues(_.toSeq).toMap
+      }
+
       // Build DepNode for each resolved dependency
-      val depNodes = resolvedDeps.zipWithIndex.flatMap { (dep, idx) =>
-        if idx < files.size then {
-          val file = files(idx)
+      val depNodes = resolvedDeps.flatMap { dep =>
+        val coord = s"${dep.getModule.getOrganization}:${dep.getModule.getName}:${dep.getVersion}"
+        coordToFile.get(coord).map { file =>
           val sizeBytes = if os.exists(file) then os.size(file) else 0L
-           
-          Some(DepNode(
+          DepNode(
             org = dep.getModule.getOrganization,
             name = dep.getModule.getName,
             version = dep.getVersion,
             filePath = file.toString,
             fileSizeBytes = sizeBytes,
             depth = 0,
-            parents = Seq.empty
-          ))
-        } else None
+            parents = parentMap.getOrElse(coord, Seq.empty)
+          )
+        }
       }
-      
+
       // Identify version conflicts
       val conflicts = detectConflicts(resolvedDeps, coursierDeps)
-      
-      // Calculate total size
+
+      // Calculate total size (unique: sum over root-level deps only to avoid counting shared deps twice)
       val totalSize = depNodes.map(_.fileSizeBytes).sum
-      
+
       // Direct deps are those in the original dependency list
-      val directDepCoords = coursierDeps.map(d => 
-        s"${d.getModule.getOrganization}:${d.getModule.getName}:${d.getVersion}"
-      ).toSet
+      val directDepCoords = coursierDeps
+        .map(d => s"${d.getModule.getOrganization}:${d.getModule.getName}:${d.getVersion}")
+        .toSet
       val rootDeps = depNodes.filter(n => directDepCoords.contains(n.coordinate))
-      
+
       DepTree(
         module = "unknown",
         allDeps = depNodes,
