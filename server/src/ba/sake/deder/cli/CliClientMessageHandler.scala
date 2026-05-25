@@ -301,12 +301,18 @@ class CliClientMessageHandler(
                       val sortedCategories = categoryOrder.filter(grouped.contains) ++
                         grouped.keys.filterNot(categoryOrder.contains).toSeq.sorted
                       val categoryLines = sortedCategories.flatMap { cat =>
-                        val taskNames = grouped(cat).map(_.name).sorted
-                        Seq(s"  ${cat}:") ++ taskNames.map(t => s"    ${t}")
+                        val taskNames = grouped(cat).toSeq.sortBy(_.name).map { task =>
+                          val tags = task.featureTags.map(_.emoji).mkString(" ")
+                          val suffix = if tags.nonEmpty then s"  $tags" else ""
+                          s"    ${task.name}$suffix"
+                        }
+                        Seq(s"  ${cat}:") ++ taskNames
                       }
                       s"${module.id}:\n${categoryLines.mkString("\n")}"
                     }
-                    serverMessages.put(CliServerMessage.Output(modulesWithTasks.mkString("\n")))
+                    val legend = FeatureTag.values.map(ft => s"${ft.emoji} = ${ft.description}").mkString("  |  ")
+                    val output = modulesWithTasks.mkString("\n") + "\n\n  " + legend
+                    serverMessages.put(CliServerMessage.Output(output))
                     serverMessages.put(CliServerMessage.Exit(0))
             }
           }
