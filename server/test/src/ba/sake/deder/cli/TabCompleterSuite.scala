@@ -80,12 +80,12 @@ class TabCompleterSuite extends munit.FunSuite {
 
     assertEquals(
       completer.complete("deder exec ", cs("deder exec ")).toSet,
-      Set("-m", "--modules", "-t", "--task", "--json", "-w", "--watch", "-l", "--log-level")
+      Set("-m", "--modules", "-t", "--task", "-f", "--format", "-w", "--watch", "-l", "--log-level")
     )
 
     assertEquals(
       completer.complete("deder exec --", cs("deder exec --")).toSet,
-      Set("--modules", "--task", "--json", "--watch", "--log-level")
+      Set("--modules", "--task", "--format", "--watch", "--log-level")
     )
   }
 
@@ -98,12 +98,12 @@ class TabCompleterSuite extends munit.FunSuite {
 
     assertEquals(
       completer.complete("deder modules ", cs("deder modules ")).toSet,
-      Set("-m", "--modules", "--depth-down", "--depth-up", "--json", "--dot", "--mermaid")
+      Set("-m", "--modules", "--depth-down", "--depth-up", "-f", "--format")
     )
 
     assertEquals(
       completer.complete("deder modules --", cs("deder modules --")).toSet,
-      Set("--modules", "--depth-down", "--depth-up", "--json", "--dot", "--mermaid")
+      Set("--modules", "--depth-down", "--depth-up", "--format")
     )
   }
 
@@ -135,12 +135,12 @@ class TabCompleterSuite extends munit.FunSuite {
 
     assertEquals(
       completer.complete("deder tasks ", cs("deder tasks ")).toSet,
-      Set("-m", "--module", "--json", "--dot", "--mermaid")
+      Set("-m", "--module", "-f", "--format")
     )
 
     assertEquals(
       completer.complete("deder tasks --", cs("deder tasks --")).toSet,
-      Set("--module", "--json", "--dot", "--mermaid")
+      Set("--module", "--format")
     )
   }
 
@@ -153,12 +153,12 @@ class TabCompleterSuite extends munit.FunSuite {
 
     assertEquals(
       completer.complete("deder plan ", cs("deder plan ")).toSet,
-      Set("-m", "--modules", "-t", "--task", "--json", "--dot", "--mermaid")
+      Set("-m", "--modules", "-t", "--task", "-f","--format")
     )
 
     assertEquals(
       completer.complete("deder plan --", cs("deder plan --")).toSet,
-      Set("--modules", "--task", "--json", "--dot", "--mermaid")
+      Set("--modules", "--task","--format")
     )
   }
 

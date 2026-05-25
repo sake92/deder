@@ -985,7 +985,9 @@ class CoreTasks() extends StrictLogging {
       effectiveMap.get(mvnAppName) match {
         case Some((deps, mainClass, args)) =>
           val dependencies = deps.map(Dependency.make(_, scalaVersion))
-          logger.info(s"Resolving dependencies for maven app '${mvnAppName}': ${dependencies.map(_.toString).mkString(", ")}")
+          logger.info(
+            s"Resolving dependencies for maven app '${mvnAppName}': ${dependencies.map(_.toString).mkString(", ")}"
+          )
           val jars = ctx.dependencyResolver.fetchFiles(dependencies, Some(ctx.notifications))
           logger.info(s"Resolved jars for maven app '${mvnAppName}': ${jars.map(_.toString).mkString(", ")}")
           val cp = jars.map(_.toString).mkString(File.pathSeparator)
@@ -1033,7 +1035,14 @@ class CoreTasks() extends StrictLogging {
       val cp = jars.map(_.toString).mkString(File.pathSeparator)
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val scalafixArgs =
-        ScalafixUtils.buildArgs(scalaVersion, scalacOptions, compileClasspath, semanticdbDir.absPath, sourcePaths, ctx.args)
+        ScalafixUtils.buildArgs(
+          scalaVersion,
+          scalacOptions,
+          compileClasspath,
+          semanticdbDir.absPath,
+          sourcePaths,
+          ctx.args
+        )
       val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, "scalafix.cli.Cli") ++ scalafixArgs
       logger.info(s"Running scalafix fix: ${cmd}")
       val forkEnv = ctx.module match {
@@ -1168,8 +1177,8 @@ class CoreTasks() extends StrictLogging {
           forkedRun.results
         }
       },
-      isResultSuccessful = _.success,
-      //summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
+      isResultSuccessful = _.success
+      // summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
     )
 
   val testInMemoryTask = TaskBuilder
