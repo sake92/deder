@@ -11,8 +11,10 @@ import ba.sake.deder.BaseIntegrationSuite
 
 class BspResilienceSuite extends BaseIntegrationSuite {
 
-  private val testResourceDir: os.Path = os.pwd / "integration/test/resources"
   private val bspRequestTimeoutMinutes = 5L
+
+  private def stageMultiProject(testDir: os.Path): Unit =
+    stageTestProject(os.RelPath("sample-projects/multi"), testDir)
 
   private def writeServerProperties(testDir: os.Path): Unit =
     os.write.over(
@@ -24,12 +26,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("BSP client re-launch connects to still-running server") {
     val testDir = os.pwd / "tmp" / s"bsp-relaunch-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -54,12 +51,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("server restart: new BSP client auto-starts server") {
     val testDir = os.pwd / "tmp" / s"bsp-restart-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -88,12 +80,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("concurrent buildTargetSources requests complete successfully") {
     val testDir = os.pwd / "tmp" / s"bsp-concurrent-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -116,12 +103,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("unknown build target request is rejected with BSP error but server stays alive") {
     val testDir = os.pwd / "tmp" / s"bsp-unknown-target-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -157,12 +139,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("buildTargetCompile after reconnect maintains state correctness") {
     val testDir = os.pwd / "tmp" / s"bsp-compile-reconnect-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -193,12 +170,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("compile notifications arrive in order: start -> progress -> finish") {
     val testDir = os.pwd / "tmp" / s"bsp-notify-order-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -232,12 +204,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("failing compilation emits error diagnostics and finish with error status") {
     val testDir = os.pwd / "tmp" / s"bsp-compile-fail-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -274,12 +241,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("rapid successive buildTargetCompile requests both complete without hanging") {
     val testDir = os.pwd / "tmp" / s"bsp-rapid-compile-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -316,12 +278,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("rapid buildTargetCompile requests each get correct originId on result") {
     val testDir = os.pwd / "tmp" / s"bsp-originid-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -369,12 +326,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("buildTargetCompile with overlapping target sets completes correctly") {
     val testDir = os.pwd / "tmp" / s"bsp-overlap-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -412,12 +364,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("simulated AI agent burst: many compiles, all originIds correct, server stays alive") {
     val testDir = os.pwd / "tmp" / s"bsp-aiburst-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -462,12 +409,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("compile finish notification is sent even when compilation fails with errors") {
     val testDir = os.pwd / "tmp" / s"bsp-finish-guarantee-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 
@@ -497,12 +439,7 @@ class BspResilienceSuite extends BaseIntegrationSuite {
   test("manual kill during in-flight compile returns CANCELLED instead of hanging") {
     val testDir = os.pwd / "tmp" / s"bsp-kill-inflight-${System.currentTimeMillis()}"
     try {
-      os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-      val lines = os.read.lines(testDir / "deder.pkl")
-      os.write.over(
-        testDir / "deder.pkl",
-        (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-      )
+      stageMultiProject(testDir)
       writeServerProperties(testDir)
       executeDederCommand(testDir, "bsp", "install")
 

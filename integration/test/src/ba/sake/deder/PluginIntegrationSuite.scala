@@ -12,7 +12,7 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
 
   private def stageSiblingProject(parentDir: os.Path, projectName: String): os.Path = {
     val stagedPath = parentDir / projectName
-    os.copy(testResourceDir / "sample-projects" / projectName, stagedPath, createFolders = true, replaceExisting = true)
+    stageTestProject(os.RelPath(s"sample-projects/$projectName"), stagedPath)
     // tweak deder.pkl, because test is run from tmp/temp_folder
     /*locally {
       val originalLines = os.read.lines(stagedPath / "deder.pkl")

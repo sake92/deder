@@ -98,6 +98,8 @@ Or leave out both to clean everything.
 Keep integration test classes rather small, because then it is easier to run them one by one.  
 Run minimal affected integration tests, rarely all of them.
 
+Never run `deder` directly inside `integration/test/resources/sample-projects/**`. Those directories are shared fixtures, and Deder creates runtime artifacts in `.deder/` (including Unix sockets) that can pollute later tests. Always copy the fixture to `tmp/` first via `withTestProject` / `stageTestProject` or an equivalent temp staging helper, and when copying fixtures ignore any existing top-level `.deder/` directory instead of propagating it.
+
 ## JarJar Shading (`jarjar-abrams 1.16.0`)
 
 Assembly shading is configured via `shadeRulesFile` on a module in `deder.pkl`.  
@@ -125,4 +127,3 @@ Implementation: `PublishTasks.scala` reads the config → `JarUtils.scala` calls
 
 5. **The `mainClass` in `deder.pkl` and the server's hardcoded main-class string must match the post-shading name.**  
    The `ForkedTestOrchestrator` (in the unshaded server JAR) must reference the shaded main class name when spawning forked test JVMs.
-

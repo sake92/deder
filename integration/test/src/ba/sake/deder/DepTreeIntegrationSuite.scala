@@ -1,16 +1,30 @@
 package ba.sake.deder
 
-import munit.FunSuite
+class DepTreeIntegrationSuite extends BaseIntegrationSuite {
 
-class DepTreeIntegrationSuite extends FunSuite {
+  private val multiProjectPath = os.RelPath("sample-projects/multi")
 
-  private def skipIfDepsTreeNotAvailable(): Unit = {
+  test("depsTree checks do not mutate the shared sample project") {
+    val projectPath = testResourceDir / multiProjectPath
+    val dederDir = projectPath / ".deder"
+    if os.exists(dederDir) then os.remove.all(dederDir)
+
+    try {
+      withTestProject(multiProjectPath) { stagedProjectPath =>
+        val result = executeDederCommand(stagedProjectPath, "tasks", "-m", "common")
+        assertEquals(result.exitCode, 0)
+      }
+      assert(!os.exists(dederDir), s"shared fixture must stay clean, but found $dederDir")
+    } finally {
+      if os.exists(dederDir) then os.remove.all(dederDir)
+    }
+  }
+
+  private def skipIfDepsTreeNotAvailable(projectPath: os.Path): Unit = {
     // Check if depsTree task is available
-    val projectPath = os.pwd / "integration/test/resources/sample-projects/multi"
-    val result = os.proc("deder", "tasks", "-m", "common")
-      .call(cwd = projectPath, check = false, stderr = os.Pipe)
+    val result = executeDederCommand(projectPath, "tasks", "-m", "common")
     val output = result.out.text()
-    
+
     assume(
       output.contains("depsTree"),
       "depsTree task not available - this task may not be fully implemented yet"
@@ -18,61 +32,53 @@ class DepTreeIntegrationSuite extends FunSuite {
   }
 
   test("depsTree task is available") {
-    val projectPath = os.pwd / "integration/test/resources/sample-projects/multi"
-    val result = os.proc("deder", "tasks", "-m", "common")
-      .call(cwd = projectPath, check = false)
-    
-    val output = result.out.text()
-    assume(
-      output.contains("depsTree") || output.contains("Dependency Management"),
-      "depsTree task should be listed in available tasks - this task may not be fully implemented yet"
-    )
+    withTestProject(multiProjectPath) { projectPath =>
+      val result = executeDederCommand(projectPath, "tasks", "-m", "common")
+      val output = result.out.text()
+      assume(
+        output.contains("depsTree") || output.contains("Dependency Management"),
+        "depsTree task should be listed in available tasks - this task may not be fully implemented yet"
+      )
+    }
   }
 
   test("depsTree task executes successfully on multi") {
-    skipIfDepsTreeNotAvailable()
-    
-    val projectPath = os.pwd / "integration/test/resources/sample-projects/multi"
-    val result = os.proc("deder", "exec", "-t", "depsTree", "-m", "common")
-      .call(cwd = projectPath, check = false)
-    assertEquals(result.exitCode, 0, "depsTree task should execute without error")
+    withTestProject(multiProjectPath) { projectPath =>
+      skipIfDepsTreeNotAvailable(projectPath)
+      val result = executeDederCommand(projectPath, "exec", "-t", "depsTree", "-m", "common")
+      assertEquals(result.exitCode, 0, "depsTree task should execute without error")
+    }
   }
 
   test("depsTree output contains dependency tree structure") {
-    skipIfDepsTreeNotAvailable()
-    
-    val projectPath = os.pwd / "integration/test/resources/sample-projects/multi"
-    val result = os.proc("deder", "exec", "-t", "depsTree", "-m", "common")
-      .call(cwd = projectPath, check = false)
-    
-    val output = result.out.text()
-    assert(
-      output.nonEmpty,
-      "Output should not be empty"
-    )
+    withTestProject(multiProjectPath) { projectPath =>
+      skipIfDepsTreeNotAvailable(projectPath)
+      val result = executeDederCommand(projectPath, "exec", "-t", "depsTree", "-m", "common")
+      val output = result.out.text()
+      assert(
+        output.nonEmpty,
+        "Output should not be empty"
+      )
+    }
   }
 
   test("depsTree executes on different modules") {
-    skipIfDepsTreeNotAvailable()
-    
-    val projectPath = os.pwd / "integration/test/resources/sample-projects/multi"
-    val result = os.proc("deder", "exec", "-t", "depsTree", "-m", "frontend")
-      .call(cwd = projectPath, check = false)
-    
-    assertEquals(result.exitCode, 0, "depsTree task should work on different modules")
+    withTestProject(multiProjectPath) { projectPath =>
+      skipIfDepsTreeNotAvailable(projectPath)
+      val result = executeDederCommand(projectPath, "exec", "-t", "depsTree", "-m", "frontend")
+      assertEquals(result.exitCode, 0, "depsTree task should work on different modules")
+    }
   }
 
   test("depsTree handles modules with no dependencies") {
-    skipIfDepsTreeNotAvailable()
-    
-    val projectPath = os.pwd / "integration/test/resources/sample-projects/multi"
-    val result = os.proc("deder", "exec", "-t", "depsTree", "-m", "common")
-      .call(cwd = projectPath, check = false, stderr = os.Pipe)
-    
-    // Task should complete without crashing
-    assert(
-      result.exitCode == 0 || result.exitCode == 1,
-      "depsTree should handle modules gracefully"
-    )
+    withTestProject(multiProjectPath) { projectPath =>
+      skipIfDepsTreeNotAvailable(projectPath)
+      val result = executeDederCommand(projectPath, "exec", "-t", "depsTree", "-m", "common")
+      // Task should complete without crashing
+      assert(
+        result.exitCode == 0 || result.exitCode == 1,
+        "depsTree should handle modules gracefully"
+      )
+    }
   }
 }

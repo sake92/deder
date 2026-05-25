@@ -27,12 +27,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
 
   override def beforeAll(): Unit = {
     testDir = os.pwd / "tmp" / s"multi-bsp-${System.currentTimeMillis()}"
-    os.copy(testResourceDir / "sample-projects/multi", testDir, createFolders = true)
-    val lines = os.read.lines(testDir / "deder.pkl")
-    os.write.over(
-      testDir / "deder.pkl",
-      (Seq("""amends "../../config/DederProject.pkl"""") ++ lines.tail).mkString("\n")
-    )
+    stageTestProject(os.RelPath("sample-projects/multi"), testDir)
     os.write.over(
       testDir / ".deder/server.properties",
       s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\nmaxConnectSeconds=300\n",
