@@ -33,17 +33,17 @@ deder complete -s bash -o > ~/.local/share/bash-completion/completions/deder
 
 ################ explore the build
 # list modules
-# supports flags: --json, --dot, --mermaid
+# supports --format json|mermaid|dot
 deder modules
 
 ################
 # list tasks
-# supports flags: --json, --dot, --mermaid
+# supports --format json|mermaid|dot
 deder tasks
 
 ################
 # print execution plan for a task
-# supports flags: --json, --dot, --mermaid
+# supports --format json|mermaid|dot
 deder plan -m common -t compileClasspath
 
 

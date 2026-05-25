@@ -64,8 +64,10 @@ pomSettings {
 
 then run this:
 ```shell
-deder exec -t jar -m myapp --json
-# will print {"myapp":"/<your_path>/myapp/.deder/out/myapp/jar/myapp.jar"}
+deder exec -t jar -m myapp
+# will print
+# [myapp]
+# .deder/out/myapp/jar/myapp.jar
 ```
 
 then if you try to run it you will get an error (expected):
@@ -87,8 +89,10 @@ Then the build tool will download those and add to the classpath (you don't need
 
 If you build an *assembly JAR*, you will be able to run it:
 ```shell
-deder exec -t assembly -m myapp --json
-# will print {"myapp":"/<your_path>/myapp/.deder/out/myapp/assembly/out.jar"}
+deder exec -t assembly -m myapp
+# will print
+# [myapp]
+# .deder/out/myapp/assembly/out.jar
 
 java -jar .deder/out/myapp/assembly/out.jar
 # Hello world!

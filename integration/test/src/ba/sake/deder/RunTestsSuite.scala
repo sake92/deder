@@ -95,7 +95,9 @@ class RunTestsSuite extends BaseIntegrationSuite {
   test("deder should run ScalaCheck tests") {
     withTestProject("sample-projects/tests") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-m", "scalacheck", "-t", "test")
-      val outText = res.out.text()
+      val outText = res.err.text() 
+      // ScalaCheck outputs to stderr
+      // only the Deder summary is on stdout
       assert(outText.contains("startsWith"), s"Expected test output to contain 'startsWith', got: ${outText}")
       assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
     }
