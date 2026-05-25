@@ -175,6 +175,15 @@ sealed trait AbstractTask[T] {
   /** When true, this task is hidden from listing/completion/plan output but can still be executed directly by name.
     */
   def internal: Boolean = false
+
+  def featureTags: Seq[FeatureTag] =
+    val b = Seq.newBuilder[FeatureTag]
+    if this.isInstanceOf[SourceFileTask] || this.isInstanceOf[SourceFilesTask] then b += FeatureTag.SourceAware
+    if this.isInstanceOf[ConfigValueTask[?]] then b += FeatureTag.ConfigAware
+    if this.isInstanceOf[FanInTask[?]] then b += FeatureTag.FanIn
+    if this.isInstanceOf[CachedTask[?, ?, ?]] then b += FeatureTag.Cached
+    b.result()
+
   def isResultSuccessful: T => Boolean
 }
 
@@ -496,3 +505,9 @@ object TaskInstance {
   def apply(module: DederModule, task: Task[?, ?, ?]): TaskInstance =
     new TaskInstance(module, task, new ReentrantLock())
 }
+
+enum FeatureTag(val emoji: String, val jsonKey: String, val description: String):
+  case SourceAware extends FeatureTag("📁", "source-aware", "watches sources")
+  case ConfigAware extends FeatureTag("⚙", "config-aware", "watches config")
+  case FanIn      extends FeatureTag("🔀", "fan-in", "fan-in")
+  case Cached     extends FeatureTag("⚡", "cached", "cached")

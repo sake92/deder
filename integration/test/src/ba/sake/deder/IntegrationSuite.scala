@@ -45,6 +45,10 @@ class IntegrationSuite extends BaseIntegrationSuite {
         List("sources", "compile", "run").foreach { taskName =>
           assert(dederOutput.contains(taskName), s"Task '$taskName' not found in 'deder tasks -m common' output")
         }
+        // verify feature tags and legend appear
+        assert(dederOutput.contains("⚡"), "output should contain cached emoji")
+        assert(dederOutput.contains("📁"), "output should contain source-aware emoji")
+        assert(dederOutput.contains("⚡ = cached"), "legend should include cached description")
       }
       locally {
         val dederRes = executeDederCommand(projectPath, "tasks", "-m", "uber-test")
@@ -52,6 +56,22 @@ class IntegrationSuite extends BaseIntegrationSuite {
         List("sources", "compile", "test").foreach { taskName =>
           assert(dederOutput.contains(taskName), s"Task '$taskName' not found in 'deder tasks -m uber-test' output")
         }
+      }
+      // deder tasks --format json
+      locally {
+        val dederRes = executeDederCommand(projectPath, "tasks", "-m", "common", "--format", "json")
+        val dederOutput = dederRes.out.text()
+        assert(dederOutput.contains("\"name\":"), "JSON tasks output should contain name field")
+        assert(dederOutput.contains("\"features\":"), "JSON tasks output should contain features array")
+        assert(dederOutput.contains("\"source-aware\""), "at least one task should have source-aware feature")
+        assert(dederOutput.contains("\"cached\""), "at least one task should have cached feature")
+      }
+      // deder tasks --format densejson
+      locally {
+        val dederRes = executeDederCommand(projectPath, "tasks", "-m", "common", "--format", "densejson")
+        val dederOutput = dederRes.out.text()
+        assert(dederOutput.contains("\"name\":"), "DenseJson tasks output should contain name field")
+        assert(dederOutput.contains("\"features\":"), "DenseJson tasks output should contain features array")
       }
       // deder plan
       locally {
