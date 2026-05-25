@@ -9,6 +9,7 @@ given TokensReader.Simple[LogLevel] with {
   def read(strs: Seq[String]) = Right(LogLevel.valueOf(strs.head.toUpperCase))
 }
 
+// TODO maybe add json pretty-printing flag, or json-dense enum value?
 given TokensReader.Simple[OutputFormat] with {
   def shortName = "outputFormat"
   def read(strs: Seq[String]) = strs.head.toLowerCase match {
@@ -34,28 +35,16 @@ case class DederCliModulesOptions(
     depthDown: Int = Int.MaxValue,
     @arg(doc = "Max hops following reverse-dependency edges (upstream). Default: unlimited")
     depthUp: Int = Int.MaxValue,
-    @arg(doc = "Output format: plain, json, dot, or mermaid")
-    format: OutputFormat = OutputFormat.PlainText,
-    @arg(doc = "Deprecated: use --format json")
-    json: Flag = Flag(),
-    @arg(doc = "Deprecated: use --format dot")
-    dot: Flag = Flag(),
-    @arg(doc = "Deprecated: use --format mermaid")
-    mermaid: Flag = Flag()
+    @arg(doc = "Output format: plain, json, dot, or mermaid", short = 'f')
+    format: OutputFormat = OutputFormat.PlainText
 )
 
 @main("tasks command", "List tasks per module")
 case class DederCliTasksOptions(
     @arg(doc = "Filter tasks by Module ID", short = 'm')
     module: Option[String],
-    @arg(doc = "Output format: plain, json, dot, or mermaid")
-    format: OutputFormat = OutputFormat.PlainText,
-    @arg(doc = "Deprecated: use --format json")
-    json: Flag = Flag(),
-    @arg(doc = "Deprecated: use --format dot")
-    dot: Flag = Flag(),
-    @arg(doc = "Deprecated: use --format mermaid")
-    mermaid: Flag = Flag()
+    @arg(doc = "Output format: plain, json, dot, or mermaid", short = 'f')
+    format: OutputFormat = OutputFormat.PlainText
 )
 
 @main("plan command", "Plan for task execution in a module")
@@ -64,14 +53,8 @@ case class DederCliPlanOptions(
     modules: Seq[String], // cant have a default... :/
     @arg(doc = "The task to plan", short = 't')
     task: String,
-    @arg(doc = "Output format: plain, json, dot, or mermaid")
-    format: OutputFormat = OutputFormat.PlainText,
-    @arg(doc = "Deprecated: use --format json")
-    json: Flag = Flag(),
-    @arg(doc = "Deprecated: use --format dot")
-    dot: Flag = Flag(),
-    @arg(doc = "Deprecated: use --format mermaid")
-    mermaid: Flag = Flag()
+    @arg(doc = "Output format: plain, json, dot, or mermaid", short = 'f')
+    format: OutputFormat = OutputFormat.PlainText
 )
 
 @main("clean command", "Clean build artifacts for module(s)")
@@ -90,10 +73,8 @@ case class DederCliExecOptions(
     modules: Seq[String], // cant have a default... :/
     @arg(doc = "Log level", short = 'l')
     logLevel: LogLevel = LogLevel.INFO,
-    @arg(doc = "Output format: plain or json")
+    @arg(doc = "Output format: plain, json, dot, or mermaid", short = 'f')
     format: OutputFormat = OutputFormat.PlainText,
-    @arg(doc = "Deprecated: use --format json")
-    json: Flag = Flag(),
     @arg(doc = "Watch mode - re-execute task on source changes", short = 'w')
     watch: Flag,
     args: Leftover[String]
@@ -143,7 +124,7 @@ given TokensReader.Simple[ShellType] with {
 
 @main("complete command", "Generate shell completion script and provide completions")
 case class DederCliCompleteOptions(
-    @arg(doc = "Shell type: bash, zsh, or powershell", short = 's')
+    @arg(doc = "Shell type: bash, zsh, fish, or powershell", short = 's')
     shell: ShellType,
     @arg(doc = "Current command line", short = 'c')
     commandLine: Option[String],
