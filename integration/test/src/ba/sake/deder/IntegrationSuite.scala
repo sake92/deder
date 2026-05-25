@@ -48,7 +48,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
         // verify feature tags and legend appear
         assert(dederOutput.contains("⚡"), "output should contain cached emoji")
         assert(dederOutput.contains("📁"), "output should contain source-aware emoji")
-        assert(dederOutput.contains("cached  |"), "legend should include cached description")
+        assert(dederOutput.contains("⚡ = cached"), "legend should include cached description")
       }
       locally {
         val dederRes = executeDederCommand(projectPath, "tasks", "-m", "uber-test")
