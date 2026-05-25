@@ -43,6 +43,7 @@
        <ul>
         <li><a href="#cheatsheet">Cheatsheet</a>
          <ul>
+          <li><a href="#dependency-tree-analysis">Dependency Tree Analysis</a></li>
           <li><a href="#custom-repositories">Custom repositories</a></li>
           <li><a href="#dependency-exclusions">Dependency Exclusions</a></li>
          </ul></li>
@@ -83,17 +84,17 @@ deder complete -s bash -o &gt; ~/.local/share/bash-completion/completions/deder
 <span class="hljs-meta prompt_">
 #</span><span class="language-bash"><span class="hljs-comment">############### explore the build</span></span>
 <span class="hljs-meta prompt_"># </span><span class="language-bash">list modules</span>
-<span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --dot, --mermaid</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">supports --format json|mermaid|dot</span>
 deder modules
 <span class="hljs-meta prompt_">
 #</span><span class="language-bash"><span class="hljs-comment">###############</span></span>
 <span class="hljs-meta prompt_"># </span><span class="language-bash">list tasks</span>
-<span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --dot, --mermaid</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">supports --format json|mermaid|dot</span>
 deder tasks
 <span class="hljs-meta prompt_">
 #</span><span class="language-bash"><span class="hljs-comment">###############</span></span>
 <span class="hljs-meta prompt_"># </span><span class="language-bash"><span class="hljs-built_in">print</span> execution plan <span class="hljs-keyword">for</span> a task</span>
-<span class="hljs-meta prompt_"># </span><span class="language-bash">supports flags: --json, --dot, --mermaid</span>
+<span class="hljs-meta prompt_"># </span><span class="language-bash">supports --format json|mermaid|dot</span>
 deder plan -m common -t compileClasspath
 <span class="hljs-meta prompt_">
 
@@ -144,6 +145,35 @@ deder exec -t fixCheck
 # </span><span class="language-bash">format with scalafmt</span>
 deder exec -t runMvnApp -m mymodule fmt
 deder exec -t runMvnApp -m mymodule fmtCheck
+<span class="hljs-meta prompt_">
+# </span><span class="language-bash">analyze dependency tree with size metrics and conflict detection</span>
+deder exec -t depsTree -m mymodule              # tree format (default)
+deder exec -t depsTree -m mymodule --format flat  # flat list
+deder exec -t depsTree -m mymodule --json      # JSON output
+</code></pre>
+   <h2 id="dependency-tree-analysis">Dependency Tree Analysis<a href="#dependency-tree-analysis" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>The <code>depsTree</code> task analyzes transitive dependencies with size metrics and conflict detection.</p>
+   <p><strong>Output includes:</strong></p>
+   <ul>
+    <li>Direct JAR size and aggregated transitive size (e.g., <code>2.1MB | 3.3MB</code>)</li>
+    <li>Version conflicts flagged inline and in summary</li>
+    <li>Total dependency tree size</li>
+   </ul>
+   <p><strong>Example tree output:</strong></p>
+   <pre><code class="language- hljs language-nix" data-highlighted="yes">Dependency Tree for <span class="hljs-params">module:</span> core
+Total <span class="hljs-params">size:</span> <span class="hljs-number">245</span>MB
+⚠️  <span class="hljs-params">Conflicts:</span> <span class="hljs-number">1</span>
+
+Direct <span class="hljs-params">Dependencies:</span>
+└── org.junit.jupiter:junit-jupiter-api:<span class="hljs-number">5.9</span>.<span class="hljs-number">2</span> (<span class="hljs-number">2.1</span>MB | <span class="hljs-number">3.3</span>MB)
+    ├── org.opentest4j:opentest4j:<span class="hljs-number">1.2</span>.<span class="hljs-number">1</span> (<span class="hljs-number">95</span>KB | <span class="hljs-number">95</span>KB)
+    └── org.junit.platform:junit-platform-commons:<span class="hljs-number">1.9</span>.<span class="hljs-number">2</span> (<span class="hljs-number">1.2</span>MB | <span class="hljs-number">1.2</span>MB)
+
+⚠️  Version <span class="hljs-params">Conflicts:</span>
+  org.opentest4j:<span class="hljs-params">opentest4j:</span>
+    • <span class="hljs-number">1.2</span>.<span class="hljs-number">0</span>
+    • <span class="hljs-number">1.2</span>.<span class="hljs-number">1</span>
+    ➜ <span class="hljs-params">Resolved:</span> <span class="hljs-number">1.2</span>.<span class="hljs-number">1</span>
 </code></pre>
    <h2 id="custom-repositories">Custom repositories<a href="#custom-repositories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Declare extra Maven repositories in <code>deder.pkl</code>:</p>
