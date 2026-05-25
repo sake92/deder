@@ -1,7 +1,6 @@
 package ba.sake.deder
 
 import scala.concurrent.duration.*
-import ba.sake.deder.importing.DederPklRenderer
 
 class ImportIntegrationSuite extends BaseIntegrationSuite {
 
@@ -62,13 +61,8 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
       assertEquals(importRes.exitCode, 0, s"deder import failed (exit ${importRes.exitCode}):\n${importRes.err.text()}")
 
       assert(os.exists(tempDir / "deder.pkl"), "deder.pkl was not created by import")
-      // Tweak amends to use local config (so we don't need network)
-      val dederPklContent = os.read(tempDir / "deder.pkl")
-      val tweakedContent = dederPklContent.replaceFirst(
-        s"amends \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederProject.pkl\"",
-        "amends \"../../config/DederProject.pkl\""
-      )
-      os.write.over(tempDir / "deder.pkl", tweakedContent)
+      // Rewrite imported config URLs to local files so all config modules come from the same source tree.
+      rewriteConfigUrls(tempDir)
 
       // Shutdown server so next command starts fresh
       forceShutdownServer(tempDir)

@@ -12,7 +12,11 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
 
   private def stageSiblingProject(parentDir: os.Path, projectName: String): os.Path = {
     val stagedPath = parentDir / projectName
-    stageTestProject(os.RelPath(s"sample-projects/$projectName"), stagedPath)
+    if os.exists(stagedPath) then os.remove.all(stagedPath)
+    os.makeDir.all(stagedPath)
+    val sourceDir = testResourceDir / "sample-projects" / projectName
+    for entry <- os.list(sourceDir) if entry.last != ".deder" do
+      os.copy(entry, stagedPath / entry.last, createFolders = true, replaceExisting = true)
     // tweak deder.pkl, because test is run from tmp/temp_folder
     /*locally {
       val originalLines = os.read.lines(stagedPath / "deder.pkl")
@@ -51,7 +55,7 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
         s"publishLocal failed: exit=${publishRes.exitCode}\nstderr=${publishRes.err.text()}\nstdout=${publishRes.out.text()}"
       )
 
-      val localRepoDir = os.Path(sys.env("DEDER_TMP_M2_REPO"))
+      val localRepoDir = os.Path(sys.env("DEDER_TMP_M2_REPO"), os.pwd)
       val publishedDir = localRepoDir / "ba" / "sake" / "deder-hello-plugin_3" / "it-test-version"
       assert(os.exists(publishedDir), s"Published artifact directory not found at $publishedDir")
       assert(
