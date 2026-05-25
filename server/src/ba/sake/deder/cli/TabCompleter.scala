@@ -1,6 +1,7 @@
 package ba.sake.deder.cli
 
 import ba.sake.deder.TasksResolver
+import scala.util.boundary
 
 class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
 
@@ -19,7 +20,7 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
   )
 
   enum ValueType:
-    case ModuleIds, TaskNames, ShellTypes, ImportFrom, Subcommands
+    case ModuleIds, TaskNames, ShellTypes, ImportFrom, Subcommands, OutputFormats
 
   case class FlagDef(long: String, short: Option[String], valueType: Option[ValueType])
 
@@ -28,49 +29,43 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
       FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
       FlagDef("--depth-down", None, None),
       FlagDef("--depth-up", None, None),
-      FlagDef("--json", None, None),
-      FlagDef("--dot", None, None),
-      FlagDef("--mermaid", None, None),
+      FlagDef("--format", Some("-f"), Some(ValueType.OutputFormats))
     ),
     "tasks" -> Seq(
       FlagDef("--module", Some("-m"), Some(ValueType.ModuleIds)),
-      FlagDef("--json", None, None),
-      FlagDef("--dot", None, None),
-      FlagDef("--mermaid", None, None),
+      FlagDef("--format", Some("-f"), Some(ValueType.OutputFormats))
     ),
     "plan" -> Seq(
       FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
       FlagDef("--task", Some("-t"), Some(ValueType.TaskNames)),
-      FlagDef("--json", None, None),
-      FlagDef("--dot", None, None),
-      FlagDef("--mermaid", None, None),
+      FlagDef("--format", Some("-f"), Some(ValueType.OutputFormats))
     ),
     "clean" -> Seq(
       FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
-      FlagDef("--task", Some("-t"), Some(ValueType.TaskNames)),
+      FlagDef("--task", Some("-t"), Some(ValueType.TaskNames))
     ),
     "exec" -> Seq(
       FlagDef("--task", Some("-t"), Some(ValueType.TaskNames)),
       FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
       FlagDef("--log-level", Some("-l"), None),
-      FlagDef("--json", None, None),
-      FlagDef("--watch", Some("-w"), None),
+      FlagDef("--format", Some("-f"), Some(ValueType.OutputFormats)),
+      FlagDef("--watch", Some("-w"), None)
     ),
     "import" -> Seq(
-      FlagDef("--from", None, Some(ValueType.ImportFrom)),
+      FlagDef("--from", None, Some(ValueType.ImportFrom))
     ),
     "complete" -> Seq(
       FlagDef("--shell", Some("-s"), Some(ValueType.ShellTypes)),
       FlagDef("--command-line", Some("-c"), None),
       FlagDef("--cursor-pos", Some("-p"), None),
-      FlagDef("--output", Some("-o"), None),
+      FlagDef("--output", Some("-o"), None)
     ),
     "help" -> Seq(
-      FlagDef("--command", Some("-c"), Some(ValueType.Subcommands)),
-    ),
+      FlagDef("--command", Some("-c"), Some(ValueType.Subcommands))
+    )
   )
 
-  def complete(commandLine: String, cursorPos: Int): Seq[String] = {
+  def complete(commandLine: String, cursorPos: Int): Seq[String] = boundary {
     val (args, wordPos) = TabCompleter.shellSplit(commandLine, cursorPos)
     val currentWord = if wordPos >= 0 && wordPos < args.length then args(wordPos) else ""
     val prevWord = if wordPos >= 1 && wordPos < args.length then args(wordPos - 1) else ""
@@ -79,29 +74,35 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
       case Seq("deder", subcommand, rest*) =>
         // 1. Check if the previous word was a flag that expects a value
         commandFlags.get(subcommand).foreach { flags =>
-          val valueCompletion = flags.collectFirst {
-            case FlagDef(long, short, Some(valueType))
-                if prevWord == long || short.exists(_ == prevWord) =>
-              valueType
-          }.flatMap { vt =>
-            Some(completeValue(vt, currentWord))
-          }
-          valueCompletion.foreach(vc => return vc)
+          val valueCompletion = flags
+            .collectFirst {
+              case FlagDef(long, short, Some(valueType)) if prevWord == long || short.exists(_ == prevWord) =>
+                valueType
+            }
+            .flatMap { vt =>
+              Some(completeValue(vt, currentWord))
+            }
+          valueCompletion.foreach(vc => boundary.break(vc))
         }
 
         // 2. Handle "bsp" subcommand specially (it has sub-subcommand)
         if subcommand == "bsp" then return Seq("install").filter(_.startsWith(currentWord))
 
         // 3. Complete flags for this subcommand
-        commandFlags.get(subcommand).map { flags =>
-          flags.flatMap { f =>
-            f.short.toSeq ++ Seq(f.long)
-          }.filter(_.startsWith(currentWord))
-        }.getOrElse {
-          // Unknown subcommand or subcommand with no flags
-          if allSubcommands.contains(subcommand) then Seq.empty
-          else allSubcommands.filter(_.startsWith(subcommand))
-        }
+        commandFlags
+          .get(subcommand)
+          .map { flags =>
+            flags
+              .flatMap { f =>
+                f.short.toSeq ++ Seq(f.long)
+              }
+              .filter(_.startsWith(currentWord))
+          }
+          .getOrElse {
+            // Unknown subcommand or subcommand with no flags
+            if allSubcommands.contains(subcommand) then Seq.empty
+            else allSubcommands.filter(_.startsWith(subcommand))
+          }
 
       case Seq("deder") =>
         allSubcommands
@@ -116,11 +117,12 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
 
   private def completeValue(valueType: ValueType, prefix: String): Seq[String] = {
     val candidates: Seq[String] = valueType match {
-      case ValueType.ModuleIds   => moduleIds
-      case ValueType.TaskNames   => taskIds
-      case ValueType.ShellTypes  => ShellType.values.map(_.toString).toSeq
-      case ValueType.ImportFrom  => ImportBuildTool.values.map(_.toString).toSeq
-      case ValueType.Subcommands => allSubcommands
+      case ValueType.ModuleIds     => moduleIds
+      case ValueType.TaskNames     => taskIds
+      case ValueType.ShellTypes    => ShellType.values.map(_.toString).toSeq
+      case ValueType.ImportFrom    => ImportBuildTool.values.map(_.toString).toSeq
+      case ValueType.Subcommands   => allSubcommands
+      case ValueType.OutputFormats => Seq("plain", "json", "densejson", "dot", "mermaid")
     }
     candidates.filter(_.startsWith(prefix))
   }
