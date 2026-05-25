@@ -30,14 +30,6 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
     TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind, internal)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps, S] =
-    TaskImpl(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category, kind = kind, internal = internal)
-
-  def buildWithSummary(
-      execute: TaskExecContext[T, Deps] => T,
-      isResultSuccessful: T => Boolean = _ => true,
-      @deprecated("Use summarizable instead", "0.4.0")
-      summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit = (_, _) => ()
-  ): Task[T, Deps, S] =
     TaskImpl(
       name,
       execute,
@@ -47,8 +39,6 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       supportedModuleTypes,
       category = category,
       kind = kind,
-      isResultSuccessful = isResultSuccessful,
-      summarize = summarize,
       internal = internal
     )
 
@@ -81,7 +71,16 @@ object TaskBuilder {
       kind: TaskKind = TaskKind.Standard,
       internal: Boolean = false
   )(using Summarizable[T, MultiModuleResults[T]]): TaskBuilder[T, EmptyTuple, MultiModuleResults[T]] =
-    new TaskBuilder[T, EmptyTuple, MultiModuleResults[T]](name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind, internal)
+    new TaskBuilder[T, EmptyTuple, MultiModuleResults[T]](
+      name,
+      EmptyTuple,
+      transitive,
+      singleton,
+      supportedModuleTypes,
+      category,
+      kind,
+      internal
+    )
 
 }
 
@@ -100,7 +99,17 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
     CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind, internal)
 
   def build(execute: TaskExecContext[T, Deps] => T)(using Deps <:< NonEmptyTuple): Task[T, Deps, S] =
-    CachedTask(name, execute, taskDeps, transitive, singleton, supportedModuleTypes, category = category, kind = kind, internal = internal)
+    CachedTask(
+      name,
+      execute,
+      taskDeps,
+      transitive,
+      singleton,
+      supportedModuleTypes,
+      category = category,
+      kind = kind,
+      internal = internal
+    )
 }
 
 object CachedTaskBuilder {
@@ -114,7 +123,16 @@ object CachedTaskBuilder {
       kind: TaskKind = TaskKind.Standard,
       internal: Boolean = false
   )(using Summarizable[T, MultiModuleResults[T]]): CachedTaskBuilder[T, EmptyTuple, MultiModuleResults[T]] =
-    new CachedTaskBuilder[T, EmptyTuple, MultiModuleResults[T]](name, EmptyTuple, transitive, singleton, supportedModuleTypes, category, kind, internal)
+    new CachedTaskBuilder[T, EmptyTuple, MultiModuleResults[T]](
+      name,
+      EmptyTuple,
+      transitive,
+      singleton,
+      supportedModuleTypes,
+      category,
+      kind,
+      internal
+    )
 }
 
 // this is to make sure that Deps are AbstractTask-s and not arbitrary types
@@ -125,8 +143,8 @@ type TaskDeps[T <: Tuple] <: Boolean = T match {
 }
 
 type TaskDepResults[T <: Tuple] <: Tuple = T match {
-  case EmptyTuple                => EmptyTuple
-  case AbstractTask[t] *: rest   => t *: TaskDepResults[rest]
+  case EmptyTuple              => EmptyTuple
+  case AbstractTask[t] *: rest => t *: TaskDepResults[rest]
 }
 
 // needs a T because of transitive results
@@ -142,10 +160,9 @@ case class TaskExecContext[T, Deps <: Tuple](
     dependencyResolver: DependencyResolverApi
 )(using ev: TaskDeps[Deps] =:= true)
 
-/** Public-facing base trait for a task, without exposing the `Deps` type parameter.
- *  Use this type in plugin APIs so callers don't need to
- *  know (or spell out) the dependency tuple.
- */
+/** Public-facing base trait for a task, without exposing the `Deps` type parameter. Use this type in plugin APIs so
+  * callers don't need to know (or spell out) the dependency tuple.
+  */
 sealed trait AbstractTask[T] {
   def name: String
   def description: String
@@ -154,28 +171,27 @@ sealed trait AbstractTask[T] {
   def supportedModuleTypes: Set[ModuleType]
   def transitive: Boolean
   def singleton: Boolean
-  /** When true, this task is hidden from listing/completion/plan output but
-   *  can still be executed directly by name.
-   */
+
+  /** When true, this task is hidden from listing/completion/plan output but can still be executed directly by name.
+    */
   def internal: Boolean = false
   def isResultSuccessful: T => Boolean
 }
 
-sealed trait Task[T, Deps <: Tuple, S](using val rw: JsonRW[T], val summarizable: Summarizable[T, S], ev: TaskDeps[Deps] =:= true)
-    extends AbstractTask[T] {
+sealed trait Task[T, Deps <: Tuple, S](using
+    val rw: JsonRW[T],
+    val summarizable: Summarizable[T, S],
+    ev: TaskDeps[Deps] =:= true
+) extends AbstractTask[T] {
   type Res = T
   def taskDeps: Deps
-  /** Tasks whose results should be appended to depResults at execution time, computed
-   *  from the registry rather than statically declared via `dependsOn`. Default: empty.
-   *  Used by FanInTask to collect all tasks of a given kind for the current module.
-   */
+
+  /** Tasks whose results should be appended to depResults at execution time, computed from the registry rather than
+    * statically declared via `dependsOn`. Default: empty. Used by FanInTask to collect all tasks of a given kind for
+    * the current module.
+    */
   def dynamicDeps(siblingTasks: Seq[Task[?, ?, ?]], moduleType: ModuleType): Seq[Task[?, ?, ?]] = Seq.empty
   def execute: TaskExecContext[T, Deps] => T
-  @deprecated("Use summarizable instead", "0.4.0")
-  def summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
-    (results, logger) =>
-      val summary = summarizable.summarize(results.map(r => r._1.id -> r._2))
-      logger.add(ServerNotification.logInfo(summon[PlainTextWritable[S]].write(summary)))
   override def isResultSuccessful: T => Boolean = _ => true
   private[deder] def executeUnsafe(
       project: DederProject,
@@ -187,12 +203,6 @@ sealed trait Task[T, Deps <: Tuple, S](using val rw: JsonRW[T], val summarizable
       serverNotificationsLogger: ServerNotificationsLogger,
       dependencyResolver: DependencyResolverApi
   ): (res: TaskResult[T], changed: Boolean)
-
-  /** Type-erased summarize for use by the execution engine */
-  private[deder] def summarizeUnsafe(
-      results: Seq[(DederModule, Any)],
-      serverNotificationsLogger: ServerNotificationsLogger
-  ): Unit = summarize(results.asInstanceOf[Seq[(DederModule, T)]], serverNotificationsLogger)
 
   /** Type-erased cross-module aggregation returning the summary value. */
   private[deder] def summarizeValueUnsafe(results: Seq[(String, Any)]): S =
@@ -219,9 +229,6 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple, S](
     val category: String = "",
     val kind: TaskKind = TaskKind.Standard,
     override val isResultSuccessful: T => Boolean = (_: T) => true,
-    @deprecated("Use summarizable instead", "0.4.0")
-    override val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
-      (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => (),
     override val internal: Boolean = false
 )(using
     summarizable: Summarizable[T, S],
@@ -279,9 +286,6 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
     val category: String = "",
     val kind: TaskKind = TaskKind.Standard,
     override val isResultSuccessful: T => Boolean = (_: T) => true,
-    @deprecated("Use summarizable instead", "0.4.0")
-    override val summarize: (Seq[(DederModule, T)], ServerNotificationsLogger) => Unit =
-      (_: Seq[(DederModule, T)], _: ServerNotificationsLogger) => (),
     override val internal: Boolean = false
 )(using
     summarizable: Summarizable[T, S],
@@ -423,10 +427,9 @@ class ConfigValueTask[T: JsonRW: Hashable](
   override def toString(): String = s"ConfigValueTask($name)"
 }
 
-/** Aggregator task: at DAG-build time, depends on every registered task with
- *  matching `collectKind` for the current module's type. Result is the Seq of
- *  contributors' results. Empty Seq if no contributors.
- */
+/** Aggregator task: at DAG-build time, depends on every registered task with matching `collectKind` for the current
+  * module's type. Result is the Seq of contributors' results. Empty Seq if no contributors.
+  */
 class FanInTask[T: JsonRW: Hashable](
     val name: String,
     val collectKind: TaskKind,
@@ -435,15 +438,16 @@ class FanInTask[T: JsonRW: Hashable](
     val category: String = "",
     override val internal: Boolean = false
 )(using S: Summarizable[Seq[T], MultiModuleResults[Seq[T]]])
-    extends Task[Seq[T], EmptyTuple, MultiModuleResults[Seq[T]]](using summon[JsonRW[Seq[T]]], S, summon[TaskDeps[EmptyTuple] =:= true]) {
+    extends Task[Seq[T], EmptyTuple, MultiModuleResults[Seq[T]]](using
+      summon[JsonRW[Seq[T]]],
+      S,
+      summon[TaskDeps[EmptyTuple] =:= true]
+    ) {
   val taskDeps: EmptyTuple = EmptyTuple
   val transitive: Boolean = false
   val singleton: Boolean = false
   val kind: TaskKind = TaskKind.Standard
   val execute: TaskExecContext[Seq[T], EmptyTuple] => Seq[T] = _ => Seq.empty
-  @deprecated("Use summarizable instead", "0.4.0")
-  override val summarize: (Seq[(DederModule, Seq[T])], ServerNotificationsLogger) => Unit =
-    (_, _) => ()
 
   override def dynamicDeps(siblingTasks: Seq[Task[?, ?, ?]], moduleType: ModuleType): Seq[Task[?, ?, ?]] =
     siblingTasks.filter { t =>
