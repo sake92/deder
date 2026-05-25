@@ -186,20 +186,26 @@ class DederProjectState(
           useLastGood = useLastGood,
           clientParams = clientParams
         )
-        // summarize across modules (only when >1 module)
+        // summarize across modules
         if results.nonEmpty then {
           val task = results.head.taskInstance.task
           val moduleResults = results.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.res)
           // Render cross-module summary in the chosen output format
           val summary = task.summarizeValueUnsafe(moduleResults)
           val format = RequestContext.outputFormat.get()
-          given JsonRW[Any] = task.summaryJsonRw.asInstanceOf[JsonRW[Any]]
-          given PlainTextWritable[Any] = task.summarizable.sPlainWritable.asInstanceOf[PlainTextWritable[Any]]
+          given JsonRW[Any] = task.summarizable.jsonRW.asInstanceOf[JsonRW[Any]]
+          given PlainTextWritable[Any] = task.summarizable.plainTextW.asInstanceOf[PlainTextWritable[Any]]
+          given MermaidWritable[Any] = task.summarizable.mermaidW.asInstanceOf[MermaidWritable[Any]]
+          given DotWritable[Any] = task.summarizable.dotW.asInstanceOf[DotWritable[Any]]
           val output = format match
             case OutputFormat.Json =>
               summon[JsonRW[Any]].write(summary).toJson(spaces = 2, sort = true)
             case OutputFormat.DenseJson =>
               summon[JsonRW[Any]].write(summary).toJson(spaces = 0, sort = false)
+            case OutputFormat.Mermaid =>
+              summon[MermaidWritable[Any]].write(summary)
+            case OutputFormat.Dot =>
+              summon[DotWritable[Any]].write(summary)
             case _ => summon[PlainTextWritable[Any]].write(summary)
           serverNotificationsLogger.add(ServerNotification.Output(output))
         }

@@ -10,7 +10,6 @@ import scala.util.chaining.*
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.toJson
 import ba.sake.deder.*
-import ba.sake.deder.cli.OutputFormatting.render
 import ba.sake.deder.importing.Importer
 import io.opentelemetry.api.trace.StatusCode
 import ba.sake.deder.OTEL
@@ -198,11 +197,10 @@ class CliClientMessageHandler(
                       val output = outputFormat match
                         case OutputFormat.PlainText =>
                           filteredModules.map(_.id).mkString("\n")
-                        case OutputFormat.Json | OutputFormat.DenseJson =>
-                          render(filteredModules.map(_.id))(using
-                            outputFormat,
-                            summon[ba.sake.tupson.JsonRW[Seq[String]]]
-                          )
+                        case OutputFormat.Json =>
+                          filteredModules.map(_.id).toJson(spaces = 2, sort = true)
+                        case OutputFormat.DenseJson =>
+                          filteredModules.map(_.id).toJson(spaces = 0, sort = false)
                         case OutputFormat.Dot =>
                           GraphUtils.generateDOT(graph, v => v.id, v => Map("label" -> v.id))
                         case OutputFormat.Mermaid =>
@@ -251,14 +249,12 @@ class CliClientMessageHandler(
                       case (moduleId, tasks) =>
                         moduleId -> tasks.map(_.task.name)
                     }
-                    serverMessages.put(
-                      CliServerMessage.Output(
-                        render(taskNamesPerModule)(using
-                          outputFormat,
-                          summon[ba.sake.tupson.JsonRW[Map[String, Seq[String]]]]
-                        )
-                      )
-                    )
+                    val json = outputFormat match
+                      case OutputFormat.Json =>
+                        taskNamesPerModule.toJson(spaces = 2, sort = true)
+                      case OutputFormat.DenseJson =>
+                        taskNamesPerModule.toJson(spaces = 0, sort = false)
+                    serverMessages.put(CliServerMessage.Output(json))
                     serverMessages.put(CliServerMessage.Exit(0))
                   case OutputFormat.Dot =>
                     val dot =
@@ -383,14 +379,13 @@ class CliClientMessageHandler(
                       case OutputFormat.Json | OutputFormat.DenseJson =>
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                         val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
-                        serverMessages.put(
-                          CliServerMessage.Output(
-                            render(publicStages.map(_.map(_.id)))(using
-                              outputFormat,
-                              summon[ba.sake.tupson.JsonRW[Seq[Seq[String]]]]
-                            )
-                          )
-                        )
+                        val values = publicStages.map(_.map(_.id))
+                        val json = outputFormat match
+                          case OutputFormat.Json =>
+                            values.toJson(spaces = 2, sort = true)
+                          case OutputFormat.DenseJson =>
+                            values.toJson(spaces = 0, sort = false)
+                        serverMessages.put(CliServerMessage.Output(json))
                       case OutputFormat.Dot =>
                         val dot = GraphUtils.generateDOT(publicSubgraph, v => v.id, v => Map("label" -> v.id))
                         serverMessages.put(CliServerMessage.Output(dot))
