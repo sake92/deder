@@ -5,6 +5,7 @@ import java.nio.channels.*
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.BlockingQueue
 import scala.jdk.CollectionConverters.*
+import scala.util.boundary
 import scala.util.chaining.*
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.toJson
@@ -197,7 +198,7 @@ class CliClientMessageHandler(
                       val output = outputFormat match
                         case OutputFormat.PlainText =>
                           filteredModules.map(_.id).mkString("\n")
-                        case OutputFormat.Json =>
+                        case OutputFormat.Json | OutputFormat.DenseJson =>
                           render(filteredModules.map(_.id))(using
                             outputFormat,
                             summon[ba.sake.tupson.JsonRW[Seq[String]]]
@@ -245,7 +246,7 @@ class CliClientMessageHandler(
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
                 outputFormat match
-                  case OutputFormat.Json =>
+                  case OutputFormat.Json | OutputFormat.DenseJson =>
                     val taskNamesPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
                       case (moduleId, tasks) =>
                         moduleId -> tasks.map(_.task.name)
@@ -316,7 +317,7 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handlePlan(clientId: Int, requestId: String, m: CliClientMessage.Plan): Unit = {
+  private def handlePlan(clientId: Int, requestId: String, m: CliClientMessage.Plan): Unit = boundary {
     if m.args == Seq("--help") || m.args == Seq("-h") then
       serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliPlanOptions].helpText()))
       serverMessages.put(CliServerMessage.Exit(0))
@@ -362,7 +363,7 @@ class CliClientMessageHandler(
                         span.setAttribute("error", msg)
                         serverMessages.put(CliServerMessage.Log(msg, LogLevel.ERROR))
                         serverMessages.put(CliServerMessage.Exit(1))
-                        return
+                        boundary.break()
                       case Right(ids) => ids
                     }
                 state.executionPlanner.getTaskInstances(selectedModuleIds, cliOptions.task) match {
@@ -379,7 +380,7 @@ class CliClientMessageHandler(
                     val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(validModuleIds, cliOptions.task)
                     val publicSubgraph = GraphUtils.projectPublic(tasksExecSubgraph, !_.task.internal)
                     outputFormat match
-                      case OutputFormat.Json =>
+                      case OutputFormat.Json | OutputFormat.DenseJson =>
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                         val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
                         serverMessages.put(

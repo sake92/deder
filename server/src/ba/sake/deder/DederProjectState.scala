@@ -196,7 +196,9 @@ class DederProjectState(
           given JsonRW[Any] = task.summaryJsonRw.asInstanceOf[JsonRW[Any]]
           given PlainTextWritable[Any] = task.summarizable.sPlainWritable.asInstanceOf[PlainTextWritable[Any]]
           val output = format match
-            case _: OutputFormat.Json.type =>
+            case OutputFormat.Json =>
+              summon[JsonRW[Any]].write(summary).toJson(spaces = 2, sort = true)
+            case OutputFormat.DenseJson =>
               summon[JsonRW[Any]].write(summary).toJson(spaces = 0, sort = false)
             case _ => summon[PlainTextWritable[Any]].write(summary)
           serverNotificationsLogger.add(ServerNotification.Output(output))
@@ -432,8 +434,8 @@ class DederProjectState(
     executor.scheduleAtFixedRate(
       () => {
         try {
-           val lastEnded = lastRequestEndedAt.get()
-           if inFlightRequests.get() == 0 then {
+          val lastEnded = lastRequestEndedAt.get()
+          if inFlightRequests.get() == 0 then {
             val now = Instant.now()
             val inactiveDuration = Duration.between(lastEnded, now)
             if inactiveDuration.compareTo(maxInactiveDuration) > 0 then {

@@ -9,6 +9,8 @@ object OutputFormatting:
       case OutputFormat.PlainText =>
         summon[PlainTextWritable[T]].write(value)
       case OutputFormat.Json =>
+        summon[JsonRW[T]].write(value).toJson(spaces = 2, sort = true)
+      case OutputFormat.DenseJson =>
         summon[JsonRW[T]].write(value).toJson(spaces = 0, sort = false)
       case OutputFormat.Dot =>
         summon[DotWritable[T]].write(value)
