@@ -22,7 +22,7 @@ import ba.sake.deder.config.DederProject.{
 }
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.deps.Dependency
-import ba.sake.deder.deps.given
+import ba.sake.deder.deps.{DepTree, given}
 import ba.sake.deder.testing.*
 import ba.sake.deder.testing.forked.ForkedTestOrchestrator
 import ba.sake.deder.testing.inmemory.InMemoryTestOrchestrator
@@ -276,6 +276,20 @@ class CoreTasks() extends StrictLogging {
     .build { ctx =>
       val deps = ctx.depResults._1
       (deps ++ ctx.transitiveResults.flatten.flatten).distinct
+    }
+
+
+  val depsTreeTask = CachedTaskBuilder
+    .make[DepTree](
+      name = "depsTree",
+      category = "Dependency Management"
+    )
+    .dependsOn(allDependenciesTask)
+    .build { ctx =>
+      val allResolved = ctx.depResults._1
+      val resolver = ctx.dependencyResolver
+      val tree = resolver.buildDepTree(allResolved)
+      tree.copy(module = ctx.module.id)
     }
 
   val mandatoryDependenciesTask = CachedTaskBuilder
@@ -1321,6 +1335,7 @@ class CoreTasks() extends StrictLogging {
     mandatoryDependenciesTask,
     dependenciesTask,
     allDependenciesTask,
+    depsTreeTask,
     classesTask,
     semanticdbDirTask,
     allClassesDirsTask,

@@ -94,6 +94,39 @@ deder exec -t fixCheck
 # format with scalafmt
 deder exec -t runMvnApp -m mymodule fmt
 deder exec -t runMvnApp -m mymodule fmtCheck
+
+# analyze dependency tree with size metrics and conflict detection
+deder exec -t depsTree -m mymodule              # tree format (default)
+deder exec -t depsTree -m mymodule --format flat  # flat list
+deder exec -t depsTree -m mymodule --json      # JSON output
+```
+
+## Dependency Tree Analysis
+
+The `depsTree` task analyzes transitive dependencies with size metrics and conflict detection.
+
+**Output includes:**
+- Direct JAR size and aggregated transitive size (e.g., `2.1MB | 3.3MB`)
+- Version conflicts flagged inline and in summary
+- Total dependency tree size
+
+**Example tree output:**
+
+```
+Dependency Tree for module: core
+Total size: 245MB
+⚠️  Conflicts: 1
+
+Direct Dependencies:
+└── org.junit.jupiter:junit-jupiter-api:5.9.2 (2.1MB | 3.3MB)
+    ├── org.opentest4j:opentest4j:1.2.1 (95KB | 95KB)
+    └── org.junit.platform:junit-platform-commons:1.9.2 (1.2MB | 1.2MB)
+
+⚠️  Version Conflicts:
+  org.opentest4j:opentest4j:
+    • 1.2.0
+    • 1.2.1
+    ➜ Resolved: 1.2.1
 ```
 
 ## Custom repositories
