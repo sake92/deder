@@ -745,7 +745,7 @@ class CoreTasks() extends StrictLogging {
         javaVersion.map(v => Seq("--release", v)).getOrElse(Seq.empty) ++
         // https://github.com/sourcegraph/scip-java/issues/390
         Option.when(semanticdbEnabled)(
-          s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${semanticdbDir} -build-tool:sbt"
+          s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${semanticdbDir.absPath} -build-tool:sbt"
         )
 
       // For Scala 2: add semanticdb-scalac plugin (when enabled)
@@ -765,13 +765,13 @@ class CoreTasks() extends StrictLogging {
             "-sourceroot",
             DederGlobals.projectRootDir.toString,
             "-semanticdb-target",
-            semanticdbDir.toString
+            semanticdbDir.absPath.toString
           )
         else
           Seq(
             "-Yrangepos",
             s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}",
-            s"-P:semanticdb:targetroot:${semanticdbDir}"
+            s"-P:semanticdb:targetroot:${semanticdbDir.absPath}"
           )
       val platformSpecificScalacOptions = ctx.module match {
         case module: ScalaJsModule => if scalaVersion.startsWith("3.") then Seq("-scalajs") else Seq.empty

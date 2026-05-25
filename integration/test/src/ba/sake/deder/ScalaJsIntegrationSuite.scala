@@ -95,7 +95,7 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
   test("deder should test scalajs project") {
     withTestProject("sample-projects/scalajs") { projectPath =>
       val res = executeDederCommand(projectPath, "exec", "-t", "test")
-      val outText = res.err.text()
+      val outText = res.out.text()
       assert(
         outText.contains("Tests: 1 passed, 1 failed, 1 skipped, 3 total"),
         s"Expected test output to contain 'Tests: 1 passed, 1 failed, 1 skipped, 3 total', got: ${outText}"

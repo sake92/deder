@@ -594,7 +594,7 @@ class DederBspServer(
         resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).flatMap { case (targetId, module) =>
           val moduleId = module.id
           val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).absPath.toNIO.toUri.toString
-          val semanticdbDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask)
+          val semanticdbDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask).absPath
           val javacOptions = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.javacOptionsTask)(Seq.empty)
           val javacAnnotationProcessors =
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.javacAnnotationProcessorsTask)(Seq.empty)
@@ -686,7 +686,7 @@ class DederBspServer(
           val scalaVersion = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalaVersionTask)
           val scalacOptions =
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.scalacOptionsTask)(Seq.empty)
-          val semanticdbDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask)
+          val semanticdbDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask).absPath
           val scalacPlugins =
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.scalacPluginsTask)(Seq.empty)
           val semanticdbOptions =
