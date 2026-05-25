@@ -25,17 +25,17 @@ class IntegrationSuite extends BaseIntegrationSuite {
         }
       }
       locally {
-        val dederRes = executeDederCommand(projectPath, "modules", "--json")
+        val dederRes = executeDederCommand(projectPath, "modules", "--format", "json")
         val dederOutput = dederRes.out.text()
         List("common", "frontend", "backend", "uber", "uber-test").foreach { moduleId =>
-          assert(dederOutput.contains(moduleId), s"Module '$moduleId' not found in 'deder modules --json' output")
+          assert(dederOutput.contains(moduleId), s"Module '$moduleId' not found in 'deder modules --format json' output")
         }
       }
       locally {
-        val dederRes = executeDederCommand(projectPath, "modules", "--dot")
+        val dederRes = executeDederCommand(projectPath, "modules", "--format", "dot")
         val dederOutput = dederRes.out.text()
         List("common", "frontend", "backend", "uber", "uber-test").foreach { moduleId =>
-          assert(dederOutput.contains(moduleId), s"Module '$moduleId' not found in 'deder modules --dot' output")
+          assert(dederOutput.contains(moduleId), s"Module '$moduleId' not found in 'deder modules --format dot' output")
         }
       }
       // deder tasks
@@ -96,9 +96,9 @@ class IntegrationSuite extends BaseIntegrationSuite {
   test("deder should compile multimodule project") {
     withTestProject("sample-projects/multi") { projectPath =>
       locally {
-        val dederOutputJson = executeDederCommand(projectPath, "exec", "-m", "uber", "-t", "compileClasspath", "--json").out.text()
-        val dederOutput = dederOutputJson.parseJson[Map[String, List[String]]]
-        val uberCompileClasspath = dederOutput("uber")
+        val dederOutputJson = executeDederCommand(projectPath, "exec", "-m", "uber", "-t", "compileClasspath", "--format", "json").out.text()
+        val dederOutput = dederOutputJson.parseJson[Map[String, Map[String, List[String]]]]
+        val uberCompileClasspath = dederOutput("results")("uber")
         assert(uberCompileClasspath(0).endsWith("/.deder/out/uber/classes"))
         assert(uberCompileClasspath(1).endsWith("/.deder/out/backend/classes"))
         assert(uberCompileClasspath(2).endsWith("/.deder/out/frontend/classes"))
@@ -224,7 +224,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
   test("deder exec should support negation in module filters") {
     withTestProject("sample-projects/multi") { projectPath =>
       // exec with -m common -m ~nonexistent: select common, negation of nonexistent has no effect
-      val dederRes = executeDederCommand(projectPath, "exec", "-m", "common", "-m", "~nonexistent", "-t", "compileClasspath", "--json")
+      val dederRes = executeDederCommand(projectPath, "exec", "-m", "common", "-m", "~nonexistent", "-t", "compileClasspath", "--format", "json")
       assert(dederRes.exitCode == 0, s"exec failed with exit=${dederRes.exitCode}: ${dederRes.err.text()}")
     }
   }

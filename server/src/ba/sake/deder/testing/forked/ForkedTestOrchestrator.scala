@@ -366,7 +366,7 @@ object ForkedTestOrchestrator extends StrictLogging {
       testParallelism = testParallelism,
       resultsFile = resultsFilePath.toString
     )
-    os.write.over(argsFilePath, args.toJson)
+    os.write.over(argsFilePath, args.toJson(spaces = 0, sort = false))
 
     val cmd = Seq(javaBinary) ++ jvmOptions ++ Seq(
       "-cp",

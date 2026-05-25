@@ -5,14 +5,13 @@ import java.nio.charset.StandardCharsets
 import scala.util.control.NonFatal
 import ba.sake.tupson.{*, given}
 
-/** Captures per-suite stdout in a forked JVM and emits JSON-lines envelopes back to the orchestrator
-  * on the original stdout (the one the parent process actually reads).
+/** Captures per-suite stdout in a forked JVM and emits JSON-lines envelopes back to the orchestrator on the original
+  * stdout (the one the parent process actually reads).
   *
-  * The capturing PrintStream is installed once in ForkedTestMain before any test framework runs.
-  * Per-suite buffers are keyed off a ThreadLocal — a worker thread executing a suite appends its
-  * prints into the suite's buffer; on suite completion the buffer is drained into a SuiteCompleted
-  * envelope. Bytes written while no suite is active for this thread are emitted as
-  * UnattributedOutput envelopes, flushed per newline to keep them ordered but not per-byte.
+  * The capturing PrintStream is installed once in ForkedTestMain before any test framework runs. Per-suite buffers are
+  * keyed off a ThreadLocal — a worker thread executing a suite appends its prints into the suite's buffer; on suite
+  * completion the buffer is drained into a SuiteCompleted envelope. Bytes written while no suite is active for this
+  * thread are emitted as UnattributedOutput envelopes, flushed per newline to keep them ordered but not per-byte.
   */
 class ForkedTestReporter private (original: PrintStream) {
   private val emitLock = new Object
@@ -20,7 +19,7 @@ class ForkedTestReporter private (original: PrintStream) {
   def emit(env: ForkedTestEnvelope): Unit = emitLock.synchronized {
     try {
       original.print(ForkedTestEnvelope.LinePrefix)
-      original.println(env.toJson)
+      original.println(env.toJson(spaces = 0, sort = false))
       original.flush()
     } catch {
       case NonFatal(_) => ()
@@ -30,9 +29,8 @@ class ForkedTestReporter private (original: PrintStream) {
 
 object ForkedTestReporter {
 
-  /** Installs a capturing PrintStream on System.out and returns a reporter + capture handle.
-    * Must be called BEFORE any logger captures System.out, so the capturing stream is the one
-    * downstream code writes through.
+  /** Installs a capturing PrintStream on System.out and returns a reporter + capture handle. Must be called BEFORE any
+    * logger captures System.out, so the capturing stream is the one downstream code writes through.
     */
   def install(): (ForkedTestReporter, SuiteOutputCapture) = {
     val originalOut = System.out
@@ -45,9 +43,9 @@ object ForkedTestReporter {
   }
 }
 
-/** OutputStream that routes bytes into the currently-active per-thread suite buffer, or emits
-  * UnattributedOutput envelopes when no suite is active on the current thread. The unattributed
-  * path is newline-flushed so we don't emit one envelope per byte under normal text output.
+/** OutputStream that routes bytes into the currently-active per-thread suite buffer, or emits UnattributedOutput
+  * envelopes when no suite is active on the current thread. The unattributed path is newline-flushed so we don't emit
+  * one envelope per byte under normal text output.
   */
 class SuiteOutputCapture(reporter: ForkedTestReporter) extends OutputStream {
 

@@ -32,7 +32,7 @@ object TestHistory {
       os.makeDir.all(outDir)
       val target = fileFor(outDir)
       val tmp = outDir / "test-history.json.tmp"
-      os.write.over(tmp, history.toJson)
+      os.write.over(tmp, history.toJson(spaces = 0, sort = false))
       os.move(tmp, target, replaceExisting = true)
     } catch {
       case NonFatal(_) => ()

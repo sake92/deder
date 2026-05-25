@@ -2,6 +2,7 @@ package ba.sake.deder
 
 import ba.sake.tupson.JsonRW
 import org.typelevel.jawn.ast.JValue
+import scala.util.control.NonFatal
 
 // project-root relative path
 case class DederPath(path: os.SubPath) {
@@ -26,7 +27,8 @@ object DederPath {
   given JsonRW[DederPath] with {
     def parse(path: String, jValue: JValue): DederPath =
       val str = JsonRW[String].parse(path, jValue)
-      DederPath(os.SubPath(str.split("/").toIndexedSeq))
+      try DederPath(os.SubPath(str.split("/").toIndexedSeq))
+      catch case NonFatal(_) => DederPath(os.Path(str))
 
     def write(value: DederPath): JValue =
       JsonRW[String].write(value.path.toString)

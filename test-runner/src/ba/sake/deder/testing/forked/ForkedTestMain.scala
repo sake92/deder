@@ -33,7 +33,7 @@ object ForkedTestMain {
       )
       val results = testRunner.run(DederTestOptions(forkedArgs.testSelectors))
       val payload = ForkedTestResultsPayload(results, testRunner.perClassStats)
-      os.write.over(os.Path(forkedArgs.resultsFile), payload.toJson, createFolders = true)
+      os.write.over(os.Path(forkedArgs.resultsFile), payload.toJson(spaces = 0, sort = false), createFolders = true)
       reporter.emit(ForkedTestEnvelope.ForkCompleted(forkedArgs.forkId, results))
       System.exit(if results.success then 0 else 1)
     } catch {
@@ -48,27 +48,32 @@ object ForkedTestMain {
           errors = forkedArgs.discoveredTests.flatMap(_.testClasses).size,
           skipped = 0,
           duration = 0L,
-          failedTestNames = forkedArgs.discoveredTests.flatMap(_.testClasses.map(tc => s"${tc.className}.${tc.className}")),
+          failedTestNames =
+            forkedArgs.discoveredTests.flatMap(_.testClasses.map(tc => s"${tc.className}.${tc.className}")),
           suites = forkedArgs.discoveredTests.flatMap(_.testClasses).map { tc =>
             DederTestSuiteReport(
               name = tc.className,
-              testCases = Seq(DederTestCaseReport(
-                name = tc.className,
-                classname = tc.className,
-                status = DederTestStatus.Error,
-                duration = 0L,
-                failure = Some(DederTestFailure(
-                  message = Some(s"Forked JVM crashed before tests could run: ${e.getMessage}"),
-                  stackTrace = None
-                ))
-              )),
+              testCases = Seq(
+                DederTestCaseReport(
+                  name = tc.className,
+                  classname = tc.className,
+                  status = DederTestStatus.Error,
+                  duration = 0L,
+                  failure = Some(
+                    DederTestFailure(
+                      message = Some(s"Forked JVM crashed before tests could run: ${e.getMessage}"),
+                      stackTrace = None
+                    )
+                  )
+                )
+              ),
               duration = 0L
             )
           }
         )
         try {
           val payload = ForkedTestResultsPayload(errorResults, Map.empty)
-          os.write.over(os.Path(forkedArgs.resultsFile), payload.toJson, createFolders = true)
+          os.write.over(os.Path(forkedArgs.resultsFile), payload.toJson(spaces = 0, sort = false), createFolders = true)
         } catch {
           case _: Throwable => // best effort
         }
