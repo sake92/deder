@@ -10,8 +10,8 @@ class CoreTasksApiAdapter(coreTasks: CoreTasks) extends CoreTasksApi {
   def sourcesTask: AbstractTask[Seq[DederPath]] = coreTasks.sourcesTask
   def sourceFilesTask: AbstractTask[Seq[DederPath]] = coreTasks.sourceFilesTask
   def resourcesTask: AbstractTask[Seq[DederPath]] = coreTasks.resourcesTask
-  def classesTask: AbstractTask[os.Path] = coreTasks.classesTask
-  def allClassesDirsTask: AbstractTask[Seq[os.Path]] = coreTasks.allClassesDirsTask
+  def classesTask: AbstractTask[DederPath] = coreTasks.classesTask
+  def allClassesDirsTask: AbstractTask[Seq[DederPath]] = coreTasks.allClassesDirsTask
   def compileTask: AbstractTask[DederPath] = coreTasks.compileTask
   def allDependenciesTask: AbstractTask[Seq[Dependency]] = coreTasks.allDependenciesTask
   def compileClasspathTask: AbstractTask[Seq[os.Path]] = coreTasks.compileClasspathTask

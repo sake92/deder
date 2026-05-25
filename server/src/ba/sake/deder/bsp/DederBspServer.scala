@@ -593,7 +593,7 @@ class DederBspServer(
         val serverNotificationsLogger = makeServerNotificationsLogger()
         resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).flatMap { case (targetId, module) =>
           val moduleId = module.id
-          val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).toNIO.toUri.toString
+          val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).absPath.toNIO.toUri.toString
           val semanticdbDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask)
           val javacOptions = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.javacOptionsTask)(Seq.empty)
           val javacAnnotationProcessors =
@@ -717,7 +717,7 @@ class DederBspServer(
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)(Seq.empty)
               .map(_.toNIO.toUri.toString)
               .toList
-          val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).toNIO.toUri.toString
+          val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).absPath.toNIO.toUri.toString
           val scalacOptionsItem =
             ScalacOptionsItem(targetId, finalScalacOptions.asJava, compileClasspath.asJava, classesDir)
           List(scalacOptionsItem)

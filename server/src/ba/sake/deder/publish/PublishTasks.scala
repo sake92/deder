@@ -109,7 +109,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     }
 
   val jarTask = CachedTaskBuilder
-    .make[os.Path](name = "jar", category = "Publishing")
+    .make[DederPath](name = "jar", category = "Publishing")
     .dependsOn(coreTasks.compileTask)
     .dependsOn(coreTasks.resourcesTask)
     .dependsOn(finalManifestSettingsTask)
@@ -122,11 +122,11 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
         jarInputPaths,
         manifestEntries.toJarManifest
       )
-      resultJarPath
+      DederPath(resultJarPath)
     }
 
   val allJarsTask = CachedTaskBuilder
-    .make[Seq[os.Path]](
+    .make[Seq[DederPath]](
       name = "allJars",
       transitive = true,
       category = "Publishing"
@@ -176,7 +176,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     }
 
   val assemblyTask = CachedTaskBuilder
-    .make[os.Path](
+    .make[DederPath](
       name = "assembly",
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST),
       category = "Publishing"
@@ -191,7 +191,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       val mergedJar = ctx.out / "mergedJar.jar"
       JarUtils.mergeJars(
         mergedJar,
-        allModulesJars ++ Seq(assemblyDepsJar),
+        allModulesJars.map(_.absPath) ++ Seq(assemblyDepsJar),
         manifestEntries.toJarManifest,
         skipAssemblyEntry
       )
@@ -219,7 +219,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
           os.move.over(mergedJar, resultJarPath)
       }
       logger.info(s"assemblyTask: total elapsed ${System.currentTimeMillis() - t0}ms for module ${ctx.module.id}")
-      resultJarPath
+      DederPath(resultJarPath)
     }
 
   val moduleDepsPomSettingsTask = CachedTaskBuilder
@@ -241,7 +241,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     }
 
   val sourcesJarTask = CachedTaskBuilder
-    .make[Option[os.Path]](name = "sourcesJar", category = "Publishing")
+    .make[Option[DederPath]](name = "sourcesJar", category = "Publishing")
     .dependsOn(pomSettingsTask)
     .dependsOn(coreTasks.sourcesTask)
     .build { ctx =>
@@ -251,12 +251,12 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
         val resultJarPath = ctx.out / s"${pomSettings.artifactId}-sources.jar"
         os.remove(resultJarPath)
         os.zip(resultJarPath, sources.map(_.absPath).filter(os.exists(_)))
-        resultJarPath
+        DederPath(resultJarPath)
       }
     }
 
   val javadocJarTask = CachedTaskBuilder
-    .make[Option[os.Path]](name = "javadocJar", category = "Publishing")
+    .make[Option[DederPath]](name = "javadocJar", category = "Publishing")
     .dependsOn(coreTasks.scalaVersionTask)
     .dependsOn(pomSettingsTask)
     .dependsOn(coreTasks.sourcesTask)
@@ -290,9 +290,9 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
           case module: ScalaModule =>
             if scalaVersion.startsWith("3.") then {
               val tastyFiles =
-                if os.exists(classesDir) then
+                if os.exists(classesDir.absPath) then
                   os.walk(
-                    classesDir,
+                    classesDir.absPath ,
                     skip = p => {
                       if os.isDir(p) then false
                       else if os.isFile(p) then !(p.ext == "tasty")
@@ -348,7 +348,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
         val resultJarPath = ctx.out / s"${pomSettings.artifactId}-javadoc.jar"
         os.remove(resultJarPath)
         os.zip(resultJarPath, Seq(generatedDir))
-        resultJarPath
+        DederPath(resultJarPath)
       }
     }
 
@@ -386,9 +386,9 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
         val artifactsDir = ctx.out / "artifacts"
         os.remove.all(artifactsDir)
         os.makeDir.all(artifactsDir)
-        os.copy.over(jar, artifactsDir / s"${artifactBaseName}.jar")
-        os.copy.over(sourcesJar, artifactsDir / s"${artifactBaseName}-sources.jar")
-        os.copy.over(javadocJar, artifactsDir / s"${artifactBaseName}-javadoc.jar")
+        os.copy.over(jar.absPath, artifactsDir / s"${artifactBaseName}.jar")
+        os.copy.over(sourcesJar.absPath, artifactsDir / s"${artifactBaseName}-sources.jar")
+        os.copy.over(javadocJar.absPath, artifactsDir / s"${artifactBaseName}-javadoc.jar")
         val pomSettings = ctx.module match {
           case jm: JavaModule => jm.pomSettings
         }

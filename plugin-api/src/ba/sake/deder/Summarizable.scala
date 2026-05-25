@@ -10,13 +10,16 @@ trait Summarizable[T, S](using val sJsonRw: JsonRW[S], val sPlainWritable: Plain
 case class MultiModuleResults[T](results: Map[String, T]) derives JsonRW
 
 object MultiModuleResults:
-  given [T: PlainTextWritable]: PlainTextWritable[MultiModuleResults[T]] with
+  given [T](using ptw: PlainTextWritable[T]): PlainTextWritable[MultiModuleResults[T]] with
     def write(mmr: MultiModuleResults[T]): String =
-      mmr.results.toSeq.sortBy(_._1).map { (moduleId, result) =>
-        val body = summon[PlainTextWritable[T]].write(result)
-        if body.nonEmpty then s"## ${moduleId}\n${body}"
-        else moduleId
-      }.mkString("\n\n")
+      mmr.results.toSeq
+        .sortBy(_._1)
+        .map { (moduleId, result) =>
+          val body = ptw.write(result)
+          Seq(s"[${moduleId}]", body).filter(_.trim.nonEmpty).mkString("\n")
+
+        }
+        .mkString("\n")
 
   given [T: JsonRW: PlainTextWritable]: Summarizable[T, MultiModuleResults[T]] with
     def summarize(results: Seq[(String, T)]): MultiModuleResults[T] =

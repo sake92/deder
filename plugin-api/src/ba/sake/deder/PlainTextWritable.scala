@@ -14,7 +14,7 @@ object PlainTextWritable extends PlainTextWritableLowPriority:
     def write(value: os.Path): String = value.toString
 
   given PlainTextWritable[DederPath] with
-    def write(value: DederPath): String = value.toString
+    def write(value: DederPath): String = value.path.toString
 
   given [T: PlainTextWritable]: PlainTextWritable[Option[T]] with
     def write(value: Option[T]): String =
