@@ -8,6 +8,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration, NANOSECONDS}
 import scala.jdk.CollectionConverters.*
 import io.opentelemetry.api.metrics.{LongCounter, LongHistogram, Meter}
 import io.opentelemetry.api.common.{Attributes, AttributeKey}
+import com.typesafe.scalalogging.StrictLogging
 
 class DederProjectInternalsImpl private (
     private val startTime: Instant,
@@ -19,7 +20,9 @@ class DederProjectInternalsImpl private (
     private val totalServed: AtomicLong,
     private val totalErrCount: AtomicLong,
     private val meter: Meter
-) extends DederProjectInternals:
+) extends DederProjectInternals, StrictLogging:
+
+  logger.info(s"DederProjectInternals initialized")
 
   // OTEL instruments
   private val requestsServedCounter: LongCounter = meter
@@ -43,6 +46,8 @@ class DederProjectInternalsImpl private (
     .setUnit("ms")
     .ofLongs()
     .build()
+
+
 
   override def currentRequests: Seq[LiveRequest] =
     currentReqs.values().asScala.toSeq
@@ -91,6 +96,7 @@ class DederProjectInternalsImpl private (
     totalServed.incrementAndGet()
     if !success then totalErrCount.incrementAndGet()
     // OTEL
+    logger.debug(s"OTEL: request completed: caller=${caller} task=${taskName} success=${success} duration=${duration.toMillis}ms")
     requestsServedCounter.add(1, Attributes.of(
       AttributeKey.stringKey("caller"), caller.toString.toLowerCase,
       AttributeKey.stringKey("task"), taskName,
@@ -105,6 +111,7 @@ class DederProjectInternalsImpl private (
     val acc = taskAccumulators.computeIfAbsent(taskName, _ => new TaskStatsAccumulator(1024))
     acc.record(duration, cacheHit)
     // OTEL
+    logger.debug(s"OTEL: task execution: task=${taskName} duration=${duration.toMillis}ms cacheHit=${cacheHit}")
     val attrs = Attributes.of(AttributeKey.stringKey("task"), taskName)
     taskExecutionsCounter.add(1, attrs)
     if cacheHit then taskCacheHitsCounter.add(1, attrs)
