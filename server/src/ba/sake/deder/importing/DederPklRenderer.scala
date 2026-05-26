@@ -214,23 +214,7 @@ object DederPklRenderer {
       slice.modulesByPlatform.get("jvm").orElse(slice.modulesByPlatform.get("main"))
     }
     if (allModuleDefs.isEmpty)
-      return ModuleDef(
-        "",
-        Seq.empty,
-        Seq.empty,
-        Seq.empty,
-        Seq.empty,
-        Seq.empty,
-        Seq.empty,
-        Seq.empty,
-        None,
-        None,
-        None,
-        Seq.empty,
-        Seq.empty,
-        Seq.empty,
-        Seq.empty
-      )
+      return ModuleDef.empty
 
     def intersect[T](seqs: Seq[Seq[T]]): Seq[T] =
       if (seqs.isEmpty) Seq.empty
@@ -596,23 +580,7 @@ object DederPklRenderer {
         .get("jvm")
         .orElse(repMods.get("main"))
         .getOrElse(
-          ModuleDef(
-            "",
-            Seq.empty,
-            Seq.empty,
-            Seq.empty,
-            Seq.empty,
-            Seq.empty,
-            Seq.empty,
-            Seq.empty,
-            None,
-            None,
-            None,
-            Seq.empty,
-            Seq.empty,
-            Seq.empty,
-            Seq.empty
-          )
+          ModuleDef.empty
         )
       val isCross = repMods.contains("js") || repMods.contains("native")
 
