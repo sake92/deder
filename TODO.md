@@ -4,7 +4,6 @@
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - maybe use https://github.com/encalmo/graphs coz zero deps?
 - init like giter8, autoimport from sbt?
-- periodic flush in forked tests, every 1s?
 - max timeout when waiting for lock and bail out, report to bsp??
 - import from other maven effective POM etc
 - import from other mill
