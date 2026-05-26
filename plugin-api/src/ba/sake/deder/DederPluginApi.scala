@@ -30,7 +30,8 @@ case class PluginTasksParams(
     configText: String,
     coreTasks: CoreTasksApi,
     sjsTasks: ScalaJsTasksApi,
-    snTasks: ScalaNativeTasksApi
+    snTasks: ScalaNativeTasksApi,
+    internals: DederProjectInternals
 )
 
 /** Typed access to the curated, stable core task surface that plugins may depend on. Internal tasks and actual
