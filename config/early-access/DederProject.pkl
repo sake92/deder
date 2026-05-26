@@ -637,10 +637,20 @@ class CreateScalaModules {
   template: ScalaModule
   testTemplate: ScalaTestModule = template.asTest()
   layout: DirLayout = "default"
-  fixed get: ScalaModules = scalaModules(template, testTemplate, root, layout, id, testId)
+  fixed get: ScalaModules = scalaModulesWithTestId(template, testTemplate, root, layout, id, testId)
 }
 
 const function scalaModules(
+  _template: ScalaModule,
+  _testTemplate: ScalaTestModule,
+  _root: String,
+  _layout: DirLayout,
+  _id: String?,
+): ScalaModules = scalaModulesWithTestId(_template, _testTemplate, _root, _layout, _id, null)
+
+/// Internal-by-convention helper for importer-rendered JVM cross-version ids.
+/// Prefer `scalaModules(...)` unless you explicitly need a custom test module id.
+const function scalaModulesWithTestId(
   _template: ScalaModule,
   _testTemplate: ScalaTestModule,
   _root: String,
@@ -655,13 +665,35 @@ const function scalaModules(
       main = (_template) {
         id = mainId
         root = _root
-        sources = I.versionedSources(cfg.versionStyle, _template.scalaVersion, cfg.mainScalaSrcBase, true, cfg.mainExtraSrc)
+        sources = new Listing {
+          cfg.mainScalaSrcBase
+          ...(cfg.mainExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.mainScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.mainScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
         resources = cfg.mainResources
       }
       test = (_testTemplate) {
         id = resolvedTestId
         root = "\(_root)\(cfg.testRootSuffix)"
-        sources = I.versionedSources(cfg.versionStyle, _template.scalaVersion, cfg.testScalaSrcBase, true, cfg.testExtraSrc)
+        sources = new Listing {
+          cfg.testScalaSrcBase
+          ...(cfg.testExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.testScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.testScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
         resources = cfg.testResources
         moduleDeps {
           main
@@ -696,13 +728,35 @@ const function scalaJsModules(
       main = (_template) {
         id = baseId
         root = _root
-        sources = I.versionedSources(cfg.versionStyle, _template.scalaVersion, cfg.mainScalaSrcBase, true, cfg.mainExtraSrc)
+        sources = new Listing {
+          cfg.mainScalaSrcBase
+          ...(cfg.mainExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.mainScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.mainScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
         resources = cfg.mainResources
       }
       test = (_testTemplate) {
         id = "\(baseId)-test"
         root = "\(_root)\(cfg.testRootSuffix)"
-        sources = I.versionedSources(cfg.versionStyle, _template.scalaVersion, cfg.testScalaSrcBase, true, cfg.testExtraSrc)
+        sources = new Listing {
+          cfg.testScalaSrcBase
+          ...(cfg.testExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.testScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.testScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
         resources = cfg.testResources
         moduleDeps {
           main
@@ -737,13 +791,35 @@ const function scalaNativeModules(
       main = (_template) {
         id = baseId
         root = _root
-        sources = I.versionedSources(cfg.versionStyle, _template.scalaVersion, cfg.mainScalaSrcBase, true, cfg.mainExtraSrc)
+        sources = new Listing {
+          cfg.mainScalaSrcBase
+          ...(cfg.mainExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.mainScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.mainScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
         resources = cfg.mainResources
       }
       test = (_testTemplate) {
         id = "\(baseId)-test"
         root = "\(_root)\(cfg.testRootSuffix)"
-        sources = I.versionedSources(cfg.versionStyle, _template.scalaVersion, cfg.testScalaSrcBase, true, cfg.testExtraSrc)
+        sources = new Listing {
+          cfg.testScalaSrcBase
+          ...(cfg.testExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.testScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.testScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
         resources = cfg.testResources
         moduleDeps {
           main
@@ -801,12 +877,72 @@ const function crossModules(
   let (sv = _template.scalaVersion)
 
   // Determine platform base directories and shared source configuration
-  let (jvmMainBase = I.platformDir("jvm", cfg.mainScalaSrcBase, cfg.crossType))
-  let (jsMainBase = I.platformDir("js", cfg.mainScalaSrcBase, cfg.crossType))
-  let (nativeMainBase = I.platformDir("native", cfg.mainScalaSrcBase, cfg.crossType))
-  let (jvmTestBase = I.platformDir("jvm", cfg.testScalaSrcBase, cfg.crossType))
-  let (jsTestBase = I.platformDir("js", cfg.testScalaSrcBase, cfg.crossType))
-  let (nativeTestBase = I.platformDir("native", cfg.testScalaSrcBase, cfg.crossType))
+  let (
+    jvmMainBase =
+      if (cfg.crossType == "full")
+        "jvm/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".jvm/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "jvm/\(cfg.mainScalaSrcBase)"
+      else
+        "\(cfg.mainScalaSrcBase)-jvm"
+  )
+  let (
+    jsMainBase =
+      if (cfg.crossType == "full")
+        "js/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".js/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "js/\(cfg.mainScalaSrcBase)"
+      else
+        "\(cfg.mainScalaSrcBase)-js"
+  )
+  let (
+    nativeMainBase =
+      if (cfg.crossType == "full")
+        "native/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".native/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "native/\(cfg.mainScalaSrcBase)"
+      else
+        "\(cfg.mainScalaSrcBase)-native"
+  )
+  let (
+    jvmTestBase =
+      if (cfg.crossType == "full")
+        "jvm/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".jvm/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "jvm/\(cfg.testScalaSrcBase)"
+      else
+        "\(cfg.testScalaSrcBase)-jvm"
+  )
+  let (
+    jsTestBase =
+      if (cfg.crossType == "full")
+        "js/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".js/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "js/\(cfg.testScalaSrcBase)"
+      else
+        "\(cfg.testScalaSrcBase)-js"
+  )
+  let (
+    nativeTestBase =
+      if (cfg.crossType == "full")
+        "native/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".native/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "native/\(cfg.testScalaSrcBase)"
+      else
+        "\(cfg.testScalaSrcBase)-native"
+  )
   let (hasSharedSource = cfg.crossType != "dummy")
   let (sharedPrefix = if (cfg.crossType == "full") "shared/" else null)
 
