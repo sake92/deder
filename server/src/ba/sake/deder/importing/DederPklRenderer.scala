@@ -808,15 +808,24 @@ object DederPklRenderer {
 
   // ---- property blocks ----
 
-  private def renderScalacOptions(opts: Seq[String], indent: Int): String = {
-    if (opts.isEmpty) ""
+  private def renderBlock[T](
+      name: String,
+      items: Seq[T],
+      indent: Int
+  )(fmt: T => String): String = {
+    if (items.isEmpty) ""
     else {
-      val entries = opts.map(o => s""""$o"""").mkString("\n")
       val spaces = " " * indent
       val inner = " " * (indent + 2)
-      s"""${spaces}scalacOptions {\n${entries.split("\n").map(l => inner + l).mkString("\n")}\n$spaces}"""
+      val formatted = items.map(fmt)
+      val body = formatted.mkString("\n")
+      val indentedBody = body.split("\n").map(line => s"$inner$line").mkString("\n")
+      s"${spaces}${name} {\n$indentedBody\n$spaces}"
     }
   }
+
+  private def renderScalacOptions(opts: Seq[String], indent: Int): String =
+    renderBlock("scalacOptions", opts, indent)(opt => s""""$opt"""")
 
   private def renderScalacOptionsSmart(
       m: ModuleDef,
@@ -862,35 +871,14 @@ object DederPklRenderer {
     deps.filterNot(d => templatePlugins.contains(d.organization -> d.name))
   }
 
-  private def renderJavacOptions(opts: Seq[String], indent: Int): String = {
-    if (opts.isEmpty) ""
-    else {
-      val entries = opts.map(o => s""""$o"""").mkString("\n")
-      val spaces = " " * indent
-      val inner = " " * (indent + 2)
-      s"""${spaces}javacOptions {\n${entries.split("\n").map(l => inner + l).mkString("\n")}\n$spaces}"""
-    }
-  }
+  private def renderJavacOptions(opts: Seq[String], indent: Int): String =
+    renderBlock("javacOptions", opts, indent)(opt => s""""$opt"""")
 
-  private def renderDeps(deps: Seq[DepDef], indent: Int): String = {
-    if (deps.isEmpty) ""
-    else {
-      val entries = deps.map(d => s""""${d.formatted}"""").mkString("\n")
-      val spaces = " " * indent
-      val inner = " " * (indent + 2)
-      s"""${spaces}deps {\n${entries.split("\n").map(l => inner + l).mkString("\n")}\n$spaces}"""
-    }
-  }
+  private def renderDeps(deps: Seq[DepDef], indent: Int): String =
+    renderBlock("deps", deps, indent)(d => s""""${d.formatted}"""")
 
-  private def renderPluginDeps(deps: Seq[DepDef], indent: Int): String = {
-    if (deps.isEmpty) ""
-    else {
-      val entries = deps.map(d => s""""${d.formatted}"""").mkString("\n")
-      val spaces = " " * indent
-      val inner = " " * (indent + 2)
-      s"""${spaces}scalacPluginDeps {\n${entries.split("\n").map(l => inner + l).mkString("\n")}\n$spaces}"""
-    }
-  }
+  private def renderPluginDeps(deps: Seq[DepDef], indent: Int): String =
+    renderBlock("scalacPluginDeps", deps, indent)(d => s""""${d.formatted}"""")
 
   private def renderModuleDepsPkl(
       refs: Seq[ModuleDepRef],
@@ -910,25 +898,11 @@ object DederPklRenderer {
     }
   }
 
-  private def renderSourceDirs(dirs: Seq[String], indent: Int): String = {
-    if (dirs.isEmpty) ""
-    else {
-      val entries = dirs.map(d => s""""$d"""").mkString("\n")
-      val spaces = " " * indent
-      val inner = " " * (indent + 2)
-      s"""${spaces}sources {\n${entries.split("\n").map(l => inner + l).mkString("\n")}\n$spaces}"""
-    }
-  }
+  private def renderSourceDirs(dirs: Seq[String], indent: Int): String =
+    renderBlock("sources", dirs, indent)(d => s""""$d"""")
 
-  private def renderResourceDirs(dirs: Seq[String], indent: Int): String = {
-    if (dirs.isEmpty) ""
-    else {
-      val entries = dirs.map(d => s""""$d"""").mkString("\n")
-      val spaces = " " * indent
-      val inner = " " * (indent + 2)
-      s"""${spaces}resources {\n${entries.split("\n").map(l => inner + l).mkString("\n")}\n$spaces}"""
-    }
-  }
+  private def renderResourceDirs(dirs: Seq[String], indent: Int): String =
+    renderBlock("resources", dirs, indent)(d => s""""$d"""")
 
   private def renderPublishInfoBase(p: PublishInfo): String = {
     val inner = "  "
