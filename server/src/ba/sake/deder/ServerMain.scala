@@ -19,10 +19,7 @@ import org.slf4j.LoggerFactory
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import io.opentelemetry.context.Context
-import io.opentelemetry.sdk.metrics.SdkMeterProvider
-import io.opentelemetry.sdk.metrics.`export`.PeriodicMetricReader
-import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter
-import java.time.Duration as JavaDuration
+import io.opentelemetry.api.GlobalOpenTelemetry
 import ba.sake.deder.TeePrintStream
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
@@ -99,18 +96,9 @@ object ServerMain extends StrictLogging {
     // automatically propagate OTEL context, parent span
     val tasksExecutorService = Context.taskWrapping(originalTasksExecutorService)
 
-    // Set up our own metrics SDK with OTLP exporter for Grafana.
-    // Tracing is handled by the OTEL Java agent; we manage metrics independently.
-    // The OTLP exporter reads config from env vars / system properties
-    // (OTEL_EXPORTER_OTLP_ENDPOINT, etc., set via JAVA_OPTS in server.properties).
-    val otlpExporter = OtlpGrpcMetricExporter.builder().build()
-    val otlpReader = PeriodicMetricReader.builder(otlpExporter)
-      .setInterval(JavaDuration.ofSeconds(10))
-      .build()
-    val meterProvider = SdkMeterProvider.builder()
-      .registerMetricReader(otlpReader)
-      .build()
-    val metricsMeter = meterProvider.get("deder-server")
+    // Use the global OTEL instance for metrics.
+    // Export is handled externally (OTEL Java agent, env vars, etc.).
+    val metricsMeter = GlobalOpenTelemetry.get().getMeter("deder-server")
     val internals = DederProjectInternalsImpl(workerThreads, metricsMeter)
 
     val watchDebounceMs = props.getProperty("watchDebounceMillis", "300").toInt
