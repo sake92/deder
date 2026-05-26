@@ -1,20 +1,32 @@
 package ba.sake.deder
 
 import ba.sake.deder.deps.{DepTree, Dependency}
+import ba.sake.deder.config.DederProject
 
 /** Trait that plugins implement to register additional tasks. */
 trait DederPluginApi {
   def id: String
 
-  /** @param params
-    * @return
-    *   Either an error message (Left) or a sequence of tasks to register (Right). If an error occurs during plugin
-    *   loading, the message will be logged and the plugin will be skipped, but the server will continue running with
-    *   previously loaded plugins (if any).
+  /** Called on every (re)load, before tasks(). Receives full context including
+    * plugin config, core task APIs, server internals, and the full DederProject.
+    * Plugin authors store what they need in instance fields.
+    *
+    * @return Left(error) → plugin is skipped (error logged, no tasks registered,
+    *         server continues with other plugins).
     */
-  def tasks(params: PluginTasksParams): Either[String, Seq[AbstractTask[?]]]
+  def start(params: PluginStartParams): Either[String, Unit] = Right(())
 
-  def onClose(): Unit = ()
+  /** Called after start(). No params — use state captured during start().
+    *
+    * @return Either an error message (Left) or a sequence of tasks to register (Right).
+    *         If an error occurs during plugin loading, the message will be logged and the
+    *         plugin will be skipped, but the server will continue running with previously
+    *         loaded plugins (if any).
+    */
+  def tasks(): Either[String, Seq[AbstractTask[?]]]
+
+  /** Called when the plugin is unloaded (config reload or server shutdown). */
+  def close(): Unit = ()
 }
 
 /** @param configText
@@ -25,13 +37,18 @@ trait DederPluginApi {
   *   Access to the stable Scala.js linking tasks that plugins may depend on.
   * @param snTasks
   *   Access to the stable Scala Native linking tasks that plugins may depend on.
+  * @param internals
+  *   Access to server introspection (request metrics, uptime, etc.).
+  * @param project
+  *   The full parsed DederProject config (modules, server properties, repositories, etc.).
   */
-case class PluginTasksParams(
+case class PluginStartParams(
     configText: String,
     coreTasks: CoreTasksApi,
     sjsTasks: ScalaJsTasksApi,
     snTasks: ScalaNativeTasksApi,
-    internals: DederProjectInternals
+    internals: DederProjectInternals,
+    project: DederProject
 )
 
 /** Typed access to the curated, stable core task surface that plugins may depend on. Internal tasks and actual
