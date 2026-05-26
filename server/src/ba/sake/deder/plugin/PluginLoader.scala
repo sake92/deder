@@ -126,12 +126,14 @@ class PluginLoader(
           plugin.start(params) match {
             case Left(err) =>
               logger.warn(s"Failed to start plugin '$pluginId': $err")
+              Try(plugin.close())
               closeClassLoaderQuietly(pluginClassLoader)
               Left(s"Failed to start plugin '$pluginId': $err")
             case Right(()) =>
               plugin.tasks() match {
                 case Left(err) =>
                   logger.warn(s"Failed to get tasks from plugin '$pluginId': $err")
+                  Try(plugin.close())
                   closeClassLoaderQuietly(pluginClassLoader)
                   Left(s"Failed to get tasks from plugin '$pluginId': $err")
                 case Right(tasks) =>
