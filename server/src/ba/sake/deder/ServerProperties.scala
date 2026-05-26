@@ -2,7 +2,7 @@ package ba.sake.deder
 
 import java.util as ju
 
-case class ServerProperties(
+final case class ServerProperties(
     logLevel: String,
     maxInactiveSeconds: Int,
     workerThreads: Int,

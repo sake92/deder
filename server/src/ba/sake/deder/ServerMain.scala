@@ -78,8 +78,6 @@ object ServerMain extends StrictLogging {
     val cfg = ServerProperties.from(props)
     DederGlobals.setTestForkSemaphore(cfg.maxConcurrentTestForks)
     DederGlobals.setForkTestFlushIntervalMs(cfg.forkTestFlushIntervalMs)
-    val _ = newCompileSemaphore(cfg)
-
     val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger]
     rootLogger.setLevel(Level.toLevel(cfg.logLevel))
 
