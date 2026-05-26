@@ -1172,6 +1172,7 @@ class CoreTasks() extends StrictLogging {
           val testOptions = DederTestOptions(ctx.args)
           val clientEnv = Option(RequestContext.clientParams.get()).map(_.envVars).getOrElse(Map.empty)
           val mergedEnv = clientEnv ++ forkEnv // forkEnv wins on conflict
+          val flushInterval = DederGlobals.forkTestFlushIntervalMs
           val forkedRun = ForkedTestOrchestrator.run(
             discoveredTests = discoveredTests,
             runtimeClasspath = runClasspath,
@@ -1183,7 +1184,8 @@ class CoreTasks() extends StrictLogging {
             moduleId = ctx.module.id,
             outDir = ctx.out,
             testParallelism = testParallelism,
-            maxTestForks = maxTestForks
+            maxTestForks = maxTestForks,
+            flushIntervalMs = flushInterval
           )
           JUnitXmlReportWriter
             .outputDir(ctx.module, forkedRun.runDir)

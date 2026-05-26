@@ -14,7 +14,7 @@ object ForkedTestMain {
 
     // Install capturing stdout BEFORE any logger captures System.out so logger writes flow through
     // the per-suite capture path.
-    val (reporter, capture) = ForkedTestReporter.install()
+    val (reporter, capture) = ForkedTestReporter.install(forkedArgs.flushIntervalMs)
     reporter.emit(ForkedTestEnvelope.ForkStarted(forkedArgs.forkId))
 
     // forked JVM already has the full classpath on -cp; use the system classloader directly.

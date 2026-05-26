@@ -45,7 +45,8 @@ object ForkedTestOrchestrator extends StrictLogging {
       moduleId: String,
       outDir: os.Path,
       testParallelism: Int,
-      maxTestForks: Int
+      maxTestForks: Int,
+      flushIntervalMs: Long = 0
   ): ForkedTestRun = {
 
     if maxTestForks > 1 && jvmOptions.exists(_.contains("-agentlib:jdwp=")) then {
@@ -122,7 +123,8 @@ object ForkedTestOrchestrator extends StrictLogging {
                 runDir = runDir,
                 showForkTag = showForkTag,
                 notifications = notifications,
-                moduleId = moduleId
+                moduleId = moduleId,
+                flushIntervalMs = flushIntervalMs
               )
               finally RequestContext.id.remove()
             }
@@ -159,7 +161,8 @@ object ForkedTestOrchestrator extends StrictLogging {
       runDir: os.Path,
       showForkTag: Boolean,
       notifications: ServerNotificationsLogger,
-      moduleId: String
+      moduleId: String,
+      flushIntervalMs: Long
   ): Option[ForkedTestResultsPayload] = {
     val cancelled = () =>
       requestId != null && {
@@ -184,7 +187,8 @@ object ForkedTestOrchestrator extends StrictLogging {
         runDir = runDir,
         showForkTag = showForkTag,
         notifications = notifications,
-        moduleId = moduleId
+        moduleId = moduleId,
+        flushIntervalMs = flushIntervalMs
       )
     } finally {
       sem.release()
@@ -207,7 +211,8 @@ object ForkedTestOrchestrator extends StrictLogging {
       runDir: os.Path,
       showForkTag: Boolean,
       notifications: ServerNotificationsLogger,
-      moduleId: String
+      moduleId: String,
+      flushIntervalMs: Long
   ): Option[ForkedTestResultsPayload] = {
 
     var currentSlice = originalSlice
@@ -247,7 +252,8 @@ object ForkedTestOrchestrator extends StrictLogging {
           forkDir = forkDir,
           showForkTag = showForkTag,
           notifications = notifications,
-          moduleId = moduleId
+          moduleId = moduleId,
+          flushIntervalMs = flushIntervalMs
         ) match {
           case ForkOutcome.Success(payload) =>
             return Some(mergeCrashSuites(payload, crashErrorSuites))
@@ -345,7 +351,8 @@ object ForkedTestOrchestrator extends StrictLogging {
       forkDir: os.Path,
       showForkTag: Boolean,
       notifications: ServerNotificationsLogger,
-      moduleId: String
+      moduleId: String,
+      flushIntervalMs: Long
   ): ForkOutcome = {
     val tag = if showForkTag then s"[fork-$forkId] " else ""
     os.makeDir.all(forkDir)
@@ -364,7 +371,8 @@ object ForkedTestOrchestrator extends StrictLogging {
       discoveredTests = slice,
       testSelectors = testOptions.testSelectors,
       testParallelism = testParallelism,
-      resultsFile = resultsFilePath.toString
+      resultsFile = resultsFilePath.toString,
+      flushIntervalMs = flushIntervalMs
     )
     os.write.over(argsFilePath, args.toJson(spaces = 0, sort = false))
 
@@ -494,6 +502,18 @@ object ForkedTestOrchestrator extends StrictLogging {
     case ForkedTestEnvelope.SuiteStarted(name, _) =>
       startedSuites.add(name)
       notifications.add(ServerNotification.logInfo(s"${tag}▶ $name", Some(moduleId)))
+    case ForkedTestEnvelope.SuiteProgress(name, output) =>
+      if output.nonEmpty then {
+        val key = DederTestNames.normalizeSuiteName(name)
+        val builder = suiteOutputs.computeIfAbsent(key, _ => new StringBuilder())
+        builder.synchronized {
+          builder.append(output)
+        }
+        os.write.append(logFile, output, createFolders = true)
+        output.linesIterator.foreach { l =>
+          if l.nonEmpty then notifications.add(ServerNotification.logInfo(s"${tag}$l", Some(moduleId)))
+        }
+      }
     case ForkedTestEnvelope.SuiteCompleted(name, _, output) =>
       completedSuites.add(name)
       val header = s"${tag}${name} completed"

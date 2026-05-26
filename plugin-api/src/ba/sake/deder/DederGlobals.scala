@@ -27,4 +27,15 @@ object DederGlobals {
     _testForkSemaphore = new Semaphore(math.max(1, permits), true)
 
   def testForkSemaphore: Semaphore = _testForkSemaphore
+
+  /** Interval in milliseconds for periodic flushing of suite output from forked test JVMs.
+    * Set to 0 to disable (output only appears when each suite completes).
+    * Initialized once in ServerMain from the `forkTestFlushIntervalMs` server property.
+    */
+  @volatile private var _forkTestFlushIntervalMs: Long = 1000L
+
+  def setForkTestFlushIntervalMs(ms: Long): Unit =
+    _forkTestFlushIntervalMs = math.max(0L, ms)
+
+  def forkTestFlushIntervalMs: Long = _forkTestFlushIntervalMs
 }
