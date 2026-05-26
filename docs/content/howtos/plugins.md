@@ -19,7 +19,7 @@ Check out some official plugins in [deder-plugins repo](https://github.com/sake9
 
 | Component | Role |
 |-----------|------|
-| `plugin-api/` | The public API your plugin depends on. Exposes `DederPluginApi`, `TaskBuilder`, `AbstractTask`, `CoreTasksApi`, and `PluginConfigEvaluators`. |
+| `plugin-api/` | The public API your plugin depends on. Exposes `DederPluginApi`, `TaskBuilder`, `AbstractTask`, `CoreTasksApi`, `ScalaJsTasksApi`, `ScalaNativeTasksApi`, and `PluginConfigEvaluators`. |
 | `config/DederProject.pkl` | The base Pkl schema. If your plugin needs typed config, extend `DederPlugin` in your own `.pkl` file. |
 | Generated config bindings | Java classes generated from your plugin's Pkl schema via `pkl-codegen-java`. Regenerate after any schema change. |
 
@@ -44,6 +44,71 @@ class MyPluginImpl extends DederPluginApi:
 Register the implementation via `META-INF/services/ba.sake.deder.DederPluginApi` (standard ServiceLoader).
 
 If your plugin owns resources (thread pools, connections, etc.), override `onClose()` to release them when the server shuts down.
+
+## Depending on built-in tasks from a plugin
+
+`PluginTasksParams` gives your plugin access to the public task wrappers:
+
+- `params.coreTasks` for core/JVM tasks such as `compileTask`
+- `params.sjsTasks` for Scala.js link tasks
+- `params.snTasks` for Scala Native link tasks
+
+For example:
+
+```scala
+import ba.sake.deder.*
+import ba.sake.deder.config.DederProject.ModuleType
+
+class MyPluginImpl extends DederPluginApi:
+  def id: String = "my-plugin"
+
+  def tasks(params: PluginTasksParams): Either[String, Seq[AbstractTask[?]]] =
+    val afterCompile = TaskBuilder
+      .make[String]("afterCompile")
+      .dependsOn(params.coreTasks.compileTask)
+      .build(_ => "compiled")
+
+    val afterScalaJsLink = TaskBuilder
+      .make[String](
+        name = "afterScalaJsLink",
+        supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST)
+      )
+      .dependsOn(params.sjsTasks.linkJsTask)
+      .build(_ => "scala.js linked")
+
+    val afterScalaNativeLink = TaskBuilder
+      .make[String](
+        name = "afterScalaNativeLink",
+        supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST)
+      )
+      .dependsOn(params.snTasks.nativeLinkTask)
+      .build(_ => "scala-native linked")
+
+    Right(Seq(afterCompile, afterScalaJsLink, afterScalaNativeLink))
+```
+
+The snippet above shows the available dependency points in one place. When you depend on `params.sjsTasks` or `params.snTasks`, make sure the plugin task is gated to matching module types, otherwise the dependency will not exist for plain JVM modules.
+
+## Public task surface vs internal tasks
+
+`PluginTasksParams` intentionally exposes a **curated** built-in task surface through stable wrapper traits:
+
+- `CoreTasksApi`
+- `ScalaJsTasksApi`
+- `ScalaNativeTasksApi`
+
+Plugin authors should depend only on these public wrappers. Deder's internal task classes are intentionally **not** part of the plugin contract, so they are not exposed directly to plugins.
+
+This boundary is deliberate:
+
+- stable public wrappers are safe for plugins to depend on
+- internal tasks may change without plugin API guarantees
+- actual execution entrypoint tasks are intentionally **not** exposed (`run`, `runMain`, `runMvnApp`, `fix`, `fixCheck`, `testClasses`, `test`, `testInMemory`, `repl`)
+- stable dependency/configuration tasks that plugins may build on remain exposed, including classpath, main-class, JVM-option, and REPL-jar style tasks
+
+If you need a built-in task dependency, first check whether it is available through one of the public wrapper traits. If it is not exposed there, treat it as internal/unsupported for plugin use.
+
+> **Migration note:** This curated API is a breaking change for plugins that depended on older internals. Task handles such as `allClassesDirsTask` and `allDependenciesTask` are no longer public, and `PluginTasksParams` now includes `sjsTasks` / `snTasks` in addition to `coreTasks`. Existing plugin code that destructures or copies `PluginTasksParams` must be updated, and plugins that used the removed task handles must migrate to supported wrapper tasks such as `classesTask`, `compileClasspathTask`, or `depsTreeTask`.
 
 ## Typed plugin config
 

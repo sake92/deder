@@ -99,8 +99,11 @@ class DederProjectState(
 
             // Load plugin tasks before TasksResolver so they are included in the execution graph.
             // Plugin tasks are kept separately and the effective registry is rebuilt per reload.
-            val coreTasksApi = CoreTasksApiAdapter(new CoreTasks())
-            val pluginLoader = PluginLoader(coreTasksApi, dependencyResolver)
+            val coreTasks = CoreTasks()
+            val coreTasksApi = CoreTasksApiAdapter(coreTasks)
+            val scalaJsTasksApi = ScalaJsTasksApiAdapter(scalajs.ScalaJsTasks(coreTasks))
+            val scalaNativeTasksApi = ScalaNativeTasksApiAdapter(scalanative.ScalaNativeTasks(coreTasks))
+            val pluginLoader = PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver)
             loadedPlugins = pluginLoader.load(loadedPlugins, configFile, newConfig).loadedPlugins
             // TODO prepend plugin id to task name to avoid conflicts?
             val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?, ?]])
