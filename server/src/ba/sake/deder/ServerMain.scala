@@ -6,6 +6,7 @@ import java.nio.channels.OverlappingFileLockException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.Semaphore
 import java.util.concurrent.ScheduledFuture
 import java.util as ju
 import scala.compiletime.uninitialized
@@ -74,27 +75,19 @@ object ServerMain extends StrictLogging {
       Using.resource(os.read.inputStream(propFile))(props.load)
     }
 
-    val logLevel = props.getProperty("logLevel", "INFO").toUpperCase
-    val maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "1800").toInt
-    val workerThreads = props.getProperty("workerThreads", "16").toInt
-    val bspEnabled = props.getProperty("bspEnabled", "true").toBoolean
-    val maxConcurrentTestForks = Option(props.getProperty("maxConcurrentTestForks"))
-      .filter(_.nonEmpty)
-      .map(_.toInt)
-      .getOrElse(Runtime.getRuntime.availableProcessors())
-    DederGlobals.setTestForkSemaphore(maxConcurrentTestForks)
-
-    val forkTestFlushIntervalMs = props.getProperty("forkTestFlushIntervalMs", "1000").toLong
-    DederGlobals.setForkTestFlushIntervalMs(forkTestFlushIntervalMs)
+    val cfg = ServerProperties.from(props)
+    DederGlobals.setTestForkSemaphore(cfg.maxConcurrentTestForks)
+    DederGlobals.setForkTestFlushIntervalMs(cfg.forkTestFlushIntervalMs)
+    val _ = newCompileSemaphore(cfg)
 
     val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger]
-    rootLogger.setLevel(Level.toLevel(logLevel))
+    rootLogger.setLevel(Level.toLevel(cfg.logLevel))
 
     // TODO maybe make it elastic ThreadPool with min/max threads for better memory usage?
-    val originalTasksExecutorService = Executors.newFixedThreadPool(workerThreads)
+    val originalTasksExecutorService = Executors.newFixedThreadPool(cfg.workerThreads)
     // automatically propagate OTEL context, parent span
     val tasksExecutorService = Context.taskWrapping(originalTasksExecutorService)
-    val watchDebounceMs = props.getProperty("watchDebounceMillis", "300").toInt
+    val watchDebounceMs = cfg.watchDebounceMillis
     debounceScheduler = Executors.newSingleThreadScheduledExecutor(r => Thread(r, "watch-debounce"))
 
     // Must be declared before onShutdown to avoid forward reference error (var, not val)
@@ -156,7 +149,7 @@ object ServerMain extends StrictLogging {
       scalaNativeTasks,
       graalvmNativeImageTasks,
       tasksRegistry,
-      maxInactiveSeconds,
+      cfg.maxInactiveSeconds,
       tasksExecutorService,
       onShutdown,
       configFile = DederGlobals.projectRootDir / "deder.pkl"
@@ -182,7 +175,7 @@ object ServerMain extends StrictLogging {
     val cliServerThread = new Thread(() => cliServer.nn.start(), "DederCliServer")
     cliServerThread.start()
 
-    if bspEnabled then {
+    if cfg.bspEnabled then {
       bspProxyServer = DederBspProxyServer(coreTasks, runTasks, scalaJsTasks, scalaNativeTasks, projectState)
       val bspProxyServerThread = new Thread(() => bspProxyServer.nn.start(), "DederBspProxyServer")
       bspProxyServerThread.start()
@@ -285,6 +278,9 @@ object ServerMain extends StrictLogging {
     try { debounceScheduler.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS) }
     catch { case _: Exception => }
   }
+
+  private[deder] def newCompileSemaphore(cfg: ServerProperties): Semaphore =
+    new Semaphore(cfg.maxActiveCompilers)
 
   private def acquireServerLock(projectRoot: os.Path): Unit = {
     val serverLockFile = projectRoot / ".deder/server.lock"
