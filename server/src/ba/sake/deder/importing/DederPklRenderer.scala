@@ -403,182 +403,196 @@ object DederPklRenderer {
       sharedVersionListName: Option[String],
       hasSharedPomBase: Boolean = false
   ): String = {
+    if (g.crossScalaVersions.nonEmpty)
+      renderCrossVersionGroup(g, groupLookup, sharedVersionListName, hasSharedPomBase)
+    else
+      renderSingleVersionGroup(g, groupLookup, hasSharedPomBase)
+  }
+
+  private def renderCrossVersionGroup(
+      g: ModuleGroup,
+      groupLookup: Map[String, ModuleGroup],
+      sharedVersionListName: Option[String],
+      hasSharedPomBase: Boolean
+  ): String = {
     val slices = versionSlices(g)
     val builderType = builderTypeFor(g)
 
-    if (g.crossScalaVersions.nonEmpty) {
-      val common = computeCommonProps(slices)
-      val rawDeltas = computeVersionDeltas(slices, common)
+    val common = computeCommonProps(slices)
+    val rawDeltas = computeVersionDeltas(slices, common)
 
-      val scalacOptDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.scalacOptions }
-      val javacOptDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.javacOptions }
-      val depsDeltas: Map[String, Seq[DepDef]] = rawDeltas.map { (v, d) => v -> d.deps }
-      val pluginDiffedSlices = slices.map { slice =>
-        val diffedModules = slice.modulesByPlatform.map { (platform, module) =>
-          platform -> module.copy(
-            scalacPluginDeps = diffTemplatePluginDeps(module.scalacPluginDeps, g, slice.scalaVersion)
-          )
-        }
-        slice.copy(modulesByPlatform = diffedModules)
-      }
-      val pluginDiffedCommon = computeCommonProps(pluginDiffedSlices)
-      val pluginDepsDeltas: Map[String, Seq[DepDef]] =
-        computeVersionDeltas(pluginDiffedSlices, pluginDiffedCommon).map { (v, d) => v -> d.scalacPluginDeps }
-      val srcDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.sources }
-      val resDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.resources }
-      val modDepDeltas: Map[String, Seq[ModuleDepRef]] = rawDeltas.map { (v, d) => v -> d.moduleDeps }
-
-      // Fixup: keep flag+argument pairs together. If a paired flag (e.g.
-      // -Ybackend-parallelism) ended up in a delta but its numeric argument
-      // ended up in common, move the argument to the delta alongside the flag.
-      val pairedFlags = Set("-Ybackend-parallelism", "-release", "-java-output-version")
-      val standaloneNums = common.scalacOptions.filter(_.matches("\\d+")).toSet
-
-      val fixedScalacOptDeltas = if (standaloneNums.nonEmpty) {
-        scalacOptDeltas.map { (v, items) =>
-          // Rebuild: for each paired flag, append its argument if found in common
-          v -> items.flatMap { item =>
-            if (pairedFlags.contains(item)) {
-              // Look for the original argument in this version's slice
-              val origItems = slices
-                .find(sl => sl.scalaVersion == v)
-                .flatMap(sl => sl.modulesByPlatform.get("jvm").orElse(sl.modulesByPlatform.get("main")))
-                .map(m => m.scalacOptions)
-                .getOrElse(Seq.empty)
-              val arg = origItems.indexOf(item) + 1 match {
-                case i if i < origItems.length && origItems(i).matches("\\d+") =>
-                  Some(origItems(i))
-                case _ => None
-              }
-              if (arg.isDefined) Seq(item, arg.get) else Seq(item)
-            } else Seq(item)
-          }
-        }
-      } else scalacOptDeltas
-
-      // Remove arguments from common that were moved to deltas
-      val fixedCommonScalacOpts = common.scalacOptions.filterNot { o =>
-        o.matches("\\d+") && fixedScalacOptDeltas.values.exists(_.contains(o))
-      }
-
-      val templateProps = Seq(
-        if (
-          g.usesTpolecat || g.usesTypelevel || fixedCommonScalacOpts.nonEmpty || fixedScalacOptDeltas.values
-            .exists(_.nonEmpty)
+    val scalacOptDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.scalacOptions }
+    val javacOptDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.javacOptions }
+    val depsDeltas: Map[String, Seq[DepDef]] = rawDeltas.map { (v, d) => v -> d.deps }
+    val pluginDiffedSlices = slices.map { slice =>
+      val diffedModules = slice.modulesByPlatform.map { (platform, module) =>
+        platform -> module.copy(
+          scalacPluginDeps = diffTemplatePluginDeps(module.scalacPluginDeps, g, slice.scalaVersion)
         )
-          Some(renderScalacOptionsWithWhens(fixedCommonScalacOpts, fixedScalacOptDeltas, g, indent = 4))
-        else None,
-        if (
-          !suppressJavacOptionsDeltas(
-            common.javacOptions,
-            javacOptDeltas,
-            g
-          ) && (common.javacOptions.nonEmpty || javacOptDeltas.values.exists(_.nonEmpty))
-        )
-          Some(renderStringListWithWhens("javacOptions", common.javacOptions, javacOptDeltas, indent = 4))
-        else None,
-        if (common.deps.nonEmpty || depsDeltas.values.exists(_.nonEmpty))
-          Some(renderDepsWithWhens(common.deps, depsDeltas, indent = 4))
-        else None,
-        if (pluginDiffedCommon.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty))
-          Some(renderPluginDepsWithWhens(pluginDiffedCommon.scalacPluginDeps, pluginDepsDeltas, indent = 4))
-        else None,
-        if (common.sources.nonEmpty || srcDeltas.values.exists(_.nonEmpty))
-          Some(renderStringListWithWhens("sources", common.sources, srcDeltas, indent = 4))
-        else None,
-        if (common.resources.nonEmpty || resDeltas.values.exists(_.nonEmpty))
-          Some(renderStringListWithWhens("resources", common.resources, resDeltas, indent = 4))
-        else None,
-        if (common.moduleDeps.nonEmpty || modDepDeltas.values.exists(_.nonEmpty))
-          Some(renderModuleDepsWithWhens(common.moduleDeps, modDepDeltas, groupLookup, indent = 4))
-        else None,
-        common.publish.map(p => renderPublishInfo(p, indent = 4, useBase = hasSharedPomBase))
-      ).flatten.mkString("\n")
-
-      val propsBlock = if (templateProps.nonEmpty) templateProps + "\n" else ""
-
-      val templateHeader = if (g.usesTpolecat || g.usesTypelevel) {
-        s"""  template = ${crossVersionTemplateAmendExpr(g)} {"""
-      } else {
-        """  template = new ScalaModule {"""
       }
-      val templateBody = {
-        val body = s"""    scalaVersion = sv
+      slice.copy(modulesByPlatform = diffedModules)
+    }
+    val pluginDiffedCommon = computeCommonProps(pluginDiffedSlices)
+    val pluginDepsDeltas: Map[String, Seq[DepDef]] =
+      computeVersionDeltas(pluginDiffedSlices, pluginDiffedCommon).map { (v, d) => v -> d.scalacPluginDeps }
+    val srcDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.sources }
+    val resDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.resources }
+    val modDepDeltas: Map[String, Seq[ModuleDepRef]] = rawDeltas.map { (v, d) => v -> d.moduleDeps }
+
+    val pairedFlags = Set("-Ybackend-parallelism", "-release", "-java-output-version")
+    val standaloneNums = common.scalacOptions.filter(_.matches("\\d+")).toSet
+
+    val fixedScalacOptDeltas = if (standaloneNums.nonEmpty) {
+      scalacOptDeltas.map { (v, items) =>
+        v -> items.flatMap { item =>
+          if (pairedFlags.contains(item)) {
+            val origItems = slices
+              .find(sl => sl.scalaVersion == v)
+              .flatMap(sl => sl.modulesByPlatform.get("jvm").orElse(sl.modulesByPlatform.get("main")))
+              .map(m => m.scalacOptions)
+              .getOrElse(Seq.empty)
+            val arg = origItems.indexOf(item) + 1 match {
+              case i if i < origItems.length && origItems(i).matches("\\d+") =>
+                Some(origItems(i))
+              case _ => None
+            }
+            if (arg.isDefined) Seq(item, arg.get) else Seq(item)
+          } else Seq(item)
+        }
+      }
+    } else scalacOptDeltas
+
+    val fixedCommonScalacOpts = common.scalacOptions.filterNot { o =>
+      o.matches("\\d+") && fixedScalacOptDeltas.values.exists(_.contains(o))
+    }
+
+    val templateProps = Seq(
+      if (
+        g.usesTpolecat || g.usesTypelevel || fixedCommonScalacOpts.nonEmpty || fixedScalacOptDeltas.values
+          .exists(_.nonEmpty)
+      )
+        Some(renderScalacOptionsWithWhens(fixedCommonScalacOpts, fixedScalacOptDeltas, g, indent = 4))
+      else None,
+      if (
+        !suppressJavacOptionsDeltas(
+          common.javacOptions,
+          javacOptDeltas,
+          g
+        ) && (common.javacOptions.nonEmpty || javacOptDeltas.values.exists(_.nonEmpty))
+      )
+        Some(renderStringListWithWhens("javacOptions", common.javacOptions, javacOptDeltas, indent = 4))
+      else None,
+      if (common.deps.nonEmpty || depsDeltas.values.exists(_.nonEmpty))
+        Some(renderDepsWithWhens(common.deps, depsDeltas, indent = 4))
+      else None,
+      if (pluginDiffedCommon.scalacPluginDeps.nonEmpty || pluginDepsDeltas.values.exists(_.nonEmpty))
+        Some(renderPluginDepsWithWhens(pluginDiffedCommon.scalacPluginDeps, pluginDepsDeltas, indent = 4))
+      else None,
+      if (common.sources.nonEmpty || srcDeltas.values.exists(_.nonEmpty))
+        Some(renderStringListWithWhens("sources", common.sources, srcDeltas, indent = 4))
+      else None,
+      if (common.resources.nonEmpty || resDeltas.values.exists(_.nonEmpty))
+        Some(renderStringListWithWhens("resources", common.resources, resDeltas, indent = 4))
+      else None,
+      if (common.moduleDeps.nonEmpty || modDepDeltas.values.exists(_.nonEmpty))
+        Some(renderModuleDepsWithWhens(common.moduleDeps, modDepDeltas, groupLookup, indent = 4))
+      else None,
+      common.publish.map(p => renderPublishInfo(p, indent = 4, useBase = hasSharedPomBase))
+    ).flatten.mkString("\n")
+
+    val propsBlock = if (templateProps.nonEmpty) templateProps + "\n" else ""
+
+    val templateHeader = if (g.usesTpolecat || g.usesTypelevel) {
+      s"""  template = ${crossVersionTemplateAmendExpr(g)} {"""
+    } else {
+      """  template = new ScalaModule {"""
+    }
+    val templateBody = {
+      val body = s"""    scalaVersion = sv
                    |$propsBlock""".stripMargin
-        s"""$templateHeader
+      s"""$templateHeader
                    |$body  }""".stripMargin
-      }
+    }
 
-      val repMods = slices.headOption.getOrElse(VersionSlice("", Map.empty)).modulesByPlatform
-      val jvmModule = repMods
-        .get("jvm")
-        .orElse(repMods.get("main"))
-        .getOrElse(
-          ModuleDef.empty
-        )
-      val isCross = repMods.contains("js") || repMods.contains("native")
+    val repMods = slices.headOption.getOrElse(VersionSlice("", Map.empty)).modulesByPlatform
+    val jvmModule = repMods
+      .get("jvm")
+      .orElse(repMods.get("main"))
+      .getOrElse(
+        ModuleDef.empty
+      )
+    val isCross = repMods.contains("js") || repMods.contains("native")
 
-      val testTmpl = renderTestTemplate(g, jvmModule, Some(ScalaVersionCtx.Placeholder), groupLookup)
+    val testTmpl = renderTestTemplate(g, jvmModule, Some(ScalaVersionCtx.Placeholder), groupLookup)
 
-      val crossPlatTmpls = if (isCross) {
-        // In cross-version mode, plugin deps are already in the template body
-        // with when-clauses. Platform helpers (jsForVersion etc.) inherit them, so
-        // DON'T emit them again here — that would apply to ALL versions.
-        renderPlatformTemplates(repMods, g, ScalaVersionCtx.Placeholder, clearPluginDeps = true).mkString("\n")
-      } else ""
+    val crossPlatTmpls = if (isCross) {
+      renderPlatformTemplates(repMods, g, ScalaVersionCtx.Placeholder, clearPluginDeps = true).mkString("\n")
+    } else ""
 
-      val body =
-        Seq(Some(templateBody), Some(testTmpl), if (crossPlatTmpls.nonEmpty) Some(crossPlatTmpls) else None).flatten
-          .mkString("\n")
+    val body =
+      Seq(Some(templateBody), Some(testTmpl), if (crossPlatTmpls.nonEmpty) Some(crossPlatTmpls) else None).flatten
+        .mkString("\n")
 
-      val versionsListName = sharedVersionListName.getOrElse(s"${g.builderVarName}ScalaVersions")
-      val versionsDecl =
-        if (sharedVersionListName.isEmpty)
-          s"local const $versionsListName = ${versionsFor(g).map(v => s""""$v"""").mkString("List(", ", ", ")")}\n\n"
-        else ""
-      val builderIdProps = {
-        val idLine = s"""      id = "${crossVersionIdWithPlaceholder(g, builderType)}""""
-        val testIdLine = Option.when(builderType == "CreateScalaModules")(
-          s"""      testId = "${crossVersionTestIdWithPlaceholder(g)}""""
-        )
-        Seq(Some(idLine), testIdLine).flatten.mkString("\n")
-      }
+    val versionsListName = sharedVersionListName.getOrElse(s"${g.builderVarName}ScalaVersions")
+    val versionsDecl =
+      if (sharedVersionListName.isEmpty)
+        s"local const $versionsListName = ${versionsFor(g).map(v => s""""$v"""").mkString("List(", ", ", ")")}\n\n"
+      else ""
+    val builderIdProps = {
+      val idLine = s"""      id = "${crossVersionIdWithPlaceholder(g, builderType)}""""
+      val testIdLine = Option.when(builderType == BuilderType.CreateScalaModules)(
+        s"""      testId = "${crossVersionTestIdWithPlaceholder(g)}""""
+      )
+      Seq(Some(idLine), testIdLine).flatten.mkString("\n")
+    }
 
-      s"""${versionsDecl}local const ${g.builderVarName}Modules = $versionsListName
+    s"""${versionsDecl}local const ${g.builderVarName}Modules = $versionsListName
                |  .map((sv) ->
-               |    new $builderType {
+               |    new ${builderType.pklName} {
                |      root = "${g.root}"
                |$builderIdProps
                |      layout = "${g.layout.toString.toLowerCase.replace("_", "-")}"
                |$body
                |    }.get.all
                |  ).flatten()""".stripMargin
-    } else {
-      val representativeSlice = slices.find(_.modulesByPlatform.nonEmpty).getOrElse {
-        val fallbackVersion = versionsFor(g).headOption.getOrElse("")
-        VersionSlice(fallbackVersion, Map.empty)
-      }
-      val scalaVersionCtx = ScalaVersionCtx.Literal(representativeSlice.scalaVersion)
-      val body = renderGroupBody(representativeSlice.modulesByPlatform, groupLookup, g, Some(scalaVersionCtx), hasSharedPomBase)
-      s"""local const ${g.builderVarName} = new $builderType {
+  }
+
+  private def renderSingleVersionGroup(
+      g: ModuleGroup,
+      groupLookup: Map[String, ModuleGroup],
+      hasSharedPomBase: Boolean
+  ): String = {
+    val slices = versionSlices(g)
+    val builderType = builderTypeFor(g)
+
+    val representativeSlice = slices.find(_.modulesByPlatform.nonEmpty).getOrElse {
+      val fallbackVersion = versionsFor(g).headOption.getOrElse("")
+      VersionSlice(fallbackVersion, Map.empty)
+    }
+    val scalaVersionCtx = ScalaVersionCtx.Literal(representativeSlice.scalaVersion)
+    val body = renderGroupBody(representativeSlice.modulesByPlatform, groupLookup, g, Some(scalaVersionCtx), hasSharedPomBase)
+    s"""local const ${g.builderVarName} = new ${builderType.pklName} {
                |  root = "${g.root}"
                |  id = "${g.builderVarName}"
                |  layout = "${g.layout.toString.toLowerCase.replace("_", "-")}"
                |$body
                |}.get""".stripMargin
-    }
   }
 
-  private def builderTypeFor(g: ModuleGroup): String = {
-    if (g.hasJsModule || g.hasNativeModule) "CreateCrossModules"
-    else "CreateScalaModules"
-  }
+  private enum BuilderType:
+    case CreateScalaModules, CreateCrossModules
+    def pklName: String = this match
+      case CreateScalaModules => "CreateScalaModules"
+      case CreateCrossModules => "CreateCrossModules"
 
-  private def crossVersionIdWithPlaceholder(g: ModuleGroup, builderType: String): String =
+  private def builderTypeFor(g: ModuleGroup): BuilderType =
+    if (g.hasJsModule || g.hasNativeModule) BuilderType.CreateCrossModules
+    else BuilderType.CreateScalaModules
+
+  private def crossVersionIdWithPlaceholder(g: ModuleGroup, builderType: BuilderType): String =
     builderType match {
-      case "CreateScalaModules" => s"${g.builderVarName}-jvm-\\(sv)"
-      case "CreateCrossModules" => g.builderVarName
-      case other                => throw new IllegalArgumentException(s"Unexpected builder type: $other")
+      case BuilderType.CreateScalaModules => s"${g.builderVarName}-jvm-\\(sv)"
+      case BuilderType.CreateCrossModules => g.builderVarName
     }
 
   private def crossVersionTestIdWithPlaceholder(g: ModuleGroup): String =
@@ -595,7 +609,7 @@ object DederPklRenderer {
       modulesByPlatform.contains("jvm") || modulesByPlatform.contains("js") || modulesByPlatform.contains("native")
     val jvmModule = selectTemplateModule(modulesByPlatform)
 
-    val jvmBody = renderTemplateBody(jvmModule, "ScalaModule", None, scalaVersionCtx, groupLookup, g, hasSharedPomBase)
+    val jvmBody = renderTemplateBody(jvmModule, "ScalaModule", scalaVersionCtx, groupLookup, g, hasSharedPomBase)
     val testTmpl = renderTestTemplate(g, jvmModule, scalaVersionCtx, groupLookup)
 
     if (isCross) {
@@ -624,13 +638,11 @@ object DederPklRenderer {
   private def renderTemplateBody(
       m: ModuleDef,
       moduleType: String,
-      extraProps: Option[String],
       scalaVersionCtx: Option[ScalaVersionCtx] = None,
       groupLookup: Map[String, ModuleGroup] = Map.empty,
       g: ModuleGroup,
       hasSharedPomBase: Boolean = false
   ): String = {
-    val extra = extraProps.map(e => s"    $e\n").getOrElse("")
     val versionLine = scalaVersionCtx match {
       case Some(ScalaVersionCtx.Placeholder)    => Some("    scalaVersion = sv")
       case Some(ScalaVersionCtx.Literal(value)) => Some(s"""    scalaVersion = "$value"""")
@@ -640,7 +652,6 @@ object DederPklRenderer {
     }
     val props = Seq(
       versionLine,
-      Some(extra.trim).filter(_.nonEmpty),
       Some(renderScalacOptionsSmart(m, g, indent = 4, scalaVersionCtx)).filter(_.nonEmpty),
       if (suppressJavacOptions(m.javacOptions, g)) None
       else Some(renderJavacOptions(m.javacOptions, indent = 4)).filter(_.nonEmpty),
@@ -904,37 +915,45 @@ object DederPklRenderer {
   private def renderResourceDirs(dirs: Seq[String], indent: Int): String =
     renderBlock("resources", dirs, indent)(d => s""""$d"""")
 
+  private def renderPomDevelopers(developers: Seq[DeveloperDef], indent: Int): String = {
+    val inner = " " * (indent + 2)
+    val inner2 = " " * (indent + 4)
+    val devs = developers
+      .map(d => s"""$inner2 new PomDeveloper { id = "${d.id}"; name = "${d.name}"; email = "${d.email}" }""")
+      .mkString("\n")
+    s"${inner}developers {\n$devs\n$inner }"
+  }
+
+  private def renderPomLicenses(licenses: Seq[LicenseDef], indent: Int): String = {
+    val inner = " " * (indent + 2)
+    val inner2 = " " * (indent + 4)
+    val lics = licenses.map(l => s"""$inner2 new PomLicense { name = "${l.name}"; url = "${l.url}" }""").mkString("\n")
+    s"${inner}licenses {\n$lics\n$inner }"
+  }
+
+  private def renderPomScm(scm: ScmDef, indent: Int): String = {
+    val inner = " " * (indent + 2)
+    val inner2 = " " * (indent + 4)
+    val sb = new StringBuilder
+    sb.append(s"${inner}scm {\n")
+    sb.append(s"""$inner2 url = "${scm.browseUrl}"\n""")
+    sb.append(s"""$inner2 connection = "${scm.connection}"\n""")
+    scm.devConnection.foreach(dc => sb.append(s"""$inner2 developerConnection = "$dc"\n"""))
+    sb.append(s"$inner }")
+    sb.result()
+  }
+
   private def renderPublishInfoBase(p: PublishInfo): String = {
     val inner = "  "
-    val inner2 = "    "
 
     val lines = Seq.newBuilder[String]
     lines += "local const basePomSettings = new PomSettings {"
     lines += s"${inner}groupId = \"${p.organization}\""
     p.description.foreach(d => lines += s"""$inner description = "$d"""")
     p.homepage.foreach(h => lines += s"""$inner url = "$h"""")
-    if (p.developers.nonEmpty) {
-      val devs = p.developers
-        .map(d => s"""$inner2 new PomDeveloper { id = "${d.id}"; name = "${d.name}"; email = "${d.email}" }""")
-        .mkString("\n")
-      lines += s"${inner}developers {"
-      lines += devs
-      lines += s"$inner }"
-    }
-    if (p.licenses.nonEmpty) {
-      val lics =
-        p.licenses.map(l => s"""$inner2 new PomLicense { name = "${l.name}"; url = "${l.url}" }""").mkString("\n")
-      lines += s"${inner}licenses {"
-      lines += lics
-      lines += s"$inner }"
-    }
-    p.scmInfo.foreach { scm =>
-      lines += s"${inner}scm {"
-      lines += s"""$inner2 url = "${scm.browseUrl}""""
-      lines += s"""$inner2 connection = "${scm.connection}""""
-      scm.devConnection.foreach(dc => lines += s"""$inner2 developerConnection = "$dc"""")
-      lines += s"$inner }"
-    }
+    if (p.developers.nonEmpty) lines += renderPomDevelopers(p.developers, indent = 0)
+    if (p.licenses.nonEmpty) lines += renderPomLicenses(p.licenses, indent = 0)
+    p.scmInfo.foreach(scm => lines += renderPomScm(scm, indent = 0))
     lines += "}"
     lines.result().mkString("\n")
   }
@@ -952,35 +971,15 @@ object DederPklRenderer {
       lines += s"$spaces}"
       lines.result().mkString("\n")
     } else {
-      val inner2 = " " * (indent + 4)
       val lines = Seq.newBuilder[String]
       lines += s"${spaces}pomSettings {"
       lines += s"${inner}groupId = \"${p.organization}\""
       lines += s"${inner}artifactId = \"${p.artifactName}\""
       p.description.foreach(d => lines += s"""$inner description = "$d"""")
       p.homepage.foreach(h => lines += s"""$inner url = "$h"""")
-      if (p.developers.nonEmpty) {
-        val devs = p.developers
-          .map(d => s"""$inner2 new PomDeveloper { id = "${d.id}"; name = "${d.name}"; email = "${d.email}" }""")
-          .mkString("\n")
-        lines += s"${inner}developers {"
-        lines += devs
-        lines += s"$inner }"
-      }
-      if (p.licenses.nonEmpty) {
-        val lics =
-          p.licenses.map(l => s"""$inner2 new PomLicense { name = "${l.name}"; url = "${l.url}" }""").mkString("\n")
-        lines += s"${inner}licenses {"
-        lines += lics
-        lines += s"$inner }"
-      }
-      p.scmInfo.foreach { scm =>
-        lines += s"${inner}scm {"
-        lines += s"""$inner2 url = "${scm.browseUrl}""""
-        lines += s"""$inner2 connection = "${scm.connection}""""
-        scm.devConnection.foreach(dc => lines += s"""$inner2 developerConnection = "$dc"""")
-        lines += s"$inner }"
-      }
+      if (p.developers.nonEmpty) lines += renderPomDevelopers(p.developers, indent)
+      if (p.licenses.nonEmpty) lines += renderPomLicenses(p.licenses, indent)
+      p.scmInfo.foreach(scm => lines += renderPomScm(scm, indent))
       if (p.version.nonEmpty) {
         lines += s"""$inner version = "${p.version}""""
       }
@@ -1018,15 +1017,13 @@ object DederPklRenderer {
     }
     val builderType = builderTypeFor(targetGroup)
     val plat = builderType match {
-      case "CreateScalaModules" =>
+      case BuilderType.CreateScalaModules =>
         "-jvm"
-      case "CreateCrossModules" =>
+      case BuilderType.CreateCrossModules =>
         ref.targetPlatform match {
           case "main" | "jvm" => "-jvm"
           case other          => s"-$other"
         }
-      case other =>
-        throw new IllegalArgumentException(s"Unexpected builder type: $other")
     }
     val testSuffix = if (ref.isTest) "-test" else ""
     scalaVersionCtx match {
