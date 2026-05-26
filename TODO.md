@@ -9,6 +9,7 @@
 - import from other mill
 - import from other gradle
 - sbt-updates for deps
+- show running task in web dash
 - periodic print tasks that are still running, maybe every 5 mins so user knows it is still compiling or whatever
 
 - run pkldoc on each tag, and publish to ghpages
