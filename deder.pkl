@@ -164,7 +164,10 @@ local const client = new JavaModule {
   mainClass = "ba.sake.deder.client.Main"
   pomSettings = pom("deder-client", "Deder client")
   deps {
-    "com.fasterxml.jackson.core:jackson-databind:2.20.1"
+    "io.avaje:avaje-jsonb:3.13"
+  }
+  javacAnnotationProcessorDeps {
+    "io.avaje:avaje-jsonb-generator:3.13"
   }
   graalvm {
     nativeImageOptions {
