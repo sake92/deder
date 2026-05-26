@@ -419,7 +419,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     .dependsOn(publishArtifactsTask)
     .build { ctx =>
       val publishArtifactsResOpt = ctx.depResults._1
-      publishArtifactsResOpt.map { publishArtifactsRes =>
+      publishArtifactsResOpt.flatMap { publishArtifactsRes =>
         val pom = publishArtifactsRes.pom
         val artifacts = os.list(publishArtifactsRes.outDir)
         // copy to staging dir so checksums don't pollute publishArtifacts output
@@ -447,17 +447,16 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
                   )
               }
               val publisher = Publisher(ctx.notifications, ctx.module.id)
-              publisher.publishLocalM2(pom, allFiles, customRepoPath)
+              Some(publisher.publishLocalM2(pom, allFiles, customRepoPath))
             } else {
               ctx.notifications.add(
                 ServerNotification
                   .logInfo(s"Skipping publishing '${ctx.module.id}' because it is disabled", ctx.module.id)
               )
+              None
             }
-          case _ =>
+          case _ => None
         }
-        // TODO return path to the folder where was published
-        ctx.out
       }
     }
 
