@@ -4,32 +4,16 @@ import scala.concurrent.duration.*
 
 class PluginIntegrationSuite extends BaseIntegrationSuite {
 
-  // copy the whole config directory, because the test is run from tmp/temp_folder
-  // so the sample modules can just refer to it without needing to tweak paths
-  private def stageConfigSupport(parentDir: os.Path): Unit = {
-   // os.copy(os.pwd / "config", parentDir / "config", createFolders = true, replaceExisting = true)
-  }
-
   private def stageSiblingProject(parentDir: os.Path, projectName: String): os.Path = {
     val stagedPath = parentDir / projectName
-    stageTestProject(os.RelPath(s"sample-projects/$projectName"), stagedPath)
-    // tweak deder.pkl, because test is run from tmp/temp_folder
-    /*locally {
-      val originalLines = os.read.lines(stagedPath / "deder.pkl")
-      val tweakedLines = Seq(""" amends "../config/DederProject.pkl" """.trim) ++ originalLines.tail
-      os.write.over(stagedPath / "deder.pkl", tweakedLines.mkString("\n"))
-    }*/
-    // tweak HelloPluginModule.pkl
-    // doesnt work because it expects DederProject to be in classpath/modulepath too..
-    /*if projectName == "hello-plugin" then {
-      val originalLines = os.read.lines(stagedPath / "resources/HelloPluginModule.pkl")
-      val tweakedLines = Seq(
-        """|module ba.sake.deder.hello.HelloPluginModule
-           |import "../../config/DederProject.pkl" as P
-           |""".stripMargin
-      ) ++ originalLines.dropWhile(!_.trim.startsWith("class"))
-      os.write.over(stagedPath / "resources/HelloPluginModule.pkl", tweakedLines.mkString("\n"))
-    }*/
+    // Copy project files without rewriting deder.pkl.
+    // Don't use stageTestProject because it rewrites the amends to a local path.
+    // We need the original HTTP amends to match the HelloPluginModule.pkl import type.
+    val sourceDir = testResourceDir / os.RelPath(s"sample-projects/$projectName")
+    os.makeDir.all(stagedPath)
+    for entry <- os.list(sourceDir) if entry.last != ".deder" do
+      os.copy(entry, stagedPath / entry.last, createFolders = true, replaceExisting = true)
+
     os.write.over(
       stagedPath / ".deder/server.properties",
       s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
@@ -40,7 +24,6 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
 
   test("deder should publish hello-plugin to ./tmp/m2 and load its typed task in consumer") {
     val tempParent = os.pwd / "tmp" / s"hello-plugin-sync-${System.currentTimeMillis()}"
-    stageConfigSupport(tempParent)
     val pluginPath = stageSiblingProject(tempParent, "hello-plugin")
     val consumerPath = stageSiblingProject(tempParent, "hello-plugin-consumer")
 
