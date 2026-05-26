@@ -13,8 +13,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import ba.sake.deder.client.DederClient;
+import io.avaje.jsonb.Jsonb;
+import io.avaje.jsonb.JsonType;
 
-// TODO handle color stuff https://clig.dev/#output
+// TODO handle no_color stuff https://clig.dev/#output
 
 public class DederCliClient implements DederClient {
 
@@ -56,8 +58,11 @@ public class DederCliClient implements DederClient {
             channel.connect(address);
             var os = Channels.newOutputStream(channel);
             var is = Channels.newInputStream(channel);
-            writeThread = new DederCliClientWriteThread(logger, running, os, clientMessages);
-            readThread = new DederCliClientReadThread(logger, running, is);
+            var jsonb = Jsonb.builder().build();
+            var clientMessageType = jsonb.type(ClientMessage.class);
+            var serverMessageType = jsonb.type(ServerMessage.class);
+            writeThread = new DederCliClientWriteThread(logger, running, os, clientMessages, clientMessageType);
+            readThread = new DederCliClientReadThread(logger, running, is, serverMessageType);
             readThread.start();
             writeThread.start();
             ClientMessage message;

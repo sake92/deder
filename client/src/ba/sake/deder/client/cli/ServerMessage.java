@@ -1,17 +1,14 @@
 package ba.sake.deder.client.cli;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import io.avaje.jsonb.Json;
 
 import java.util.Map;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
-@JsonSubTypes({ @JsonSubTypes.Type(value = ServerMessage.Output.class, name = "Output"),
-		@JsonSubTypes.Type(value = ServerMessage.Log.class, name = "Log"),
-		@JsonSubTypes.Type(value = ServerMessage.RunSubprocess.class, name = "RunSubprocess"),
-		@JsonSubTypes.Type(value = ServerMessage.Exit.class, name = "Exit") })
+@Json
+@Json.SubType(type = ServerMessage.Output.class, name = "Output")
+@Json.SubType(type = ServerMessage.Log.class, name = "Log")
+@Json.SubType(type = ServerMessage.RunSubprocess.class, name = "RunSubprocess")
+@Json.SubType(type = ServerMessage.Exit.class, name = "Exit")
 public sealed interface ServerMessage {
 
 	// goes to stdout
