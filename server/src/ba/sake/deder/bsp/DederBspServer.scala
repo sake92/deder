@@ -1154,7 +1154,7 @@ class DederBspServer(
       args: Seq[String] = Seq.empty,
       originId: String = null
   ): T =
-    projectState.executeTask(moduleId, task, args, serverNotificationsLogger, useLastGood = true, requestId = originId).res
+    projectState.executeTask(moduleId, task, args, serverNotificationsLogger, useLastGood = true, requestId = originId, callerType = CallerType.Bsp).res
 
   private def toBspLogMessage(n: ServerNotification.Log): LogMessageParams = {
     val level = n.level match {
