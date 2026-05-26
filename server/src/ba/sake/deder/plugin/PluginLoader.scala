@@ -35,17 +35,18 @@ class PluginLoader(
       dederProject: DederProject
   ): PluginsLoadResult = {
     val pluginConfigs = dederProject.plugins.asScala.toSeq
-    loadConfiguredPlugins(loadedPlugins, pluginConfigs, pklFile)
+    loadConfiguredPlugins(loadedPlugins, pluginConfigs, pklFile, dederProject)
   }
 
   private def loadConfiguredPlugins(
       loadedPlugins: Seq[LoadedPlugin],
       pluginConfigs: Seq[DederPlugin],
-      pklFile: os.Path
+      pklFile: os.Path,
+      dederProject: DederProject
   ): PluginsLoadResult = {
     // TODO optimize, unload only the necessary plugins, compare config hashes, etc
     loadedPlugins.foreach { loadedPlugin =>
-      Try(loadedPlugin.plugin.onClose())
+      Try(loadedPlugin.plugin.close())
       closeClassLoaderQuietly(loadedPlugin.classLoader)
     }
     val newLoadedPlugins = pluginConfigs.flatMap { pluginConfig =>
@@ -59,7 +60,8 @@ class PluginLoader(
           loadPluginFromPaths(
             pluginId = pluginConfig.id,
             configText = serializedPluginConfig,
-            pluginJarPaths = pluginJarPaths
+            pluginJarPaths = pluginJarPaths,
+            dederProject = dederProject
           ) match {
             case Left(err) =>
               logger.warn(s"Failed to load plugin '${pluginConfig.id}': $err. Skipping plugin.", err)
@@ -106,7 +108,8 @@ class PluginLoader(
   private def loadPluginFromPaths(
       pluginId: String,
       configText: String,
-      pluginJarPaths: Seq[os.Path]
+      pluginJarPaths: Seq[os.Path],
+      dederProject: DederProject
   ): Either[String, LoadedPlugin] = {
     val pluginUrls = pluginJarPaths.map(_.toIO.toURI.toURL).toArray
     val pluginClassLoader = new URLClassLoader(pluginUrls, getClass.getClassLoader)
@@ -119,16 +122,23 @@ class PluginLoader(
         case Some(plugin) =>
           logger.debug(s"Loaded plugin '$pluginId'")
           logger.debug(s"Plugin config Pkl text: $configText")
-          val params = PluginTasksParams(configText, coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, internals)
-          plugin.tasks(params) match {
+          val params = PluginStartParams(configText, coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, internals, dederProject)
+          plugin.start(params) match {
             case Left(err) =>
-              logger.warn(s"Failed to get tasks from plugin '$pluginId': $err")
+              logger.warn(s"Failed to start plugin '$pluginId': $err")
               closeClassLoaderQuietly(pluginClassLoader)
-              Left(s"Failed to get tasks from plugin '$pluginId': $err")
-            case Right(tasks) =>
-              // TODO validate task names, check for duplicates across plugins, etc
-              logger.debug(s"Plugin '$pluginId' contributed ${tasks.size} tasks: ${tasks.map(_.name).mkString(", ")}")
-              Right(LoadedPlugin(plugin, configText, tasks, pluginClassLoader))
+              Left(s"Failed to start plugin '$pluginId': $err")
+            case Right(()) =>
+              plugin.tasks() match {
+                case Left(err) =>
+                  logger.warn(s"Failed to get tasks from plugin '$pluginId': $err")
+                  closeClassLoaderQuietly(pluginClassLoader)
+                  Left(s"Failed to get tasks from plugin '$pluginId': $err")
+                case Right(tasks) =>
+                  // TODO validate task names, check for duplicates across plugins, etc
+                  logger.debug(s"Plugin '$pluginId' contributed ${tasks.size} tasks: ${tasks.map(_.name).mkString(", ")}")
+                  Right(LoadedPlugin(plugin, configText, tasks, pluginClassLoader))
+              }
           }
         case None =>
           closeClassLoaderQuietly(pluginClassLoader)
