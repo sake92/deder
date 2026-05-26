@@ -144,7 +144,7 @@ val results = handler.results
       val threadId = Thread.currentThread().getId
       if forkHooks.isEmpty then logger.info(s"  ▶ $suiteName")
       forkHooks.foreach { h =>
-        h.capture.startSuite()
+        h.capture.startSuite(suiteName)
         h.reporter.emit(ForkedTestEnvelope.SuiteStarted(suiteName, threadId))
       }
       try {

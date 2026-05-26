@@ -32,3 +32,4 @@ Available properties:
 - `maxConnectSeconds` - max number of seconds the client waits for the server to start before giving up. Defaults to `30`. Increase this on slow machines or CI environments.
 - `localPath` - fixed local path to server JAR, useful for developing Deder and debugging. **Note:** When using localPath, the global cache is bypassed - the artifact is copied directly without caching. This ensures you're always testing your latest local build.
 - `testRunnerLocalPath` - fixed local path to test-runner JAR, useful for developing Deder and debugging. **Note:** When using testRunnerLocalPath, the global cache is bypassed - the artifact is copied directly without caching.
+- `forkTestFlushIntervalMs` - interval in milliseconds for flushing partial test output from forked test JVMs. Setting to `0` disables periodic flushing (output only appears when each test suite completes). Defaults to `1000` (1 second).

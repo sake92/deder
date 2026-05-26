@@ -8,7 +8,8 @@ case class ForkedTestArgs(
     discoveredTests: Seq[DiscoveredFrameworkTests],
     testSelectors: Seq[String],
     testParallelism: Int,
-    resultsFile: String
+    resultsFile: String,
+    flushIntervalMs: Long = 0
 ) derives JsonRW
 
 case class ForkedTestResultsPayload(
@@ -25,6 +26,7 @@ case class ForkedTestResultsPayload(
 enum ForkedTestEnvelope derives JsonRW {
   case ForkStarted(forkId: Int)
   case SuiteStarted(suiteName: String, threadId: Long)
+  case SuiteProgress(suiteName: String, output: String)
   case SuiteCompleted(suiteName: String, threadId: Long, capturedOutput: String)
   case UnattributedOutput(text: String)
   case ForkCompleted(forkId: Int, totals: DederTestResults)
