@@ -12,6 +12,7 @@ import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import io.opentelemetry.api.trace.StatusCode
 import scala.jdk.CollectionConverters.*
+import ox.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
 import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
@@ -52,6 +53,7 @@ class DederProjectState(
 
   private val watchedTasksLock = new AnyRef
   private var watchedTasks = Seq.empty[WatchedTaskData]
+  private val watchReexecutionGates = new java.util.concurrent.ConcurrentHashMap[String, java.lang.Boolean]()
   private var loadedPlugins = Seq.empty[LoadedPlugin]
 
   // Track active BSP servers for graceful teardown on CLI shutdown
@@ -134,8 +136,7 @@ class DederProjectState(
   }
 
   def executeCLI(
-      clientId: String,
-      requestId: String,
+      ctx: CliClientContext,
       moduleSelectors: Seq[String],
       taskName: String,
       args: Seq[String],
@@ -143,8 +144,6 @@ class DederProjectState(
       useLastGood: Boolean = false,
       startWatch: Boolean = false,
       exitOnEnd: Boolean = true,
-      outputFormat: OutputFormat,
-      clientParams: CliClientParams
   ): Unit = try {
     val state = readState(useLastGood) match
       case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
@@ -188,14 +187,13 @@ class DederProjectState(
         if isTaskSingleton && relevantModuleIds.length > 1 then
           throw RuntimeException(s"Task '${taskName}' is singleton, cannot execute it on multiple modules at once")
         val results = executeTasks(
-          requestId,
+          ctx,
           relevantModuleIds,
           taskName,
           args,
           watch = startWatch,
           serverNotificationsLogger,
-          useLastGood = useLastGood,
-          clientParams = clientParams
+          useLastGood = useLastGood
         )
         // summarize across modules
         if results.nonEmpty then {
@@ -203,7 +201,7 @@ class DederProjectState(
           val moduleResults = results.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.res)
           // Render cross-module summary in the chosen output format
           val summary = task.summarizeValueUnsafe(moduleResults)
-          val format = outputFormat
+          val format = ctx.outputFormat
           given JsonRW[Any] = task.summarizable.jsonRW.asInstanceOf[JsonRW[Any]]
           given PlainTextWritable[Any] = task.summarizable.plainTextW.asInstanceOf[PlainTextWritable[Any]]
           given MermaidWritable[Any] = task.summarizable.mermaidW.asInstanceOf[MermaidWritable[Any]]
@@ -227,15 +225,13 @@ class DederProjectState(
             watchedTasksLock.synchronized {
               watchedTasks = watchedTasks.appended(
                 WatchedTaskData(
-                  clientId,
+                  ctx,
                   taskInstance,
                   args,
                   serverNotificationsLogger,
                   useLastGood,
-                  outputFormat,
                   affectingSourceFileTasks,
-                  affectingConfigValueTasks,
-                  clientParams
+                  affectingConfigValueTasks
                 )
               )
             }
@@ -272,8 +268,18 @@ class DederProjectState(
     try {
       Using.resource(span.makeCurrent()) { scope =>
         val reqId = if requestId != null then requestId else UUID.randomUUID().toString
+        val baseCtx =
+          RequestContext.clientContext.get().getOrElse(CliClientContext(clientId = "internal", requestId = reqId))
         val res =
-          executeTasks(reqId, Seq(moduleId), task.name, args, watch, serverNotificationsLogger, useLastGood).head
+          executeTasks(
+            baseCtx.copy(requestId = reqId),
+            Seq(moduleId),
+            task.name,
+            args,
+            watch,
+            serverNotificationsLogger,
+            useLastGood
+          ).head
         (res.res.asInstanceOf[T], res.changed)
       }
     } catch {
@@ -286,14 +292,13 @@ class DederProjectState(
 
   // execute a single task on many modules
   def executeTasks(
-      requestId: String,
+      ctx: CliClientContext,
       moduleIds: Seq[String], // nonempty please :')
       taskName: String,
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
-      useLastGood: Boolean,
-      clientParams: CliClientParams = CliClientParams(Map.empty)
+      useLastGood: Boolean
   ): Seq[TaskExecResult] =
     try {
       inFlightRequests.incrementAndGet()
@@ -318,16 +323,16 @@ class DederProjectState(
           // TODO timed wait
           taskInstance.lock.lock()
         }
-        DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
+        DederGlobals.cancellationTokens.put(ctx.requestId, new AtomicBoolean(false))
         tasksExecutor.execute(
-          requestId,
+          ctx.requestId,
           tasksExecStages,
           moduleIds,
           taskName,
           args,
           watch,
           serverNotificationsLogger,
-          clientParams
+          CliClientParams(ctx.envVars)
         )
       } finally {
         // Only unlock locks actually held by this thread (prevents IllegalMonitorStateException on interrupt)
@@ -336,7 +341,7 @@ class DederProjectState(
             if taskInstance.lock.isHeldByCurrentThread then taskInstance.lock.unlock()
           } catch { case _: Exception => }
         }
-        DederGlobals.cancellationTokens.remove(requestId)
+        DederGlobals.cancellationTokens.remove(ctx.requestId)
       }
     } catch {
       case NonFatal(e) =>
@@ -511,23 +516,35 @@ class DederProjectState(
         }
       }
       if affected then {
-        val requestId = UUID.randomUUID().toString
-        executeTasks(
-          requestId,
-          Seq(watchedTask.taskInstance.moduleId),
-          watchedTask.taskInstance.task.name,
-          watchedTask.args,
-          true, // tell client we are in watch mode
-          watchedTask.serverNotificationsLogger,
-          watchedTask.useLastGood,
-          clientParams = watchedTask.clientParams
-        )
-        watchedTask.serverNotificationsLogger.add(
-          ServerNotification.logInfo(
-            s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-            watchedTask.taskInstance.moduleId
+        val watchTaskId = watchedTask.taskInstance.id
+        if watchReexecutionGates.putIfAbsent(watchTaskId, java.lang.Boolean.TRUE) == null then {
+          val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
+          Thread.ofVirtual().start(() =>
+            supervised {
+              try
+                RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+                  executeTasks(
+                    ctx,
+                    Seq(watchedTask.taskInstance.moduleId),
+                    watchedTask.taskInstance.task.name,
+                    watchedTask.args,
+                    true, // tell client we are in watch mode
+                    watchedTask.serverNotificationsLogger,
+                    watchedTask.useLastGood
+                  )
+                  watchedTask.serverNotificationsLogger.add(
+                    ServerNotification.logInfo(
+                      s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                      watchedTask.taskInstance.moduleId
+                    )
+                  )
+                }
+              finally watchReexecutionGates.remove(watchTaskId)
+            }
           )
-        )
+        } else {
+          logger.debug(s"Skipping re-execution for watched task ${watchTaskId} because one is already running")
+        }
       }
     }
   }
@@ -564,26 +581,36 @@ class DederProjectState(
         logger.debug(
           s"Config value dependencies of watched task ${watchedTask.taskInstance.id} have changed, re-executing..."
         )
-        val requestId = UUID.randomUUID().toString
-        executeCLI(
-          watchedTask.clientId,
-          requestId,
-          Seq(watchedTask.taskInstance.moduleId),
-          watchedTask.taskInstance.task.name,
-          watchedTask.args,
-          watchedTask.serverNotificationsLogger,
-          watchedTask.useLastGood,
-          startWatch = false,
-          exitOnEnd = false,
-          outputFormat = watchedTask.format,
-          clientParams = watchedTask.clientParams
-        )
-        watchedTask.serverNotificationsLogger.add(
-          ServerNotification.logInfo(
-            s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-            watchedTask.taskInstance.moduleId
+        val watchTaskId = watchedTask.taskInstance.id
+        if watchReexecutionGates.putIfAbsent(watchTaskId, java.lang.Boolean.TRUE) == null then {
+          val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
+          Thread.ofVirtual().start(() =>
+            supervised {
+              try
+                RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+                  executeCLI(
+                    ctx,
+                    Seq(watchedTask.taskInstance.moduleId),
+                    watchedTask.taskInstance.task.name,
+                    watchedTask.args,
+                    watchedTask.serverNotificationsLogger,
+                    watchedTask.useLastGood,
+                    startWatch = false,
+                    exitOnEnd = false
+                  )
+                  watchedTask.serverNotificationsLogger.add(
+                    ServerNotification.logInfo(
+                      s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                      watchedTask.taskInstance.moduleId
+                    )
+                  )
+                }
+              finally watchReexecutionGates.remove(watchTaskId)
+            }
           )
-        )
+        } else {
+          logger.debug(s"Skipping re-execution for watched task ${watchTaskId} because one is already running")
+        }
       }
     }
   }
@@ -591,7 +618,7 @@ class DederProjectState(
   def removeWatchedTasks(clientId: String): Unit = {
     logger.debug(s"Removing watched tasks for client ${clientId}")
     watchedTasksLock.synchronized {
-      watchedTasks = watchedTasks.filterNot(_.clientId == clientId)
+      watchedTasks = watchedTasks.filterNot(_.ctx.clientId == clientId)
     }
   }
 
@@ -651,13 +678,11 @@ case class DederProjectStateData(
 )
 
 case class WatchedTaskData(
-    clientId: String,
+    ctx: CliClientContext,
     taskInstance: TaskInstance,
     args: Seq[String],
     serverNotificationsLogger: ServerNotificationsLogger,
     useLastGood: Boolean,
-    format: OutputFormat,
     affectingSourceFileTasks: Set[TaskInstance],
-    affectingConfigValueTasks: Set[TaskInstance],
-    clientParams: CliClientParams
+    affectingConfigValueTasks: Set[TaskInstance]
 )

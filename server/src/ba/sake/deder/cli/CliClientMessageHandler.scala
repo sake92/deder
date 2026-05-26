@@ -490,16 +490,13 @@ class CliClientMessageHandler(
               if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail
               else cliOptions.args.value
             projectState.executeCLI(
-              clientId,
-              requestId,
+              ctx,
               cliOptions.modules,
               cliOptions.task,
               args = argss,
               serverNotificationsLogger,
               startWatch = cliOptions.watch.value,
               exitOnEnd = !cliOptions.watch.value,
-              outputFormat = ctx.outputFormat,
-              clientParams = CliClientParams(m.envVars)
             )
           }
       }
