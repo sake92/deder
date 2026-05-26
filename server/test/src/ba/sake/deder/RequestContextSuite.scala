@@ -4,7 +4,7 @@ import ox.*
 
 class RequestContextSuite extends munit.FunSuite {
 
-  test("clientContext propagates into ox fork") {
+  test("clientContext propagates into forkUser") {
     val expectedCtx = CliClientContext(
       clientId = "client-1",
       requestId = "request-1",
@@ -14,7 +14,7 @@ class RequestContextSuite extends munit.FunSuite {
 
     val forkCtx = supervised {
       RequestContext.clientContext.supervisedWhere(Some(expectedCtx)) {
-        fork {
+        forkUser {
           RequestContext.clientContext.get()
         }.join()
       }
@@ -35,5 +35,12 @@ class RequestContextSuite extends munit.FunSuite {
     }
 
     assertEquals(RequestContext.clientContext.get(), None)
+
+    val forkCtxAfterScope = supervised {
+      forkUser {
+        RequestContext.clientContext.get()
+      }.join()
+    }
+    assertEquals(forkCtxAfterScope, None)
   }
 }
