@@ -128,4 +128,107 @@ class ConcurrencySuite extends munit.FunSuite {
     assertEquals(globalVar, clientsCount)
   }
 
+  test("executeTask should timeout when lock is held longer than taskLockTimeoutSeconds") {
+    val tasksRegistry = TasksRegistry(coreTasks.all)
+    val slowTask = TaskBuilder
+      .make[String](name = "slowTask", supportedModuleTypes = Set(ModuleType.SCALA))
+      .dependsOn(coreTasks.compileTask)
+      .build { _ =>
+        Thread.sleep(5000)
+        ""
+      }
+    tasksRegistry.add(slowTask)
+    val dederExecutorService = java.util.concurrent.Executors.newFixedThreadPool(4)
+
+    val state = DederProjectState(
+      coreTasks,
+      runTasks,
+      scalaJsTasks,
+      scalaNativeTasks,
+      graalvmNativeImageTasks,
+      tasksRegistry,
+      Int.MaxValue,
+      2,
+      dederExecutorService,
+      () => (),
+      configFile = testProjectDir / "deder.pkl",
+      internals = noopInternals
+    )
+    val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
+
+    val requestId1 = UUID.randomUUID().toString
+    val requestId2 = UUID.randomUUID().toString
+
+    val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    val backgroundFuture = backgroundExecutor.submit(() => {
+      try {
+        state.executeTasks(requestId1, Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
+      } catch {
+        case _: Exception =>
+      }
+    })
+
+    Thread.sleep(500)
+
+    val ex = intercept[TaskEvaluationException] {
+      state.executeTasks(requestId2, Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
+    }
+
+    assert(ex.getCause.isInstanceOf[TaskLockTimeoutException], s"Expected TaskLockTimeoutException, got: ${ex.getCause.getClass.getName}")
+    assert(ex.getCause.getMessage.contains("Timed out waiting for lock"), s"Unexpected message: ${ex.getCause.getMessage}")
+
+    backgroundExecutor.shutdown()
+    dederExecutorService.shutdown()
+  }
+
+  test("executeTask with taskLockTimeoutSeconds=0 should not timeout (unlimited wait)") {
+    val tasksRegistry = TasksRegistry(coreTasks.all)
+    val slowTask = TaskBuilder
+      .make[String](name = "slowTaskZero", supportedModuleTypes = Set(ModuleType.SCALA))
+      .dependsOn(coreTasks.compileTask)
+      .build { _ =>
+        Thread.sleep(1000)
+        ""
+      }
+    tasksRegistry.add(slowTask)
+    val dederExecutorService = java.util.concurrent.Executors.newFixedThreadPool(4)
+
+    val state = DederProjectState(
+      coreTasks,
+      runTasks,
+      scalaJsTasks,
+      scalaNativeTasks,
+      graalvmNativeImageTasks,
+      tasksRegistry,
+      Int.MaxValue,
+      0,
+      dederExecutorService,
+      () => (),
+      configFile = testProjectDir / "deder.pkl",
+      internals = noopInternals
+    )
+    val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
+
+    val requestId1 = UUID.randomUUID().toString
+    val requestId2 = UUID.randomUUID().toString
+
+    val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    val lockAcquiredLatch = new java.util.concurrent.CountDownLatch(1)
+    val backgroundFuture = backgroundExecutor.submit(() => {
+      try {
+        lockAcquiredLatch.countDown()
+        state.executeTasks(requestId1, Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
+      } catch {
+        case _: Exception =>
+      }
+    })
+
+    lockAcquiredLatch.await()
+
+    state.executeTasks(requestId2, Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
+
+    backgroundExecutor.shutdown()
+    dederExecutorService.shutdown()
+  }
+
 }
