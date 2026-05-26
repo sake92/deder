@@ -32,7 +32,8 @@ class DederProjectState(
     maxInactiveSeconds: Int,
     tasksExecutorService: ExecutorService,
     onShutdown: () => Unit,
-    configFile: os.Path
+    configFile: os.Path,
+    val internals: DederProjectInternalsImpl
 ) extends StrictLogging {
 
   private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)
@@ -194,7 +195,8 @@ class DederProjectState(
           watch = startWatch,
           serverNotificationsLogger,
           useLastGood = useLastGood,
-          clientParams = clientParams
+          clientParams = clientParams,
+          callerType = CallerType.Cli
         )
         // summarize across modules
         if results.nonEmpty then {
@@ -261,7 +263,8 @@ class DederProjectState(
       serverNotificationsLogger: ServerNotificationsLogger,
       watch: Boolean = false,
       useLastGood: Boolean = false,
-      requestId: String = null
+      requestId: String = null,
+      callerType: CallerType = CallerType.Cli
   ): (res: T, changed: Boolean) = {
     val span = OTEL.TRACER
       .spanBuilder(s"${moduleId}.${task.name}")
@@ -272,7 +275,7 @@ class DederProjectState(
       Using.resource(span.makeCurrent()) { scope =>
         val reqId = if requestId != null then requestId else UUID.randomUUID().toString
         val res =
-          executeTasks(reqId, Seq(moduleId), task.name, args, watch, serverNotificationsLogger, useLastGood).head
+          executeTasks(reqId, Seq(moduleId), task.name, args, watch, serverNotificationsLogger, useLastGood, callerType = callerType).head
         (res.res.asInstanceOf[T], res.changed)
       }
     } catch {
@@ -292,8 +295,12 @@ class DederProjectState(
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean,
-      clientParams: CliClientParams = CliClientParams(Map.empty)
+      clientParams: CliClientParams = CliClientParams(Map.empty),
+      callerType: CallerType = CallerType.Cli
   ): Seq[TaskExecResult] =
+    val requestStartNanos = System.nanoTime()
+    val requestStartInstant = java.time.Instant.now()
+    internals.recordRequestStarted(requestId, callerType, taskName, moduleIds, requestStartInstant)
     try {
       inFlightRequests.incrementAndGet()
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
@@ -309,7 +316,8 @@ class DederProjectState(
           state.tasksResolver.modulesGraph,
           state.tasksResolver.taskInstancesGraph,
           tasksExecutorService,
-          state.dependencyResolver
+          state.dependencyResolver,
+          internals
         )
       val allTaskInstances = tasksExecStages.flatten.sortBy(_.id) // essential!!
       try {
@@ -318,7 +326,7 @@ class DederProjectState(
           taskInstance.lock.lock()
         }
         DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
-        tasksExecutor.execute(
+        val result = tasksExecutor.execute(
           requestId,
           tasksExecStages,
           moduleIds,
@@ -328,6 +336,9 @@ class DederProjectState(
           serverNotificationsLogger,
           clientParams
         )
+        val duration = scala.concurrent.duration.FiniteDuration(System.nanoTime() - requestStartNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+        internals.recordRequestCompleted(requestId, taskName, success = true, duration, callerType)
+        result
       } finally {
         // Only unlock locks actually held by this thread (prevents IllegalMonitorStateException on interrupt)
         allTaskInstances.reverse.foreach { taskInstance =>
@@ -339,6 +350,8 @@ class DederProjectState(
       }
     } catch {
       case NonFatal(e) =>
+        val duration = scala.concurrent.duration.FiniteDuration(System.nanoTime() - requestStartNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+        internals.recordRequestCompleted(requestId, taskName, success = false, duration, callerType)
         // send notification about failure to client
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
         if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
