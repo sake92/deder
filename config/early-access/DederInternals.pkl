@@ -78,6 +78,24 @@ const function crossPlatformSources(baseDir: String, platformDir: String, extraS
     platformDir
   }
 
+/// Returns the platform-specific base source directory for a given crossType.
+/// Example: platformDir("jvm", "src/main/scala", "full") → "jvm/src/main/scala"
+const function platformDir(platform: String, baseDir: String, crossType: String?): String =
+  if (crossType == "full") "\(platform)/\(baseDir)"
+  else if (crossType == "pure") ".\(platform)/\(baseDir)"
+  else if (crossType == "dummy") "\(platform)/\(baseDir)"
+  else "\(baseDir)-\\(platform)"
+
+/// Generates version-specific source directories for a given base dir, including the base + extras.
+/// Dispatches between sbt-style and deder-style via resolveVersionSourceDirs.
+const function versionedSources(versionStyle: String, scalaVersion: String, baseDir: String, includeBase: Boolean, extraDirs: Listing<String>): Listing<String> = new Listing {
+  when (includeBase) {
+    baseDir
+    ...(extraDirs)
+  }
+  ...resolveVersionSourceDirs(versionStyle, scalaVersion, baseDir)
+}
+
 /// Resolves layout-specific directory paths for Create*Modules helpers.
 class LayoutConfig {
   mainScalaSrcBase: String

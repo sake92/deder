@@ -8,16 +8,21 @@ import "DederProject.pkl" as P
 ///
 /// Modes: Dev (default, no fatal warnings), Ci (with -Xfatal-warnings / -Werror).
 /// Mode auto-selected via $CI env var.
-hidden tpolecatScalacOptions2_12: Listing<String> = new {
+/// Options shared by all Scala versions.
+hidden tpolecatSharedOptions: Listing<String> = new {
   "-encoding"
   "utf8"
-  "-deprecation"
   "-feature"
   "-unchecked"
-  "-language:existentials"
   "-language:experimental.macros"
-  "-language:higherKinds"
   "-language:implicitConversions"
+}
+
+hidden tpolecatScalacOptions2_12: Listing<String> = new {
+  ...tpolecatSharedOptions
+  "-deprecation"
+  "-language:existentials"
+  "-language:higherKinds"
   "-Xlint:adapted-args"
   "-Xlint:by-name-right-associative"
   "-Xlint:constant"
@@ -54,14 +59,9 @@ hidden tpolecatScalacOptions2_12: Listing<String> = new {
 }
 
 hidden tpolecatScalacOptions2_13: Listing<String> = new {
-  "-encoding"
-  "utf8"
-  "-feature"
-  "-unchecked"
+  ...tpolecatSharedOptions
   "-language:existentials"
-  "-language:experimental.macros"
   "-language:higherKinds"
-  "-language:implicitConversions"
   "-Xlint:adapted-args"
   "-Xlint:constant"
   "-Xlint:delayedinit-select"
@@ -97,13 +97,8 @@ hidden tpolecatScalacOptions2_13: Listing<String> = new {
 }
 
 hidden tpolecatScalacOptions3: Listing<String> = new {
-  "-encoding"
-  "utf8"
+  ...tpolecatSharedOptions
   "-deprecation"
-  "-feature"
-  "-unchecked"
-  "-language:experimental.macros"
-  "-language:implicitConversions"
   "-Xkind-projector"
   "-Wvalue-discard"
   "-Wnonunit-statement"

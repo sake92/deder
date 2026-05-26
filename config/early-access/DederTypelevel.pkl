@@ -8,12 +8,17 @@ import "DederProject.pkl" as P
 ///
 /// Modes: Dev (default, no fatal warnings), Ci (with -Xfatal-warnings / -Werror).
 /// Mode auto-selected via $CI env var.
-hidden typelevelScalacOptions2_12: Listing<String> = new {
+/// Options shared by all Scala versions.
+hidden typelevelSharedOptions: Listing<String> = new {
   "-deprecation"
   "-encoding"
   "utf8"
   "-feature"
   "-unchecked"
+}
+
+hidden typelevelScalacOptions2_12: Listing<String> = new {
+  ...typelevelSharedOptions
   "-Xlint"
   "-Yno-adapted-args"
   "-Ywarn-dead-code"
@@ -26,11 +31,7 @@ hidden typelevelScalacOptions2_12: Listing<String> = new {
 }
 
 hidden typelevelScalacOptions2_13: Listing<String> = new {
-  "-deprecation"
-  "-encoding"
-  "utf8"
-  "-feature"
-  "-unchecked"
+  ...typelevelSharedOptions
   "-Wdead-code"
   "-Wextra-implicit"
   "-Wnumeric-widen"
@@ -43,11 +44,7 @@ hidden typelevelScalacOptions2_13: Listing<String> = new {
 }
 
 hidden typelevelScalacOptions3: Listing<String> = new {
-  "-deprecation"
-  "-encoding"
-  "utf8"
-  "-feature"
-  "-unchecked"
+  ...typelevelSharedOptions
   "-Wunused:implicits"
   "-Wunused:explicits"
   "-Wunused:imports"
