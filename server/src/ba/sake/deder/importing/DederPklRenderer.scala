@@ -320,14 +320,47 @@ object DederPklRenderer {
     }.toMap
   }
 
-  private def renderScalacOptionsWithWhens(
+  private def renderWithWhens[T](
+      name: String,
+      common: Seq[T],
+      deltas: Map[String, Seq[T]],
+      indent: Int
+  )(fmt: T => String): String = {
+    val hasCommon = common.nonEmpty
+    val hasAnyDelta = deltas.values.exists(_.nonEmpty)
+    if (!hasCommon && !hasAnyDelta) return ""
+
+    val spaces = " " * indent
+    val i1 = " " * (indent + 2)
+    val i2 = " " * (indent + 4)
+
+    val commonEntries = if (hasCommon) {
+      common.map(item => s"$i1${fmt(item)}").mkString("\n")
+    } else ""
+
+    val whenEntries = deltas.toSeq.sortBy(_._1).flatMap { (version, items) =>
+      if (items.nonEmpty) {
+        val header = s"""${i1}when (sv == "$version") {"""
+        val body = items.map(item => s"$i2${fmt(item)}").mkString("\n")
+        val footer = s"$i1}"
+        Seq(header, body, footer)
+      } else Seq.empty
+    }.mkString("\n")
+
+    val body = Seq(
+      if (hasCommon) Some(commonEntries) else None,
+      if (whenEntries.nonEmpty) Some(whenEntries) else None
+    ).flatten.mkString("\n")
+
+    s"""${spaces}$name {\n$body\n$spaces}"""
+  }
+
+  private def diffAgainstTemplate(
       common: Seq[String],
       deltas: Map[String, Seq[String]],
-      g: ModuleGroup,
-      indent: Int
-  ): String = {
-    // If using tpolecat/typelevel template, diff against its default options
-    val (effectiveCommon, effectiveDeltas) = if (g.usesTpolecat || g.usesTypelevel) {
+      g: ModuleGroup
+  ): (Seq[String], Map[String, Seq[String]]) = {
+    if (g.usesTpolecat || g.usesTypelevel) {
       val refVersion = g.crossScalaVersions.headOption.getOrElse("2.13")
       val templateSet =
         if (g.usesTpolecat) TemplateOptionsReader.tpolecatScalacOptions(refVersion)
@@ -336,146 +369,47 @@ object DederPklRenderer {
       val filteredDeltas = deltas.view.mapValues(_.filterNot(templateSet.contains)).filter(_._2.nonEmpty).toMap
       (filteredCommon, filteredDeltas)
     } else (common, deltas)
+  }
 
-    val hasCommon = effectiveCommon.nonEmpty
-    val hasAnyDelta = effectiveDeltas.values.exists(_.nonEmpty)
-    if (!hasCommon && !hasAnyDelta) return ""
-
-    val spaces = " " * indent
-    val i1 = " " * (indent + 2)
-    val i2 = " " * (indent + 4)
-    val commonEntries = effectiveCommon.map(o => s"""$i1"$o"""").mkString("\n")
-    val whenEntries = effectiveDeltas.toSeq
-      .sortBy(_._1)
-      .flatMap { (v, items) =>
-        if (items.nonEmpty) {
-          val itemLines = items.map(o => s"""$i2"$o"""").mkString("\n")
-          Some(s"""${i1}when (sv == "$v") {\n$itemLines\n$i1}""")
-        } else None
-      }
-      .mkString("\n")
-    val body = Seq(
-      if (commonEntries.nonEmpty) Some(commonEntries) else None,
-      if (whenEntries.nonEmpty) Some(whenEntries) else None
-    ).flatten.mkString("\n")
-    s"""${spaces}scalacOptions {\n$body\n$spaces}"""
+  private def renderScalacOptionsWithWhens(
+      common: Seq[String],
+      deltas: Map[String, Seq[String]],
+      g: ModuleGroup,
+      indent: Int
+  ): String = {
+    val (effectiveCommon, effectiveDeltas) = diffAgainstTemplate(common, deltas, g)
+    renderWithWhens("scalacOptions", effectiveCommon, effectiveDeltas, indent)(v => s""""$v"""")
   }
 
   private def renderDepsWithWhens(
       common: Seq[DepDef],
       deltas: Map[String, Seq[DepDef]],
       indent: Int
-  ): String = {
-    val hasCommon = common.nonEmpty
-    val hasAnyDelta = deltas.values.exists(_.nonEmpty)
-    if (!hasCommon && !hasAnyDelta) return ""
-    val spaces = " " * indent
-    val i1 = " " * (indent + 2)
-    val i2 = " " * (indent + 4)
-    val commonEntries = common.map(d => s"""$i1"${d.formatted}"""").mkString("\n")
-    val whenEntries = deltas.toSeq
-      .sortBy(_._1)
-      .flatMap { (v, deps) =>
-        if (deps.nonEmpty) {
-          val depLines = deps.map(d => s"""$i2"${d.formatted}"""").mkString("\n")
-          Some(s"""${i1}when (sv == "$v") {\n$depLines\n$i1}""")
-        } else None
-      }
-      .mkString("\n")
-    val body = Seq(
-      if (commonEntries.nonEmpty) Some(commonEntries) else None,
-      if (whenEntries.nonEmpty) Some(whenEntries) else None
-    ).flatten.mkString("\n")
-    s"""${spaces}deps {\n$body\n$spaces}"""
-  }
+  ): String =
+    renderWithWhens("deps", common, deltas, indent)(d => s""""${d.formatted}"""")
 
   private def renderStringListWithWhens(
       label: String,
       common: Seq[String],
       deltas: Map[String, Seq[String]],
       indent: Int
-  ): String = {
-    val hasCommon = common.nonEmpty
-    val hasAnyDelta = deltas.values.exists(_.nonEmpty)
-    if (!hasCommon && !hasAnyDelta) return ""
-    val spaces = " " * indent
-    val i1 = " " * (indent + 2)
-    val i2 = " " * (indent + 4)
-    val commonEntries = common.map(s => s"""$i1"$s"""").mkString("\n")
-    val whenEntries = deltas.toSeq
-      .sortBy(_._1)
-      .flatMap { (v, items) =>
-        if (items.nonEmpty) {
-          val itemLines = items.map(s => s"""$i2"$s"""").mkString("\n")
-          Some(s"""${i1}when (sv == "$v") {\n$itemLines\n$i1}""")
-        } else None
-      }
-      .mkString("\n")
-    val body = Seq(
-      if (commonEntries.nonEmpty) Some(commonEntries) else None,
-      if (whenEntries.nonEmpty) Some(whenEntries) else None
-    ).flatten.mkString("\n")
-    s"""${spaces}$label {\n$body\n$spaces}"""
-  }
+  ): String =
+    renderWithWhens(label, common, deltas, indent)(s => s""""$s"""")
 
   private def renderPluginDepsWithWhens(
       common: Seq[DepDef],
       deltas: Map[String, Seq[DepDef]],
       indent: Int
-  ): String = {
-    val hasCommon = common.nonEmpty
-    val hasAnyDelta = deltas.values.exists(_.nonEmpty)
-    if (!hasCommon && !hasAnyDelta) return ""
-    val spaces = " " * indent
-    val i1 = " " * (indent + 2)
-    val i2 = " " * (indent + 4)
-    val commonEntries = common.map(d => s"""$i1"${d.formatted}"""").mkString("\n")
-    val whenEntries = deltas.toSeq
-      .sortBy(_._1)
-      .flatMap { (v, deps) =>
-        if (deps.nonEmpty) {
-          val depLines = deps.map(d => s"""$i2"${d.formatted}"""").mkString("\n")
-          Some(s"""${i1}when (sv == "$v") {\n$depLines\n$i1}""")
-        } else None
-      }
-      .mkString("\n")
-    val body = Seq(
-      if (commonEntries.nonEmpty) Some(commonEntries) else None,
-      if (whenEntries.nonEmpty) Some(whenEntries) else None
-    ).flatten.mkString("\n")
-    s"""${spaces}scalacPluginDeps {\n$body\n$spaces}"""
-  }
+  ): String =
+    renderWithWhens("scalacPluginDeps", common, deltas, indent)(d => s""""${d.formatted}"""")
 
   private def renderModuleDepsWithWhens(
       common: Seq[ModuleDepRef],
       deltas: Map[String, Seq[ModuleDepRef]],
       groupLookup: Map[String, ModuleGroup],
       indent: Int
-  ): String = {
-    val hasCommon = common.nonEmpty
-    val hasAnyDelta = deltas.values.exists(_.nonEmpty)
-    if (!hasCommon && !hasAnyDelta) return ""
-    val spaces = " " * indent
-    val i1 = " " * (indent + 2)
-    val i2 = " " * (indent + 4)
-    val commonEntries =
-      common.map(r => s"$i1${crossDepFilter(r, groupLookup, ScalaVersionCtx.Placeholder)}").mkString("\n")
-    val whenEntries = deltas.toSeq
-      .sortBy(_._1)
-      .flatMap { (v, refs) =>
-        if (refs.nonEmpty) {
-          val refLines =
-            refs.map(r => s"$i2${crossDepFilter(r, groupLookup, ScalaVersionCtx.Placeholder)}").mkString("\n")
-          Some(s"""${i1}when (sv == "$v") {\n$refLines\n$i1}""")
-        } else None
-      }
-      .mkString("\n")
-    val body = Seq(
-      if (commonEntries.nonEmpty) Some(commonEntries) else None,
-      if (whenEntries.nonEmpty) Some(whenEntries) else None
-    ).flatten.mkString("\n")
-    s"""${spaces}moduleDeps {\n$body\n$spaces}"""
-  }
+  ): String =
+    renderWithWhens("moduleDeps", common, deltas, indent)(r => crossDepFilter(r, groupLookup, ScalaVersionCtx.Placeholder))
 
   // ---- group rendering ----
 
