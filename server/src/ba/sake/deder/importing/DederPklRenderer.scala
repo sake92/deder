@@ -556,83 +556,7 @@ object DederPklRenderer {
         // In cross-version mode, plugin deps are already in the template body
         // with when-clauses. Platform helpers (jsForVersion etc.) inherit them, so
         // DON'T emit them again here — that would apply to ALL versions.
-        val jsTmpl = repMods
-          .get("js")
-          .map { m =>
-            val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
-            val amendExpr = platformAmendExpr(
-              g,
-              "Js",
-              ScalaVersionCtx.Placeholder,
-              Some(jsVersion)
-            )
-            val body = renderJsNativeOverride(
-              "jsTemplate",
-              amendExpr,
-              m.copy(scalacPluginDeps = Seq.empty),
-              scalaJsVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(jsVersion),
-              scalaNativeVersion = None
-            )
-            s"  $body"
-          }
-          .getOrElse("")
-
-        val nativeTmpl = repMods
-          .get("native")
-          .map { m =>
-            val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
-            val amendExpr = platformAmendExpr(
-              g,
-              "Native",
-              ScalaVersionCtx.Placeholder,
-              Some(nativeVersion)
-            )
-            val body = renderJsNativeOverride(
-              "nativeTemplate",
-              amendExpr,
-              m.copy(scalacPluginDeps = Seq.empty),
-              scalaJsVersion = None,
-              scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion)
-            )
-            s"  $body"
-          }
-          .getOrElse("")
-
-        val jsTestTmpl = repMods
-          .get("js")
-          .map { m =>
-            if (m.testDeps.nonEmpty) {
-              val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
-              val amendExpr = platformAmendExpr(
-                g,
-                "JsTest",
-                ScalaVersionCtx.Placeholder,
-                Some(jsVersion)
-              )
-              val depsStr = renderDeps(m.testDeps, indent = 6)
-              s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
-            } else ""
-          }
-          .getOrElse("")
-
-        val nativeTestTmpl = repMods
-          .get("native")
-          .map { m =>
-            if (m.testDeps.nonEmpty) {
-              val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
-              val amendExpr = platformAmendExpr(
-                g,
-                "NativeTest",
-                ScalaVersionCtx.Placeholder,
-                Some(nativeVersion)
-              )
-              val depsStr = renderDeps(m.testDeps, indent = 6)
-              s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
-            } else ""
-          }
-          .getOrElse("")
-
-        Seq(jsTmpl, jsTestTmpl, nativeTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
+        renderPlatformTemplates(repMods, g, ScalaVersionCtx.Placeholder, clearPluginDeps = true).mkString("\n")
       } else ""
 
       val body =
@@ -707,87 +631,8 @@ object DederPklRenderer {
     val testTmpl = renderTestTemplate(g, jvmModule, scalaVersionCtx, groupLookup)
 
     if (isCross) {
-      val jsTmpl = modulesByPlatform
-        .get("js")
-        .map { m =>
-          val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
-          val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
-          val amendExpr = platformAmendExpr(
-            g,
-            "Js",
-            resolvedCtx,
-            Some(jsVersion)
-          )
-          val body = renderJsNativeOverride(
-            "jsTemplate",
-            amendExpr,
-            m,
-            scalaJsVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(jsVersion),
-            scalaNativeVersion = None
-          )
-          s"  $body"
-        }
-        .getOrElse("")
-
-      val nativeTmpl = modulesByPlatform
-        .get("native")
-        .map { m =>
-          val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
-          val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
-          val amendExpr = platformAmendExpr(
-            g,
-            "Native",
-            resolvedCtx,
-            Some(nativeVersion)
-          )
-          val body = renderJsNativeOverride(
-            "nativeTemplate",
-            amendExpr,
-            m,
-            scalaJsVersion = None,
-            scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion)
-          )
-          s"  $body"
-        }
-        .getOrElse("")
-
-      val jsTestTmpl = modulesByPlatform
-        .get("js")
-        .map { m =>
-          if (m.testDeps.nonEmpty) {
-            val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
-            val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
-            val amendExpr = platformAmendExpr(
-              g,
-              "JsTest",
-              resolvedCtx,
-              Some(jsVersion)
-            )
-            val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
-          } else ""
-        }
-        .getOrElse("")
-
-      val nativeTestTmpl = modulesByPlatform
-        .get("native")
-        .map { m =>
-          if (m.testDeps.nonEmpty) {
-            val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
-            val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
-            val amendExpr = platformAmendExpr(
-              g,
-              "NativeTest",
-              resolvedCtx,
-              Some(nativeVersion)
-            )
-            val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
-          } else ""
-        }
-        .getOrElse("")
-
-      val tmpls = Seq(jsTmpl, jsTestTmpl, nativeTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
+      val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(jvmModule.scalaVersion))
+      val tmpls = renderPlatformTemplates(modulesByPlatform, g, resolvedCtx, clearPluginDeps = false).mkString("\n")
       val tmplsWithNewline = if (tmpls.nonEmpty) tmpls + "\n" else ""
 
       s"""$jvmBody
@@ -873,11 +718,98 @@ object DederPklRenderer {
       s"""$label = ($amendExpr) {
          |$versionProp
          |${if (depsStr.nonEmpty) s"$depsStr\n" else ""}${
-          if (pluginsStr.nonEmpty) s"$pluginsStr\n" else ""
-        }  }""".stripMargin
+           if (pluginsStr.nonEmpty) s"$pluginsStr\n" else ""
+         }  }""".stripMargin
     } else {
       s"""$label = ($amendExpr) { $versionProp }"""
     }
+  }
+
+  private def renderPlatformTemplates(
+      modulesByPlatform: Map[String, ModuleDef],
+      g: ModuleGroup,
+      scalaVersionCtx: ScalaVersionCtx,
+      clearPluginDeps: Boolean
+  ): Seq[String] = {
+    val jsTmpl = modulesByPlatform
+      .get("js")
+      .map { m =>
+        val mod = if (clearPluginDeps) m.copy(scalacPluginDeps = Seq.empty) else m
+        val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
+        val amendExpr = platformAmendExpr(
+          g,
+          "Js",
+          scalaVersionCtx,
+          Some(jsVersion)
+        )
+        val body = renderJsNativeOverride(
+          "jsTemplate",
+          amendExpr,
+          mod,
+          scalaJsVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(jsVersion),
+          scalaNativeVersion = None
+        )
+        s"  $body"
+      }
+      .getOrElse("")
+
+    val nativeTmpl = modulesByPlatform
+      .get("native")
+      .map { m =>
+        val mod = if (clearPluginDeps) m.copy(scalacPluginDeps = Seq.empty) else m
+        val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
+        val amendExpr = platformAmendExpr(
+          g,
+          "Native",
+          scalaVersionCtx,
+          Some(nativeVersion)
+        )
+        val body = renderJsNativeOverride(
+          "nativeTemplate",
+          amendExpr,
+          mod,
+          scalaJsVersion = None,
+          scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion)
+        )
+        s"  $body"
+      }
+      .getOrElse("")
+
+    val jsTestTmpl = modulesByPlatform
+      .get("js")
+      .map { m =>
+        if (m.testDeps.nonEmpty) {
+          val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
+          val amendExpr = platformAmendExpr(
+            g,
+            "JsTest",
+            scalaVersionCtx,
+            Some(jsVersion)
+          )
+          val depsStr = renderDeps(m.testDeps, indent = 6)
+          s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
+        } else ""
+      }
+      .getOrElse("")
+
+    val nativeTestTmpl = modulesByPlatform
+      .get("native")
+      .map { m =>
+        if (m.testDeps.nonEmpty) {
+          val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
+          val amendExpr = platformAmendExpr(
+            g,
+            "NativeTest",
+            scalaVersionCtx,
+            Some(nativeVersion)
+          )
+          val depsStr = renderDeps(m.testDeps, indent = 6)
+          s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
+        } else ""
+      }
+      .getOrElse("")
+
+    Seq(jsTmpl, jsTestTmpl, nativeTmpl, nativeTestTmpl).filter(_.nonEmpty)
   }
 
   private def renderTestTemplate(
