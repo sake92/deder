@@ -5,13 +5,6 @@ import ba.sake.deder.config.DederProject
 object DederPklRenderer {
   val DederVersion = "v0.11.1"
 
-  private enum BuilderType:
-    case CreateScalaModules, CreateCrossModules
-
-    def pklName: String = this match
-      case CreateScalaModules => "CreateScalaModules"
-      case CreateCrossModules => "CreateCrossModules"
-
   private enum ScalaVersionCtx:
     case Placeholder
     case Literal(value: String)
@@ -311,14 +304,47 @@ object DederPklRenderer {
     }.toMap
   }
 
-  private def renderScalacOptionsWithWhens(
+  private def renderWithWhens[T](
+      name: String,
+      common: Seq[T],
+      deltas: Map[String, Seq[T]],
+      indent: Int
+  )(fmt: T => String): String = {
+    val hasCommon = common.nonEmpty
+    val hasAnyDelta = deltas.values.exists(_.nonEmpty)
+    if (!hasCommon && !hasAnyDelta) return ""
+
+    val spaces = " " * indent
+    val i1 = " " * (indent + 2)
+    val i2 = " " * (indent + 4)
+
+    val commonEntries = if (hasCommon) {
+      common.map(item => s"$i1${fmt(item)}").mkString("\n")
+    } else ""
+
+    val whenEntries = deltas.toSeq.sortBy(_._1).flatMap { (version, items) =>
+      if (items.nonEmpty) {
+        val header = s"""${i1}when (sv == "$version") {"""
+        val body = items.map(item => s"$i2${fmt(item)}").mkString("\n")
+        val footer = s"$i1}"
+        Seq(header, body, footer)
+      } else Seq.empty
+    }.mkString("\n")
+
+    val body = Seq(
+      if (hasCommon) Some(commonEntries) else None,
+      if (whenEntries.nonEmpty) Some(whenEntries) else None
+    ).flatten.mkString("\n")
+
+    s"""${spaces}$name {\n$body\n$spaces}"""
+  }
+
+  private def diffAgainstTemplate(
       common: Seq[String],
       deltas: Map[String, Seq[String]],
-      g: ModuleGroup,
-      indent: Int
-  ): String = {
-    // If using tpolecat/typelevel template, diff against its default options
-    val (effectiveCommon, effectiveDeltas) = if (g.usesTpolecat || g.usesTypelevel) {
+      g: ModuleGroup
+  ): (Seq[String], Map[String, Seq[String]]) = {
+    if (g.usesTpolecat || g.usesTypelevel) {
       val refVersion = g.crossScalaVersions.headOption.getOrElse("2.13")
       val templateSet =
         if (g.usesTpolecat) TemplateOptionsReader.tpolecatScalacOptions(refVersion)
@@ -327,146 +353,47 @@ object DederPklRenderer {
       val filteredDeltas = deltas.view.mapValues(_.filterNot(templateSet.contains)).filter(_._2.nonEmpty).toMap
       (filteredCommon, filteredDeltas)
     } else (common, deltas)
+  }
 
-    val hasCommon = effectiveCommon.nonEmpty
-    val hasAnyDelta = effectiveDeltas.values.exists(_.nonEmpty)
-    if (!hasCommon && !hasAnyDelta) return ""
-
-    val spaces = " " * indent
-    val i1 = " " * (indent + 2)
-    val i2 = " " * (indent + 4)
-    val commonEntries = effectiveCommon.map(o => s"""$i1"$o"""").mkString("\n")
-    val whenEntries = effectiveDeltas.toSeq
-      .sortBy(_._1)
-      .flatMap { (v, items) =>
-        if (items.nonEmpty) {
-          val itemLines = items.map(o => s"""$i2"$o"""").mkString("\n")
-          Some(s"""${i1}when (sv == "$v") {\n$itemLines\n$i1}""")
-        } else None
-      }
-      .mkString("\n")
-    val body = Seq(
-      if (commonEntries.nonEmpty) Some(commonEntries) else None,
-      if (whenEntries.nonEmpty) Some(whenEntries) else None
-    ).flatten.mkString("\n")
-    s"""${spaces}scalacOptions {\n$body\n$spaces}"""
+  private def renderScalacOptionsWithWhens(
+      common: Seq[String],
+      deltas: Map[String, Seq[String]],
+      g: ModuleGroup,
+      indent: Int
+  ): String = {
+    val (effectiveCommon, effectiveDeltas) = diffAgainstTemplate(common, deltas, g)
+    renderWithWhens("scalacOptions", effectiveCommon, effectiveDeltas, indent)(v => s""""$v"""")
   }
 
   private def renderDepsWithWhens(
       common: Seq[DepDef],
       deltas: Map[String, Seq[DepDef]],
       indent: Int
-  ): String = {
-    val hasCommon = common.nonEmpty
-    val hasAnyDelta = deltas.values.exists(_.nonEmpty)
-    if (!hasCommon && !hasAnyDelta) return ""
-    val spaces = " " * indent
-    val i1 = " " * (indent + 2)
-    val i2 = " " * (indent + 4)
-    val commonEntries = common.map(d => s"""$i1"${d.formatted}"""").mkString("\n")
-    val whenEntries = deltas.toSeq
-      .sortBy(_._1)
-      .flatMap { (v, deps) =>
-        if (deps.nonEmpty) {
-          val depLines = deps.map(d => s"""$i2"${d.formatted}"""").mkString("\n")
-          Some(s"""${i1}when (sv == "$v") {\n$depLines\n$i1}""")
-        } else None
-      }
-      .mkString("\n")
-    val body = Seq(
-      if (commonEntries.nonEmpty) Some(commonEntries) else None,
-      if (whenEntries.nonEmpty) Some(whenEntries) else None
-    ).flatten.mkString("\n")
-    s"""${spaces}deps {\n$body\n$spaces}"""
-  }
+  ): String =
+    renderWithWhens("deps", common, deltas, indent)(d => s""""${d.formatted}"""")
 
   private def renderStringListWithWhens(
       label: String,
       common: Seq[String],
       deltas: Map[String, Seq[String]],
       indent: Int
-  ): String = {
-    val hasCommon = common.nonEmpty
-    val hasAnyDelta = deltas.values.exists(_.nonEmpty)
-    if (!hasCommon && !hasAnyDelta) return ""
-    val spaces = " " * indent
-    val i1 = " " * (indent + 2)
-    val i2 = " " * (indent + 4)
-    val commonEntries = common.map(s => s"""$i1"$s"""").mkString("\n")
-    val whenEntries = deltas.toSeq
-      .sortBy(_._1)
-      .flatMap { (v, items) =>
-        if (items.nonEmpty) {
-          val itemLines = items.map(s => s"""$i2"$s"""").mkString("\n")
-          Some(s"""${i1}when (sv == "$v") {\n$itemLines\n$i1}""")
-        } else None
-      }
-      .mkString("\n")
-    val body = Seq(
-      if (commonEntries.nonEmpty) Some(commonEntries) else None,
-      if (whenEntries.nonEmpty) Some(whenEntries) else None
-    ).flatten.mkString("\n")
-    s"""${spaces}$label {\n$body\n$spaces}"""
-  }
+  ): String =
+    renderWithWhens(label, common, deltas, indent)(s => s""""$s"""")
 
   private def renderPluginDepsWithWhens(
       common: Seq[DepDef],
       deltas: Map[String, Seq[DepDef]],
       indent: Int
-  ): String = {
-    val hasCommon = common.nonEmpty
-    val hasAnyDelta = deltas.values.exists(_.nonEmpty)
-    if (!hasCommon && !hasAnyDelta) return ""
-    val spaces = " " * indent
-    val i1 = " " * (indent + 2)
-    val i2 = " " * (indent + 4)
-    val commonEntries = common.map(d => s"""$i1"${d.formatted}"""").mkString("\n")
-    val whenEntries = deltas.toSeq
-      .sortBy(_._1)
-      .flatMap { (v, deps) =>
-        if (deps.nonEmpty) {
-          val depLines = deps.map(d => s"""$i2"${d.formatted}"""").mkString("\n")
-          Some(s"""${i1}when (sv == "$v") {\n$depLines\n$i1}""")
-        } else None
-      }
-      .mkString("\n")
-    val body = Seq(
-      if (commonEntries.nonEmpty) Some(commonEntries) else None,
-      if (whenEntries.nonEmpty) Some(whenEntries) else None
-    ).flatten.mkString("\n")
-    s"""${spaces}scalacPluginDeps {\n$body\n$spaces}"""
-  }
+  ): String =
+    renderWithWhens("scalacPluginDeps", common, deltas, indent)(d => s""""${d.formatted}"""")
 
   private def renderModuleDepsWithWhens(
       common: Seq[ModuleDepRef],
       deltas: Map[String, Seq[ModuleDepRef]],
       groupLookup: Map[String, ModuleGroup],
       indent: Int
-  ): String = {
-    val hasCommon = common.nonEmpty
-    val hasAnyDelta = deltas.values.exists(_.nonEmpty)
-    if (!hasCommon && !hasAnyDelta) return ""
-    val spaces = " " * indent
-    val i1 = " " * (indent + 2)
-    val i2 = " " * (indent + 4)
-    val commonEntries =
-      common.map(r => s"$i1${crossDepFilter(r, groupLookup, ScalaVersionCtx.Placeholder)}").mkString("\n")
-    val whenEntries = deltas.toSeq
-      .sortBy(_._1)
-      .flatMap { (v, refs) =>
-        if (refs.nonEmpty) {
-          val refLines =
-            refs.map(r => s"$i2${crossDepFilter(r, groupLookup, ScalaVersionCtx.Placeholder)}").mkString("\n")
-          Some(s"""${i1}when (sv == "$v") {\n$refLines\n$i1}""")
-        } else None
-      }
-      .mkString("\n")
-    val body = Seq(
-      if (commonEntries.nonEmpty) Some(commonEntries) else None,
-      if (whenEntries.nonEmpty) Some(whenEntries) else None
-    ).flatten.mkString("\n")
-    s"""${spaces}moduleDeps {\n$body\n$spaces}"""
-  }
+  ): String =
+    renderWithWhens("moduleDeps", common, deltas, indent)(r => crossDepFilter(r, groupLookup, ScalaVersionCtx.Placeholder))
 
   // ---- group rendering ----
 
@@ -476,8 +403,10 @@ object DederPklRenderer {
       sharedVersionListName: Option[String],
       hasSharedPomBase: Boolean = false
   ): String = {
-    if (g.crossScalaVersions.nonEmpty) renderCrossVersionGroup(g, groupLookup, sharedVersionListName, hasSharedPomBase)
-    else renderSingleVersionGroup(g, groupLookup, hasSharedPomBase)
+    if (g.crossScalaVersions.nonEmpty)
+      renderCrossVersionGroup(g, groupLookup, sharedVersionListName, hasSharedPomBase)
+    else
+      renderSingleVersionGroup(g, groupLookup, hasSharedPomBase)
   }
 
   private def renderCrossVersionGroup(
@@ -488,6 +417,7 @@ object DederPklRenderer {
   ): String = {
     val slices = versionSlices(g)
     val builderType = builderTypeFor(g)
+
     val common = computeCommonProps(slices)
     val rawDeltas = computeVersionDeltas(slices, common)
 
@@ -509,15 +439,11 @@ object DederPklRenderer {
     val resDeltas: Map[String, Seq[String]] = rawDeltas.map { (v, d) => v -> d.resources }
     val modDepDeltas: Map[String, Seq[ModuleDepRef]] = rawDeltas.map { (v, d) => v -> d.moduleDeps }
 
-    // Fixup: keep flag+argument pairs together. If a paired flag (e.g.
-    // -Ybackend-parallelism) ended up in a delta but its numeric argument
-    // ended up in common, move the argument to the delta alongside the flag.
     val pairedFlags = Set("-Ybackend-parallelism", "-release", "-java-output-version")
     val standaloneNums = common.scalacOptions.filter(_.matches("\\d+")).toSet
 
     val fixedScalacOptDeltas = if (standaloneNums.nonEmpty) {
       scalacOptDeltas.map { (v, items) =>
-        // Rebuild: for each paired flag, append its argument if found in common
         v -> items.flatMap { item =>
           if (pairedFlags.contains(item)) {
             val origItems = slices
@@ -536,7 +462,6 @@ object DederPklRenderer {
       }
     } else scalacOptDeltas
 
-    // Remove arguments from common that were moved to deltas
     val fixedCommonScalacOpts = common.scalacOptions.filterNot { o =>
       o.matches("\\d+") && fixedScalacOptDeltas.values.exists(_.contains(o))
     }
@@ -584,9 +509,9 @@ object DederPklRenderer {
     }
     val templateBody = {
       val body = s"""    scalaVersion = sv
-                 |$propsBlock""".stripMargin
+                   |$propsBlock""".stripMargin
       s"""$templateHeader
-                 |$body  }""".stripMargin
+                   |$body  }""".stripMargin
     }
 
     val repMods = slices.headOption.getOrElse(VersionSlice("", Map.empty)).modulesByPlatform
@@ -601,83 +526,7 @@ object DederPklRenderer {
     val testTmpl = renderTestTemplate(g, jvmModule, Some(ScalaVersionCtx.Placeholder), groupLookup)
 
     val crossPlatTmpls = if (isCross) {
-      val jsTmpl = repMods
-        .get("js")
-        .map { m =>
-          val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
-          val amendExpr = platformAmendExpr(
-            g,
-            "Js",
-            ScalaVersionCtx.Placeholder,
-            Some(jsVersion)
-          )
-          val body = renderJsNativeOverride(
-            "jsTemplate",
-            amendExpr,
-            m.copy(scalacPluginDeps = Seq.empty),
-            scalaJsVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(jsVersion),
-            scalaNativeVersion = None
-          )
-          s"  $body"
-        }
-        .getOrElse("")
-
-      val nativeTmpl = repMods
-        .get("native")
-        .map { m =>
-          val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
-          val amendExpr = platformAmendExpr(
-            g,
-            "Native",
-            ScalaVersionCtx.Placeholder,
-            Some(nativeVersion)
-          )
-          val body = renderJsNativeOverride(
-            "nativeTemplate",
-            amendExpr,
-            m.copy(scalacPluginDeps = Seq.empty),
-            scalaJsVersion = None,
-            scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion)
-          )
-          s"  $body"
-        }
-        .getOrElse("")
-
-      val jsTestTmpl = repMods
-        .get("js")
-        .map { m =>
-          if (m.testDeps.nonEmpty) {
-            val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
-            val amendExpr = platformAmendExpr(
-              g,
-              "JsTest",
-              ScalaVersionCtx.Placeholder,
-              Some(jsVersion)
-            )
-            val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
-          } else ""
-        }
-        .getOrElse("")
-
-      val nativeTestTmpl = repMods
-        .get("native")
-        .map { m =>
-          if (m.testDeps.nonEmpty) {
-            val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
-            val amendExpr = platformAmendExpr(
-              g,
-              "NativeTest",
-              ScalaVersionCtx.Placeholder,
-              Some(nativeVersion)
-            )
-            val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
-          } else ""
-        }
-        .getOrElse("")
-
-      Seq(jsTmpl, jsTestTmpl, nativeTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
+      renderPlatformTemplates(repMods, g, ScalaVersionCtx.Placeholder, clearPluginDeps = true).mkString("\n")
     } else ""
 
     val body =
@@ -698,14 +547,14 @@ object DederPklRenderer {
     }
 
     s"""${versionsDecl}local const ${g.builderVarName}Modules = $versionsListName
-             |  .map((sv) ->
-             |    new ${builderType.pklName} {
-             |      root = "${g.root}"
-             |$builderIdProps
-             |      layout = "${g.layout.toString.toLowerCase.replace("_", "-")}"
-             |$body
-             |    }.get.all
-             |  ).flatten()""".stripMargin
+               |  .map((sv) ->
+               |    new ${builderType.pklName} {
+               |      root = "${g.root}"
+               |$builderIdProps
+               |      layout = "${g.layout.toString.toLowerCase.replace("_", "-")}"
+               |$body
+               |    }.get.all
+               |  ).flatten()""".stripMargin
   }
 
   private def renderSingleVersionGroup(
@@ -715,6 +564,7 @@ object DederPklRenderer {
   ): String = {
     val slices = versionSlices(g)
     val builderType = builderTypeFor(g)
+
     val representativeSlice = slices.find(_.modulesByPlatform.nonEmpty).getOrElse {
       val fallbackVersion = versionsFor(g).headOption.getOrElse("")
       VersionSlice(fallbackVersion, Map.empty)
@@ -722,22 +572,27 @@ object DederPklRenderer {
     val scalaVersionCtx = ScalaVersionCtx.Literal(representativeSlice.scalaVersion)
     val body = renderGroupBody(representativeSlice.modulesByPlatform, groupLookup, g, Some(scalaVersionCtx), hasSharedPomBase)
     s"""local const ${g.builderVarName} = new ${builderType.pklName} {
-             |  root = "${g.root}"
-             |  id = "${g.builderVarName}"
-             |  layout = "${g.layout.toString.toLowerCase.replace("_", "-")}"
-             |$body
-             |}.get""".stripMargin
+               |  root = "${g.root}"
+               |  id = "${g.builderVarName}"
+               |  layout = "${g.layout.toString.toLowerCase.replace("_", "-")}"
+               |$body
+               |}.get""".stripMargin
   }
 
-  private def builderTypeFor(g: ModuleGroup): BuilderType = {
+  private enum BuilderType:
+    case CreateScalaModules, CreateCrossModules
+    def pklName: String = this match
+      case CreateScalaModules => "CreateScalaModules"
+      case CreateCrossModules => "CreateCrossModules"
+
+  private def builderTypeFor(g: ModuleGroup): BuilderType =
     if (g.hasJsModule || g.hasNativeModule) BuilderType.CreateCrossModules
     else BuilderType.CreateScalaModules
-  }
 
   private def crossVersionIdWithPlaceholder(g: ModuleGroup, builderType: BuilderType): String =
     builderType match {
       case BuilderType.CreateScalaModules => s"${g.builderVarName}-jvm-\\(sv)"
-      case _                              => g.builderVarName
+      case BuilderType.CreateCrossModules => g.builderVarName
     }
 
   private def crossVersionTestIdWithPlaceholder(g: ModuleGroup): String =
@@ -758,87 +613,8 @@ object DederPklRenderer {
     val testTmpl = renderTestTemplate(g, jvmModule, scalaVersionCtx, groupLookup)
 
     if (isCross) {
-      val jsTmpl = modulesByPlatform
-        .get("js")
-        .map { m =>
-          val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
-          val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
-          val amendExpr = platformAmendExpr(
-            g,
-            "Js",
-            resolvedCtx,
-            Some(jsVersion)
-          )
-          val body = renderJsNativeOverride(
-            "jsTemplate",
-            amendExpr,
-            m,
-            scalaJsVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(jsVersion),
-            scalaNativeVersion = None
-          )
-          s"  $body"
-        }
-        .getOrElse("")
-
-      val nativeTmpl = modulesByPlatform
-        .get("native")
-        .map { m =>
-          val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
-          val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
-          val amendExpr = platformAmendExpr(
-            g,
-            "Native",
-            resolvedCtx,
-            Some(nativeVersion)
-          )
-          val body = renderJsNativeOverride(
-            "nativeTemplate",
-            amendExpr,
-            m,
-            scalaJsVersion = None,
-            scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion)
-          )
-          s"  $body"
-        }
-        .getOrElse("")
-
-      val jsTestTmpl = modulesByPlatform
-        .get("js")
-        .map { m =>
-          if (m.testDeps.nonEmpty) {
-            val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
-            val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
-            val amendExpr = platformAmendExpr(
-              g,
-              "JsTest",
-              resolvedCtx,
-              Some(jsVersion)
-            )
-            val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
-          } else ""
-        }
-        .getOrElse("")
-
-      val nativeTestTmpl = modulesByPlatform
-        .get("native")
-        .map { m =>
-          if (m.testDeps.nonEmpty) {
-            val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
-            val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
-            val amendExpr = platformAmendExpr(
-              g,
-              "NativeTest",
-              resolvedCtx,
-              Some(nativeVersion)
-            )
-            val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
-          } else ""
-        }
-        .getOrElse("")
-
-      val tmpls = Seq(jsTmpl, jsTestTmpl, nativeTmpl, nativeTestTmpl).filter(_.nonEmpty).mkString("\n")
+      val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(jvmModule.scalaVersion))
+      val tmpls = renderPlatformTemplates(modulesByPlatform, g, resolvedCtx, clearPluginDeps = false).mkString("\n")
       val tmplsWithNewline = if (tmpls.nonEmpty) tmpls + "\n" else ""
 
       s"""$jvmBody
@@ -921,11 +697,98 @@ object DederPklRenderer {
       s"""$label = ($amendExpr) {
          |$versionProp
          |${if (depsStr.nonEmpty) s"$depsStr\n" else ""}${
-          if (pluginsStr.nonEmpty) s"$pluginsStr\n" else ""
-        }  }""".stripMargin
+           if (pluginsStr.nonEmpty) s"$pluginsStr\n" else ""
+         }  }""".stripMargin
     } else {
       s"""$label = ($amendExpr) { $versionProp }"""
     }
+  }
+
+  private def renderPlatformTemplates(
+      modulesByPlatform: Map[String, ModuleDef],
+      g: ModuleGroup,
+      scalaVersionCtx: ScalaVersionCtx,
+      clearPluginDeps: Boolean
+  ): Seq[String] = {
+    val jsTmpl = modulesByPlatform
+      .get("js")
+      .map { m =>
+        val mod = if (clearPluginDeps) m.copy(scalacPluginDeps = Seq.empty) else m
+        val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
+        val amendExpr = platformAmendExpr(
+          g,
+          "Js",
+          scalaVersionCtx,
+          Some(jsVersion)
+        )
+        val body = renderJsNativeOverride(
+          "jsTemplate",
+          amendExpr,
+          mod,
+          scalaJsVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(jsVersion),
+          scalaNativeVersion = None
+        )
+        s"  $body"
+      }
+      .getOrElse("")
+
+    val nativeTmpl = modulesByPlatform
+      .get("native")
+      .map { m =>
+        val mod = if (clearPluginDeps) m.copy(scalacPluginDeps = Seq.empty) else m
+        val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
+        val amendExpr = platformAmendExpr(
+          g,
+          "Native",
+          scalaVersionCtx,
+          Some(nativeVersion)
+        )
+        val body = renderJsNativeOverride(
+          "nativeTemplate",
+          amendExpr,
+          mod,
+          scalaJsVersion = None,
+          scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion)
+        )
+        s"  $body"
+      }
+      .getOrElse("")
+
+    val jsTestTmpl = modulesByPlatform
+      .get("js")
+      .map { m =>
+        if (m.testDeps.nonEmpty) {
+          val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
+          val amendExpr = platformAmendExpr(
+            g,
+            "JsTest",
+            scalaVersionCtx,
+            Some(jsVersion)
+          )
+          val depsStr = renderDeps(m.testDeps, indent = 6)
+          s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
+        } else ""
+      }
+      .getOrElse("")
+
+    val nativeTestTmpl = modulesByPlatform
+      .get("native")
+      .map { m =>
+        if (m.testDeps.nonEmpty) {
+          val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
+          val amendExpr = platformAmendExpr(
+            g,
+            "NativeTest",
+            scalaVersionCtx,
+            Some(nativeVersion)
+          )
+          val depsStr = renderDeps(m.testDeps, indent = 6)
+          s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
+        } else ""
+      }
+      .getOrElse("")
+
+    Seq(jsTmpl, jsTestTmpl, nativeTmpl, nativeTestTmpl).filter(_.nonEmpty)
   }
 
   private def renderTestTemplate(
@@ -1053,45 +916,31 @@ object DederPklRenderer {
     renderBlock("resources", dirs, indent)(d => s""""$d"""")
 
   private def renderPomDevelopers(developers: Seq[DeveloperDef], indent: Int): String = {
-    if (developers.isEmpty) ""
-    else {
-      val inner = " " * (indent + 2)
-      val inner2 = " " * (indent + 4)
-      val devs = developers
-        .map(d => s"""$inner2 new PomDeveloper { id = "${d.id}"; name = "${d.name}"; email = "${d.email}" }""")
-        .mkString("\n")
-      s"""${inner}developers {
-         |$devs
-         |$inner}""".stripMargin
-    }
+    val inner = " " * (indent + 2)
+    val inner2 = " " * (indent + 4)
+    val devs = developers
+      .map(d => s"""$inner2 new PomDeveloper { id = "${d.id}"; name = "${d.name}"; email = "${d.email}" }""")
+      .mkString("\n")
+    s"${inner}developers {\n$devs\n$inner }"
   }
 
   private def renderPomLicenses(licenses: Seq[LicenseDef], indent: Int): String = {
-    if (licenses.isEmpty) ""
-    else {
-      val inner = " " * (indent + 2)
-      val inner2 = " " * (indent + 4)
-      val lics =
-        licenses.map(l => s"""$inner2 new PomLicense { name = "${l.name}"; url = "${l.url}" }""").mkString("\n")
-      s"""${inner}licenses {
-         |$lics
-         |$inner}""".stripMargin
-    }
+    val inner = " " * (indent + 2)
+    val inner2 = " " * (indent + 4)
+    val lics = licenses.map(l => s"""$inner2 new PomLicense { name = "${l.name}"; url = "${l.url}" }""").mkString("\n")
+    s"${inner}licenses {\n$lics\n$inner }"
   }
 
-  private def renderPomScm(scm: Option[ScmDef], indent: Int): String = {
-    scm match {
-      case None => ""
-      case Some(s) =>
-        val inner = " " * (indent + 2)
-        val inner2 = " " * (indent + 4)
-        val conn = s"""$inner2 connection = "${s.connection}""""
-        val devConn = s.devConnection.map(dc => s"""\n${inner2}developerConnection = "$dc"""").getOrElse("")
-        s"""${inner}scm {
-           |$inner2 url = "${s.browseUrl}"
-           |$conn$devConn
-           |$inner}""".stripMargin
-    }
+  private def renderPomScm(scm: ScmDef, indent: Int): String = {
+    val inner = " " * (indent + 2)
+    val inner2 = " " * (indent + 4)
+    val sb = new StringBuilder
+    sb.append(s"${inner}scm {\n")
+    sb.append(s"""$inner2 url = "${scm.browseUrl}"\n""")
+    sb.append(s"""$inner2 connection = "${scm.connection}"\n""")
+    scm.devConnection.foreach(dc => sb.append(s"""$inner2 developerConnection = "$dc"\n"""))
+    sb.append(s"$inner }")
+    sb.result()
   }
 
   private def renderPublishInfoBase(p: PublishInfo): String = {
@@ -1102,11 +951,11 @@ object DederPklRenderer {
     lines += s"${inner}groupId = \"${p.organization}\""
     p.description.foreach(d => lines += s"""$inner description = "$d"""")
     p.homepage.foreach(h => lines += s"""$inner url = "$h"""")
-    lines += renderPomDevelopers(p.developers, 0)
-    lines += renderPomLicenses(p.licenses, 0)
-    lines += renderPomScm(p.scmInfo, 0)
+    if (p.developers.nonEmpty) lines += renderPomDevelopers(p.developers, indent = 0)
+    if (p.licenses.nonEmpty) lines += renderPomLicenses(p.licenses, indent = 0)
+    p.scmInfo.foreach(scm => lines += renderPomScm(scm, indent = 0))
     lines += "}"
-    lines.result().filter(_.nonEmpty).mkString("\n")
+    lines.result().mkString("\n")
   }
 
   private def renderPublishInfo(p: PublishInfo, indent: Int, useBase: Boolean = false): String = {
@@ -1128,14 +977,14 @@ object DederPklRenderer {
       lines += s"${inner}artifactId = \"${p.artifactName}\""
       p.description.foreach(d => lines += s"""$inner description = "$d"""")
       p.homepage.foreach(h => lines += s"""$inner url = "$h"""")
-      lines += renderPomDevelopers(p.developers, indent)
-      lines += renderPomLicenses(p.licenses, indent)
-      lines += renderPomScm(p.scmInfo, indent)
+      if (p.developers.nonEmpty) lines += renderPomDevelopers(p.developers, indent)
+      if (p.licenses.nonEmpty) lines += renderPomLicenses(p.licenses, indent)
+      p.scmInfo.foreach(scm => lines += renderPomScm(scm, indent))
       if (p.version.nonEmpty) {
         lines += s"""$inner version = "${p.version}""""
       }
       lines += s"$spaces}"
-      lines.result().filter(_.nonEmpty).mkString("\n")
+      lines.result().mkString("\n")
     }
   }
 
