@@ -498,6 +498,7 @@ class CliClientMessageHandler(
               serverNotificationsLogger,
               startWatch = cliOptions.watch.value,
               exitOnEnd = !cliOptions.watch.value,
+              outputFormat = ctx.outputFormat,
               clientParams = CliClientParams(m.envVars)
             )
           }

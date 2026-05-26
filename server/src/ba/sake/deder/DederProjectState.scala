@@ -143,6 +143,7 @@ class DederProjectState(
       useLastGood: Boolean = false,
       startWatch: Boolean = false,
       exitOnEnd: Boolean = true,
+      outputFormat: OutputFormat,
       clientParams: CliClientParams
   ): Unit = try {
     val state = readState(useLastGood) match
@@ -202,7 +203,7 @@ class DederProjectState(
           val moduleResults = results.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.res)
           // Render cross-module summary in the chosen output format
           val summary = task.summarizeValueUnsafe(moduleResults)
-          val format = RequestContext.outputFormat.get()
+          val format = outputFormat
           given JsonRW[Any] = task.summarizable.jsonRW.asInstanceOf[JsonRW[Any]]
           given PlainTextWritable[Any] = task.summarizable.plainTextW.asInstanceOf[PlainTextWritable[Any]]
           given MermaidWritable[Any] = task.summarizable.mermaidW.asInstanceOf[MermaidWritable[Any]]
@@ -231,7 +232,7 @@ class DederProjectState(
                   args,
                   serverNotificationsLogger,
                   useLastGood,
-                  RequestContext.outputFormat.get(),
+                  outputFormat,
                   affectingSourceFileTasks,
                   affectingConfigValueTasks,
                   clientParams
@@ -564,7 +565,6 @@ class DederProjectState(
           s"Config value dependencies of watched task ${watchedTask.taskInstance.id} have changed, re-executing..."
         )
         val requestId = UUID.randomUUID().toString
-        RequestContext.outputFormat.set(watchedTask.format)
         executeCLI(
           watchedTask.clientId,
           requestId,
@@ -575,6 +575,7 @@ class DederProjectState(
           watchedTask.useLastGood,
           startWatch = false,
           exitOnEnd = false,
+          outputFormat = watchedTask.format,
           clientParams = watchedTask.clientParams
         )
         watchedTask.serverNotificationsLogger.add(
