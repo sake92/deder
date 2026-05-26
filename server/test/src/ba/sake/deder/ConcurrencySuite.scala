@@ -5,8 +5,16 @@ import scala.util.Random
 import ba.sake.deder.config.DederProject.ModuleType
 import ba.sake.deder.publish.PublishTasks
 import ba.sake.deder.graalvm.GraalVmNativeImageTasks
+import io.opentelemetry.sdk.OpenTelemetrySdk
+import io.opentelemetry.sdk.metrics.SdkMeterProvider
 
 class ConcurrencySuite extends munit.FunSuite {
+
+  private def noopInternals: DederProjectInternalsImpl =
+    val sdk = OpenTelemetrySdk.builder()
+      .setMeterProvider(SdkMeterProvider.builder().build())
+      .build()
+    DederProjectInternalsImpl(16, sdk.getMeter("test"))
 
   private var testProjectDir: os.Path = scala.compiletime.uninitialized
 
@@ -46,7 +54,8 @@ class ConcurrencySuite extends munit.FunSuite {
       Int.MaxValue,
       dederExecutorService,
       () => (),
-      configFile = testProjectDir / "deder.pkl"
+      configFile = testProjectDir / "deder.pkl",
+      internals = noopInternals
     )
     val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
     // simulate clients calling "task1" concurrently
@@ -96,7 +105,8 @@ class ConcurrencySuite extends munit.FunSuite {
       Int.MaxValue,
       dederExecutorService,
       () => (),
-      configFile = testProjectDir / "deder.pkl"
+      configFile = testProjectDir / "deder.pkl",
+      internals = noopInternals
     )
     val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
     // simulate clients calling random tasks concurrently
