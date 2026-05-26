@@ -39,8 +39,6 @@ class CliClientMessageHandler(
     }
   }
 
-  private def legacyClientId(clientId: String): Int = clientId.hashCode
-
   private def handleHelp(ctx: CliClientContext, m: CliClientMessage.Help): Unit = {
     val clientId = ctx.clientId
     val requestId = ctx.requestId
@@ -200,7 +198,7 @@ class CliClientMessageHandler(
                       serverMessages.put(CliServerMessage.Exit(1))
                     case Right(graph) =>
                       val filteredModules = graph.vertexSet().asScala.toSeq.sortBy(_.id)
-                      val output = ctx.outputFormat match
+                      val output = cliOptions.format match
                         case OutputFormat.PlainText =>
                           filteredModules.map(_.id).mkString("\n")
                         case OutputFormat.Json =>
@@ -251,15 +249,15 @@ class CliClientMessageHandler(
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
                 // TODO handle these in a case class + typeclassess
-                ctx.outputFormat match
-                  case OutputFormat.Json | OutputFormat.DenseJson =>
+                cliOptions.format match
+                  case format @ (OutputFormat.Json | OutputFormat.DenseJson) =>
                     val taskInfosPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
                       case (moduleId, tasks) =>
                         moduleId -> tasks.map { ti =>
                           TaskInfo(ti.task.name, ti.task.featureTags.map(_.jsonKey).toSeq)
                         }
                     }
-                    val json = ctx.outputFormat match
+                    val json = format match
                       case OutputFormat.Json =>
                         taskInfosPerModule.toJson(spaces = 2, sort = true)
                       case OutputFormat.DenseJson =>
@@ -392,12 +390,12 @@ class CliClientMessageHandler(
                     val validModuleIds = validModuleTasks.map(_._1)
                     val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(validModuleIds, cliOptions.task)
                     val publicSubgraph = GraphUtils.projectPublic(tasksExecSubgraph, !_.task.internal)
-                    ctx.outputFormat match
-                      case OutputFormat.Json | OutputFormat.DenseJson =>
+                    cliOptions.format match
+                      case format @ (OutputFormat.Json | OutputFormat.DenseJson) =>
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                         val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
                         val values = publicStages.map(_.map(_.id))
-                        val json = ctx.outputFormat match
+                        val json = format match
                           case OutputFormat.Json =>
                             values.toJson(spaces = 2, sort = true)
                           case OutputFormat.DenseJson =>
@@ -492,7 +490,7 @@ class CliClientMessageHandler(
               if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail
               else cliOptions.args.value
             projectState.executeCLI(
-              legacyClientId(clientId),
+              clientId,
               requestId,
               cliOptions.modules,
               cliOptions.task,

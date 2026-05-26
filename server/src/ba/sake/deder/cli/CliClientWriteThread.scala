@@ -33,7 +33,7 @@ class CliClientWriteThread(
     } finally {
       logger.info(s"Client ${clientId} disconnected... Bye!")
       if clientChannel.isOpen then clientChannel.close()
-      projectState.removeWatchedTasks(clientId.hashCode)
+      projectState.removeWatchedTasks(clientId)
     }
   }
 }

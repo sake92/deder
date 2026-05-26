@@ -134,7 +134,7 @@ class DederProjectState(
   }
 
   def executeCLI(
-      clientId: Int,
+      clientId: String,
       requestId: String,
       moduleSelectors: Seq[String],
       taskName: String,
@@ -587,7 +587,7 @@ class DederProjectState(
     }
   }
 
-  def removeWatchedTasks(clientId: Int): Unit = {
+  def removeWatchedTasks(clientId: String): Unit = {
     logger.debug(s"Removing watched tasks for client ${clientId}")
     watchedTasksLock.synchronized {
       watchedTasks = watchedTasks.filterNot(_.clientId == clientId)
@@ -650,7 +650,7 @@ case class DederProjectStateData(
 )
 
 case class WatchedTaskData(
-    clientId: Int,
+    clientId: String,
     taskInstance: TaskInstance,
     args: Seq[String],
     serverNotificationsLogger: ServerNotificationsLogger,
