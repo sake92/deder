@@ -10,6 +10,7 @@ import com.github.mizosoft.methanol.{Methanol, MultipartBodyPublisher}
 
 class Publisher(notifications: ServerNotificationsLogger, moduleId: String) {
 
+  // TODO return path to the folder
   def publishLocalM2(pom: PomSettings, files: Seq[os.Path], customRepoPath: Option[os.Path] = None): Unit = {
     // default to ~/.m2/repository/group/artifact/version
     val baseRepo = customRepoPath.getOrElse(os.home / ".m2/repository")

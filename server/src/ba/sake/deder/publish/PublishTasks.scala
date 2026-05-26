@@ -456,6 +456,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
             }
           case _ =>
         }
+        // TODO return path to the folder where was published
         ctx.out
       }
     }
