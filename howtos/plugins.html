@@ -45,6 +45,8 @@
          <ul>
           <li><a href="#core-moving-parts">Core moving parts</a></li>
           <li><a href="#implementing-dederpluginapi">Implementing DederPluginApi</a></li>
+          <li><a href="#depending-on-built-in-tasks-from-a-plugin">Depending on built-in tasks from a plugin</a></li>
+          <li><a href="#public-task-surface-vs-internal-tasks">Public task surface vs internal tasks</a></li>
           <li><a href="#typed-plugin-config">Typed plugin config</a>
            <ul>
             <li><a href="#1-define-the-pkl-schema-bundled-in-the-plugin-jar">1. Define the Pkl schema (bundled in the plugin JAR)</a></li>
@@ -82,7 +84,7 @@
     <tbody>
      <tr>
       <td><code>plugin-api/</code></td>
-      <td>The public API your plugin depends on. Exposes <code>DederPluginApi</code>, <code>TaskBuilder</code>, <code>AbstractTask</code>, <code>CoreTasksApi</code>, and <code>PluginConfigEvaluators</code>.</td>
+      <td>The public API your plugin depends on. Exposes <code>DederPluginApi</code>, <code>TaskBuilder</code>, <code>AbstractTask</code>, <code>CoreTasksApi</code>, <code>ScalaJsTasksApi</code>, <code>ScalaNativeTasksApi</code>, and <code>PluginConfigEvaluators</code>.</td>
      </tr>
      <tr>
       <td><code>config/DederProject.pkl</code></td>
@@ -111,6 +113,64 @@
 </code></pre>
    <p>Register the implementation via <code>META-INF/services/ba.sake.deder.DederPluginApi</code> (standard ServiceLoader).</p>
    <p>If your plugin owns resources (thread pools, connections, etc.), override <code>onClose()</code> to release them when the server shuts down.</p>
+   <h2 id="depending-on-built-in-tasks-from-a-plugin">Depending on built-in tasks from a plugin<a href="#depending-on-built-in-tasks-from-a-plugin" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p><code>PluginTasksParams</code> gives your plugin access to the public task wrappers:</p>
+   <ul>
+    <li><code>params.coreTasks</code> for core/JVM tasks such as <code>compileTask</code></li>
+    <li><code>params.sjsTasks</code> for Scala.js link tasks</li>
+    <li><code>params.snTasks</code> for Scala Native link tasks</li>
+   </ul>
+   <p>For example:</p>
+   <pre><code class="language-scala hljs" data-highlighted="yes"><span class="hljs-keyword">import</span> ba.sake.deder.*
+<span class="hljs-keyword">import</span> ba.sake.deder.config.<span class="hljs-type">DederProject</span>.<span class="hljs-type">ModuleType</span>
+
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MyPluginImpl</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">DederPluginApi</span></span>:
+  <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">id</span></span>: <span class="hljs-type">String</span> = <span class="hljs-string">"my-plugin"</span>
+
+  <span class="hljs-function"><span class="hljs-keyword">def</span> <span class="hljs-title">tasks</span></span>(params: <span class="hljs-type">PluginTasksParams</span>): <span class="hljs-type">Either</span>[<span class="hljs-type">String</span>, <span class="hljs-type">Seq</span>[<span class="hljs-type">AbstractTask</span>[?]]] =
+    <span class="hljs-keyword">val</span> afterCompile = <span class="hljs-type">TaskBuilder</span>
+      .make[<span class="hljs-type">String</span>](<span class="hljs-string">"afterCompile"</span>)
+      .dependsOn(params.coreTasks.compileTask)
+      .build(_ =&gt; <span class="hljs-string">"compiled"</span>)
+
+    <span class="hljs-keyword">val</span> afterScalaJsLink = <span class="hljs-type">TaskBuilder</span>
+      .make[<span class="hljs-type">String</span>](
+        name = <span class="hljs-string">"afterScalaJsLink"</span>,
+        supportedModuleTypes = <span class="hljs-type">Set</span>(<span class="hljs-type">ModuleType</span>.<span class="hljs-type">SCALA_JS</span>, <span class="hljs-type">ModuleType</span>.<span class="hljs-type">SCALA_JS_TEST</span>)
+      )
+      .dependsOn(params.sjsTasks.linkJsTask)
+      .build(_ =&gt; <span class="hljs-string">"scala.js linked"</span>)
+
+    <span class="hljs-keyword">val</span> afterScalaNativeLink = <span class="hljs-type">TaskBuilder</span>
+      .make[<span class="hljs-type">String</span>](
+        name = <span class="hljs-string">"afterScalaNativeLink"</span>,
+        supportedModuleTypes = <span class="hljs-type">Set</span>(<span class="hljs-type">ModuleType</span>.<span class="hljs-type">SCALA_NATIVE</span>, <span class="hljs-type">ModuleType</span>.<span class="hljs-type">SCALA_NATIVE_TEST</span>)
+      )
+      .dependsOn(params.snTasks.nativeLinkTask)
+      .build(_ =&gt; <span class="hljs-string">"scala-native linked"</span>)
+
+    <span class="hljs-type">Right</span>(<span class="hljs-type">Seq</span>(afterCompile, afterScalaJsLink, afterScalaNativeLink))
+</code></pre>
+   <p>The snippet above shows the available dependency points in one place. When you depend on <code>params.sjsTasks</code> or <code>params.snTasks</code>, make sure the plugin task is gated to matching module types, otherwise the dependency will not exist for plain JVM modules.</p>
+   <h2 id="public-task-surface-vs-internal-tasks">Public task surface vs internal tasks<a href="#public-task-surface-vs-internal-tasks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p><code>PluginTasksParams</code> intentionally exposes a <strong>curated</strong> built-in task surface through stable wrapper traits:</p>
+   <ul>
+    <li><code>CoreTasksApi</code></li>
+    <li><code>ScalaJsTasksApi</code></li>
+    <li><code>ScalaNativeTasksApi</code></li>
+   </ul>
+   <p>Plugin authors should depend only on these public wrappers. Deder's internal task classes are intentionally <strong>not</strong> part of the plugin contract, so they are not exposed directly to plugins.</p>
+   <p>This boundary is deliberate:</p>
+   <ul>
+    <li>stable public wrappers are safe for plugins to depend on</li>
+    <li>internal tasks may change without plugin API guarantees</li>
+    <li>actual execution entrypoint tasks are intentionally <strong>not</strong> exposed (<code>run</code>, <code>runMain</code>, <code>runMvnApp</code>, <code>fix</code>, <code>fixCheck</code>, <code>testClasses</code>, <code>test</code>, <code>testInMemory</code>, <code>repl</code>)</li>
+    <li>stable dependency/configuration tasks that plugins may build on remain exposed, including classpath, main-class, JVM-option, and REPL-jar style tasks</li>
+   </ul>
+   <p>If you need a built-in task dependency, first check whether it is available through one of the public wrapper traits. If it is not exposed there, treat it as internal/unsupported for plugin use.</p>
+   <blockquote>
+    <p><strong>Migration note:</strong> This curated API is a breaking change for plugins that depended on older internals. Task handles such as <code>allClassesDirsTask</code> and <code>allDependenciesTask</code> are no longer public, and <code>PluginTasksParams</code> now includes <code>sjsTasks</code> / <code>snTasks</code> in addition to <code>coreTasks</code>. Existing plugin code that destructures or copies <code>PluginTasksParams</code> must be updated, and plugins that used the removed task handles must migrate to supported wrapper tasks such as <code>classesTask</code>, <code>compileClasspathTask</code>, or <code>depsTreeTask</code>.</p>
+   </blockquote>
    <h2 id="typed-plugin-config">Typed plugin config<a href="#typed-plugin-config" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <h3 id="1-define-the-pkl-schema-bundled-in-the-plugin-jar">1. Define the Pkl schema (bundled in the plugin JAR)<a href="#1-define-the-pkl-schema-bundled-in-the-plugin-jar" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <pre><code class="language-pkl">// MyPluginModule.pkl
