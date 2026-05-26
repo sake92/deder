@@ -15,11 +15,12 @@ import com.typesafe.scalalogging.StrictLogging
 import com.google.gson.{Gson, JsonParser, TypeAdapter, TypeAdapterFactory}
 import com.google.gson.reflect.TypeToken
 import com.google.gson.stream.{JsonReader, JsonWriter}
-import ba.sake.deder.{CoreTasks, DederGlobals, DederProjectState, RequestContext}
+import ba.sake.deder.*
 import scala.compiletime.uninitialized
 
 class DederBspProxyServer(
     coreTasks: CoreTasks,
+    runTasks: RunTasks,
     scalaJsTasks: ScalaJsTasks,
     scalaNativeTasks: ScalaNativeTasks,
     projectState: DederProjectState
@@ -44,8 +45,14 @@ class DederBspProxyServer(
         var localServer: DederBspServer = null
         try {
           clientChannel = serverChannel.accept()
-          localServer =
-            new DederBspServer(coreTasks, scalaJsTasks, scalaNativeTasks, projectState, () => clientChannel.close())
+          localServer = new DederBspServer(
+            coreTasks,
+            runTasks,
+            scalaJsTasks,
+            scalaNativeTasks,
+            projectState,
+            () => clientChannel.close()
+          )
           val os = Channels.newOutputStream(clientChannel)
           val is = Channels.newInputStream(clientChannel)
           val launcher = new Launcher.Builder[BuildClient]()
@@ -72,18 +79,18 @@ class DederBspProxyServer(
 
   def stop(): Unit = {
     logger.info("BSP proxy server shutting down...")
-    try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
+    try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() }
+    catch { case _: Exception => }
     // Socket file intentionally NOT deleted here — the next server's start() handles cleanup.
     // Deleting here would race with a new server process that already rebound to the socket.
   }
 
 }
 
-/** Gson TypeAdapterFactory that extracts W3C traceparent from incoming BSP messages.
-  * Metals injects `_traceparent` into the `params` object of BSP requests.
-  * This factory intercepts Message deserialization, peeks at the JSON to find
-  * `_traceparent` inside `params`, stores it in [[RequestContext.traceparent]],
-  * then delegates to the standard lsp4j MessageTypeAdapter.
+/** Gson TypeAdapterFactory that extracts W3C traceparent from incoming BSP messages. Metals injects `_traceparent` into
+  * the `params` object of BSP requests. This factory intercepts Message deserialization, peeks at the JSON to find
+  * `_traceparent` inside `params`, stores it in [[RequestContext.traceparent]], then delegates to the standard lsp4j
+  * MessageTypeAdapter.
   */
 private class TraceContextExtractorFactory extends TypeAdapterFactory {
 

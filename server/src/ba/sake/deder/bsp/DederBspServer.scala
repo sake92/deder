@@ -22,6 +22,7 @@ import ba.sake.deder.scalanative.ScalaNativeTasks
 
 class DederBspServer(
     coreTasks: CoreTasks,
+    runTasks: RunTasks,
     scalaJsTasks: ScalaJsTasks,
     scalaNativeTasks: ScalaNativeTasks,
     projectState: DederProjectState,
@@ -852,7 +853,7 @@ class DederBspServer(
           case Some(mainClass) =>
             val args = Option(params.getArguments).map(_.asScala.toSeq).getOrElse(Seq.empty)
             val runCmd =
-              tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.runTask, args = args)(Seq.empty)
+              tryExecuteTask(serverNotificationsLogger, moduleId, runTasks.runTask, args = args)(Seq.empty)
             if runCmd.isEmpty then {
               logger.error(s"Failed to run module ${moduleId} via BSP")
               runSucceeded = false

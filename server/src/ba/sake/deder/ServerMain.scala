@@ -140,13 +140,14 @@ object ServerMain extends StrictLogging {
       )
 
     val coreTasks = CoreTasks()
+    val runTasks = RunTasks(coreTasks)
     val publishTasks = PublishTasks(coreTasks)
     val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)
     val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
     val graalvmNativeImageTasks = GraalVmNativeImageTasks(coreTasks)
 
     val allTasks =
-      coreTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
+      coreTasks.all ++ runTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
     val projectState = DederProjectState(
       tasksRegistry,
@@ -177,7 +178,7 @@ object ServerMain extends StrictLogging {
     cliServerThread.start()
 
     if bspEnabled then {
-      bspProxyServer = DederBspProxyServer(coreTasks, scalaJsTasks, scalaNativeTasks, projectState)
+      bspProxyServer = DederBspProxyServer(coreTasks, runTasks, scalaJsTasks, scalaNativeTasks, projectState)
       val bspProxyServerThread = new Thread(() => bspProxyServer.nn.start(), "DederBspProxyServer")
       bspProxyServerThread.start()
     }

@@ -8,7 +8,7 @@ import ba.sake.deder.scalanative.ScalaNativeTasks
  *  This keeps [[CoreTasks]] free of the [[CoreTasksApi]] inheritance (which
  *  would cause Scala to widen task-val types to `AbstractTask[T]`).
  */
-class CoreTasksApiAdapter(coreTasks: CoreTasks) extends CoreTasksApi {
+class CoreTasksApiAdapter(coreTasks: CoreTasks, runTasks: RunTasks) extends CoreTasksApi {
   def sourcesTask: AbstractTask[Seq[DederPath]] = coreTasks.sourcesTask
   def sourceFilesTask: AbstractTask[Seq[DederPath]] = coreTasks.sourceFilesTask
   def generatedSourcesTask: AbstractTask[DederPath] = coreTasks.generatedSourcesTask
@@ -39,8 +39,8 @@ class CoreTasksApiAdapter(coreTasks: CoreTasks) extends CoreTasksApi {
   def mainClassesTask: AbstractTask[Seq[String]] = coreTasks.mainClassesTask
   def mainClassTask: AbstractTask[Option[String]] = coreTasks.mainClassTask
   def finalMainClassTask: AbstractTask[Option[String]] = coreTasks.finalMainClassTask
-  def replDepsTask: AbstractTask[Seq[Dependency]] = coreTasks.replDepsTask
-  def replJarsTask: AbstractTask[Seq[os.Path]] = coreTasks.replJarsTask
+  def replDepsTask: AbstractTask[Seq[Dependency]] = runTasks.replDepsTask
+  def replJarsTask: AbstractTask[Seq[os.Path]] = runTasks.replJarsTask
 }
 
 /** Adapts the internal [[ScalaJsTasks]] to the public [[ScalaJsTasksApi]] interface without widening the task vals. */
