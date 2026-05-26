@@ -150,6 +150,11 @@ object ServerMain extends StrictLogging {
       coreTasks.all ++ runTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
     val projectState = DederProjectState(
+      coreTasks,
+      runTasks,
+      scalaJsTasks,
+      scalaNativeTasks,
+      graalvmNativeImageTasks,
       tasksRegistry,
       maxInactiveSeconds,
       tasksExecutorService,

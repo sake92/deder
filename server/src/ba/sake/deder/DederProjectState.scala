@@ -18,8 +18,16 @@ import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
 import ba.sake.deder.plugin.{LoadedPlugin, PluginLoader, PluginLoaderApi}
 import ba.sake.tupson.JsonRW
 import ba.sake.tupson.toJson
+import ba.sake.deder.scalajs.ScalaJsTasks
+import ba.sake.deder.scalanative.ScalaNativeTasks
+import ba.sake.deder.graalvm.GraalVmNativeImageTasks
 
 class DederProjectState(
+    coreTasks: CoreTasks,
+    runTasks: RunTasks,
+    scalaJsTasks: ScalaJsTasks,
+    scalaNativeTasks: ScalaNativeTasks,
+    graalvmNativeImageTasks: GraalVmNativeImageTasks,
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
     tasksExecutorService: ExecutorService,
@@ -99,12 +107,9 @@ class DederProjectState(
 
             // Load plugin tasks before TasksResolver so they are included in the execution graph.
             // Plugin tasks are kept separately and the effective registry is rebuilt per reload.
-            // TODO pass in the core tasks from outside??
-            val coreTasks = CoreTasks()
-            val runTasks = RunTasks(coreTasks)
             val coreTasksApi = CoreTasksApiAdapter(coreTasks, runTasks)
-            val scalaJsTasksApi = ScalaJsTasksApiAdapter(scalajs.ScalaJsTasks(coreTasks))
-            val scalaNativeTasksApi = ScalaNativeTasksApiAdapter(scalanative.ScalaNativeTasks(coreTasks))
+            val scalaJsTasksApi = ScalaJsTasksApiAdapter(scalaJsTasks)
+            val scalaNativeTasksApi = ScalaNativeTasksApiAdapter(scalaNativeTasks)
             val pluginLoader = PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver)
             loadedPlugins = pluginLoader.load(loadedPlugins, configFile, newConfig).loadedPlugins
             // TODO prepend plugin id to task name to avoid conflicts?

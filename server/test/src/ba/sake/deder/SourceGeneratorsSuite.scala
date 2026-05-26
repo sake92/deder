@@ -2,10 +2,19 @@ package ba.sake.deder
 
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.DederProject.ModuleType
+import ba.sake.deder.publish.PublishTasks
+import ba.sake.deder.graalvm.GraalVmNativeImageTasks
 
 class SourceGeneratorsSuite extends munit.FunSuite {
 
   private var testProjectDir: os.Path = scala.compiletime.uninitialized
+
+  val coreTasks = CoreTasks()
+  val runTasks = RunTasks(coreTasks)
+  val publishTasks = PublishTasks(coreTasks)
+  val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)
+  val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
+  val graalvmNativeImageTasks = GraalVmNativeImageTasks(coreTasks)
 
   override def beforeAll(): Unit = {
     testProjectDir = os.pwd / "server/test/resources/sample-projects/multi"
@@ -71,7 +80,6 @@ class SourceGeneratorsSuite extends munit.FunSuite {
       collectKind = TaskKind.SourceGenerator
     )
 
-    val coreTasks = CoreTasks()
     val tasksRegistry = TasksRegistry(coreTasks.all ++ Seq(genA, genB, resGen, fanInSources))
 
     val configParser = ba.sake.deder.config.ConfigParser(writeJson = false)
@@ -105,12 +113,22 @@ class SourceGeneratorsSuite extends munit.FunSuite {
       collectKind = TaskKind.SourceGenerator
     )
 
-    val coreTasks = CoreTasks()
     val tasksRegistry = TasksRegistry(coreTasks.all ++ Seq(gen, fanIn))
     val pool = java.util.concurrent.Executors.newFixedThreadPool(4)
     try {
       val state =
-        DederProjectState(tasksRegistry, Int.MaxValue, pool, () => (), configFile = testProjectDir / "deder.pkl")
+        DederProjectState(
+          coreTasks,
+          runTasks,
+          scalaJsTasks,
+          scalaNativeTasks,
+          graalvmNativeImageTasks,
+          tasksRegistry,
+          Int.MaxValue,
+          pool,
+          () => (),
+          configFile = testProjectDir / "deder.pkl"
+        )
       val notif = new ServerNotificationsLogger(_ => ())
       val results = state.executeTasks(
         requestId = java.util.UUID.randomUUID().toString,

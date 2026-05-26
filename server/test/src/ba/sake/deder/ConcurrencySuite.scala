@@ -3,10 +3,19 @@ package ba.sake.deder
 import java.util.UUID
 import scala.util.Random
 import ba.sake.deder.config.DederProject.ModuleType
+import ba.sake.deder.publish.PublishTasks
+import ba.sake.deder.graalvm.GraalVmNativeImageTasks
 
 class ConcurrencySuite extends munit.FunSuite {
 
   private var testProjectDir: os.Path = scala.compiletime.uninitialized
+
+  val coreTasks = CoreTasks()
+  val runTasks = RunTasks(coreTasks)
+  val publishTasks = PublishTasks(coreTasks)
+  val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)
+  val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
+  val graalvmNativeImageTasks = GraalVmNativeImageTasks(coreTasks)
 
   override def beforeAll(): Unit = {
     testProjectDir = os.pwd / "server/test/resources/sample-projects/multi"
@@ -14,7 +23,6 @@ class ConcurrencySuite extends munit.FunSuite {
   }
 
   test("executeTask should guard against concurrent executions of the same task") {
-    val coreTasks = CoreTasks()
     val tasksRegistry = TasksRegistry(coreTasks.all)
     var globalVar = 0
     val task1 = TaskBuilder
@@ -27,8 +35,19 @@ class ConcurrencySuite extends munit.FunSuite {
       }
     tasksRegistry.add(task1)
     val dederExecutorService = java.util.concurrent.Executors.newFixedThreadPool(8)
-    val state = DederProjectState(tasksRegistry, Int.MaxValue, dederExecutorService, () => (),
-        configFile = testProjectDir / "deder.pkl")
+
+    val state = DederProjectState(
+      coreTasks,
+      runTasks,
+      scalaJsTasks,
+      scalaNativeTasks,
+      graalvmNativeImageTasks,
+      tasksRegistry,
+      Int.MaxValue,
+      dederExecutorService,
+      () => (),
+      configFile = testProjectDir / "deder.pkl"
+    )
     val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
     // simulate clients calling "task1" concurrently
     val clientsCount = 10
@@ -46,7 +65,6 @@ class ConcurrencySuite extends munit.FunSuite {
   }
 
   test("executeTask should serialize locks by task instance id") {
-    val coreTasks = CoreTasks()
     val tasksRegistry = TasksRegistry(coreTasks.all)
     var globalVar = 0
     val task1 = TaskBuilder
@@ -68,8 +86,18 @@ class ConcurrencySuite extends munit.FunSuite {
     tasksRegistry.add(task1)
     tasksRegistry.add(task2)
     val dederExecutorService = java.util.concurrent.Executors.newFixedThreadPool(8)
-    val state = DederProjectState(tasksRegistry, Int.MaxValue, dederExecutorService, () => (),
-        configFile = testProjectDir / "deder.pkl")
+    val state = DederProjectState(
+      coreTasks,
+      runTasks,
+      scalaJsTasks,
+      scalaNativeTasks,
+      graalvmNativeImageTasks,
+      tasksRegistry,
+      Int.MaxValue,
+      dederExecutorService,
+      () => (),
+      configFile = testProjectDir / "deder.pkl"
+    )
     val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
     // simulate clients calling random tasks concurrently
     val taskNames = Seq("compile", "sources", "javacOptions")
