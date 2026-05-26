@@ -111,7 +111,7 @@ class DederProjectState(
             val coreTasksApi = CoreTasksApiAdapter(coreTasks, runTasks)
             val scalaJsTasksApi = ScalaJsTasksApiAdapter(scalaJsTasks)
             val scalaNativeTasksApi = ScalaNativeTasksApiAdapter(scalaNativeTasks)
-            val pluginLoader = PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver)
+            val pluginLoader = PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver, internals)
             loadedPlugins = pluginLoader.load(loadedPlugins, configFile, newConfig).loadedPlugins
             // TODO prepend plugin id to task name to avoid conflicts?
             val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?, ?]])
