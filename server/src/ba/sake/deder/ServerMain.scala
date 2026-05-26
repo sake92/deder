@@ -19,8 +19,7 @@ import org.slf4j.LoggerFactory
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import io.opentelemetry.context.Context
-import io.opentelemetry.sdk.OpenTelemetrySdk
-import io.opentelemetry.sdk.metrics.SdkMeterProvider
+import io.opentelemetry.api.GlobalOpenTelemetry
 import ba.sake.deder.TeePrintStream
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
@@ -97,11 +96,9 @@ object ServerMain extends StrictLogging {
     // automatically propagate OTEL context, parent span
     val tasksExecutorService = Context.taskWrapping(originalTasksExecutorService)
 
-    // Set up local OTEL SDK for metrics (tracing uses GlobalOpenTelemetry via agent or noop)
-    val metricsSdk = OpenTelemetrySdk.builder()
-      .setMeterProvider(SdkMeterProvider.builder().build())
-      .build()
-    val metricsMeter = metricsSdk.getMeter("deder-server")
+    // Use the global OTEL instance for metrics (Java agent registers OTLP exporter there)
+    // If no agent is present, this returns a noop meter which is harmless.
+    val metricsMeter = GlobalOpenTelemetry.get().getMeter("deder-server")
     val internals = DederProjectInternalsImpl(workerThreads, metricsMeter)
 
     val watchDebounceMs = props.getProperty("watchDebounceMillis", "300").toInt
