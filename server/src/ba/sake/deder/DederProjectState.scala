@@ -248,7 +248,7 @@ class DederProjectState(
   } catch {
     case NonFatal(e) =>
       serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
-      serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
+      if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
   }
 
   def executeTask[T](
@@ -497,7 +497,7 @@ class DederProjectState(
               sourceFilesTask,
               watchedTask.args,
               watchedTask.serverNotificationsLogger,
-              watchedTask.useLastGood
+              useLastGood = watchedTask.useLastGood
             ).res.map(_.absPath)
           case sourceFileTask: SourceFileTask =>
             Seq(
@@ -506,7 +506,7 @@ class DederProjectState(
                 sourceFileTask,
                 watchedTask.args,
                 watchedTask.serverNotificationsLogger,
-                watchedTask.useLastGood
+                useLastGood = watchedTask.useLastGood
               ).res.absPath
             )
           case _ => Seq.empty
@@ -518,25 +518,29 @@ class DederProjectState(
       if affected then {
         val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
         Thread.ofVirtual().start(() =>
-          supervised {
-            RequestContext.clientContext.supervisedWhere(Some(ctx)) {
-              executeTasks(
-                ctx,
-                Seq(watchedTask.taskInstance.moduleId),
-                watchedTask.taskInstance.task.name,
-                watchedTask.args,
-                true, // tell client we are in watch mode
-                watchedTask.serverNotificationsLogger,
-                watchedTask.useLastGood
-              )
-              watchedTask.serverNotificationsLogger.add(
-                ServerNotification.logInfo(
-                  s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-                  watchedTask.taskInstance.moduleId
+          try
+            supervised {
+              RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+                watchedTask.serverNotificationsLogger.add(
+                  ServerNotification.logInfo(
+                    s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                    watchedTask.taskInstance.moduleId
+                  )
                 )
-              )
+                executeTasks(
+                  ctx,
+                  Seq(watchedTask.taskInstance.moduleId),
+                  watchedTask.taskInstance.task.name,
+                  watchedTask.args,
+                  true, // tell client we are in watch mode
+                  watchedTask.serverNotificationsLogger,
+                  watchedTask.useLastGood
+                )
+              }
             }
-          }
+          catch
+            case NonFatal(e) =>
+              logger.warn(s"Watch rerun for ${watchedTask.taskInstance.id} failed: ${e.getMessage}")
         )
       }
     }
@@ -564,7 +568,7 @@ class DederProjectState(
               configValueTask,
               watchedTask.args,
               watchedTask.serverNotificationsLogger,
-              watchedTask.useLastGood
+              useLastGood = watchedTask.useLastGood
             )
           case _ => ((), true) // should not happen
         }
@@ -576,27 +580,31 @@ class DederProjectState(
         )
         val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
         Thread.ofVirtual().start(() =>
-          supervised {
-            RequestContext.clientContext.supervisedWhere(Some(ctx)) {
-              executeCLI(
-                ctx,
-                Seq(watchedTask.taskInstance.moduleId),
-                watchedTask.taskInstance.task.name,
-                watchedTask.args,
-                watchedTask.serverNotificationsLogger,
-                watchedTask.useLastGood,
-                startWatch = false,
-                exitOnEnd = false,
-                watch = true,
-              )
-              watchedTask.serverNotificationsLogger.add(
-                ServerNotification.logInfo(
-                  s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-                  watchedTask.taskInstance.moduleId
+          try
+            supervised {
+              RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+                watchedTask.serverNotificationsLogger.add(
+                  ServerNotification.logInfo(
+                    s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                    watchedTask.taskInstance.moduleId
+                  )
                 )
-              )
+                executeCLI(
+                  ctx,
+                  Seq(watchedTask.taskInstance.moduleId),
+                  watchedTask.taskInstance.task.name,
+                  watchedTask.args,
+                  watchedTask.serverNotificationsLogger,
+                  watchedTask.useLastGood,
+                  startWatch = false,
+                  exitOnEnd = false,
+                  watch = true,
+                )
+              }
             }
-          }
+          catch
+            case NonFatal(e) =>
+              logger.warn(s"Watch rerun for ${watchedTask.taskInstance.id} failed: ${e.getMessage}")
         )
       }
     }
