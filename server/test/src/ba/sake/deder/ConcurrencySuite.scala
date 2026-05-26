@@ -52,6 +52,7 @@ class ConcurrencySuite extends munit.FunSuite {
       graalvmNativeImageTasks,
       tasksRegistry,
       Int.MaxValue,
+      0,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals
@@ -102,6 +103,7 @@ class ConcurrencySuite extends munit.FunSuite {
       graalvmNativeImageTasks,
       tasksRegistry,
       Int.MaxValue,
+      0,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals

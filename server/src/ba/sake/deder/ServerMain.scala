@@ -146,7 +146,9 @@ object ServerMain extends StrictLogging {
       scalaNativeTasks,
       graalvmNativeImageTasks,
       tasksRegistry,
+<<<<<<< HEAD
       cfg.maxInactiveSeconds,
+      cfg.taskLockTimeoutSeconds,
       onShutdown,
       configFile = DederGlobals.projectRootDir / "deder.pkl",
       internals = internals
