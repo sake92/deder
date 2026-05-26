@@ -91,6 +91,25 @@ case class ModuleDef(
     testResources: Seq[String]
 )
 
+object ModuleDef:
+  val empty: ModuleDef = ModuleDef(
+    scalaVersion = "",
+    scalacOptions = Seq.empty,
+    javacOptions = Seq.empty,
+    deps = Seq.empty,
+    scalacPluginDeps = Seq.empty,
+    testDeps = Seq.empty,
+    moduleDeps = Seq.empty,
+    testModuleDeps = Seq.empty,
+    scalaJsVersion = None,
+    scalaNativeVersion = None,
+    publish = None,
+    sources = Seq.empty,
+    testSources = Seq.empty,
+    resources = Seq.empty,
+    testResources = Seq.empty
+  )
+
 /** A dependency with its formatted Pkl string and metadata for summary. */
 case class DepDef(
     formatted: String,
