@@ -5,24 +5,31 @@ import ba.sake.deder.*
 class HelloPluginImpl extends DederPluginApi {
   def id: String = "hello"
 
-  def tasks(params: PluginTasksParams): Either[String, Seq[AbstractTask[?]]] = {
+  private var pluginModule: Hello = _
+  private var core: CoreTasksApi = _
+
+  override def start(params: PluginStartParams): Either[String, Unit] = {
     // test if classpath isolation works,
     // os.BasicStatInfo exists in os-lib 0.3.0, removed in later versions
     println(os.BasicStatInfo)
 
-    val pluginModule =
+    pluginModule =
       PluginConfigEvaluators.evaluate(
         getClass.getClassLoader,
         modulePath = "HelloPlugin.pkl",
         configText = params.configText,
         clazz = classOf[Hello]
       )
+    core = params.coreTasks
+    Right(())
+  }
 
+  override def tasks(): Either[String, Seq[AbstractTask[?]]] = {
     val greeting = pluginModule.config.greeting
 
     val helloTask = TaskBuilder
       .make[String](name = "hello")
-      .dependsOn(params.coreTasks.compileTask)
+      .dependsOn(core.compileTask)
       .build { ctx =>
         ctx.notifications.add(ServerNotification.logInfo(greeting))
         greeting
