@@ -125,7 +125,6 @@ class SourceGeneratorsSuite extends munit.FunSuite {
           graalvmNativeImageTasks,
           tasksRegistry,
           Int.MaxValue,
-          pool,
           () => (),
           configFile = testProjectDir / "deder.pkl"
         )

@@ -4,7 +4,6 @@ import java.net.URLClassLoader
 import java.time.{Duration, Instant}
 import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
-import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
 import scala.util.control.NonFatal
@@ -31,7 +30,6 @@ class DederProjectState(
     graalvmNativeImageTasks: GraalVmNativeImageTasks,
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
-    tasksExecutorService: ExecutorService,
     onShutdown: () => Unit,
     configFile: os.Path
 ) extends StrictLogging {
@@ -314,7 +312,6 @@ class DederProjectState(
           state.projectConfig,
           state.tasksResolver.modulesGraph,
           state.tasksResolver.taskInstancesGraph,
-          tasksExecutorService,
           state.dependencyResolver
         )
       val allTaskInstances = tasksExecStages.flatten.sortBy(_.id) // essential!!
@@ -325,14 +322,12 @@ class DederProjectState(
         }
         DederGlobals.cancellationTokens.put(ctx.requestId, new AtomicBoolean(false))
         tasksExecutor.execute(
-          ctx.requestId,
           tasksExecStages,
           moduleIds,
           taskName,
           args,
           watch,
-          serverNotificationsLogger,
-          CliClientParams(ctx.envVars)
+          serverNotificationsLogger
         )
       } finally {
         // Only unlock locks actually held by this thread (prevents IllegalMonitorStateException on interrupt)

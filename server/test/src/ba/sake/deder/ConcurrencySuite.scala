@@ -44,7 +44,6 @@ class ConcurrencySuite extends munit.FunSuite {
       graalvmNativeImageTasks,
       tasksRegistry,
       Int.MaxValue,
-      dederExecutorService,
       () => (),
       configFile = testProjectDir / "deder.pkl"
     )
@@ -94,7 +93,6 @@ class ConcurrencySuite extends munit.FunSuite {
       graalvmNativeImageTasks,
       tasksRegistry,
       Int.MaxValue,
-      dederExecutorService,
       () => (),
       configFile = testProjectDir / "deder.pkl"
     )

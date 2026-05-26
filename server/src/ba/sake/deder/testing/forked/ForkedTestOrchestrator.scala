@@ -2,9 +2,9 @@ package ba.sake.deder.testing.forked
 
 import java.time.Instant
 import java.time.format.DateTimeFormatter
-import java.util.concurrent.{Callable, Executors}
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
+import ox.{supervised, forkUser}
 import ba.sake.deder.*
 import ba.sake.deder.testing.*
 import ba.sake.tupson.{*, given}
@@ -100,58 +100,40 @@ object ForkedTestOrchestrator extends StrictLogging {
 
     val javaBinary = resolveJavaBinary(javaHome)
     val fullClasspath = buildClasspath(runtimeClasspath)
-    val requestId = RequestContext.id.get()
 
     val showForkTag = effectiveForks > 1
-    val forkExecutor = Executors.newFixedThreadPool(effectiveForks)
-    try {
-      val callables: Seq[Callable[Option[ForkedTestResultsPayload]]] =
-        buckets.zipWithIndex.map { case (slice, forkId) =>
-          new Callable[Option[ForkedTestResultsPayload]] {
-            def call(): Option[ForkedTestResultsPayload] = {
-              RequestContext.id.set(requestId)
-              try runForkWithPermit(
-                forkId = forkId,
-                slice = slice,
-                requestId = requestId,
-                javaBinary = javaBinary,
-                fullClasspath = fullClasspath,
-                jvmOptions = jvmOptions,
-                envVars = envVars,
-                testOptions = testOptions,
-                testParallelism = testParallelism,
-                runDir = runDir,
-                showForkTag = showForkTag,
-                notifications = notifications,
-                moduleId = moduleId,
-                flushIntervalMs = flushIntervalMs
-              )
-              finally RequestContext.id.remove()
-            }
-          }
-        }
-      val futures = callables.map(forkExecutor.submit)
-      val payloads = futures.flatMap { f =>
-        try f.get()
-        catch {
-          case _: InterruptedException => Thread.currentThread().interrupt(); None
-          case NonFatal(_) => None
+    val payloads = supervised {
+      val forks = buckets.zipWithIndex.map { case (slice, forkId) =>
+        forkUser {
+          runForkWithPermit(
+            forkId = forkId,
+            slice = slice,
+            javaBinary = javaBinary,
+            fullClasspath = fullClasspath,
+            jvmOptions = jvmOptions,
+            envVars = envVars,
+            testOptions = testOptions,
+            testParallelism = testParallelism,
+            runDir = runDir,
+            showForkTag = showForkTag,
+            notifications = notifications,
+            moduleId = moduleId,
+            flushIntervalMs = flushIntervalMs
+          )
         }
       }
+      forks.map(_.join())
+    }.flatten
 
-      val aggregated = aggregate(payloads.map(_.results))
-      val perClassStats = payloads.flatMap(_.perClassStats).toMap
-      TestHistory.save(outDir, history.merge(perClassStats))
-      ForkedTestRun(aggregated, runDir)
-    } finally {
-      forkExecutor.shutdownNow()
-    }
+    val aggregated = aggregate(payloads.map(_.results))
+    val perClassStats = payloads.flatMap(_.perClassStats).toMap
+    TestHistory.save(outDir, history.merge(perClassStats))
+    ForkedTestRun(aggregated, runDir)
   }
 
   private def runForkWithPermit(
       forkId: Int,
       slice: Seq[DiscoveredFrameworkTests],
-      requestId: String,
       javaBinary: String,
       fullClasspath: String,
       jvmOptions: Seq[String],
@@ -164,11 +146,13 @@ object ForkedTestOrchestrator extends StrictLogging {
       moduleId: String,
       flushIntervalMs: Long
   ): Option[ForkedTestResultsPayload] = {
-    val cancelled = () =>
+    val cancelled = () => {
+      val requestId = RequestContext.clientContext.get().map(_.requestId).orNull
       requestId != null && {
         val tok = DederGlobals.cancellationTokens.get(requestId)
         tok != null && tok.get()
       }
+    }
     if cancelled() then return None
     val sem = DederGlobals.testForkSemaphore
     sem.acquire()
@@ -177,7 +161,6 @@ object ForkedTestOrchestrator extends StrictLogging {
       spawnAndRunWithRetry(
         forkId = forkId,
         originalSlice = slice,
-        requestId = requestId,
         javaBinary = javaBinary,
         fullClasspath = fullClasspath,
         jvmOptions = jvmOptions,
@@ -201,7 +184,6 @@ object ForkedTestOrchestrator extends StrictLogging {
   private def spawnAndRunWithRetry(
       forkId: Int,
       originalSlice: Seq[DiscoveredFrameworkTests],
-      requestId: String,
       javaBinary: String,
       fullClasspath: String,
       jvmOptions: Seq[String],

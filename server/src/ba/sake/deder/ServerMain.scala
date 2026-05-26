@@ -19,7 +19,6 @@ import mainargs.*
 import org.slf4j.LoggerFactory
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
-import io.opentelemetry.context.Context
 import ba.sake.deder.TeePrintStream
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
@@ -81,10 +80,6 @@ object ServerMain extends StrictLogging {
     val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger]
     rootLogger.setLevel(Level.toLevel(cfg.logLevel))
 
-    // TODO maybe make it elastic ThreadPool with min/max threads for better memory usage?
-    val originalTasksExecutorService = Executors.newFixedThreadPool(cfg.workerThreads)
-    // automatically propagate OTEL context, parent span
-    val tasksExecutorService = Context.taskWrapping(originalTasksExecutorService)
     val watchDebounceMs = cfg.watchDebounceMillis
     debounceScheduler = Executors.newSingleThreadScheduledExecutor(r => Thread(r, "watch-debounce"))
 
@@ -109,16 +104,6 @@ object ServerMain extends StrictLogging {
       // 3. Close sockets so new connections go to the new server process
       if (cliServer != null) cliServer.nn.stop()
       if bspProxyServer != null then bspProxyServer.stop()
-
-      // 4. Graceful executor shutdown: wait briefly for in-flight tasks, then force
-      //    (can take time, but lock and sockets are already released above)
-      tasksExecutorService.shutdown()
-      try {
-        if !tasksExecutorService.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS) then
-          tasksExecutorService.shutdownNow()
-      } catch {
-        case _: InterruptedException => tasksExecutorService.shutdownNow()
-      }
 
       logger.info("Server shutdown complete.")
       sys.exit(0)
@@ -148,7 +133,6 @@ object ServerMain extends StrictLogging {
       graalvmNativeImageTasks,
       tasksRegistry,
       cfg.maxInactiveSeconds,
-      tasksExecutorService,
       onShutdown,
       configFile = DederGlobals.projectRootDir / "deder.pkl"
     )
