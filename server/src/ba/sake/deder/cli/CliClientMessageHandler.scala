@@ -497,6 +497,7 @@ class CliClientMessageHandler(
               serverNotificationsLogger,
               startWatch = cliOptions.watch.value,
               exitOnEnd = !cliOptions.watch.value,
+              watch = cliOptions.watch.value,
             )
           }
       }

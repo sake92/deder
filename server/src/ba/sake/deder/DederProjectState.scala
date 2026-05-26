@@ -53,7 +53,6 @@ class DederProjectState(
 
   private val watchedTasksLock = new AnyRef
   private var watchedTasks = Seq.empty[WatchedTaskData]
-  private val watchReexecutionGates = new java.util.concurrent.ConcurrentHashMap[String, java.lang.Boolean]()
   private var loadedPlugins = Seq.empty[LoadedPlugin]
 
   // Track active BSP servers for graceful teardown on CLI shutdown
@@ -144,6 +143,7 @@ class DederProjectState(
       useLastGood: Boolean = false,
       startWatch: Boolean = false,
       exitOnEnd: Boolean = true,
+      watch: Boolean = false,
   ): Unit = try {
     val state = readState(useLastGood) match
       case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
@@ -191,7 +191,7 @@ class DederProjectState(
           relevantModuleIds,
           taskName,
           args,
-          watch = startWatch,
+          watch = watch,
           serverNotificationsLogger,
           useLastGood = useLastGood
         )
@@ -516,35 +516,28 @@ class DederProjectState(
         }
       }
       if affected then {
-        val watchTaskId = watchedTask.taskInstance.id
-        if watchReexecutionGates.putIfAbsent(watchTaskId, java.lang.Boolean.TRUE) == null then {
-          val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
-          Thread.ofVirtual().start(() =>
-            supervised {
-              try
-                RequestContext.clientContext.supervisedWhere(Some(ctx)) {
-                  executeTasks(
-                    ctx,
-                    Seq(watchedTask.taskInstance.moduleId),
-                    watchedTask.taskInstance.task.name,
-                    watchedTask.args,
-                    true, // tell client we are in watch mode
-                    watchedTask.serverNotificationsLogger,
-                    watchedTask.useLastGood
-                  )
-                  watchedTask.serverNotificationsLogger.add(
-                    ServerNotification.logInfo(
-                      s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-                      watchedTask.taskInstance.moduleId
-                    )
-                  )
-                }
-              finally watchReexecutionGates.remove(watchTaskId)
+        val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
+        Thread.ofVirtual().start(() =>
+          supervised {
+            RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+              executeTasks(
+                ctx,
+                Seq(watchedTask.taskInstance.moduleId),
+                watchedTask.taskInstance.task.name,
+                watchedTask.args,
+                true, // tell client we are in watch mode
+                watchedTask.serverNotificationsLogger,
+                watchedTask.useLastGood
+              )
+              watchedTask.serverNotificationsLogger.add(
+                ServerNotification.logInfo(
+                  s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                  watchedTask.taskInstance.moduleId
+                )
+              )
             }
-          )
-        } else {
-          logger.debug(s"Skipping re-execution for watched task ${watchTaskId} because one is already running")
-        }
+          }
+        )
       }
     }
   }
@@ -581,36 +574,30 @@ class DederProjectState(
         logger.debug(
           s"Config value dependencies of watched task ${watchedTask.taskInstance.id} have changed, re-executing..."
         )
-        val watchTaskId = watchedTask.taskInstance.id
-        if watchReexecutionGates.putIfAbsent(watchTaskId, java.lang.Boolean.TRUE) == null then {
-          val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
-          Thread.ofVirtual().start(() =>
-            supervised {
-              try
-                RequestContext.clientContext.supervisedWhere(Some(ctx)) {
-                  executeCLI(
-                    ctx,
-                    Seq(watchedTask.taskInstance.moduleId),
-                    watchedTask.taskInstance.task.name,
-                    watchedTask.args,
-                    watchedTask.serverNotificationsLogger,
-                    watchedTask.useLastGood,
-                    startWatch = false,
-                    exitOnEnd = false
-                  )
-                  watchedTask.serverNotificationsLogger.add(
-                    ServerNotification.logInfo(
-                      s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-                      watchedTask.taskInstance.moduleId
-                    )
-                  )
-                }
-              finally watchReexecutionGates.remove(watchTaskId)
+        val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
+        Thread.ofVirtual().start(() =>
+          supervised {
+            RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+              executeCLI(
+                ctx,
+                Seq(watchedTask.taskInstance.moduleId),
+                watchedTask.taskInstance.task.name,
+                watchedTask.args,
+                watchedTask.serverNotificationsLogger,
+                watchedTask.useLastGood,
+                startWatch = false,
+                exitOnEnd = false,
+                watch = true,
+              )
+              watchedTask.serverNotificationsLogger.add(
+                ServerNotification.logInfo(
+                  s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                  watchedTask.taskInstance.moduleId
+                )
+              )
             }
-          )
-        } else {
-          logger.debug(s"Skipping re-execution for watched task ${watchTaskId} because one is already running")
-        }
+          }
+        )
       }
     }
   }
