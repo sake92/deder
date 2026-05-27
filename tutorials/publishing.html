@@ -120,21 +120,8 @@ modules {
   "com.example::deder-example-library:0.0.1-SNAPSHOT"
 }
 </code></pre>
-   <p>If you also use sbt or Mill in other projects, use their equivalent dependency syntax for the same coordinate.</p>
-   <p>By default, Deder resolves from <code>~/.m2/repository</code>, so this works without extra repository configuration. If you set <code>includeDefaultRepos = false</code>, add your local Maven repo explicitly:</p>
-   <pre><code class="language-pkl">repositories {
-  new MavenRepository { url = "file:///home/your-user/.m2/repository" }
-}
-
-includeDefaultRepos = false
-</code></pre>
-   <p>See also:</p>
-   <ul>
-    <li><a href="https://sake92.github.io/deder/reference/repositories.html">Custom Repositories</a></li>
-    <li><a href="https://sake92.github.io/deder/howtos/dependencies.html">Dependencies how-to</a></li>
-   </ul>
    <h2 id="publish-to-sonatype-maven-central">Publish to Sonatype Maven Central<a href="#publish-to-sonatype-maven-central" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
-   <p>To publish to Sonatype Maven Central, credentials can come from env vars following the pattern <code>DEDER_&lt;PUBLISH_TO_ID&gt;_&lt;FIELD&gt;</code> (uppercased, <code>-</code> replaced with <code>_</code>). With <code>id = "sonatype"</code> (default one), set these:</p>
+   <p>To publish to Sonatype Maven Central, credentials can come from env vars following the pattern <code>DEDER_&lt;REPO_ID&gt;_&lt;FIELD&gt;</code> (uppercased, <code>-</code> replaced with <code>_</code>). With <code>id = "sonatype"</code> (default one), set these:</p>
    <pre><code class="language-shell hljs" data-highlighted="yes">export DEDER_SONATYPE_USERNAME="..."
 export DEDER_SONATYPE_PASSWORD="..."
 export DEDER_SONATYPE_PGP_SECRET="..."
