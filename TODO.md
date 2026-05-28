@@ -8,6 +8,9 @@
 - import from other gradle
 - sbt-updates for deps
 - periodic print tasks that are still running, maybe every 5 mins so user knows it is still compiling or whatever
+- cleanup virtual threads work, do it for test-runner too?
+- no need to pass current cli client ctx coz its per-vthread now
+- no extends Thread.. no threadpools
 
 run pkldoc on each tag, and publish to ghpages
 https://pkl-lang.org/main/current/pkl-doc/index.html
