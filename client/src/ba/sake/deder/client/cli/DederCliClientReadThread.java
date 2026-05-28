@@ -1,7 +1,6 @@
 package ba.sake.deder.client.cli;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.avaje.jsonb.JsonType;
 
 import java.io.*;
 import java.nio.channels.ClosedByInterruptException;
@@ -14,15 +13,14 @@ public class DederCliClientReadThread extends Thread {
     private final Consumer<String> logger;
     private final AtomicBoolean running;
     private final InputStream is;
+    private final JsonType<ServerMessage> messageType;
 
-    private final ObjectMapper jsonMapper = new ObjectMapper()
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
-    public DederCliClientReadThread(Consumer<String> logger, AtomicBoolean running, InputStream is) {
+    public DederCliClientReadThread(Consumer<String> logger, AtomicBoolean running, InputStream is, JsonType<ServerMessage> messageType) {
         super("DederCliClientReadThread");
         this.logger = logger;
         this.running = running;
         this.is = is;
+        this.messageType = messageType;
     }
 
     @Override
@@ -47,7 +45,7 @@ public class DederCliClientReadThread extends Thread {
         SubprocessRunningThread subprocessRunningThread = null;
         // System.err.println("Waiting for messages from server...");
         while (running.get() && (messageJson = reader.readLine()) != null) {
-            var message = jsonMapper.readValue(messageJson, ServerMessage.class);
+            var message = messageType.fromJson(messageJson);
             // System.err.println("Received message from server: " + messageJson); // for debugging
             if (message instanceof ServerMessage.Output(String text)) {
                 System.out.println(text);

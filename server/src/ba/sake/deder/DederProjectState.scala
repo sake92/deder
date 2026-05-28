@@ -31,7 +31,8 @@ class DederProjectState(
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
     onShutdown: () => Unit,
-    configFile: os.Path
+    configFile: os.Path,
+    val internals: DederProjectInternalsImpl
 ) extends StrictLogging {
 
   private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)
@@ -109,7 +110,7 @@ class DederProjectState(
             val coreTasksApi = CoreTasksApiAdapter(coreTasks, runTasks)
             val scalaJsTasksApi = ScalaJsTasksApiAdapter(scalaJsTasks)
             val scalaNativeTasksApi = ScalaNativeTasksApiAdapter(scalaNativeTasks)
-            val pluginLoader = PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver)
+            val pluginLoader = PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver, internals)
             loadedPlugins = pluginLoader.load(loadedPlugins, configFile, newConfig).loadedPlugins
             // TODO prepend plugin id to task name to avoid conflicts?
             val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?, ?]])
@@ -191,7 +192,9 @@ class DederProjectState(
           args,
           watch = watch,
           serverNotificationsLogger,
-          useLastGood = useLastGood
+          useLastGood = useLastGood,
+         // clientParams = clientParams,
+          callerType = CallerType.Cli
         )
         // summarize across modules
         if results.nonEmpty then {
@@ -256,7 +259,8 @@ class DederProjectState(
       serverNotificationsLogger: ServerNotificationsLogger,
       watch: Boolean = false,
       useLastGood: Boolean = false,
-      requestId: String = null
+      requestId: String = null,
+      callerType: CallerType = CallerType.Cli
   ): (res: T, changed: Boolean) = {
     val span = OTEL.TRACER
       .spanBuilder(s"${moduleId}.${task.name}")
@@ -278,6 +282,7 @@ class DederProjectState(
             serverNotificationsLogger,
             useLastGood
           ).head
+
         (res.res.asInstanceOf[T], res.changed)
       }
     } catch {
@@ -296,8 +301,13 @@ class DederProjectState(
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
-      useLastGood: Boolean
+      useLastGood: Boolean,
+      //clientParams: CliClientParams = CliClientParams(Map.empty),
+      callerType: CallerType = CallerType.Cli
   ): Seq[TaskExecResult] =
+    val requestStartNanos = System.nanoTime()
+    val requestStartInstant = java.time.Instant.now()
+    internals.recordRequestStarted(ctx.requestId, callerType, taskName, moduleIds, requestStartInstant)
     try {
       inFlightRequests.incrementAndGet()
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
@@ -312,7 +322,9 @@ class DederProjectState(
           state.projectConfig,
           state.tasksResolver.modulesGraph,
           state.tasksResolver.taskInstancesGraph,
-          state.dependencyResolver
+         // tasksExecutorService,
+          state.dependencyResolver,
+          internals
         )
       val allTaskInstances = tasksExecStages.flatten.sortBy(_.id) // essential!!
       try {
@@ -321,7 +333,7 @@ class DederProjectState(
           taskInstance.lock.lock()
         }
         DederGlobals.cancellationTokens.put(ctx.requestId, new AtomicBoolean(false))
-        tasksExecutor.execute(
+        val result = tasksExecutor.execute(
           tasksExecStages,
           moduleIds,
           taskName,
@@ -329,17 +341,19 @@ class DederProjectState(
           watch,
           serverNotificationsLogger
         )
+        val duration = scala.concurrent.duration.FiniteDuration(System.nanoTime() - requestStartNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+        internals.recordRequestCompleted(ctx.requestId, taskName, success = true, duration, callerType)
+        result
       } finally {
-        // Only unlock locks actually held by this thread (prevents IllegalMonitorStateException on interrupt)
         allTaskInstances.reverse.foreach { taskInstance =>
-          try {
-            if taskInstance.lock.isHeldByCurrentThread then taskInstance.lock.unlock()
-          } catch { case _: Exception => }
+          taskInstance.lock.unlock()
         }
         DederGlobals.cancellationTokens.remove(ctx.requestId)
       }
     } catch {
       case NonFatal(e) =>
+        val duration = scala.concurrent.duration.FiniteDuration(System.nanoTime() - requestStartNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+        internals.recordRequestCompleted(ctx.requestId, taskName, success = false, duration, callerType)
         // send notification about failure to client
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
         if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))

@@ -1,4 +1,4 @@
-amends "https://sake92.github.io/deder/config/v0.9.1/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/v0.12.0/DederProject.pkl"
 
 //amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
@@ -152,6 +152,8 @@ local const serverModules =
     testTemplate = (template.asTest()) {
       deps {
         "org.scalameta::munit:1.2.1"
+        "io.opentelemetry:opentelemetry-sdk:1.58.0"
+        "io.opentelemetry:opentelemetry-sdk-metrics:1.58.0"
       }
       junitXmlReport {
         enabled = true
@@ -165,7 +167,10 @@ local const client = new JavaModule {
   mainClass = "ba.sake.deder.client.Main"
   pomSettings = pom("deder-client", "Deder client")
   deps {
-    "com.fasterxml.jackson.core:jackson-databind:2.20.1"
+    "io.avaje:avaje-jsonb:3.13"
+  }
+  javacAnnotationProcessorDeps {
+    "io.avaje:avaje-jsonb-generator:3.13"
   }
   graalvm {
     nativeImageOptions {

@@ -1,6 +1,6 @@
 package ba.sake.deder.client.cli;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.avaje.jsonb.JsonType;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -18,15 +18,15 @@ public class DederCliClientWriteThread extends Thread {
     private final AtomicBoolean running;
     private final OutputStream os;
     private final BlockingQueue<ClientMessage> clientMessages;
+    private final JsonType<ClientMessage> messageType;
 
-    private final ObjectMapper jsonMapper = new ObjectMapper();
-
-    public DederCliClientWriteThread(Consumer<String> logger, AtomicBoolean running, OutputStream os, BlockingQueue<ClientMessage> clientMessages) {
+    public DederCliClientWriteThread(Consumer<String> logger, AtomicBoolean running, OutputStream os, BlockingQueue<ClientMessage> clientMessages, JsonType<ClientMessage> messageType) {
         super("DederCliClientWriteThread");
         this.logger = logger;
         this.running = running;
         this.os = os;
         this.clientMessages = clientMessages;
+        this.messageType = messageType;
     }
 
     @Override
@@ -51,7 +51,7 @@ public class DederCliClientWriteThread extends Thread {
                 continue;
             }
             // newline delimited JSON messages
-            var messageJson = jsonMapper.writeValueAsString(message);
+            var messageJson = messageType.toJson(message);
             logger.accept("Sending message to server: " + messageJson);
             os.write((messageJson + '\n').getBytes(StandardCharsets.UTF_8));
             logger.accept("Sent message to server");

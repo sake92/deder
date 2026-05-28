@@ -1,8 +1,6 @@
 
 # Misc
-- replace jackson with avaje jsonb
 - publish pkl configs as proper Pkl modules, good for offline/caching
-- maybe use https://github.com/encalmo/graphs coz zero deps?
 - init like giter8, autoimport from sbt?
 - max timeout when waiting for lock and bail out, report to bsp??
 - import from other maven effective POM etc
@@ -11,7 +9,7 @@
 - sbt-updates for deps
 - periodic print tasks that are still running, maybe every 5 mins so user knows it is still compiling or whatever
 
-- run pkldoc on each tag, and publish to ghpages
+run pkldoc on each tag, and publish to ghpages
 https://pkl-lang.org/main/current/pkl-doc/index.html
 
 

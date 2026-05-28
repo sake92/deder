@@ -1,20 +1,19 @@
 package ba.sake.deder.client.cli;
 
-import com.fasterxml.jackson.annotation.JsonSubTypes;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import io.avaje.jsonb.Json;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "@type")
-@JsonSubTypes({@JsonSubTypes.Type(value = ClientMessage.Help.class, name = "Help"),
-        @JsonSubTypes.Type(value = ClientMessage.Version.class, name = "Version"),
-        @JsonSubTypes.Type(value = ClientMessage.Modules.class, name = "Modules"),
-        @JsonSubTypes.Type(value = ClientMessage.Tasks.class, name = "Tasks"),
-        @JsonSubTypes.Type(value = ClientMessage.Plan.class, name = "Plan"),
-        @JsonSubTypes.Type(value = ClientMessage.Exec.class, name = "Exec"),
-        @JsonSubTypes.Type(value = ClientMessage.Cancel.class, name = "Cancel"),
-        @JsonSubTypes.Type(value = ClientMessage.Clean.class, name = "Clean"),
-        @JsonSubTypes.Type(value = ClientMessage.Import.class, name = "Import"),
-        @JsonSubTypes.Type(value = ClientMessage.Complete.class, name = "Complete"),
-        @JsonSubTypes.Type(value = ClientMessage.Shutdown.class, name = "Shutdown")})
+@Json
+@Json.SubType(type = ClientMessage.Help.class, name = "Help")
+@Json.SubType(type = ClientMessage.Version.class, name = "Version")
+@Json.SubType(type = ClientMessage.Modules.class, name = "Modules")
+@Json.SubType(type = ClientMessage.Tasks.class, name = "Tasks")
+@Json.SubType(type = ClientMessage.Plan.class, name = "Plan")
+@Json.SubType(type = ClientMessage.Exec.class, name = "Exec")
+@Json.SubType(type = ClientMessage.Cancel.class, name = "Cancel")
+@Json.SubType(type = ClientMessage.Clean.class, name = "Clean")
+@Json.SubType(type = ClientMessage.Import.class, name = "Import")
+@Json.SubType(type = ClientMessage.Complete.class, name = "Complete")
+@Json.SubType(type = ClientMessage.Shutdown.class, name = "Shutdown")
 public sealed interface ClientMessage {
 
     record Help(String[] args) implements ClientMessage {

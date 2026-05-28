@@ -19,8 +19,8 @@ import ba.sake.deder.config.DederProject
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.deps.{DepTree, given}
 
-class RunTasks(coreTasks: CoreTasks) extends StrictLogging{
-    import coreTasks.*
+class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
+  import coreTasks.*
 
   val runTask = TaskBuilder
     .make[Seq[String]](

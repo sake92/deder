@@ -4,8 +4,16 @@ import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.DederProject.ModuleType
 import ba.sake.deder.publish.PublishTasks
 import ba.sake.deder.graalvm.GraalVmNativeImageTasks
+import io.opentelemetry.sdk.OpenTelemetrySdk
+import io.opentelemetry.sdk.metrics.SdkMeterProvider
 
 class SourceGeneratorsSuite extends munit.FunSuite {
+
+  private def noopInternals: DederProjectInternalsImpl =
+    val sdk = OpenTelemetrySdk.builder()
+      .setMeterProvider(SdkMeterProvider.builder().build())
+      .build()
+    DederProjectInternalsImpl(16, sdk.getMeter("test"))
 
   private var testProjectDir: os.Path = scala.compiletime.uninitialized
 
@@ -126,7 +134,8 @@ class SourceGeneratorsSuite extends munit.FunSuite {
           tasksRegistry,
           Int.MaxValue,
           () => (),
-          configFile = testProjectDir / "deder.pkl"
+          configFile = testProjectDir / "deder.pkl",
+          internals = noopInternals
         )
       val notif = new ServerNotificationsLogger(_ => ())
       val results = state.executeTasks(

@@ -19,6 +19,8 @@ import mainargs.*
 import org.slf4j.LoggerFactory
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
+import io.opentelemetry.context.Context
+import io.opentelemetry.api.GlobalOpenTelemetry
 import ba.sake.deder.TeePrintStream
 import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
@@ -81,6 +83,18 @@ object ServerMain extends StrictLogging {
     rootLogger.setLevel(Level.toLevel(cfg.logLevel))
 
     val watchDebounceMs = cfg.watchDebounceMillis
+
+    // TODO maybe make it elastic ThreadPool with min/max threads for better memory usage?
+    //val originalTasksExecutorService = Executors.newFixedThreadPool(workerThreads)
+    // automatically propagate OTEL context, parent span
+    //val tasksExecutorService = Context.taskWrapping(originalTasksExecutorService)
+
+    // Use the global OTEL instance for metrics.
+    // Export is handled externally (OTEL Java agent, env vars, etc.).
+    val metricsMeter = GlobalOpenTelemetry.get().getMeter("deder-server")
+    val internals = DederProjectInternalsImpl(1, metricsMeter)
+
+
     debounceScheduler = Executors.newSingleThreadScheduledExecutor(r => Thread(r, "watch-debounce"))
 
     // Must be declared before onShutdown to avoid forward reference error (var, not val)
@@ -134,7 +148,8 @@ object ServerMain extends StrictLogging {
       tasksRegistry,
       cfg.maxInactiveSeconds,
       onShutdown,
-      configFile = DederGlobals.projectRootDir / "deder.pkl"
+      configFile = DederGlobals.projectRootDir / "deder.pkl",
+      internals = internals
     )
 
     // Wire up early lock release for fast shutdown+restart

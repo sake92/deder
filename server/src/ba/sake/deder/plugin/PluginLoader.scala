@@ -22,7 +22,8 @@ class PluginLoader(
     coreTasksApi: CoreTasksApi,
     scalaJsTasksApi: ScalaJsTasksApi,
     scalaNativeTasksApi: ScalaNativeTasksApi,
-    dependencyResolver: DependencyResolverApi
+    dependencyResolver: DependencyResolverApi,
+    internals: DederProjectInternals
 ) extends PluginLoaderApi,
       StrictLogging {
 
@@ -118,7 +119,7 @@ class PluginLoader(
         case Some(plugin) =>
           logger.debug(s"Loaded plugin '$pluginId'")
           logger.debug(s"Plugin config Pkl text: $configText")
-          val params = PluginTasksParams(configText, coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi)
+          val params = PluginTasksParams(configText, coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, internals)
           plugin.tasks(params) match {
             case Left(err) =>
               logger.warn(s"Failed to get tasks from plugin '$pluginId': $err")

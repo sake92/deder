@@ -10,7 +10,7 @@ import com.github.mizosoft.methanol.{Methanol, MultipartBodyPublisher}
 
 class Publisher(notifications: ServerNotificationsLogger, moduleId: String) {
 
-  def publishLocalM2(pom: PomSettings, files: Seq[os.Path], customRepoPath: Option[os.Path] = None): Unit = {
+  def publishLocalM2(pom: PomSettings, files: Seq[os.Path], customRepoPath: Option[os.Path] = None): os.Path = {
     // default to ~/.m2/repository/group/artifact/version
     val baseRepo = customRepoPath.getOrElse(os.home / ".m2/repository")
     val m2Repo = baseRepo / pom.groupId.split('.') / pom.artifactId / pom.version
@@ -27,6 +27,7 @@ class Publisher(notifications: ServerNotificationsLogger, moduleId: String) {
         moduleId
       )
     )
+    m2Repo
   }
 
   // file by file upload to Sonatype Snapshots
