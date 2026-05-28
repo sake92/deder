@@ -43,6 +43,7 @@ class ServerPropertiesSuite extends munit.FunSuite {
     val cfg = ServerProperties(
       logLevel = "INFO",
       maxInactiveSeconds = 1800,
+      taskLockTimeoutSeconds = 600,
       workerThreads = 16,
       maxActiveCompilers = 2,
       bspEnabled = true,
