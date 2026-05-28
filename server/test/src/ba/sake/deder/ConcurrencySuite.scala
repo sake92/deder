@@ -138,7 +138,6 @@ class ConcurrencySuite extends munit.FunSuite {
         ""
       }
     tasksRegistry.add(slowTask)
-    val dederExecutorService = java.util.concurrent.Executors.newFixedThreadPool(4)
 
     val state = DederProjectState(
       coreTasks,
@@ -149,7 +148,6 @@ class ConcurrencySuite extends munit.FunSuite {
       tasksRegistry,
       Int.MaxValue,
       2,
-      dederExecutorService,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals
@@ -162,7 +160,7 @@ class ConcurrencySuite extends munit.FunSuite {
     val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
     val backgroundFuture = backgroundExecutor.submit(() => {
       try {
-        state.executeTasks(requestId1, Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
+        state.executeTasks(CliClientContext(clientId = requestId1, requestId = requestId1), Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
       } catch {
         case _: Exception =>
       }
@@ -171,14 +169,13 @@ class ConcurrencySuite extends munit.FunSuite {
     Thread.sleep(500)
 
     val ex = intercept[TaskEvaluationException] {
-      state.executeTasks(requestId2, Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
+      state.executeTasks(CliClientContext(clientId = requestId2, requestId = requestId2), Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
     }
 
     assert(ex.getCause.isInstanceOf[TaskLockTimeoutException], s"Expected TaskLockTimeoutException, got: ${ex.getCause.getClass.getName}")
     assert(ex.getCause.getMessage.contains("Timed out waiting for lock"), s"Unexpected message: ${ex.getCause.getMessage}")
 
     backgroundExecutor.shutdown()
-    dederExecutorService.shutdown()
   }
 
   test("executeTask with taskLockTimeoutSeconds=0 should not timeout (unlimited wait)") {
@@ -191,7 +188,6 @@ class ConcurrencySuite extends munit.FunSuite {
         ""
       }
     tasksRegistry.add(slowTask)
-    val dederExecutorService = java.util.concurrent.Executors.newFixedThreadPool(4)
 
     val state = DederProjectState(
       coreTasks,
@@ -202,7 +198,6 @@ class ConcurrencySuite extends munit.FunSuite {
       tasksRegistry,
       Int.MaxValue,
       0,
-      dederExecutorService,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals
@@ -217,7 +212,7 @@ class ConcurrencySuite extends munit.FunSuite {
     val backgroundFuture = backgroundExecutor.submit(() => {
       try {
         lockAcquiredLatch.countDown()
-        state.executeTasks(requestId1, Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
+        state.executeTasks(CliClientContext(clientId = requestId1, requestId = requestId1), Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
       } catch {
         case _: Exception =>
       }
@@ -225,10 +220,9 @@ class ConcurrencySuite extends munit.FunSuite {
 
     lockAcquiredLatch.await()
 
-    state.executeTasks(requestId2, Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
+    state.executeTasks(CliClientContext(clientId = requestId2, requestId = requestId2), Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
 
     backgroundExecutor.shutdown()
-    dederExecutorService.shutdown()
   }
 
 }
