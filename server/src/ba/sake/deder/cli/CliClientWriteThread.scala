@@ -11,7 +11,7 @@ import ba.sake.deder.DederProjectState
 class CliClientWriteThread(
     projectState: DederProjectState,
     clientChannel: SocketChannel,
-    clientId: Int,
+    clientId: String,
     serverMessages: BlockingQueue[CliServerMessage]
 ) extends Thread(s"CliClientWriteThread-${clientId}"),
       StrictLogging {

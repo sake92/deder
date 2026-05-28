@@ -41,12 +41,13 @@ class ScalaNativeTestRunner(
       }
 
       val testRunner = DederTestRunner(testParallelism, discoveredTests, loadedFrameworks, getClass.getClassLoader, dederLogger, isCancelled = {
-        val currentRequestId = RequestContext.id.get()
-        () =>
-          currentRequestId != null && {
-            val tok = DederGlobals.cancellationTokens.get(currentRequestId)
+        () => {
+          val requestId = RequestContext.clientContext.get().map(_.requestId).orNull
+          requestId != null && {
+            val tok = DederGlobals.cancellationTokens.get(requestId)
             tok != null && tok.get()
           }
+        }
       })
       testRunner.run(testOptions)
     } finally {

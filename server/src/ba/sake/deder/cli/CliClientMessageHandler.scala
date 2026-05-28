@@ -23,27 +23,25 @@ class CliClientMessageHandler(
     cliServer: DederCliServer
 ) extends StrictLogging {
 
-  def handle(
-      clientId: Int,
-      requestId: String,
-      message: CliClientMessage
-  ): Unit = {
+  def handle(ctx: CliClientContext, message: CliClientMessage): Unit = {
     message match {
-      case m: CliClientMessage.Help     => handleHelp(clientId, requestId, m)
-      case m: CliClientMessage.Version  => handleVersion(clientId, requestId)
-      case m: CliClientMessage.Modules  => handleModules(clientId, requestId, m)
-      case m: CliClientMessage.Tasks    => handleTasks(clientId, requestId, m)
-      case m: CliClientMessage.Plan     => handlePlan(clientId, requestId, m)
-      case m: CliClientMessage.Exec     => handleExec(clientId, requestId, m)
-      case m: CliClientMessage.Cancel   => handleCancel(clientId, requestId, m)
-      case m: CliClientMessage.Clean    => handleClean(clientId, requestId, m)
-      case m: CliClientMessage.Import   => handleImport(clientId, requestId, m)
-      case m: CliClientMessage.Complete => handleComplete(clientId, requestId, m)
-      case m: CliClientMessage.Shutdown => handleShutdown(clientId, m)
+      case m: CliClientMessage.Help     => handleHelp(ctx, m)
+      case m: CliClientMessage.Version  => handleVersion(ctx)
+      case m: CliClientMessage.Modules  => handleModules(ctx, m)
+      case m: CliClientMessage.Tasks    => handleTasks(ctx, m)
+      case m: CliClientMessage.Plan     => handlePlan(ctx, m)
+      case m: CliClientMessage.Exec     => handleExec(ctx, m)
+      case m: CliClientMessage.Cancel   => handleCancel(ctx, m)
+      case m: CliClientMessage.Clean    => handleClean(ctx, m)
+      case m: CliClientMessage.Import   => handleImport(ctx, m)
+      case m: CliClientMessage.Complete => handleComplete(ctx, m)
+      case m: CliClientMessage.Shutdown => handleShutdown(ctx, m)
     }
   }
 
-  private def handleHelp(clientId: Int, requestId: String, m: CliClientMessage.Help): Unit = {
+  private def handleHelp(ctx: CliClientContext, m: CliClientMessage.Help): Unit = {
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
     OTEL.withSpan("cli.help")(
       _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
     ) { span =>
@@ -112,7 +110,9 @@ class CliClientMessageHandler(
     }
   }
 
-  private def handleVersion(clientId: Int, requestId: String): Unit = {
+  private def handleVersion(ctx: CliClientContext): Unit = {
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
     OTEL.withSpan("cli.version")(
       _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
     ) { _ =>
@@ -121,7 +121,9 @@ class CliClientMessageHandler(
     }
   }
 
-  private def handleModules(clientId: Int, requestId: String, m: CliClientMessage.Modules): Unit = {
+  private def handleModules(ctx: CliClientContext, m: CliClientMessage.Modules): Unit = {
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
       serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliModulesOptions].helpText()))
       serverMessages.put(CliServerMessage.Exit(0))
@@ -137,7 +139,6 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          val outputFormat = cliOptions.format
           OTEL.withSpan("cli.modules")(
             _.setAttribute("clientId", clientId)
               .setAttribute("request.id", requestId)
@@ -197,7 +198,7 @@ class CliClientMessageHandler(
                       serverMessages.put(CliServerMessage.Exit(1))
                     case Right(graph) =>
                       val filteredModules = graph.vertexSet().asScala.toSeq.sortBy(_.id)
-                      val output = outputFormat match
+                      val output = cliOptions.format match
                         case OutputFormat.PlainText =>
                           filteredModules.map(_.id).mkString("\n")
                         case OutputFormat.Json =>
@@ -217,7 +218,9 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleTasks(clientId: Int, requestId: String, m: CliClientMessage.Tasks): Unit = {
+  private def handleTasks(ctx: CliClientContext, m: CliClientMessage.Tasks): Unit = {
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
       serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliTasksOptions].helpText()))
       serverMessages.put(CliServerMessage.Exit(0))
@@ -233,7 +236,6 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          val outputFormat = cliOptions.format
           OTEL.withSpan("cli.tasks")(
             _.setAttribute("clientId", clientId)
               .setAttribute("request.id", requestId)
@@ -247,15 +249,15 @@ class CliClientMessageHandler(
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
                 // TODO handle these in a case class + typeclassess
-                outputFormat match
-                  case OutputFormat.Json | OutputFormat.DenseJson =>
+                cliOptions.format match
+                  case format @ (OutputFormat.Json | OutputFormat.DenseJson) =>
                     val taskInfosPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
                       case (moduleId, tasks) =>
                         moduleId -> tasks.map { ti =>
                           TaskInfo(ti.task.name, ti.task.featureTags.map(_.jsonKey).toSeq)
                         }
                     }
-                    val json = outputFormat match
+                    val json = format match
                       case OutputFormat.Json =>
                         taskInfosPerModule.toJson(spaces = 2, sort = true)
                       case OutputFormat.DenseJson =>
@@ -325,7 +327,9 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handlePlan(clientId: Int, requestId: String, m: CliClientMessage.Plan): Unit = boundary {
+  private def handlePlan(ctx: CliClientContext, m: CliClientMessage.Plan): Unit = boundary {
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
       serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliPlanOptions].helpText()))
       serverMessages.put(CliServerMessage.Exit(0))
@@ -341,7 +345,6 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          val outputFormat = cliOptions.format
           OTEL.withSpan("cli.plan")(
             _.setAttribute("clientId", clientId)
               .setAttribute("request.id", requestId)
@@ -387,12 +390,12 @@ class CliClientMessageHandler(
                     val validModuleIds = validModuleTasks.map(_._1)
                     val tasksExecSubgraph = state.executionPlanner.getExecSubgraph(validModuleIds, cliOptions.task)
                     val publicSubgraph = GraphUtils.projectPublic(tasksExecSubgraph, !_.task.internal)
-                    outputFormat match
-                      case OutputFormat.Json | OutputFormat.DenseJson =>
+                    cliOptions.format match
+                      case format @ (OutputFormat.Json | OutputFormat.DenseJson) =>
                         val tasksExecStages = state.executionPlanner.getExecStages(validModuleIds, cliOptions.task)
                         val publicStages = tasksExecStages.map(_.filter(!_.task.internal)).filter(_.nonEmpty)
                         val values = publicStages.map(_.map(_.id))
-                        val json = outputFormat match
+                        val json = format match
                           case OutputFormat.Json =>
                             values.toJson(spaces = 2, sort = true)
                           case OutputFormat.DenseJson =>
@@ -449,7 +452,9 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleExec(clientId: Int, requestId: String, m: CliClientMessage.Exec): Unit = {
+  private def handleExec(ctx: CliClientContext, m: CliClientMessage.Exec): Unit = {
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
       serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliExecOptions].helpText()))
       serverMessages.put(CliServerMessage.Exit(0))
@@ -465,15 +470,14 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          val outputFormat = cliOptions.format
-          RequestContext.outputFormat.set(outputFormat)
+          
           OTEL.withSpan(s"cli.exec.${cliOptions.task}")(
             _.setAttribute("clientId", clientId)
               .setAttribute("request.id", requestId)
               .setAttribute("cli.task", cliOptions.task)
               .setAttribute("cli.moduleIds", cliOptions.modules.mkString(","))
               .setAttribute("cli.watch", cliOptions.watch.value)
-              .setAttribute("cli.format", outputFormat.toString)
+              .setAttribute("cli.format", ctx.outputFormat.toString)
           ) { _ =>
             val notificationCallback: ServerNotification => Unit = {
               case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
@@ -486,21 +490,22 @@ class CliClientMessageHandler(
               if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail
               else cliOptions.args.value
             projectState.executeCLI(
-              clientId,
-              requestId,
+              ctx,
               cliOptions.modules,
               cliOptions.task,
               args = argss,
               serverNotificationsLogger,
               startWatch = cliOptions.watch.value,
               exitOnEnd = !cliOptions.watch.value,
-              clientParams = CliClientParams(m.envVars)
+              watch = cliOptions.watch.value,
             )
           }
       }
   }
 
-  private def handleCancel(clientId: Int, requestId: String, m: CliClientMessage.Cancel): Unit = {
+  private def handleCancel(ctx: CliClientContext, m: CliClientMessage.Cancel): Unit = {
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
     OTEL.withSpan("cli.cancel")(
       _.setAttribute("clientId", clientId)
         .setAttribute("request.id", requestId)
@@ -511,7 +516,9 @@ class CliClientMessageHandler(
     }
   }
 
-  private def handleClean(clientId: Int, requestId: String, m: CliClientMessage.Clean): Unit = {
+  private def handleClean(ctx: CliClientContext, m: CliClientMessage.Clean): Unit = {
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
       serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliCleanOptions].helpText()))
       serverMessages.put(CliServerMessage.Exit(0))
@@ -547,7 +554,9 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleImport(clientId: Int, requestId: String, m: CliClientMessage.Import): Unit = {
+  private def handleImport(ctx: CliClientContext, m: CliClientMessage.Import): Unit = {
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
       serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliImportOptions].helpText()))
       serverMessages.put(CliServerMessage.Exit(0))
@@ -588,7 +597,9 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleComplete(clientId: Int, requestId: String, m: CliClientMessage.Complete): Unit = {
+  private def handleComplete(ctx: CliClientContext, m: CliClientMessage.Complete): Unit = {
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
       serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliCompleteOptions].helpText()))
       serverMessages.put(CliServerMessage.Exit(0))
@@ -631,7 +642,8 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleShutdown(clientId: Int, m: CliClientMessage.Shutdown): Unit = {
+  private def handleShutdown(ctx: CliClientContext, m: CliClientMessage.Shutdown): Unit = {
+    val clientId = ctx.clientId
     OTEL.withSpan("cli.shutdown")(
       _.setAttribute("clientId", clientId)
     ) { _ =>

@@ -133,14 +133,16 @@ class SourceGeneratorsSuite extends munit.FunSuite {
           graalvmNativeImageTasks,
           tasksRegistry,
           Int.MaxValue,
-          pool,
           () => (),
           configFile = testProjectDir / "deder.pkl",
           internals = noopInternals
         )
       val notif = new ServerNotificationsLogger(_ => ())
       val results = state.executeTasks(
-        requestId = java.util.UUID.randomUUID().toString,
+        ctx = CliClientContext(
+          clientId = java.util.UUID.randomUUID().toString,
+          requestId = java.util.UUID.randomUUID().toString
+        ),
         moduleIds = Seq("common"),
         taskName = "syntheticFanIn",
         args = Seq.empty,

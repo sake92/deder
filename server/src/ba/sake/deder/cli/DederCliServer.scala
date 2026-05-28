@@ -37,18 +37,16 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
     // TODO better try catch
     try {
-      var clientId = 0
       while true do {
         // Accept client connection (blocking)
         val clientChannel = serverChannel.accept()
-        clientId += 1
-        val currentClientId = clientId
-        logger.info(s"Client #$currentClientId connected")
+        val clientId = UUID.randomUUID().toString
+        logger.info(s"Client $clientId connected")
         val serverMessages = new LinkedBlockingQueue[CliServerMessage]()
         val handler = new CliClientMessageHandler(projectState, serverMessages, this)
         val clientReadThread =
-          new CliClientReadThread(projectState, handler, clientChannel, currentClientId, serverMessages)
-        val clientWriteThread = new CliClientWriteThread(projectState, clientChannel, currentClientId, serverMessages)
+          new CliClientReadThread(projectState, handler, clientChannel, clientId, serverMessages)
+        val clientWriteThread = new CliClientWriteThread(projectState, clientChannel, clientId, serverMessages)
         clientWriteThread.start()
         clientReadThread.start()
         // no join, just let them run
