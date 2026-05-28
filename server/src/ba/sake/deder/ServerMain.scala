@@ -146,7 +146,6 @@ object ServerMain extends StrictLogging {
       scalaNativeTasks,
       graalvmNativeImageTasks,
       tasksRegistry,
-<<<<<<< HEAD
       cfg.maxInactiveSeconds,
       cfg.taskLockTimeoutSeconds,
       onShutdown,
