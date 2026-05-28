@@ -122,6 +122,7 @@ local const serverModules =
       }
       pomSettings = pom("deder-server", "Deder server")
       deps {
+        "com.softwaremill.ox::core:1.0.4"
         "org.jgrapht:jgrapht-core:1.5.2"
         "org.jgrapht:jgrapht-io:1.5.2"
         "com.lihaoyi::os-lib-watch:\(versions.osLib)"

@@ -52,7 +52,6 @@ class ConcurrencySuite extends munit.FunSuite {
       graalvmNativeImageTasks,
       tasksRegistry,
       Int.MaxValue,
-      dederExecutorService,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals
@@ -63,8 +62,8 @@ class ConcurrencySuite extends munit.FunSuite {
     val clientExecutorService = java.util.concurrent.Executors.newFixedThreadPool(32)
     val clientFutures = (1 to clientsCount).map { _ =>
       clientExecutorService.submit(() => {
-        val requestId = UUID.randomUUID().toString
-        state.executeTasks(requestId, Seq("common"), "task1", Seq.empty, false, serverNotificationsLogger, false)
+        val ctx = CliClientContext(clientId = UUID.randomUUID().toString, requestId = UUID.randomUUID().toString)
+        state.executeTasks(ctx, Seq("common"), "task1", Seq.empty, false, serverNotificationsLogger, false)
       })
     }
     clientFutures.foreach(_.get()) // wait for all clients to finish
@@ -103,7 +102,6 @@ class ConcurrencySuite extends munit.FunSuite {
       graalvmNativeImageTasks,
       tasksRegistry,
       Int.MaxValue,
-      dederExecutorService,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals
@@ -117,8 +115,8 @@ class ConcurrencySuite extends munit.FunSuite {
       clientExecutorService.submit(() => {
         // half of the clients always call "task2", the other half random tasks
         val taskName = if i % 2 == 0 then "task2" else taskNames(Random.nextInt(taskNames.length))
-        val requestId = UUID.randomUUID().toString
-        state.executeTasks(requestId, Seq("common"), taskName, Seq.empty, false, serverNotificationsLogger, false)
+        val ctx = CliClientContext(clientId = UUID.randomUUID().toString, requestId = UUID.randomUUID().toString)
+        state.executeTasks(ctx, Seq("common"), taskName, Seq.empty, false, serverNotificationsLogger, false)
       })
     }
     clientFutures.foreach(_.get()) // wait for all clients to finish

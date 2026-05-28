@@ -7,6 +7,7 @@ import scala.util.control.NonFatal
 import scala.util.Using
 import org.jgrapht.graph.{DefaultEdge, SimpleDirectedGraph}
 import com.typesafe.scalalogging.StrictLogging
+import ox.{supervised, forkUser}
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.DependencyResolver
@@ -16,7 +17,7 @@ class TasksExecutor(
     projectConfig: DederProject,
     modulesGraph: SimpleDirectedGraph[DederModule, DefaultEdge],
     tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge],
-    tasksExecutorService: ExecutorService,
+   // tasksExecutorService: ExecutorService,
     dependencyResolver: DependencyResolver,
     internals: DederProjectInternalsImpl
 ) extends StrictLogging {
@@ -25,14 +26,12 @@ class TasksExecutor(
   private type StageResult = (String, TaskResult[?], Boolean)
 
   def execute(
-      requestId: String,
       stages: Seq[Seq[TaskInstance]],
       moduleIds: Seq[String],
       taskName: String,
       args: Seq[String],
       watch: Boolean,
-      serverNotificationsLogger: ServerNotificationsLogger,
-      clientParams: CliClientParams
+      serverNotificationsLogger: ServerNotificationsLogger
   ): Seq[TaskExecResult] = {
     var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
     val finalTaskResults = Seq.newBuilder[TaskExecResult]
@@ -40,7 +39,7 @@ class TasksExecutor(
       val stageSpan = OTEL.TRACER.spanBuilder(s"Stage $stageIndex").startSpan()
       try {
         Using.resource(stageSpan.makeCurrent()) { _ =>
-          val taskExecutions: Seq[Callable[StageResult]] = for taskInstance <- taskInstances yield {
+          val taskExecutions: Seq[() => StageResult] = for taskInstance <- taskInstances yield {
             val allTaskDeps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
             val depResults = allTaskDeps.flatMap { depEdge =>
               val d = tasksGraph.getEdgeTarget(depEdge)
@@ -52,8 +51,6 @@ class TasksExecutor(
             () =>
               val taskStartNanos = System.nanoTime()
               val taskSpan = OTEL.TRACER.spanBuilder(taskInstance.id).startSpan()
-              RequestContext.id.set(requestId)
-              RequestContext.clientParams.set(clientParams)
               try {
                 Using.resource(taskSpan.makeCurrent()) { scope =>
                   val (taskRes, changed) = taskInstance.task
@@ -80,24 +77,13 @@ class TasksExecutor(
                   taskSpan.setStatus(StatusCode.ERROR)
                   throw e
               } finally {
-                RequestContext.id.remove()
-                RequestContext.clientParams.remove()
                 taskSpan.end()
               }
           }
-          val futures = taskExecutions.map(tasksExecutorService.submit)
-          val results: Seq[StageResult] =
-            try {
-              futures.map(f => f.get())
-            } catch {
-              case e: ExecutionException =>
-                // if one task fails, cancel all other tasks in this stage
-                futures.foreach(_.cancel(true))
-                throw Option(e.getCause).getOrElse(e)
-              case NonFatal(e) =>
-                futures.foreach(_.cancel(true))
-                throw e
-            }
+          val results: Seq[StageResult] = supervised {
+            val forks = taskExecutions.map(te => forkUser { te() })
+            forks.map(_.join())
+          }
           taskResults ++= results.map { case (id, taskRes, _) => id -> taskRes }
           // collect final task results on the caller thread (after all futures have completed)
           // to avoid a data race: multiple worker threads writing to finalTaskResults concurrently

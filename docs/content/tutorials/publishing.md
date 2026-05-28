@@ -82,29 +82,10 @@ deps {
 }
 ```
 
-If you also use sbt or Mill in other projects, use their equivalent dependency syntax for the same coordinate.
-
-By default, Deder resolves from `~/.m2/repository`, so this works without extra repository configuration.
-If you set `includeDefaultRepos = false`, add your local Maven repo explicitly:
-
-```pkl
-repositories {
-  new MavenRepository { url = "file:///home/your-user/.m2/repository" }
-}
-
-includeDefaultRepos = false
-```
-
-See also:
-
-- [Custom Repositories](/reference/repositories.html)
-- [Dependencies how-to](/howtos/dependencies.html)
-
-
 ## Publish to Sonatype Maven Central
 
 To publish to Sonatype Maven Central, credentials can come from env vars following the pattern
-`DEDER_<PUBLISH_TO_ID>_<FIELD>` (uppercased, `-` replaced with `_`).
+`DEDER_<REPO_ID>_<FIELD>` (uppercased, `-` replaced with `_`).
 With `id = "sonatype"` (default one), set these:
 ```shell
 export DEDER_SONATYPE_USERNAME="..."

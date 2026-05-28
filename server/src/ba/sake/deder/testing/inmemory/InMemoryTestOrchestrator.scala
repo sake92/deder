@@ -37,12 +37,13 @@ object InMemoryTestOrchestrator {
     Thread.currentThread().setContextClassLoader(classLoader)
     try {
       val logger = DederTestLogger(notifications, moduleId)
-      val currentRequestId = RequestContext.id.get()
-      val isCancelled: () => Boolean = () =>
-        currentRequestId != null && {
-          val tok = DederGlobals.cancellationTokens.get(currentRequestId)
+      val isCancelled: () => Boolean = () => {
+        val requestId = RequestContext.clientContext.get().map(_.requestId).orNull
+        requestId != null && {
+          val tok = DederGlobals.cancellationTokens.get(requestId)
           tok != null && tok.get()
         }
+      }
       val testRunner = DederTestRunner(testParallelism, discoveredTests, Map.empty, classLoader, logger, isCancelled = isCancelled)
       testRunner.run(testOptions)
     } finally {

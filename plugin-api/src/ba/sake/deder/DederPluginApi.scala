@@ -7,23 +7,15 @@ import ba.sake.deder.config.DederProject
 trait DederPluginApi {
   def id: String
 
-  /** Called on every (re)load, before tasks(). Receives full context including
-    * plugin config, core task APIs, server internals, and the full DederProject.
-    * Plugin authors store what they need in instance fields.
+  /** Called on every (re)load. Receives full context including plugin config, core task APIs,
+    * server internals, and the full DederProject. Returns tasks to register (or Seq.empty for
+    * sidecar-only plugins like dashboards).
     *
     * @return Left(error) → plugin is skipped (error logged, no tasks registered,
     *         server continues with other plugins).
+    *         Right(tasks) → tasks are registered in the build DAG.
     */
-  def start(params: PluginStartParams): Either[String, Unit] = Right(())
-
-  /** Called after start(). No params — use state captured during start().
-    *
-    * @return Either an error message (Left) or a sequence of tasks to register (Right).
-    *         If an error occurs during plugin loading, the message will be logged and the
-    *         plugin will be skipped, but the server will continue running with previously
-    *         loaded plugins (if any).
-    */
-  def tasks(): Either[String, Seq[AbstractTask[?]]]
+  def init(params: PluginInitParams): Either[String, Seq[AbstractTask[?]]] = Right(Seq.empty)
 
   /** Called when the plugin is unloaded (config reload or server shutdown). */
   def close(): Unit = ()
@@ -42,7 +34,7 @@ trait DederPluginApi {
   * @param project
   *   The full parsed DederProject config (modules, server properties, repositories, etc.).
   */
-case class PluginStartParams(
+case class PluginInitParams(
     configText: String,
     coreTasks: CoreTasksApi,
     sjsTasks: ScalaJsTasksApi,

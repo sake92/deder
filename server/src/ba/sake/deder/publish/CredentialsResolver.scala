@@ -10,7 +10,7 @@ object CredentialsResolver {
   /** Resolve publish credentials with env var overrides.
     *
     * Precedence (highest to lowest):
-    * 1. Client env vars from CLI (RequestContext.clientParams)
+    * 1. Client env vars from CLI (RequestContext.clientContext)
     * 2. System env vars (sys.env / System.getenv)
     * 3. ~/.deder/credentials.pkl (fallback)
     *
@@ -23,7 +23,7 @@ object CredentialsResolver {
     *
     * @param publishTo       The publish target from deder.pkl
     * @param credentialsOpt  Parsed credentials from ~/.deder/credentials.pkl (None if file missing)
-    * @param clientEnv       Client-side env vars (from RequestContext.clientParams)
+    * @param clientEnv       Client-side env vars (from RequestContext.clientContext)
     * @param sysEnv          Server-side system env vars (sys.env / System.getenv)
     * @return                Fully resolved RepoCredentials
     * @throws RuntimeException if any required field is missing from all sources
