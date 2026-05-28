@@ -6,6 +6,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
+import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
@@ -30,12 +31,14 @@ class DederProjectState(
     graalvmNativeImageTasks: GraalVmNativeImageTasks,
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
+    taskLockTimeoutSeconds: Int,
     onShutdown: () => Unit,
     configFile: os.Path,
     val internals: DederProjectInternalsImpl
 ) extends StrictLogging {
 
   private val maxInactiveDuration = Duration.ofSeconds(maxInactiveSeconds)
+  private val taskLockTimeoutEnabled = taskLockTimeoutSeconds > 0
 
   @volatile private var shutdownStarted = false
 
@@ -322,15 +325,23 @@ class DederProjectState(
           state.projectConfig,
           state.tasksResolver.modulesGraph,
           state.tasksResolver.taskInstancesGraph,
-         // tasksExecutorService,
           state.dependencyResolver,
           internals
         )
       val allTaskInstances = tasksExecStages.flatten.sortBy(_.id) // essential!!
+      val acquiredLocks = ArrayBuffer.empty[TaskInstance]
       try {
         allTaskInstances.foreach { taskInstance =>
-          // TODO timed wait
-          taskInstance.lock.lock()
+          if taskLockTimeoutEnabled then
+            val acquired = taskInstance.lock.tryLock(taskLockTimeoutSeconds.toLong, TimeUnit.SECONDS)
+            if !acquired then
+              throw TaskLockTimeoutException(
+                s"Timed out waiting for lock on task '${taskInstance.id}' after ${taskLockTimeoutSeconds}s. " +
+                s"The lock is held by another in-flight request. Consider increasing 'taskLockTimeoutSeconds' in .deder/server.properties."
+              )
+          else
+            taskInstance.lock.lock()
+          acquiredLocks += taskInstance
         }
         DederGlobals.cancellationTokens.put(ctx.requestId, new AtomicBoolean(false))
         val result = tasksExecutor.execute(
@@ -345,7 +356,7 @@ class DederProjectState(
         internals.recordRequestCompleted(ctx.requestId, taskName, success = true, duration, callerType)
         result
       } finally {
-        allTaskInstances.reverse.foreach { taskInstance =>
+        acquiredLocks.reverse.foreach { taskInstance =>
           taskInstance.lock.unlock()
         }
         DederGlobals.cancellationTokens.remove(ctx.requestId)
@@ -401,11 +412,23 @@ class DederProjectState(
               .flatMap(state.tasksResolver.taskInstancesPerModule.get)
               .flatten
               .sortBy(_.id)
+            val acquiredCleanLocks = ArrayBuffer.empty[TaskInstance]
             try {
-              modulesTaskInstances.foreach(_.lock.lock())
+              modulesTaskInstances.foreach { taskInstance =>
+                if taskLockTimeoutEnabled then
+                  val acquired = taskInstance.lock.tryLock(taskLockTimeoutSeconds.toLong, TimeUnit.SECONDS)
+                  if !acquired then
+                    throw TaskLockTimeoutException(
+                      s"Timed out waiting for lock on task '${taskInstance.id}' while cleaning after ${taskLockTimeoutSeconds}s. " +
+                      s"The lock is held by another in-flight request."
+                    )
+                else
+                  taskInstance.lock.lock()
+                acquiredCleanLocks += taskInstance
+              }
               DederCleaner.cleanModules(moduleIds)
             } finally {
-              modulesTaskInstances.reverse.foreach(_.lock.unlock())
+              acquiredCleanLocks.reverse.foreach(_.lock.unlock())
             }
         }
     }
@@ -447,13 +470,25 @@ class DederProjectState(
                 if remaining > 0 then logger.info(s"...and ${remaining} more task/module combo(s)")
 
                 val sorted = taskInstances.map(_._2).sortBy(_.id)
+                val acquiredCleanTaskLocks = ArrayBuffer.empty[TaskInstance]
                 try {
-                  sorted.foreach(_.lock.lock())
+                  sorted.foreach { taskInstance =>
+                    if taskLockTimeoutEnabled then
+                      val acquired = taskInstance.lock.tryLock(taskLockTimeoutSeconds.toLong, TimeUnit.SECONDS)
+                      if !acquired then
+                        throw TaskLockTimeoutException(
+                          s"Timed out waiting for lock on task '${taskInstance.id}' while cleaning after ${taskLockTimeoutSeconds}s. " +
+                          s"The lock is held by another in-flight request."
+                        )
+                    else
+                      taskInstance.lock.lock()
+                    acquiredCleanTaskLocks += taskInstance
+                  }
                   taskInstances.forall { (moduleId, taskInstance) =>
                     DederCleaner.cleanTask(moduleId, taskInstance.task.name)
                   }
                 } finally {
-                  sorted.reverse.foreach(_.lock.unlock())
+                  acquiredCleanTaskLocks.reverse.foreach(_.lock.unlock())
                 }
             }
         }

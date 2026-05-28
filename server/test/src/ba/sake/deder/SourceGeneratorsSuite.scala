@@ -133,6 +133,7 @@ class SourceGeneratorsSuite extends munit.FunSuite {
           graalvmNativeImageTasks,
           tasksRegistry,
           Int.MaxValue,
+          0,
           () => (),
           configFile = testProjectDir / "deder.pkl",
           internals = noopInternals

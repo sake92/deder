@@ -52,6 +52,7 @@ class ConcurrencySuite extends munit.FunSuite {
       graalvmNativeImageTasks,
       tasksRegistry,
       Int.MaxValue,
+      0,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals
@@ -102,6 +103,7 @@ class ConcurrencySuite extends munit.FunSuite {
       graalvmNativeImageTasks,
       tasksRegistry,
       Int.MaxValue,
+      0,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals
@@ -124,6 +126,103 @@ class ConcurrencySuite extends munit.FunSuite {
     dederExecutorService.shutdown()
     // count gets incremented by task1+task2
     assertEquals(globalVar, clientsCount)
+  }
+
+  test("executeTask should timeout when lock is held longer than taskLockTimeoutSeconds") {
+    val tasksRegistry = TasksRegistry(coreTasks.all)
+    val slowTask = TaskBuilder
+      .make[String](name = "slowTask", supportedModuleTypes = Set(ModuleType.SCALA))
+      .dependsOn(coreTasks.compileTask)
+      .build { _ =>
+        Thread.sleep(5000)
+        ""
+      }
+    tasksRegistry.add(slowTask)
+
+    val state = DederProjectState(
+      coreTasks,
+      runTasks,
+      scalaJsTasks,
+      scalaNativeTasks,
+      graalvmNativeImageTasks,
+      tasksRegistry,
+      Int.MaxValue,
+      2,
+      () => (),
+      configFile = testProjectDir / "deder.pkl",
+      internals = noopInternals
+    )
+    val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
+
+    val requestId1 = UUID.randomUUID().toString
+    val requestId2 = UUID.randomUUID().toString
+
+    val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    val backgroundFuture = backgroundExecutor.submit(() => {
+      try {
+        state.executeTasks(CliClientContext(clientId = requestId1, requestId = requestId1), Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
+      } catch {
+        case _: Exception =>
+      }
+    })
+
+    Thread.sleep(500)
+
+    val ex = intercept[TaskEvaluationException] {
+      state.executeTasks(CliClientContext(clientId = requestId2, requestId = requestId2), Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
+    }
+
+    assert(ex.getCause.isInstanceOf[TaskLockTimeoutException], s"Expected TaskLockTimeoutException, got: ${ex.getCause.getClass.getName}")
+    assert(ex.getCause.getMessage.contains("Timed out waiting for lock"), s"Unexpected message: ${ex.getCause.getMessage}")
+
+    backgroundExecutor.shutdown()
+  }
+
+  test("executeTask with taskLockTimeoutSeconds=0 should not timeout (unlimited wait)") {
+    val tasksRegistry = TasksRegistry(coreTasks.all)
+    val slowTask = TaskBuilder
+      .make[String](name = "slowTaskZero", supportedModuleTypes = Set(ModuleType.SCALA))
+      .dependsOn(coreTasks.compileTask)
+      .build { _ =>
+        Thread.sleep(1000)
+        ""
+      }
+    tasksRegistry.add(slowTask)
+
+    val state = DederProjectState(
+      coreTasks,
+      runTasks,
+      scalaJsTasks,
+      scalaNativeTasks,
+      graalvmNativeImageTasks,
+      tasksRegistry,
+      Int.MaxValue,
+      0,
+      () => (),
+      configFile = testProjectDir / "deder.pkl",
+      internals = noopInternals
+    )
+    val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
+
+    val requestId1 = UUID.randomUUID().toString
+    val requestId2 = UUID.randomUUID().toString
+
+    val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    val lockAcquiredLatch = new java.util.concurrent.CountDownLatch(1)
+    val backgroundFuture = backgroundExecutor.submit(() => {
+      try {
+        lockAcquiredLatch.countDown()
+        state.executeTasks(CliClientContext(clientId = requestId1, requestId = requestId1), Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
+      } catch {
+        case _: Exception =>
+      }
+    })
+
+    lockAcquiredLatch.await()
+
+    state.executeTasks(CliClientContext(clientId = requestId2, requestId = requestId2), Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
+
+    backgroundExecutor.shutdown()
   }
 
 }

@@ -5,3 +5,5 @@ class DederException(message: String, cause: Throwable = null) extends RuntimeEx
 class TaskNotFoundException(message: String, cause: Throwable = null) extends DederException(message, cause)
 
 class TaskEvaluationException(message: String, cause: Throwable = null) extends DederException(message, cause)
+
+class TaskLockTimeoutException(message: String, cause: Throwable = null) extends DederException(message, cause)
