@@ -31,7 +31,8 @@ import ba.sake.deder.*
 class MyPluginImpl extends DederPluginApi:
   def id: String = "my-plugin"
 
-  def tasks(params: PluginTasksParams): Either[String, Seq[AbstractTask[?]]] =
+  // Called on every (re)load. Return tasks to register, or Seq.empty for no tasks.
+  def init(params: PluginInitParams): Either[String, Seq[AbstractTask[?]]] =
     val myTask = TaskBuilder
       .make[String]("myTask") // T must have JsonRW and Hashable instances
       .build { ctx =>
@@ -43,17 +44,13 @@ class MyPluginImpl extends DederPluginApi:
 
 Register the implementation via `META-INF/services/ba.sake.deder.DederPluginApi` (standard ServiceLoader).
 
-If your plugin owns resources (thread pools, connections, etc.), override `onClose()` to release them when the server shuts down.
+If your plugin owns resources (thread pools, connections, etc.), override `close()` to release them when the server shuts down.
+
+`PluginInitParams` provides everything you need in one place: plugin config, core task APIs, server internals, and the full `DederProject`.
 
 ## Depending on built-in tasks from a plugin
 
-`PluginTasksParams` gives your plugin access to the public task wrappers:
-
-- `params.coreTasks` for core/JVM tasks such as `compileTask`
-- `params.sjsTasks` for Scala.js link tasks
-- `params.snTasks` for Scala Native link tasks
-
-For example:
+Use `params.coreTasks`, `params.sjsTasks`, and `params.snTasks` directly from `PluginInitParams`:
 
 ```scala
 import ba.sake.deder.*
@@ -62,7 +59,7 @@ import ba.sake.deder.config.DederProject.ModuleType
 class MyPluginImpl extends DederPluginApi:
   def id: String = "my-plugin"
 
-  def tasks(params: PluginTasksParams): Either[String, Seq[AbstractTask[?]]] =
+  def init(params: PluginInitParams): Either[String, Seq[AbstractTask[?]]] =
     val afterCompile = TaskBuilder
       .make[String]("afterCompile")
       .dependsOn(params.coreTasks.compileTask)
@@ -87,11 +84,11 @@ class MyPluginImpl extends DederPluginApi:
     Right(Seq(afterCompile, afterScalaJsLink, afterScalaNativeLink))
 ```
 
-The snippet above shows the available dependency points in one place. When you depend on `params.sjsTasks` or `params.snTasks`, make sure the plugin task is gated to matching module types, otherwise the dependency will not exist for plain JVM modules.
+The snippet above shows the available dependency points in one place. When you depend on `sjsTasks` or `snTasks`, make sure the plugin task is gated to matching module types, otherwise the dependency will not exist for plain JVM modules.
 
 ## Public task surface vs internal tasks
 
-`PluginTasksParams` intentionally exposes a **curated** built-in task surface through stable wrapper traits:
+`PluginInitParams` intentionally exposes a **curated** built-in task surface through stable wrapper traits:
 
 - `CoreTasksApi`
 - `ScalaJsTasksApi`
@@ -108,7 +105,7 @@ This boundary is deliberate:
 
 If you need a built-in task dependency, first check whether it is available through one of the public wrapper traits. If it is not exposed there, treat it as internal/unsupported for plugin use.
 
-> **Migration note:** This curated API is a breaking change for plugins that depended on older internals. Task handles such as `allClassesDirsTask` and `allDependenciesTask` are no longer public, and `PluginTasksParams` now includes `sjsTasks` / `snTasks` in addition to `coreTasks`. Existing plugin code that destructures or copies `PluginTasksParams` must be updated, and plugins that used the removed task handles must migrate to supported wrapper tasks such as `classesTask`, `compileClasspathTask`, or `depsTreeTask`.
+> **Migration note:** The plugin API changed in v0.x: the old `tasks(PluginTasksParams)` is now a single `init(PluginInitParams)` method that receives full context (plugin config, core task APIs, server internals, and the full `DederProject`) and returns tasks directly. `onClose()` is renamed to `close()`.
 
 ## Typed plugin config
 
@@ -153,7 +150,7 @@ If you are developing inside a Deder checkout, the convenience wrapper does the 
 
 This reads `my-plugin/resources/*.pkl`, writes generated Java sources into `my-plugin/src/`, and refreshes any generated or bundled resources under `my-plugin/resources/`.
 
-### 3. Read config in `tasks` function
+### 3. Read config in `init` function
 
 ```scala
 import ba.sake.deder.*
@@ -161,7 +158,7 @@ import ba.sake.deder.*
 class MyPluginImpl extends DederPluginApi:
   def id: String = "my-plugin"
 
-  def tasks(params: PluginTasksParams): Either[String, Seq[AbstractTask[?]]] =
+  def init(params: PluginInitParams): Either[String, Seq[AbstractTask[?]]] =
     val pluginModule = PluginConfigEvaluators.evaluate(
       getClass.getClassLoader,
       modulePath = "MyPluginModule.pkl",

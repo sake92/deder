@@ -5,7 +5,7 @@ import ba.sake.deder.*
 class HelloPluginImpl extends DederPluginApi {
   def id: String = "hello2"
 
-  def tasks(params: PluginTasksParams): Either[String, Seq[AbstractTask[?]]] = {
+  override def init(params: PluginInitParams): Either[String, Seq[AbstractTask[?]]] = {
     // test if classpath isolation works,
     // os.zip exists from os-lib 0.11.0
     println(os.zip)

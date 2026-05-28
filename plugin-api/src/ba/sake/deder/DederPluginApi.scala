@@ -1,20 +1,24 @@
 package ba.sake.deder
 
 import ba.sake.deder.deps.{DepTree, Dependency}
+import ba.sake.deder.config.DederProject
 
 /** Trait that plugins implement to register additional tasks. */
 trait DederPluginApi {
   def id: String
 
-  /** @param params
-    * @return
-    *   Either an error message (Left) or a sequence of tasks to register (Right). If an error occurs during plugin
-    *   loading, the message will be logged and the plugin will be skipped, but the server will continue running with
-    *   previously loaded plugins (if any).
+  /** Called on every (re)load. Receives full context including plugin config, core task APIs,
+    * server internals, and the full DederProject. Returns tasks to register (or Seq.empty for
+    * sidecar-only plugins like dashboards).
+    *
+    * @return Left(error) → plugin is skipped (error logged, no tasks registered,
+    *         server continues with other plugins).
+    *         Right(tasks) → tasks are registered in the build DAG.
     */
-  def tasks(params: PluginTasksParams): Either[String, Seq[AbstractTask[?]]]
+  def init(params: PluginInitParams): Either[String, Seq[AbstractTask[?]]] = Right(Seq.empty)
 
-  def onClose(): Unit = ()
+  /** Called when the plugin is unloaded (config reload or server shutdown). */
+  def close(): Unit = ()
 }
 
 /** @param configText
@@ -25,13 +29,18 @@ trait DederPluginApi {
   *   Access to the stable Scala.js linking tasks that plugins may depend on.
   * @param snTasks
   *   Access to the stable Scala Native linking tasks that plugins may depend on.
+  * @param internals
+  *   Access to server introspection (request metrics, uptime, etc.).
+  * @param project
+  *   The full parsed DederProject config (modules, server properties, repositories, etc.).
   */
-case class PluginTasksParams(
+case class PluginInitParams(
     configText: String,
     coreTasks: CoreTasksApi,
     sjsTasks: ScalaJsTasksApi,
     snTasks: ScalaNativeTasksApi,
-    internals: DederProjectInternals
+    internals: DederProjectInternals,
+    project: DederProject
 )
 
 /** Typed access to the curated, stable core task surface that plugins may depend on. Internal tasks and actual

@@ -94,7 +94,6 @@ object ServerMain extends StrictLogging {
     val metricsMeter = GlobalOpenTelemetry.get().getMeter("deder-server")
     val internals = DederProjectInternalsImpl(1, metricsMeter)
 
-
     debounceScheduler = Executors.newSingleThreadScheduledExecutor(r => Thread(r, "watch-debounce"))
 
     // Must be declared before onShutdown to avoid forward reference error (var, not val)

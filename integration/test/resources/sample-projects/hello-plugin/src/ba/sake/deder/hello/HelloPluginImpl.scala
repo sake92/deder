@@ -5,7 +5,7 @@ import ba.sake.deder.*
 class HelloPluginImpl extends DederPluginApi {
   def id: String = "hello"
 
-  override def tasks(params: PluginTasksParams): Either[String, Seq[AbstractTask[?]]] = {
+  override def init(params: PluginInitParams): Either[String, Seq[AbstractTask[?]]] = {
     val pluginModule =
       PluginConfigEvaluators.evaluate(
         getClass.getClassLoader,
