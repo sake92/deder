@@ -120,12 +120,9 @@ class ScalaJsTestRunner(
     }
 
   private def startForwarding(stream: InputStream, log: String => Unit): Unit = {
-    val thread = new Thread(
-      () => drainStream(stream, log),
-      s"deder-scalajs-test-output-$moduleId"
+    Thread.ofVirtual().name(s"deder-scalajs-test-output-$moduleId").start(() =>
+      drainStream(stream, log)
     )
-    thread.setDaemon(true)
-    thread.start()
   }
 
   private def drainStream(stream: InputStream, log: String => Unit): Unit =
