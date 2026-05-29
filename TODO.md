@@ -2,16 +2,12 @@
 # Misc
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - init like giter8, autoimport from sbt?
-- max timeout when waiting for lock and bail out, report to bsp??
 - import from other maven effective POM etc
 - import from other mill
 - import from other gradle
 - sbt-updates for deps
 - periodic print tasks that are still running, maybe every 5 mins so user knows it is still compiling or whatever
-- cleanup virtual threads work, do it for test-runner too?
-- no need to pass current cli client ctx coz its per-vthread now
-- no extends Thread.. no threadpools
-- optimize early-release download cache and version print..!!
+
 
 run pkldoc on each tag, and publish to ghpages
 https://pkl-lang.org/main/current/pkl-doc/index.html
