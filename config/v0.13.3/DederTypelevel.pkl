@@ -1,0 +1,328 @@
+module ba.sake.deder.config.DederTypelevel
+
+import "DederProject.pkl" as P
+
+/// sbt-typelevel convention templates as reusable ScalaModule templates.
+/// Source: https://github.com/typelevel/sbt-typelevel
+/// Option lists transcribed from TypelevelSettingsPlugin.scala (sbt-typelevel main branch).
+///
+/// Modes: Dev (default, no fatal warnings), Ci (with -Xfatal-warnings / -Werror).
+/// Mode auto-selected via $CI env var.
+hidden commonScalacOptions: Listing<String> = new {
+  "-deprecation"
+  "-encoding"
+  "utf8"
+  "-feature"
+  "-unchecked"
+}
+
+hidden typelevelScalacOptions2_12: Listing<String> = new {
+  ...commonScalacOptions
+  "-Xlint"
+  "-Yno-adapted-args"
+  "-Ywarn-dead-code"
+  "-Ywarn-unused-import"
+  "-Xlint:_,-unused"
+  "-Ywarn-unused:_,-nowarn,-privates"
+  "-Ypartial-unification"
+  "-language:_"
+  "-Xsource:3"
+}
+
+hidden typelevelScalacOptions2_13: Listing<String> = new {
+  ...commonScalacOptions
+  "-Wdead-code"
+  "-Wextra-implicit"
+  "-Wnumeric-widen"
+  "-Wunused"
+  "-Wvalue-discard"
+  "-Xlint:_,-implicit-recursion,-recurse-with-default,-unused,-byname-implicit"
+  "-Wconf:cat=scala3-migration:s"
+  "-language:_"
+  "-Xsource:3"
+}
+
+hidden typelevelScalacOptions3: Listing<String> = new {
+  ...commonScalacOptions
+  "-Wunused:implicits"
+  "-Wunused:explicits"
+  "-Wunused:imports"
+  "-Wunused:locals"
+  "-Wunused:params"
+  "-Wunused:privates"
+  "-Wvalue-discard"
+  "-Ykind-projector:underscores"
+  "-language:implicitConversions"
+}
+
+local function mkScalacOptions(version: P.ScalaBinaryVersion, mode: String): Listing<String> =
+  let (
+    opts =
+      if (version == "2.12")
+        typelevelScalacOptions2_12
+      else if (version == "2.13")
+        typelevelScalacOptions2_13
+      else
+        typelevelScalacOptions3
+  )
+  let (
+    fatalFlag =
+      if (version == "3")
+        "-Werror"
+      else if (version == "2.13")
+        "-Werror"
+      else
+        "-Xfatal-warnings"
+  )
+    if (mode == "ci")
+      (opts.toList().add(fatalFlag)).toListing()
+    else
+      opts
+
+local function mkBaseMain(version: P.ScalaBinaryVersion, mode: String): P.ScalaModule = new {
+  id = "dummy-typelevel-base"
+  // dummy scalaVersion just so we get a proper ScalaModule type
+  scalaVersion = if (version == "3") "3.0.0" else if (version == "2.13") "2.13.0" else "2.12.0"
+  scalacOptions = mkScalacOptions(version, mode)
+  compileOrder = "java-then-scala"
+  javacOptions {
+    "-encoding:utf8"
+    "-Xlint:all"
+  }
+  when (version != "3") {
+    scalacPluginDeps {
+      "com.olegpy::better-monadic-for:0.3.1"
+      "org.typelevel:::kind-projector:0.13.4"
+    }
+  }
+  compileOnlyDeps {
+    "org.typelevel::scalac-compat-annotation:0.1.4"
+  }
+  pomSettings {
+    groupId = "com.example"
+    artifactId = "dummy-typelevel-artifact"
+    licenses {
+      new P.PomLicense {
+        name = "Apache 2.0 License"
+        url = "https://opensource.org/license/apache-2.0"
+      }
+    }
+  }
+}
+
+local function mkBaseTest(version: P.ScalaBinaryVersion, mode: String): P.ScalaTestModule = (
+  mkBaseMain(version, mode).asTest()
+) {
+  testFrameworks {
+    "munit.Framework"
+    "org.scalacheck.ScalaCheckFramework"
+  }
+  deps {
+    "org.scalameta::munit:1.1.0"
+    "org.scalacheck::scalacheck:1.18.1"
+    "org.typelevel::discipline-munit:2.0.0"
+  }
+}
+
+function mkBaseJs(version: P.ScalaBinaryVersion, mode: String): P.ScalaJsModule = (
+  mkBaseMain(version, mode).asJs()
+) {
+  scalaJsVersion = "1.18.2"
+}
+
+function mkBaseJsTest(version: P.ScalaBinaryVersion, mode: String): P.ScalaJsTestModule = (
+  mkBaseJs(version, mode).asTest()
+) {
+  testFrameworks {
+    "munit.Framework"
+    "org.scalacheck.ScalaCheckFramework"
+  }
+  deps {
+    "org.scalameta::munit:1.1.0"
+    "org.scalacheck::scalacheck:1.18.1"
+    "org.typelevel::discipline-munit:2.0.0"
+  }
+}
+
+function mkBaseNative(version: P.ScalaBinaryVersion, mode: String): P.ScalaNativeModule = (
+  mkBaseMain(version, mode).asNative()
+) {
+  scalaNativeVersion = "0.5.7"
+}
+
+function mkBaseNativeTest(version: P.ScalaBinaryVersion, mode: String): P.ScalaNativeTestModule = (
+  mkBaseNative(version, mode).asTest()
+) {
+  testFrameworks {
+    "munit.Framework"
+    "org.scalacheck.ScalaCheckFramework"
+  }
+  deps {
+    "org.scalameta::munit:1.1.0"
+    "org.scalacheck::scalacheck:1.18.1"
+    "org.typelevel::discipline-munit:2.0.0"
+  }
+}
+
+// --- Scala 3 exports ---
+
+typelevelScala3Dev: P.ScalaModule = mkBaseMain("3", "dev")
+typelevelScala3Ci: P.ScalaModule = mkBaseMain("3", "ci")
+typelevelScala3: P.ScalaModule =
+  if (read?("env:CI") != null) typelevelScala3Ci else typelevelScala3Dev
+
+typelevelScala3TestDev: P.ScalaTestModule = mkBaseTest("3", "dev")
+typelevelScala3TestCi: P.ScalaTestModule = mkBaseTest("3", "ci")
+typelevelScala3Test: P.ScalaTestModule =
+  if (read?("env:CI") != null) typelevelScala3TestCi else typelevelScala3TestDev
+
+typelevelScala3JsDev: P.ScalaJsModule = mkBaseJs("3", "dev")
+typelevelScala3JsCi: P.ScalaJsModule = mkBaseJs("3", "ci")
+typelevelScala3Js: P.ScalaJsModule =
+  if (read?("env:CI") != null) typelevelScala3JsCi else typelevelScala3JsDev
+
+typelevelScala3JsTestDev: P.ScalaJsTestModule = mkBaseJsTest("3", "dev")
+typelevelScala3JsTestCi: P.ScalaJsTestModule = mkBaseJsTest("3", "ci")
+typelevelScala3JsTest: P.ScalaJsTestModule =
+  if (read?("env:CI") != null) typelevelScala3JsTestCi else typelevelScala3JsTestDev
+
+typelevelScala3NativeDev: P.ScalaNativeModule = mkBaseNative("3", "dev")
+typelevelScala3NativeCi: P.ScalaNativeModule = mkBaseNative("3", "ci")
+typelevelScala3Native: P.ScalaNativeModule =
+  if (read?("env:CI") != null) typelevelScala3NativeCi else typelevelScala3NativeDev
+
+typelevelScala3NativeTestDev: P.ScalaNativeTestModule = mkBaseNativeTest("3", "dev")
+typelevelScala3NativeTestCi: P.ScalaNativeTestModule = mkBaseNativeTest("3", "ci")
+typelevelScala3NativeTest: P.ScalaNativeTestModule =
+  if (read?("env:CI") != null) typelevelScala3NativeTestCi else typelevelScala3NativeTestDev
+
+// --- Scala 2.13 exports ---
+
+typelevelScala213Dev: P.ScalaModule = mkBaseMain("2.13", "dev")
+typelevelScala213Ci: P.ScalaModule = mkBaseMain("2.13", "ci")
+typelevelScala213: P.ScalaModule =
+  if (read?("env:CI") != null) typelevelScala213Ci else typelevelScala213Dev
+
+typelevelScala213TestDev: P.ScalaTestModule = mkBaseTest("2.13", "dev")
+typelevelScala213TestCi: P.ScalaTestModule = mkBaseTest("2.13", "ci")
+typelevelScala213Test: P.ScalaTestModule =
+  if (read?("env:CI") != null) typelevelScala213TestCi else typelevelScala213TestDev
+
+typelevelScala213JsDev: P.ScalaJsModule = mkBaseJs("2.13", "dev")
+typelevelScala213JsCi: P.ScalaJsModule = mkBaseJs("2.13", "ci")
+typelevelScala213Js: P.ScalaJsModule =
+  if (read?("env:CI") != null) typelevelScala213JsCi else typelevelScala213JsDev
+
+typelevelScala213JsTestDev: P.ScalaJsTestModule = mkBaseJsTest("2.13", "dev")
+typelevelScala213JsTestCi: P.ScalaJsTestModule = mkBaseJsTest("2.13", "ci")
+typelevelScala213JsTest: P.ScalaJsTestModule =
+  if (read?("env:CI") != null) typelevelScala213JsTestCi else typelevelScala213JsTestDev
+
+typelevelScala213NativeDev: P.ScalaNativeModule = mkBaseNative("2.13", "dev")
+typelevelScala213NativeCi: P.ScalaNativeModule = mkBaseNative("2.13", "ci")
+typelevelScala213Native: P.ScalaNativeModule =
+  if (read?("env:CI") != null) typelevelScala213NativeCi else typelevelScala213NativeDev
+
+typelevelScala213NativeTestDev: P.ScalaNativeTestModule = mkBaseNativeTest("2.13", "dev")
+typelevelScala213NativeTestCi: P.ScalaNativeTestModule = mkBaseNativeTest("2.13", "ci")
+typelevelScala213NativeTest: P.ScalaNativeTestModule =
+  if (read?("env:CI") != null) typelevelScala213NativeTestCi else typelevelScala213NativeTestDev
+
+// --- Scala 2.12 exports ---
+
+typelevelScala212Dev: P.ScalaModule = mkBaseMain("2.12", "dev")
+typelevelScala212Ci: P.ScalaModule = mkBaseMain("2.12", "ci")
+typelevelScala212: P.ScalaModule =
+  if (read?("env:CI") != null) typelevelScala212Ci else typelevelScala212Dev
+
+typelevelScala212TestDev: P.ScalaTestModule = mkBaseTest("2.12", "dev")
+typelevelScala212TestCi: P.ScalaTestModule = mkBaseTest("2.12", "ci")
+typelevelScala212Test: P.ScalaTestModule =
+  if (read?("env:CI") != null) typelevelScala212TestCi else typelevelScala212TestDev
+
+typelevelScala212JsDev: P.ScalaJsModule = mkBaseJs("2.12", "dev")
+typelevelScala212JsCi: P.ScalaJsModule = mkBaseJs("2.12", "ci")
+typelevelScala212Js: P.ScalaJsModule =
+  if (read?("env:CI") != null) typelevelScala212JsCi else typelevelScala212JsDev
+
+typelevelScala212JsTestDev: P.ScalaJsTestModule = mkBaseJsTest("2.12", "dev")
+typelevelScala212JsTestCi: P.ScalaJsTestModule = mkBaseJsTest("2.12", "ci")
+typelevelScala212JsTest: P.ScalaJsTestModule =
+  if (read?("env:CI") != null) typelevelScala212JsTestCi else typelevelScala212JsTestDev
+
+typelevelScala212NativeDev: P.ScalaNativeModule = mkBaseNative("2.12", "dev")
+typelevelScala212NativeCi: P.ScalaNativeModule = mkBaseNative("2.12", "ci")
+typelevelScala212Native: P.ScalaNativeModule =
+  if (read?("env:CI") != null) typelevelScala212NativeCi else typelevelScala212NativeDev
+
+typelevelScala212NativeTestDev: P.ScalaNativeTestModule = mkBaseNativeTest("2.12", "dev")
+typelevelScala212NativeTestCi: P.ScalaNativeTestModule = mkBaseNativeTest("2.12", "ci")
+typelevelScala212NativeTest: P.ScalaNativeTestModule =
+  if (read?("env:CI") != null) typelevelScala212NativeTestCi else typelevelScala212NativeTestDev
+
+/// Returns the auto-select base template for a given Scala version string.
+/// "3.7.4" -> typelevelScala3, "2.13.18" -> typelevelScala213, "2.12.20" -> typelevelScala212
+function forVersion(sv: String): P.ScalaModule =
+  if (sv.startsWith("3"))
+    typelevelScala3
+  else if (sv.startsWith("2.13"))
+    typelevelScala213
+  else
+    typelevelScala212
+
+/// Returns the auto-select test template for a given Scala version string.
+function testForVersion(sv: String): P.ScalaTestModule =
+  (if (sv.startsWith("3"))
+    typelevelScala3Test
+  else if (sv.startsWith("2.13"))
+    typelevelScala213Test
+  else
+    typelevelScala212Test) { scalaVersion = sv }
+
+/// Returns the auto-select Scala.js template for a given Scala version string.
+function jsForVersion(sv: String, jsVersion: String): P.ScalaJsModule =
+  (if (sv.startsWith("3"))
+    typelevelScala3Js
+  else if (sv.startsWith("2.13"))
+    typelevelScala213Js
+  else
+    typelevelScala212Js) {
+    scalaVersion = sv
+    scalaJsVersion = jsVersion
+  }
+
+/// Returns the auto-select Scala.js test template for a given Scala version string.
+function jsTestForVersion(sv: String, jsVersion: String): P.ScalaJsTestModule =
+  (if (sv.startsWith("3"))
+    typelevelScala3JsTest
+  else if (sv.startsWith("2.13"))
+    typelevelScala213JsTest
+  else
+    typelevelScala212JsTest) {
+    scalaVersion = sv
+    scalaJsVersion = jsVersion
+  }
+
+/// Returns the auto-select Scala Native template for a given Scala version string.
+function nativeForVersion(sv: String, nativeVersion: String): P.ScalaNativeModule =
+  (if (sv.startsWith("3"))
+    typelevelScala3Native
+  else if (sv.startsWith("2.13"))
+    typelevelScala213Native
+  else
+    typelevelScala212Native) {
+    scalaVersion = sv
+    scalaNativeVersion = nativeVersion
+  }
+
+/// Returns the auto-select Scala Native test template for a given Scala version string.
+function nativeTestForVersion(sv: String, nativeVersion: String): P.ScalaNativeTestModule =
+  (if (sv.startsWith("3"))
+    typelevelScala3NativeTest
+  else if (sv.startsWith("2.13"))
+    typelevelScala213NativeTest
+  else
+    typelevelScala212NativeTest) {
+    scalaVersion = sv
+    scalaNativeVersion = nativeVersion
+  }
