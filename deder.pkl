@@ -36,7 +36,8 @@ local const function pom(artId: String, artName: String) = new PomSettings {
     }
   }
   scm {
-    url = "git@github.com:sake92/deder.git"
+    url = "https://github.com/sake92/deder"
+    connection = "scm:git:git@github.com:sake92/deder.git"
   }
 }
 

@@ -11,6 +11,7 @@
 - cleanup virtual threads work, do it for test-runner too?
 - no need to pass current cli client ctx coz its per-vthread now
 - no extends Thread.. no threadpools
+- optimize early-release download cache and version print..!!
 
 run pkldoc on each tag, and publish to ghpages
 https://pkl-lang.org/main/current/pkl-doc/index.html
