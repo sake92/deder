@@ -53,7 +53,7 @@ class CliClientSocketReader(
         supervised {
           try {
             RequestContext.clientContext.supervisedWhere(Some(ctx)) {
-              handler.handle(ctx, message)
+              handler.handle(message)
             }
           } catch {
             case e: IOException =>

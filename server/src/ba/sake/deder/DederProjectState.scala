@@ -136,7 +136,6 @@ class DederProjectState(
   }
 
   def executeCLI(
-      ctx: CliClientContext,
       moduleSelectors: Seq[String],
       taskName: String,
       args: Seq[String],
@@ -146,6 +145,7 @@ class DederProjectState(
       exitOnEnd: Boolean = true,
       watch: Boolean = false,
   ): Unit = try {
+    val ctx = RequestContext.cliContext
     val state = readState(useLastGood) match
       case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
       case Right(s)  => s
@@ -630,7 +630,6 @@ class DederProjectState(
                   )
                 )
                 executeCLI(
-                  ctx,
                   Seq(watchedTask.taskInstance.moduleId),
                   watchedTask.taskInstance.task.name,
                   watchedTask.args,
