@@ -9,14 +9,13 @@ import ba.sake.tupson.*
 import ba.sake.deder.*
 import ox.*
 
-class CliClientReadThread(
+class CliClientSocketReader(
     projectState: DederProjectState,
     handler: CliClientMessageHandler,
     clientChannel: SocketChannel,
     clientId: String,
     serverMessages: BlockingQueue[CliServerMessage]
-) extends Thread(s"CliClientReadThread-${clientId}"),
-      StrictLogging {
+) extends Runnable, StrictLogging {
   override def run(): Unit = {
     try clientRead(clientChannel, clientId, serverMessages)
     catch {
