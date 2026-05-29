@@ -49,6 +49,9 @@ public class ArtifactCache {
 
 	// For atomic check-then-act operations
 	private final Path cacheBasePath;
+	
+	// Session-level early-access checksums cache (avoids downloading twice)
+	private Map<String, String> earlyAccessChecksums = null;
 
 	private final java.util.function.Consumer<String> logger;
 
@@ -104,8 +107,18 @@ public class ArtifactCache {
 
 			// Verify checksum
 			if (verifyCachedChecksum(version, type)) {
-				log("Cache hit, checksum verified for " + version);
-				return cachedPath;
+				// For early-access, also verify against remote checksums
+				if ("early-access".equals(version)) {
+					if (isEarlyAccessChecksumMatch(type)) {
+						System.err.println("Using cached early-access " + type.getName() + ".jar");
+						return cachedPath;
+					}
+					log("Early-access " + type.getName() + " updated, re-downloading...");
+					System.err.println("Early-access " + type.getName() + " updated, downloading...");
+				} else {
+					log("Cache hit, checksum verified for " + version);
+					return cachedPath;
+				}
 			} else {
 				log("Cached artifact checksum mismatch, re-downloading");
 				// Remove corrupted artifact
@@ -289,7 +302,8 @@ public class ArtifactCache {
 	}
 
 	/**
-	 * Verifies that cached artifact matches stored checksum
+	 * Verifies local integrity: compares the cached JAR's SHA-256 against the
+	 * locally stored .sha256 file. This catches corruption, not staleness.
 	 */
 	private boolean verifyCachedChecksum(String version, ArtifactType type) {
 		Path checksumPath = getChecksumPath(version, type);
@@ -429,6 +443,34 @@ public class ArtifactCache {
 	}
 
 	/**
+	 * Checks remote freshness: downloads the 536-byte checksums_sha256.txt from
+	 * the early-access GitHub release and compares it against the locally stored
+	 * .sha256. Local integrity (verifyCachedChecksum) confirms the cache is not
+	 * corrupted; this confirms the cache is still current.
+	 */
+	private boolean isEarlyAccessChecksumMatch(ArtifactType type) {
+		try {
+			if (earlyAccessChecksums == null) {
+				earlyAccessChecksums = fetchChecksums("early-access");
+			}
+			String fileName = ARTIFACT_FILE_NAMES.get(type);
+			String remoteHash = earlyAccessChecksums.get(fileName);
+			if (remoteHash == null) {
+				return false;
+			}
+			Path checksumPath = getChecksumPath("early-access", type);
+			if (!Files.exists(checksumPath)) {
+				return false;
+			}
+			String cachedHash = Files.readString(checksumPath, StandardCharsets.UTF_8).strip();
+			return remoteHash.equals(cachedHash);
+		} catch (Exception e) {
+			log("Error checking early-access freshness: " + e.getMessage());
+			return false;
+		}
+	}
+
+	/**
 	 * Validates version and type
 	 */
 	private void validateVersion(String version, ArtifactType type) {
@@ -437,11 +479,6 @@ public class ArtifactCache {
 		}
 		if (type == null) {
 			throw new IllegalArgumentException("ArtifactType cannot be null");
-		}
-
-		// early-access never cached
-		if ("early-access".equals(version)) {
-			throw new IllegalArgumentException("early-access is not cached");
 		}
 	}
 

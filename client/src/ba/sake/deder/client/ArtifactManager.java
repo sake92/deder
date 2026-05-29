@@ -98,8 +98,7 @@ public class ArtifactManager {
         String serverLocalPath = serverProps.getProperty("localPath", "");
         String testRunnerLocalPath = serverProps.getProperty("testRunnerLocalPath", "");
         
-        boolean useCache = (serverLocalPath == null || serverLocalPath.isBlank())
-                && !version.equals("early-access");
+        boolean useCache = (serverLocalPath == null || serverLocalPath.isBlank());
         
         if (useCache) {
             try {
@@ -163,14 +162,7 @@ public class ArtifactManager {
             return;
         }
 
-        // Case 3: early-access - direct download (no cache)
-        if (version.equals("early-access")) {
-            log("Downloading " + artifactName + " from GitHub (early-access)...");
-            downloadDirect(type, version, targetPath);
-            return;
-        }
-
-        // Case 4: Stable version - try cache, fallback to direct download
+        // Case 3: Use global cache (stable versions and early-access)
         if (cache != null) {
             try {
                 System.err.println("Resolving " + artifactName + " from global cache (version " + version + ")...");
