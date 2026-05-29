@@ -128,6 +128,7 @@ class SourceGeneratorsSuite extends munit.FunSuite {
         DederProjectState(
           coreTasks,
           runTasks,
+          publishTasks,
           scalaJsTasks,
           scalaNativeTasks,
           graalvmNativeImageTasks,

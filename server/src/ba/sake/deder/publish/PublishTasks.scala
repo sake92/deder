@@ -352,11 +352,6 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       }
     }
 
-  case class PublishArtifactsRes(
-      pom: PomSettings,
-      outDir: os.Path
-  ) derives JsonRW
-
   val publishArtifactsTask = CachedTaskBuilder
     .make[Option[PublishArtifactsRes]](
       name = "publishArtifacts",

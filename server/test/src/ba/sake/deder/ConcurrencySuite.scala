@@ -47,6 +47,7 @@ class ConcurrencySuite extends munit.FunSuite {
     val state = DederProjectState(
       coreTasks,
       runTasks,
+      publishTasks,
       scalaJsTasks,
       scalaNativeTasks,
       graalvmNativeImageTasks,
@@ -98,6 +99,7 @@ class ConcurrencySuite extends munit.FunSuite {
     val state = DederProjectState(
       coreTasks,
       runTasks,
+      publishTasks,
       scalaJsTasks,
       scalaNativeTasks,
       graalvmNativeImageTasks,
@@ -142,6 +144,7 @@ class ConcurrencySuite extends munit.FunSuite {
     val state = DederProjectState(
       coreTasks,
       runTasks,
+      publishTasks,
       scalaJsTasks,
       scalaNativeTasks,
       graalvmNativeImageTasks,
@@ -192,6 +195,7 @@ class ConcurrencySuite extends munit.FunSuite {
     val state = DederProjectState(
       coreTasks,
       runTasks,
+      publishTasks,
       scalaJsTasks,
       scalaNativeTasks,
       graalvmNativeImageTasks,

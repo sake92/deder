@@ -2,6 +2,9 @@ package ba.sake.deder
 
 import ba.sake.deder.deps.{DepTree, Dependency}
 import ba.sake.deder.config.DederProject
+import ba.sake.deder.testing.{DederTestResults, DiscoveredFrameworkTests}
+import ba.sake.deder.publish.{PomSettings, PublishArtifactsRes}
+import ba.sake.deder.jvm.ManifestEntries
 
 /** Trait that plugins implement to register additional tasks. */
 trait DederPluginApi {
@@ -43,10 +46,9 @@ case class PluginInitParams(
     project: DederProject
 )
 
-/** Typed access to the curated, stable core task surface that plugins may depend on. Internal tasks and actual
-  * execution entrypoint tasks (such as `run`, `test`, or `repl`) are intentionally kept out, while stable
-  * dependency/configuration tasks such as classpaths, main-class selection, JVM options, and REPL jars remain
-  * available.
+/** Typed access to all built-in task references that plugins may depend on. This includes core
+  * configuration/build tasks, run/test/repl entrypoints, publishing, GraalVM native-image,
+  * and internal implementation tasks.
   */
 trait CoreTasksApi {
   def sourcesTask: AbstractTask[Seq[DederPath]]
@@ -81,6 +83,55 @@ trait CoreTasksApi {
   def finalMainClassTask: AbstractTask[Option[String]]
   def replDepsTask: AbstractTask[Seq[Dependency]]
   def replJarsTask: AbstractTask[Seq[os.Path]]
+
+  // Run/REPL entrypoints
+  def runTask: AbstractTask[Seq[String]]
+  def runMainTask: AbstractTask[Seq[String]]
+  def runMvnAppTask: AbstractTask[Seq[String]]
+  def replTask: AbstractTask[Seq[String]]
+
+  // Test
+  def testTask: AbstractTask[DederTestResults]
+  def testInMemoryTask: AbstractTask[DederTestResults]
+  def testClassesTask: AbstractTask[Seq[DiscoveredFrameworkTests]]
+
+  // Fix (scalafix)
+  def fixTask: AbstractTask[Seq[String]]
+  def fixCheckTask: AbstractTask[Seq[String]]
+
+  // Publishing
+  def versionTask: AbstractTask[String]
+  def manifestTask: AbstractTask[ManifestEntries]
+  def pomSettingsTask: AbstractTask[Option[PomSettings]]
+  def finalManifestTask: AbstractTask[ManifestEntries]
+  def jarTask: AbstractTask[DederPath]
+  def allJarsTask: AbstractTask[Seq[DederPath]]
+  def assemblyDepsTask: AbstractTask[os.Path]
+  def assemblyTask: AbstractTask[DederPath]
+  def moduleDepsPomSettingsTask: AbstractTask[Seq[Seq[PomSettings]]]
+  def sourcesJarTask: AbstractTask[Option[DederPath]]
+  def javadocJarTask: AbstractTask[Option[DederPath]]
+  def publishArtifactsTask: AbstractTask[Option[PublishArtifactsRes]]
+  def publishLocalTask: AbstractTask[Option[os.Path]]
+  def publishTask: AbstractTask[String]
+
+  // GraalVM
+  def graalvmHomeTask: AbstractTask[Option[os.Path]]
+  def nativeImageOptionsTask: AbstractTask[Seq[String]]
+  def nativeIncludedResourcesOptionsTask: AbstractTask[Seq[String]]
+  def graalvmReachabilityMetadataOptionsTask: AbstractTask[Seq[String]]
+  def graalvmNativeImageTask: AbstractTask[os.Path]
+
+  // Internal tasks (implementation details, useful for advanced plugins)
+  def allGeneratedSourcesTask: AbstractTask[Seq[DederPath]]
+  def allGeneratedSourceFilesTask: AbstractTask[Seq[DederPath]]
+  def allGeneratedResourcesTask: AbstractTask[Seq[DederPath]]
+  def compileOnlyDependenciesTask: AbstractTask[Seq[Dependency]]
+  def dependenciesTask: AbstractTask[Seq[Dependency]]
+  def allDependenciesTask: AbstractTask[Seq[Dependency]]
+  def mandatoryDependenciesTask: AbstractTask[Seq[Dependency]]
+  def allClassesDirsTask: AbstractTask[Seq[DederPath]]
+  def compilerJarsTask: AbstractTask[Seq[os.Path]]
 }
 
 /** Typed access to the curated, stable Scala.js task surface that plugins may depend on. */
@@ -88,6 +139,8 @@ trait ScalaJsTasksApi {
   def fastLinkJsTask: AbstractTask[String]
   def fullLinkJsTask: AbstractTask[String]
   def linkJsTask: AbstractTask[String]
+  def runJsTask: AbstractTask[Seq[String]]
+  def testTask: AbstractTask[DederTestResults]
 }
 
 /** Typed access to the curated, stable Scala Native task surface that plugins may depend on. */
@@ -95,4 +148,6 @@ trait ScalaNativeTasksApi {
   def fastNativeLinkTask: AbstractTask[String]
   def fullNativeLinkTask: AbstractTask[String]
   def nativeLinkTask: AbstractTask[String]
+  def runNativeTask: AbstractTask[Seq[String]]
+  def testTask: AbstractTask[DederTestResults]
 }

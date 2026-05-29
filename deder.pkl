@@ -58,6 +58,7 @@ local const testCommonModules =
     template = new {
       scalaVersion = scalaVer
       publish = false
+      moduleDeps { pluginApi }
       deps {
         "ba.sake::tupson:\(versions.tupson)"
         "com.lihaoyi::os-lib:\(versions.osLib)"
@@ -102,6 +103,7 @@ local const pluginApi = new ScalaModule {
     "io.get-coursier::dependency:0.3.2"
     "io.get-coursier::dependency-interface:0.3.2"
     "io.opentelemetry:opentelemetry-api:1.58.0"
+    "org.scala-sbt:test-interface:1.0"
   }
 }
 
