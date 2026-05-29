@@ -152,7 +152,7 @@ object ServerMain extends StrictLogging {
       debounceLock.synchronized {
         while (debounceRunning) {
           debounceLock.wait(watchDebounceMs)
-          if (!debounceRunning) return
+          // debounceRunning may have been set to false during wait() — while condition will exit
           val snapshot = {
             val iter = accumulatedChangedPaths.iterator()
             val buf = Set.newBuilder[os.Path]

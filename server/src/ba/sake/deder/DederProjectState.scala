@@ -493,7 +493,8 @@ class DederProjectState(
 
   private def scheduleInactiveShutdownChecker(): Unit = {
     Thread.ofVirtual().name("inactivity-checker").start(() => {
-      while (!shutdownStarted) {
+      var running = true
+      while (running && !shutdownStarted) {
         try {
           Thread.sleep(TimeUnit.MINUTES.toMillis(1))
           if (inFlightRequests.get() == 0) {
@@ -503,11 +504,11 @@ class DederProjectState(
             if (inactiveDuration.compareTo(maxInactiveDuration) > 0) {
               logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
               shutdown()
-              return
+              running = false
             }
           }
         } catch {
-          case _: InterruptedException => return
+          case _: InterruptedException => running = false
           case NonFatal(e) =>
             logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
         }
