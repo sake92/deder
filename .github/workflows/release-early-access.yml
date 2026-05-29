@@ -47,7 +47,7 @@ jobs:
         shell: bash
         run: |
           ./scripts/gen-config-bindings.sh
-          VERSION=$(deder exec --json -t version -m server | jq -r '.["server"]')
+          VERSION=$(deder exec -t version -m server -f densejson | jq -r '.["server"]')
           echo "VERSION=$(echo $VERSION)" >> $GITHUB_OUTPUT
 
   build-jars:
