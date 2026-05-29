@@ -2,7 +2,7 @@ package ba.sake.deder.testing.forked
 
 import java.io.{ByteArrayOutputStream, OutputStream, PrintStream}
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.{ConcurrentHashMap, Executors, ScheduledExecutorService, ScheduledFuture, TimeUnit}
+import java.util.concurrent.ConcurrentHashMap
 import scala.util.control.NonFatal
 import ba.sake.tupson.{*, given}
 
@@ -59,19 +59,42 @@ class SuiteOutputCapture(reporter: ForkedTestReporter, flushIntervalMs: Long = 0
   private val suiteBuffers = new ConcurrentHashMap[String, ByteArrayOutputStream]()
   // Per-thread tracking of the currently active suite name (used by write() to find the right buffer)
   private val suiteNameTL = new ThreadLocal[String]
-  // Per-thread tracking of the scheduled flush future (cancelled in finishSuite)
-  private val flushFutureTL = new ThreadLocal[ScheduledFuture[?]]
   private val unattributedBuffer = new ThreadLocal[ByteArrayOutputStream] {
     override def initialValue: ByteArrayOutputStream = new ByteArrayOutputStream()
   }
 
-  // Lazy single-thread daemon executor for periodic flushes
-  private lazy val flushExecutor: ScheduledExecutorService =
-    Executors.newSingleThreadScheduledExecutor(r => {
-      val t = new Thread(r, "suite-output-flush")
-      t.setDaemon(true)
-      t
+  @volatile private var flushRunning = true
+
+  // Dedicated virtual thread for periodic flush of all suite buffers
+  private val flushThread: Thread = {
+    val delay = Math.max(flushIntervalMs, 100)
+    Thread.ofVirtual().name("suite-output-flush").start(() => {
+      while (flushRunning) {
+        try {
+          Thread.sleep(delay)
+          flushAllSuiteBuffers()
+        } catch {
+          case _: InterruptedException => flushRunning = false
+        }
+      }
     })
+  }
+
+  private def flushAllSuiteBuffers(): Unit = {
+    val entries = suiteBuffers.entrySet().iterator()
+    while (entries.hasNext) {
+      val entry = entries.next()
+      val buf = entry.getValue
+      buf.synchronized {
+        if (buf.size() > 0) {
+          val text = buf.toString(StandardCharsets.UTF_8)
+          buf.reset()
+          if (text.nonEmpty)
+            reporter.emit(ForkedTestEnvelope.SuiteProgress(entry.getKey, text))
+        }
+      }
+    }
+  }
 
   // Stored so startSuite can reset System.out if a prior test forgot to restore it.
   @volatile private var capturingStream: PrintStream = scala.compiletime.uninitialized
@@ -83,39 +106,10 @@ class SuiteOutputCapture(reporter: ForkedTestReporter, flushIntervalMs: Long = 0
     val cs = capturingStream
     // In case a test (or framework) forgets to restore it, reset it here
     if cs != null && (System.out ne cs) then System.setOut(cs)
-
-    if flushIntervalMs > 0 then {
-      val name = suiteName
-      val future = flushExecutor.scheduleWithFixedDelay(
-        () => {
-          val buf = suiteBuffers.get(name)
-          if buf != null then {
-            buf.synchronized {
-              if buf.size() > 0 then {
-                val text = buf.toString(StandardCharsets.UTF_8)
-                buf.reset()
-                if text.nonEmpty then
-                  reporter.emit(ForkedTestEnvelope.SuiteProgress(name, text))
-              }
-            }
-          }
-        },
-        flushIntervalMs,
-        flushIntervalMs,
-        TimeUnit.MILLISECONDS
-      )
-      flushFutureTL.set(future)
-    }
   }
 
   def finishSuite(): String = {
     val name = suiteNameTL.get()
-    // Cancel the periodic flush for this thread
-    val future = flushFutureTL.get()
-    if future != null then {
-      future.cancel(false)
-      flushFutureTL.remove()
-    }
     suiteNameTL.remove()
     val buf = if name != null then suiteBuffers.remove(name) else null
     if buf == null then "" else buf.toString(StandardCharsets.UTF_8)
