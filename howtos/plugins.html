@@ -113,7 +113,7 @@
     <span class="hljs-type">Right</span>(<span class="hljs-type">Seq</span>(myTask))
 </code></pre>
    <p>Register the implementation via <code>META-INF/services/ba.sake.deder.DederPluginApi</code> (standard ServiceLoader).</p>
-   <p>If your plugin owns resources (thread pools, connections, etc.), override <code>close()</code> to release them when the server shuts down.</p>
+   <p>If your plugin owns resources (thread pools, connections, etc.), override <code>close()</code> to release them when the plugin is being reloaded/unloaded and when server shuts down.</p>
    <p><code>PluginInitParams</code> provides everything you need in one place: plugin config, core task APIs, server internals, and the full <code>DederProject</code>.</p>
    <h2 id="depending-on-built-in-tasks-from-a-plugin">Depending on built-in tasks from a plugin<a href="#depending-on-built-in-tasks-from-a-plugin" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Use <code>params.coreTasks</code>, <code>params.sjsTasks</code>, and <code>params.snTasks</code> directly from <code>PluginInitParams</code>:</p>
