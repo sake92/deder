@@ -106,6 +106,8 @@ class ScalaJsTasksApiAdapter(scalaJsTasks: ScalaJsTasks) extends ScalaJsTasksApi
   def fastLinkJsTask: AbstractTask[String] = scalaJsTasks.fastLinkJsTask
   def fullLinkJsTask: AbstractTask[String] = scalaJsTasks.fullLinkJsTask
   def linkJsTask: AbstractTask[String] = scalaJsTasks.linkJsTask
+  def runJsTask: AbstractTask[Seq[String]] = scalaJsTasks.runJsTask
+  def testTask: AbstractTask[DederTestResults] = scalaJsTasks.testJsTask
 }
 
 /** Adapts the internal [[ScalaNativeTasks]] to the public [[ScalaNativeTasksApi]] interface without widening the task
@@ -115,4 +117,6 @@ class ScalaNativeTasksApiAdapter(scalaNativeTasks: ScalaNativeTasks) extends Sca
   def fastNativeLinkTask: AbstractTask[String] = scalaNativeTasks.fastNativeLinkTask
   def fullNativeLinkTask: AbstractTask[String] = scalaNativeTasks.fullNativeLinkTask
   def nativeLinkTask: AbstractTask[String] = scalaNativeTasks.nativeLinkTask
+  def runNativeTask: AbstractTask[Seq[String]] = scalaNativeTasks.runNativeTask
+  def testTask: AbstractTask[DederTestResults] = scalaNativeTasks.testNativeTask
 }
