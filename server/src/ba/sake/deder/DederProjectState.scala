@@ -352,7 +352,7 @@ class DederProjectState(
           watch,
           serverNotificationsLogger
         )
-        val duration = scala.concurrent.duration.FiniteDuration(System.nanoTime() - requestStartNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+        val duration = Duration.ofNanos(System.nanoTime() - requestStartNanos)
         internals.recordRequestCompleted(ctx.requestId, taskName, success = true, duration, callerType)
         result
       } finally {
@@ -363,7 +363,7 @@ class DederProjectState(
       }
     } catch {
       case NonFatal(e) =>
-        val duration = scala.concurrent.duration.FiniteDuration(System.nanoTime() - requestStartNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
+        val duration = Duration.ofNanos(System.nanoTime() - requestStartNanos)
         internals.recordRequestCompleted(ctx.requestId, taskName, success = false, duration, callerType)
         // send notification about failure to client
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))

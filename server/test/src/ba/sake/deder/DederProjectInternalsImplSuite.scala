@@ -1,8 +1,8 @@
 package ba.sake.deder
 
-import java.time.Instant
-import scala.concurrent.duration.*
+import java.time.{Duration, Instant}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.DurationConverters.*
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.metrics.SdkMeterProvider
 
@@ -26,7 +26,7 @@ class DederProjectInternalsImplSuite extends munit.FunSuite {
     assertEquals(internals.currentRequests.head.taskName, "compile")
     assertEquals(internals.currentRequests.head.moduleIds, Seq("app"))
 
-    internals.recordRequestCompleted("req-1", "compile", success = true, 100.millis, CallerType.Cli)
+    internals.recordRequestCompleted("req-1", "compile", success = true, Duration.ofMillis(100), CallerType.Cli)
     assertEquals(internals.currentRequests.size, 0)
     assertEquals(internals.totalRequestsServed, 1L)
     assertEquals(internals.totalErrors, 0L)
@@ -36,7 +36,7 @@ class DederProjectInternalsImplSuite extends munit.FunSuite {
     val internals = testInternals()
     for i <- 1 to 150 do
       internals.recordRequestStarted(s"req-$i", CallerType.Cli, "compile", Seq("app"), Instant.now())
-      internals.recordRequestCompleted(s"req-$i", "compile", success = true, 10.millis, CallerType.Cli)
+      internals.recordRequestCompleted(s"req-$i", "compile", success = true, Duration.ofMillis(10), CallerType.Cli)
 
     assertEquals(internals.recentHistory.size, 100)
     assertEquals(internals.recentHistory.head.requestId, "req-150")
@@ -46,17 +46,17 @@ class DederProjectInternalsImplSuite extends munit.FunSuite {
   test("taskStats accumulates per-task execution data") {
     val internals = testInternals()
 
-    internals.recordTaskExecution("compile", 100.millis, cacheHit = false)
-    internals.recordTaskExecution("compile", 200.millis, cacheHit = true)
-    internals.recordTaskExecution("test", 50.millis, cacheHit = false)
+    internals.recordTaskExecution("compile", Duration.ofMillis(100), cacheHit = false)
+    internals.recordTaskExecution("compile", Duration.ofMillis(200), cacheHit = true)
+    internals.recordTaskExecution("test", Duration.ofMillis(50), cacheHit = false)
 
     val compileStats = internals.taskStats("compile").get
     assertEquals(compileStats.executions, 2L)
     assertEquals(compileStats.cacheHits, 1L)
     assertEquals(compileStats.errors, 0L)
     assertEquals(compileStats.duration.count, 2L)
-    assertEquals(compileStats.duration.min, 100.millis)
-    assertEquals(compileStats.duration.max, 200.millis)
+    assertEquals(compileStats.duration.min, Duration.ofMillis(100))
+    assertEquals(compileStats.duration.max, Duration.ofMillis(200))
 
     val testStats = internals.taskStats("test").get
     assertEquals(testStats.executions, 1L)
@@ -68,21 +68,21 @@ class DederProjectInternalsImplSuite extends munit.FunSuite {
   test("totalRequestsServed and totalErrors are independent") {
     val internals = testInternals()
     internals.recordRequestStarted("ok", CallerType.Cli, "compile", Seq("app"), Instant.now())
-    internals.recordRequestCompleted("ok", "compile", success = true, 10.millis, CallerType.Cli)
+    internals.recordRequestCompleted("ok", "compile", success = true, Duration.ofMillis(10), CallerType.Cli)
     assertEquals(internals.totalRequestsServed, 1L)
     assertEquals(internals.totalErrors, 0L)
 
     internals.recordRequestStarted("fail", CallerType.Bsp, "test", Seq("app"), Instant.now())
-    internals.recordRequestCompleted("fail", "test", success = false, 10.millis, CallerType.Bsp)
+    internals.recordRequestCompleted("fail", "test", success = false, Duration.ofMillis(10), CallerType.Bsp)
     assertEquals(internals.totalRequestsServed, 2L)
     assertEquals(internals.totalErrors, 1L)
   }
 
   test("allTaskStats returns all tracked tasks alphabetically") {
     val internals = testInternals()
-    internals.recordTaskExecution("classes", 10.millis, false)
-    internals.recordTaskExecution("compile", 100.millis, false)
-    internals.recordTaskExecution("sourceFiles", 5.millis, false)
+    internals.recordTaskExecution("classes", Duration.ofMillis(10), false)
+    internals.recordTaskExecution("compile", Duration.ofMillis(100), false)
+    internals.recordTaskExecution("sourceFiles", Duration.ofMillis(5), false)
 
     val all = internals.allTaskStats
     assertEquals(all.size, 3)
@@ -103,10 +103,10 @@ class DederProjectInternalsImplSuite extends munit.FunSuite {
     val internals = testInternals()
     val tasks = (1 to 1000).map { i =>
       Future {
-        internals.recordTaskExecution(s"task-${i % 10}", (i % 100).millis, i % 3 == 0)
+        internals.recordTaskExecution(s"task-${i % 10}", Duration.ofMillis(i % 100), i % 3 == 0)
       }
     }
-    Await.result(Future.sequence(tasks), 10.seconds)
+    Await.result(Future.sequence(tasks),  Duration.ofSeconds(10).toScala)
     val all = internals.allTaskStats
     assertEquals(all.size, 10)
     val totalExecs = all.map(_._2.executions).sum

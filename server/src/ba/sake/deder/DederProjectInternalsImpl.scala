@@ -4,7 +4,7 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
-import scala.concurrent.duration.{Duration, FiniteDuration, NANOSECONDS}
+import java.time.Duration
 import scala.jdk.CollectionConverters.*
 import io.opentelemetry.api.metrics.{LongCounter, LongHistogram, Meter}
 import io.opentelemetry.api.common.{Attributes, AttributeKey}
@@ -66,7 +66,7 @@ class DederProjectInternalsImpl private (
   override def totalErrors: Long = totalErrCount.get()
 
   override def serverUptime: Duration =
-    Duration.fromNanos(System.nanoTime() - startTime.toEpochMilli * 1_000_000L)
+    Duration.ofMillis(System.currentTimeMillis() - startTime.toEpochMilli)
 
   // -- Write methods --
 
@@ -83,7 +83,7 @@ class DederProjectInternalsImpl private (
       requestId: String,
       taskName: String,
       success: Boolean,
-      duration: FiniteDuration,
+      duration: Duration,
       caller: CallerType
   ): Unit =
     currentReqs.remove(requestId)
@@ -102,7 +102,7 @@ class DederProjectInternalsImpl private (
 
   private[deder] def recordTaskExecution(
       taskName: String,
-      duration: FiniteDuration,
+      duration: Duration,
       cacheHit: Boolean
   ): Unit =
     val acc = taskAccumulators.computeIfAbsent(taskName, _ => new TaskStatsAccumulator(1024))
@@ -138,7 +138,7 @@ private class TaskStatsAccumulator(sampleCapacity: Int):
   private val sampleCursor = new AtomicInteger(0)
   private val sampleCount = new AtomicInteger(0)
 
-  def record(duration: FiniteDuration, cacheHit: Boolean): Unit =
+  def record(duration: Duration, cacheHit: Boolean): Unit =
     val nanos = duration.toNanos
     executions.incrementAndGet()
     if cacheHit then cacheHits.incrementAndGet()
@@ -153,22 +153,22 @@ private class TaskStatsAccumulator(sampleCapacity: Int):
     val execs = executions.get()
     if execs == 0 then
       TaskStats(0L, 0L, 0L,
-        DurationDistribution(0L, Duration.Zero, Duration.Zero, Duration.Zero, Duration.Zero, Duration.Zero, Duration.Zero))
+        DurationDistribution(0L, Duration.ZERO, Duration.ZERO, Duration.ZERO, Duration.ZERO, Duration.ZERO, Duration.ZERO))
     else
       val count = math.min(sampleCount.get(), sampleCapacity)
       val sorted = samples.take(count).sorted
-      def pct(p: Double): FiniteDuration =
+      def pct(p: Double): Duration =
         val idx = ((count - 1) * p).toInt
-        FiniteDuration(sorted(idx), NANOSECONDS)
+        Duration.ofNanos(sorted(idx))
       TaskStats(
         executions = execs,
         cacheHits = cacheHits.get(),
         errors = errors.get(),
         duration = DurationDistribution(
           count = count,
-          min = FiniteDuration(minDurationNanos.get(), NANOSECONDS),
-          max = FiniteDuration(maxDurationNanos.get(), NANOSECONDS),
-          mean = FiniteDuration(totalDurationNanos.get() / execs, NANOSECONDS),
+          min = Duration.ofNanos(minDurationNanos.get()),
+          max = Duration.ofNanos(maxDurationNanos.get()),
+          mean = Duration.ofNanos(totalDurationNanos.get() / execs),
           p50 = pct(0.50),
           p95 = pct(0.95),
           p99 = pct(0.99)

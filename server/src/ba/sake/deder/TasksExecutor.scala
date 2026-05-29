@@ -1,7 +1,7 @@
 package ba.sake.deder
 
 import java.util.concurrent.{Callable, ExecutionException, ExecutorService, TimeUnit}
-import scala.concurrent.duration.{FiniteDuration, NANOSECONDS}
+import java.time.Duration
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 import scala.util.Using
@@ -64,13 +64,13 @@ class TasksExecutor(
                       serverNotificationsLogger,
                       dependencyResolver
                     )
-                  val taskDuration = FiniteDuration(System.nanoTime() - taskStartNanos, NANOSECONDS)
+                  val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
                   internals.recordTaskExecution(taskInstance.task.name, taskDuration, !changed)
                   (taskInstance.id, taskRes, changed)
                 }
               } catch {
                 case NonFatal(e) =>
-                  val taskDuration = FiniteDuration(System.nanoTime() - taskStartNanos, NANOSECONDS)
+                  val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
                   internals.recordTaskExecution(taskInstance.task.name, taskDuration, cacheHit = false)
                   logger.error(s"Error during execution of task ${taskInstance.id}", e)
                   taskSpan.recordException(e)

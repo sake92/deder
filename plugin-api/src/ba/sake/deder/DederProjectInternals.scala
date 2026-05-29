@@ -1,7 +1,6 @@
 package ba.sake.deder
 
-import java.time.Instant
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import java.time.{Duration, Instant}
 
 enum CallerType:
   case Cli, Bsp
@@ -20,18 +19,18 @@ case class CompletedRequest(
     taskName: String,
     moduleIds: Seq[String],
     startTime: Instant,
-    duration: FiniteDuration,
+    duration: Duration,
     success: Boolean
 )
 
 case class DurationDistribution(
     count: Long,
-    min: FiniteDuration,
-    max: FiniteDuration,
-    mean: FiniteDuration,
-    p50: FiniteDuration,
-    p95: FiniteDuration,
-    p99: FiniteDuration
+    min: Duration,
+    max: Duration,
+    mean: Duration,
+    p50: Duration,
+    p95: Duration,
+    p99: Duration
 )
 
 case class TaskStats(
