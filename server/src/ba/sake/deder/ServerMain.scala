@@ -38,6 +38,7 @@ object ServerMain extends StrictLogging {
   @volatile private var watcherThread: Thread = uninitialized
   @volatile private var debounceThread: Thread = uninitialized
   @volatile private var debounceRunning = true
+  private var lastChangeMillis: Long = 0L // Guarded by debounceLock
   private val debounceLock = new Object()
   private val accumulatedChangedPaths = ConcurrentHashMap.newKeySet[os.Path]()
 
@@ -149,10 +150,26 @@ object ServerMain extends StrictLogging {
     )
 
     debounceThread = Thread.ofVirtual().name("watch-debounce").start(() => {
-      debounceLock.synchronized {
-        while (debounceRunning) {
-          debounceLock.wait(watchDebounceMs)
-          // debounceRunning may have been set to false during wait() — while condition will exit
+      var running = true
+      while (running) {
+        // Wait for the quiet period (watchDebounceMs with no new changes) to expire
+        debounceLock.synchronized {
+          var remaining: Long = watchDebounceMs
+          if (lastChangeMillis > 0) {
+            val elapsed = System.currentTimeMillis() - lastChangeMillis
+            remaining = (watchDebounceMs - elapsed).max(0L)
+          }
+          while (remaining > 0 && debounceRunning) {
+            debounceLock.wait(remaining.toInt)
+            if (debounceRunning) {
+              val elapsed = System.currentTimeMillis() - lastChangeMillis
+              remaining = if (elapsed >= watchDebounceMs) 0L else watchDebounceMs - elapsed
+            }
+          }
+          running = debounceRunning
+        }
+        // Quiet period expired — drain accumulated paths if still running
+        if (running) {
           val snapshot = {
             val iter = accumulatedChangedPaths.iterator()
             val buf = Set.newBuilder[os.Path]
@@ -161,6 +178,7 @@ object ServerMain extends StrictLogging {
               iter.remove()
             buf.result()
           }
+          debounceLock.synchronized { lastChangeMillis = 0L }
           if (snapshot.nonEmpty) {
             logger.debug(
               s"Debounce fired, triggering tasks for ${snapshot.size} changed paths: ${snapshot.take(3).mkString(", ")}..."
@@ -227,7 +245,10 @@ object ServerMain extends StrictLogging {
                   val candidates = paths.filter(isTaskTriggerCandidate)
                   if candidates.nonEmpty then {
                     accumulatedChangedPaths.addAll(candidates.asJava)
-                    debounceLock.synchronized { debounceLock.notify() }
+                    debounceLock.synchronized {
+                      lastChangeMillis = System.currentTimeMillis()
+                      debounceLock.notify()
+                    }
                   }
               } catch {
                 case _: InterruptedException => throw new InterruptedException // propagate to exit watcher loop

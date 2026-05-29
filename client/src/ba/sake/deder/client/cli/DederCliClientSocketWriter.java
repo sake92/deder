@@ -38,7 +38,8 @@ public class DederCliClientSocketWriter implements Runnable {
             // when cancelled with Ctrl+C
         } catch (IOException e) {
             // ignore broken pipe, usually some race condition..
-            if (!e.getMessage().contains("Broken pipe"))
+            var message = e.getMessage();
+            if (message == null || !message.contains("Broken pipe"))
                 throw new UncheckedIOException(e);
         }
     }

@@ -65,20 +65,22 @@ class SuiteOutputCapture(reporter: ForkedTestReporter, flushIntervalMs: Long = 0
 
   @volatile private var flushRunning = true
 
-  // Dedicated virtual thread for periodic flush of all suite buffers
-  private val flushThread: Thread = {
-    val delay = Math.max(flushIntervalMs, 100)
-    Thread.ofVirtual().name("suite-output-flush").start(() => {
-      while (flushRunning) {
-        try {
-          Thread.sleep(delay)
-          flushAllSuiteBuffers()
-        } catch {
-          case _: InterruptedException => flushRunning = false
+  // Dedicated virtual thread for periodic flush of all suite buffers.
+  // Only started when flushIntervalMs > 0 to preserve the documented
+  // "no periodic flush when 0 (the default)" behavior.
+  private val flushThread: Option[Thread] =
+    Option.when(flushIntervalMs > 0) {
+      Thread.ofVirtual().name("suite-output-flush").start(() => {
+        while (flushRunning) {
+          try {
+            Thread.sleep(flushIntervalMs)
+            flushAllSuiteBuffers()
+          } catch {
+            case _: InterruptedException => flushRunning = false
+          }
         }
-      }
-    })
-  }
+      })
+    }
 
   private def flushAllSuiteBuffers(): Unit = {
     val entries = suiteBuffers.entrySet().iterator()
@@ -112,13 +114,18 @@ class SuiteOutputCapture(reporter: ForkedTestReporter, flushIntervalMs: Long = 0
     val name = suiteNameTL.get()
     suiteNameTL.remove()
     val buf = if name != null then suiteBuffers.remove(name) else null
-    if buf == null then "" else buf.toString(StandardCharsets.UTF_8)
+    if buf == null then ""
+    else buf.synchronized {
+      val text = buf.toString(StandardCharsets.UTF_8)
+      buf.reset()
+      text
+    }
   }
 
   override def write(b: Int): Unit = {
     val name = suiteNameTL.get()
     val buf = if name != null then suiteBuffers.get(name) else null
-    if buf != null then buf.write(b)
+    if buf != null then buf.synchronized { buf.write(b) }
     else {
       val ub = unattributedBuffer.get()
       ub.write(b)
@@ -129,7 +136,7 @@ class SuiteOutputCapture(reporter: ForkedTestReporter, flushIntervalMs: Long = 0
   override def write(bytes: Array[Byte], off: Int, len: Int): Unit = {
     val name = suiteNameTL.get()
     val buf = if name != null then suiteBuffers.get(name) else null
-    if buf != null then buf.write(bytes, off, len)
+    if buf != null then buf.synchronized { buf.write(bytes, off, len) }
     else {
       val ub = unattributedBuffer.get()
       // Flush line-by-line so UnattributedOutput envelopes stay newline-delimited.
