@@ -84,15 +84,11 @@ object ServerMain extends StrictLogging {
 
     val watchDebounceMs = cfg.watchDebounceMillis
 
-    // TODO maybe make it elastic ThreadPool with min/max threads for better memory usage?
-    //val originalTasksExecutorService = Executors.newFixedThreadPool(workerThreads)
-    // automatically propagate OTEL context, parent span
-    //val tasksExecutorService = Context.taskWrapping(originalTasksExecutorService)
-
+    // TODO check if OTEL still works with virutal threads
     // Use the global OTEL instance for metrics.
     // Export is handled externally (OTEL Java agent, env vars, etc.).
     val metricsMeter = GlobalOpenTelemetry.get().getMeter("deder-server")
-    val internals = DederProjectInternalsImpl(1, metricsMeter)
+    val internals = DederProjectInternalsImpl(metricsMeter)
 
     debounceScheduler = Executors.newSingleThreadScheduledExecutor(r => Thread(r, "watch-debounce"))
 

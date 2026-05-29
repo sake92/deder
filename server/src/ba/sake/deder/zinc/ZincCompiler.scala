@@ -377,7 +377,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
         )
         val currentRequestId = RequestContext.clientContext.get().map(_.requestId).orNull
         if currentRequestId == null then true
-        else !DederGlobals.cancellationTokens.get(currentRequestId).get()
+        else !Option(DederGlobals.cancellationTokens.get(currentRequestId)).exists(_.get())
       }
     }
 

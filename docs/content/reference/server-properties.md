@@ -10,7 +10,6 @@ Example:
 ```properties
 localPath=myprojects/deder/.deder/out/server/assembly/out.jar
 testRunnerLocalPath=myprojects/deder/.deder/out/test-runner/assembly/out.jar
-workerThreads=32
 logLevel=debug
 JAVA_OPTS=-javaagent:otel.jar -Dotel.service.name=my-project -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
 ```
@@ -24,8 +23,7 @@ deder version
 
 Available properties:
 - `logLevel` - log level used for server log at `.deder/logs/server.log`, one of `ERROR`, `WARNING`, `INFO`, `DEBUG`, `TRACE`
-- `workerThreads` - number of threads to use for executing tasks
-- `maxActiveCompilers` - maximum number of concurrent Zinc compilation calls. Values ≤ 0 mean "use `workerThreads`" (the default). Setting this lower than `workerThreads` reduces peak memory during compilation at the cost of slower parallel builds.
+- `maxActiveCompilers` - maximum number of concurrent Zinc compilation calls.
 - `maxConcurrentTestForks` - maximum number of forked test JVMs alive server-wide at any one time. Optional; defaults to the number of available CPU cores. Per-module `maxTestForks` is capped by this.
 - `maxInactiveSeconds` - max number of seconds server is inactive before it shuts down automatically
 - `bspEnabled` - specifies if BSP protocol is enabled. If false, the BSP Deder server is never started (useful in CI or to save memory/CPU)

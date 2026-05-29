@@ -12,7 +12,6 @@ import com.typesafe.scalalogging.StrictLogging
 
 class DederProjectInternalsImpl private (
     private val startTime: Instant,
-    private val workerPoolSize: Int,
     private val currentReqs: ConcurrentHashMap[String, LiveRequest],
     private val history: ConcurrentLinkedDeque[CompletedRequest],
     private val maxHistory: Int,
@@ -69,8 +68,6 @@ class DederProjectInternalsImpl private (
   override def serverUptime: Duration =
     Duration.fromNanos(System.nanoTime() - startTime.toEpochMilli * 1_000_000L)
 
-  override def workerThreadPoolSize: Int = workerPoolSize
-
   // -- Write methods --
 
   private[deder] def recordRequestStarted(
@@ -118,10 +115,9 @@ class DederProjectInternalsImpl private (
     taskDurationHistogram.record(duration.toMillis, attrs)
 
 object DederProjectInternalsImpl:
-  def apply(workerThreadPoolSize: Int, meter: Meter): DederProjectInternalsImpl =
+  def apply(meter: Meter): DederProjectInternalsImpl =
     new DederProjectInternalsImpl(
       startTime = Instant.now(),
-      workerPoolSize = workerThreadPoolSize,
       currentReqs = new ConcurrentHashMap[String, LiveRequest](),
       history = new ConcurrentLinkedDeque[CompletedRequest](),
       maxHistory = 100,

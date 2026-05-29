@@ -8,12 +8,12 @@ import io.opentelemetry.sdk.metrics.SdkMeterProvider
 
 class DederProjectInternalsImplSuite extends munit.FunSuite {
 
-  private def testInternals(workers: Int = 16): DederProjectInternalsImpl =
+  private def testInternals(): DederProjectInternalsImpl =
     val sdk = OpenTelemetrySdk.builder()
       .setMeterProvider(SdkMeterProvider.builder().build())
       .build()
     val meter = sdk.getMeter("test")
-    DederProjectInternalsImpl(workers, meter)
+    DederProjectInternalsImpl(meter)
 
   test("currentRequests tracks live requests") {
     val internals = testInternals()
@@ -97,11 +97,6 @@ class DederProjectInternalsImplSuite extends munit.FunSuite {
     assert(t1.toMillis > t0.toMillis)
   }
 
-  test("workerThreadPoolSize is as configured") {
-    val internals = testInternals(workers = 8)
-    assertEquals(internals.workerThreadPoolSize, 8)
-  }
-
   test("multiple concurrent recordTaskExecution calls are thread-safe") {
     import scala.concurrent.{Await, ExecutionContext, Future}
     import scala.concurrent.ExecutionContext.Implicits.global
@@ -109,9 +104,9 @@ class DederProjectInternalsImplSuite extends munit.FunSuite {
     val tasks = (1 to 1000).map { i =>
       Future {
         internals.recordTaskExecution(s"task-${i % 10}", (i % 100).millis, i % 3 == 0)
-      }(global)
+      }
     }
-    Await.result(Future.sequence(tasks)(implicitly, global), 10.seconds)
+    Await.result(Future.sequence(tasks), 10.seconds)
     val all = internals.allTaskStats
     assertEquals(all.size, 10)
     val totalExecs = all.map(_._2.executions).sum

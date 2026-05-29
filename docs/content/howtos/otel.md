@@ -46,7 +46,6 @@ curl -L -o otel.jar https://github.com/open-telemetry/opentelemetry-java-instrum
 # set the agent options in .deder/server.properties:
 JAVA_OPTS=-javaagent:path/to/otel.jar -Dotel.service.name=my-project -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
 
-# see examples/multi/.deder/server.properties for reference
 ```
 
 The Deder server *only depends on OTEL API*, so if no agent is provided it will just run normally without tracing.

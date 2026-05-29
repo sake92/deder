@@ -58,4 +58,3 @@ trait DederProjectInternals:
 
   /** Server metadata. */
   def serverUptime: Duration
-  def workerThreadPoolSize: Int

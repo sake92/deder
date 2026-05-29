@@ -2,41 +2,20 @@ package ba.sake.deder
 
 class ServerPropertiesSuite extends munit.FunSuite {
 
-  test("maxActiveCompilers defaults to workerThreads") {
-    val props = mkProps("workerThreads" -> "7")
-    val cfg = ServerProperties.from(props)
-    assertEquals(cfg.maxActiveCompilers, 7)
-  }
-
   test("maxActiveCompilers uses explicit override") {
     val props = mkProps(
-      "workerThreads" -> "7",
       "maxActiveCompilers" -> "3"
     )
     val cfg = ServerProperties.from(props)
     assertEquals(cfg.maxActiveCompilers, 3)
   }
 
-  test("maxActiveCompilers falls back to workerThreads when <= 0") {
-    val zeroProps = mkProps(
-      "workerThreads" -> "7",
-      "maxActiveCompilers" -> "0"
-    )
-    val negativeProps = mkProps(
-      "workerThreads" -> "7",
-      "maxActiveCompilers" -> "-2"
-    )
-    assertEquals(ServerProperties.from(zeroProps).maxActiveCompilers, 7)
-    assertEquals(ServerProperties.from(negativeProps).maxActiveCompilers, 7)
-  }
-
-  test("maxActiveCompilers falls back to workerThreads when invalid") {
+  test("maxActiveCompilers falls back to available processors when invalid") {
     val props = mkProps(
-      "workerThreads" -> "7",
       "maxActiveCompilers" -> "abc"
     )
     val cfg = ServerProperties.from(props)
-    assertEquals(cfg.maxActiveCompilers, 7)
+    assertEquals(cfg.maxActiveCompilers, Runtime.getRuntime.availableProcessors())
   }
 
   test("ServerMain compile semaphore uses maxActiveCompilers") {
@@ -44,7 +23,6 @@ class ServerPropertiesSuite extends munit.FunSuite {
       logLevel = "INFO",
       maxInactiveSeconds = 1800,
       taskLockTimeoutSeconds = 600,
-      workerThreads = 16,
       maxActiveCompilers = 2,
       bspEnabled = true,
       maxConcurrentTestForks = Runtime.getRuntime.availableProcessors(),

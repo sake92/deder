@@ -57,7 +57,7 @@ The core abstraction is `Task[T, Deps]` (`server/src/ba/sake/deder/Task.scala`).
 
 ### Configuration
 - Project config: `deder.pkl` (amends `config/DederProject.pkl`)
-- Server config: `.deder/server.properties` (logLevel, workerThreads, maxInactiveSeconds, bspEnabled)
+- Server config: `.deder/server.properties` (logLevel, maxInactiveSeconds, bspEnabled)
 - Config classes are **generated Java code** in `config/src/` — never edit directly; modify `config/DederProject.pkl` and run the gen script
 
 ### Module Types
