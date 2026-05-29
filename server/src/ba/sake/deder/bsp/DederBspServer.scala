@@ -971,18 +971,13 @@ class DederBspServer(
     logger.info("Initiating BSP server shutdown (CLI shutdown requested)...")
     running.set(false)
     cancelInFlightCompilationsOnShutdown()
-    val closeThread = new Thread(
-      () => {
-        try Thread.sleep(200) // give JSON-RPC layer a brief window to flush cancelled responses
-        catch {
-          case _: InterruptedException =>
-        }
-        try { onExit() } catch { case _: Exception => }
-      },
-      "bsp-shutdown-close"
-    )
-    closeThread.setDaemon(true)
-    closeThread.start()
+    Thread.ofVirtual().name("bsp-shutdown-close").start(() => {
+      try Thread.sleep(200) // give JSON-RPC layer a brief window to flush cancelled responses
+      catch {
+        case _: InterruptedException =>
+      }
+      try { onExit() } catch { case _: Exception => }
+    })
   }
 
   private def cancelInFlightCompilationsOnShutdown(): Unit = {
