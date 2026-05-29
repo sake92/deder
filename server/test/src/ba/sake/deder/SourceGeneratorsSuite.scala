@@ -140,10 +140,8 @@ class SourceGeneratorsSuite extends munit.FunSuite {
         )
       val notif = new ServerNotificationsLogger(_ => ())
       val results = state.executeTasks(
-        ctx = CliClientContext(
-          clientId = java.util.UUID.randomUUID().toString,
-          requestId = java.util.UUID.randomUUID().toString
-        ),
+        requestId = java.util.UUID.randomUUID().toString,
+        callerType = CallerType.Cli,
         moduleIds = Seq("common"),
         taskName = "syntheticFanIn",
         args = Seq.empty,

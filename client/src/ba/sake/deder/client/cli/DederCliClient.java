@@ -61,10 +61,10 @@ public class DederCliClient implements DederClient {
             var jsonb = Jsonb.builder().build();
             var clientMessageType = jsonb.type(ClientMessage.class);
             var serverMessageType = jsonb.type(ServerMessage.class);
-            writeThread = new DederCliClientWriteThread(logger, running, os, clientMessages, clientMessageType);
-            readThread = new DederCliClientReadThread(logger, running, is, serverMessageType);
-            readThread.start();
-            writeThread.start();
+            var writeRunner = new DederCliClientSocketWriter(logger, running, os, clientMessages, clientMessageType);
+            var readRunner = new DederCliClientSocketReader(logger, running, is, serverMessageType);
+            readThread = Thread.ofVirtual().name("DederCliClientSocketReader").start(readRunner);
+            writeThread = Thread.ofVirtual().name("DederCliClientSocketWriter").start(writeRunner);
             ClientMessage message;
             if (args.length > 0) {
                 var leftoverArgs = new String[args.length - 1];

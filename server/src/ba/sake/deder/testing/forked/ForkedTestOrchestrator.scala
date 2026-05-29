@@ -374,23 +374,16 @@ object ForkedTestOrchestrator extends StrictLogging {
       )
 
     withProcessCleanup(proc) {
-      val stdoutThread = new Thread(
-        () =>
-          streamStdout(
-            forkId, proc, stdoutLog, tag, notifications, moduleId, suiteOutputs,
-            startedSuites, completedSuites
-          ),
-        s"fork-$forkId-stdout"
+      val stdoutThread = Thread.ofVirtual().name(s"fork-$forkId-stdout").start(() =>
+        streamStdout(
+          forkId, proc, stdoutLog, tag, notifications, moduleId, suiteOutputs,
+          startedSuites, completedSuites
+        )
       )
-      stdoutThread.setDaemon(true)
-      stdoutThread.start()
 
-      val stderrThread = new Thread(
-        () => streamStderr(proc, stderrLog, tag, notifications, moduleId),
-        s"fork-$forkId-stderr"
+      val stderrThread = Thread.ofVirtual().name(s"fork-$forkId-stderr").start(() =>
+        streamStderr(proc, stderrLog, tag, notifications, moduleId)
       )
-      stderrThread.setDaemon(true)
-      stderrThread.start()
 
       val finished = waitForForkProcess(proc, tag, moduleId, notifications)
       stdoutThread.join(300)

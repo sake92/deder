@@ -8,13 +8,12 @@ import com.typesafe.scalalogging.StrictLogging
 import ba.sake.tupson.toJson
 import ba.sake.deder.DederProjectState
 
-class CliClientWriteThread(
+class CliClientSocketWriter(
     projectState: DederProjectState,
     clientChannel: SocketChannel,
     clientId: String,
     serverMessages: BlockingQueue[CliServerMessage]
-) extends Thread(s"CliClientWriteThread-${clientId}"),
-      StrictLogging {
+) extends Runnable, StrictLogging {
 
   override def run(): Unit = {
     try {

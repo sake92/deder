@@ -44,11 +44,11 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         logger.info(s"Client $clientId connected")
         val serverMessages = new LinkedBlockingQueue[CliServerMessage]()
         val handler = new CliClientMessageHandler(projectState, serverMessages, this)
-        val clientReadThread =
-          new CliClientReadThread(projectState, handler, clientChannel, clientId, serverMessages)
-        val clientWriteThread = new CliClientWriteThread(projectState, clientChannel, clientId, serverMessages)
-        clientWriteThread.start()
-        clientReadThread.start()
+        val clientReadRunner =
+          new CliClientSocketReader(projectState, handler, clientChannel, clientId, serverMessages)
+        val clientWriteRunner = new CliClientSocketWriter(projectState, clientChannel, clientId, serverMessages)
+        Thread.ofVirtual().name(s"CliClientSocketWriter-${clientId}").start(clientWriteRunner)
+        Thread.ofVirtual().name(s"CliClientSocketReader-${clientId}").start(clientReadRunner)
         // no join, just let them run
       }
     } finally {

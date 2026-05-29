@@ -5,7 +5,6 @@ import java.time.{Duration, Instant}
 import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.Executors
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 import scala.util.Using
@@ -137,7 +136,6 @@ class DederProjectState(
   }
 
   def executeCLI(
-      ctx: CliClientContext,
       moduleSelectors: Seq[String],
       taskName: String,
       args: Seq[String],
@@ -147,6 +145,7 @@ class DederProjectState(
       exitOnEnd: Boolean = true,
       watch: Boolean = false,
   ): Unit = try {
+    val ctx = RequestContext.cliContext
     val state = readState(useLastGood) match
       case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
       case Right(s)  => s
@@ -189,15 +188,14 @@ class DederProjectState(
         if isTaskSingleton && relevantModuleIds.length > 1 then
           throw RuntimeException(s"Task '${taskName}' is singleton, cannot execute it on multiple modules at once")
         val results = executeTasks(
-          ctx,
+          ctx.requestId,
+          CallerType.Cli,
           relevantModuleIds,
           taskName,
           args,
           watch = watch,
           serverNotificationsLogger,
           useLastGood = useLastGood,
-         // clientParams = clientParams,
-          callerType = CallerType.Cli
         )
         // summarize across modules
         if results.nonEmpty then {
@@ -273,11 +271,10 @@ class DederProjectState(
     try {
       Using.resource(span.makeCurrent()) { scope =>
         val reqId = if requestId != null then requestId else UUID.randomUUID().toString
-        val baseCtx =
-          RequestContext.clientContext.get().getOrElse(CliClientContext(clientId = "internal", requestId = reqId))
         val res =
           executeTasks(
-            baseCtx.copy(requestId = reqId),
+            reqId,
+            callerType,
             Seq(moduleId),
             task.name,
             args,
@@ -298,19 +295,18 @@ class DederProjectState(
 
   // execute a single task on many modules
   def executeTasks(
-      ctx: CliClientContext,
+      requestId: String,
+      callerType: CallerType,
       moduleIds: Seq[String], // nonempty please :')
       taskName: String,
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean,
-      //clientParams: CliClientParams = CliClientParams(Map.empty),
-      callerType: CallerType = CallerType.Cli
   ): Seq[TaskExecResult] =
     val requestStartNanos = System.nanoTime()
     val requestStartInstant = java.time.Instant.now()
-    internals.recordRequestStarted(ctx.requestId, callerType, taskName, moduleIds, requestStartInstant)
+    internals.recordRequestStarted(requestId, callerType, taskName, moduleIds, requestStartInstant)
     try {
       inFlightRequests.incrementAndGet()
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
@@ -343,7 +339,7 @@ class DederProjectState(
             taskInstance.lock.lock()
           acquiredLocks += taskInstance
         }
-        DederGlobals.cancellationTokens.put(ctx.requestId, new AtomicBoolean(false))
+        DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
         val result = tasksExecutor.execute(
           tasksExecStages,
           moduleIds,
@@ -353,18 +349,18 @@ class DederProjectState(
           serverNotificationsLogger
         )
         val duration = Duration.ofNanos(System.nanoTime() - requestStartNanos)
-        internals.recordRequestCompleted(ctx.requestId, taskName, success = true, duration, callerType)
+        internals.recordRequestCompleted(requestId, taskName, success = true, duration, callerType)
         result
       } finally {
         acquiredLocks.reverse.foreach { taskInstance =>
           taskInstance.lock.unlock()
         }
-        DederGlobals.cancellationTokens.remove(ctx.requestId)
+        DederGlobals.cancellationTokens.remove(requestId)
       }
     } catch {
       case NonFatal(e) =>
         val duration = Duration.ofNanos(System.nanoTime() - requestStartNanos)
-        internals.recordRequestCompleted(ctx.requestId, taskName, success = false, duration, callerType)
+        internals.recordRequestCompleted(requestId, taskName, success = false, duration, callerType)
         // send notification about failure to client
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
         if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
@@ -496,28 +492,28 @@ class DederProjectState(
   }
 
   private def scheduleInactiveShutdownChecker(): Unit = {
-    val executor = Executors.newSingleThreadScheduledExecutor()
-    executor.scheduleAtFixedRate(
-      () => {
+    Thread.ofVirtual().name("inactivity-checker").start(() => {
+      var running = true
+      while (running && !shutdownStarted) {
         try {
-          val lastEnded = lastRequestEndedAt.get()
-          if inFlightRequests.get() == 0 then {
+          Thread.sleep(TimeUnit.MINUTES.toMillis(1))
+          if (inFlightRequests.get() == 0) {
             val now = Instant.now()
+            val lastEnded = lastRequestEndedAt.get()
             val inactiveDuration = Duration.between(lastEnded, now)
-            if inactiveDuration.compareTo(maxInactiveDuration) > 0 then {
+            if (inactiveDuration.compareTo(maxInactiveDuration) > 0) {
               logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
               shutdown()
+              running = false
             }
           }
         } catch {
+          case _: InterruptedException => running = false
           case NonFatal(e) =>
             logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
         }
-      },
-      1,
-      1,
-      TimeUnit.MINUTES
-    )
+      }
+    })
   }
 
   def triggerFileWatchedTasks(changedPaths: Set[os.Path]): Unit = {
@@ -572,7 +568,8 @@ class DederProjectState(
                   )
                 )
                 executeTasks(
-                  ctx,
+                  ctx.requestId,
+                  CallerType.Cli,
                   Seq(watchedTask.taskInstance.moduleId),
                   watchedTask.taskInstance.task.name,
                   watchedTask.args,
@@ -634,7 +631,6 @@ class DederProjectState(
                   )
                 )
                 executeCLI(
-                  ctx,
                   Seq(watchedTask.taskInstance.moduleId),
                   watchedTask.taskInstance.task.name,
                   watchedTask.args,

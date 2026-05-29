@@ -5,9 +5,9 @@ import java.nio.channels.FileLock
 import java.nio.channels.OverlappingFileLockException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
+
 import java.util.concurrent.Semaphore
-import java.util.concurrent.ScheduledFuture
+
 import java.util as ju
 import scala.compiletime.uninitialized
 import scala.jdk.CollectionConverters.*
@@ -36,8 +36,9 @@ object ServerMain extends StrictLogging {
 
   // Watcher fields — used by stopFileWatcher/stopDebounceScheduler during shutdown
   @volatile private var watcherThread: Thread = uninitialized
-  @volatile private var debounceScheduler: java.util.concurrent.ScheduledExecutorService = uninitialized
-  @volatile private var pendingDebounce: Option[ScheduledFuture[?]] = None
+  @volatile private var debounceThread: Thread = uninitialized
+  @volatile private var debounceRunning = true
+  private var lastChangeMillis: Long = 0L // Guarded by debounceLock
   private val debounceLock = new Object()
   private val accumulatedChangedPaths = ConcurrentHashMap.newKeySet[os.Path]()
 
@@ -90,7 +91,7 @@ object ServerMain extends StrictLogging {
     val metricsMeter = GlobalOpenTelemetry.get().getMeter("deder-server")
     val internals = DederProjectInternalsImpl(metricsMeter)
 
-    debounceScheduler = Executors.newSingleThreadScheduledExecutor(r => Thread(r, "watch-debounce"))
+
 
     // Must be declared before onShutdown to avoid forward reference error (var, not val)
     var cliServer: DederCliServer | Null = null
@@ -148,6 +149,46 @@ object ServerMain extends StrictLogging {
       internals = internals
     )
 
+    debounceThread = Thread.ofVirtual().name("watch-debounce").start(() => {
+      var running = true
+      while (running) {
+        // Wait for the quiet period (watchDebounceMs with no new changes) to expire
+        debounceLock.synchronized {
+          var remaining: Long = watchDebounceMs
+          if (lastChangeMillis > 0) {
+            val elapsed = System.currentTimeMillis() - lastChangeMillis
+            remaining = (watchDebounceMs - elapsed).max(0L)
+          }
+          while (remaining > 0 && debounceRunning) {
+            debounceLock.wait(remaining.toInt)
+            if (debounceRunning) {
+              val elapsed = System.currentTimeMillis() - lastChangeMillis
+              remaining = if (elapsed >= watchDebounceMs) 0L else watchDebounceMs - elapsed
+            }
+          }
+          running = debounceRunning
+        }
+        // Quiet period expired — drain accumulated paths if still running
+        if (running) {
+          val snapshot = {
+            val iter = accumulatedChangedPaths.iterator()
+            val buf = Set.newBuilder[os.Path]
+            while (iter.hasNext) do
+              buf += iter.next()
+              iter.remove()
+            buf.result()
+          }
+          debounceLock.synchronized { lastChangeMillis = 0L }
+          if (snapshot.nonEmpty) {
+            logger.debug(
+              s"Debounce fired, triggering tasks for ${snapshot.size} changed paths: ${snapshot.take(3).mkString(", ")}..."
+            )
+            projectState.triggerFileWatchedTasks(snapshot)
+          }
+        }
+      }
+    })
+
     // Wire up early lock release for fast shutdown+restart
     projectState.setReleaseServerLock(() => {
       try { serverFileLock.release() }
@@ -156,6 +197,7 @@ object ServerMain extends StrictLogging {
       catch { case _: Exception => }
     })
 
+    // Platform thread — Runtime shutdown hooks must execute reliably during JVM teardown
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
       logger.warn("JVM shutdown hook fired — best-effort BSP request cancellation")
       try projectState.notifyBspClientsShuttingDown()
@@ -165,9 +207,11 @@ object ServerMain extends StrictLogging {
     }))
 
     cliServer = DederCliServer(projectState)
+    // Platform thread — root accept loop keeping the JVM alive
     val cliServerThread = new Thread(() => cliServer.nn.start(), "DederCliServer")
     cliServerThread.start()
 
+    // Platform thread — root accept loop keeping the JVM alive
     if cfg.bspEnabled then {
       bspProxyServer = DederBspProxyServer(coreTasks, runTasks, scalaJsTasks, scalaNativeTasks, projectState)
       val bspProxyServerThread = new Thread(() => bspProxyServer.nn.start(), "DederBspProxyServer")
@@ -179,6 +223,7 @@ object ServerMain extends StrictLogging {
     loadGitignore()
 
     // Run file watcher on a dedicated daemon thread so it can be interrupted during shutdown
+    // Platform thread — uses native filesystem I/O (os.watch.watch); joined from main to keep JVM alive
     watcherThread = new Thread(
       () => {
         try {
@@ -201,32 +246,8 @@ object ServerMain extends StrictLogging {
                   if candidates.nonEmpty then {
                     accumulatedChangedPaths.addAll(candidates.asJava)
                     debounceLock.synchronized {
-                      pendingDebounce.foreach(_.cancel(false))
-                      pendingDebounce = Some(
-                        debounceScheduler.schedule(
-                          new Runnable {
-                            def run(): Unit = {
-                              val snapshot = {
-                                val iter = accumulatedChangedPaths.iterator()
-                                val buf = Set.newBuilder[os.Path]
-                                while iter.hasNext do
-                                  buf += iter.next()
-                                  iter.remove()
-                                buf.result()
-                              }
-                              if snapshot.nonEmpty then {
-                                logger.debug(
-                                  s"Debounce fired, triggering tasks for ${snapshot.size} changed paths: ${snapshot.take(3).mkString(", ")}..."
-                                )
-                                projectState.triggerFileWatchedTasks(snapshot)
-                              }
-                              debounceLock.synchronized { pendingDebounce = None }
-                            }
-                          },
-                          watchDebounceMs,
-                          java.util.concurrent.TimeUnit.MILLISECONDS
-                        )
-                      )
+                      lastChangeMillis = System.currentTimeMillis()
+                      debounceLock.notify()
                     }
                   }
               } catch {
@@ -265,10 +286,10 @@ object ServerMain extends StrictLogging {
   }
 
   private def stopDebounceScheduler(): Unit = {
-    logger.info("Stopping debounce scheduler...")
-    try { debounceScheduler.shutdownNow() }
-    catch { case _: Exception => }
-    try { debounceScheduler.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS) }
+    logger.info("Stopping debounce thread...")
+    debounceRunning = false
+    debounceLock.synchronized { debounceLock.notify() }
+    try { debounceThread.join(3000) }
     catch { case _: Exception => }
   }
 
@@ -334,6 +355,7 @@ object ServerMain extends StrictLogging {
       serverFileLock = lock
     }
 
+    // Platform thread — Runtime shutdown hooks must execute reliably during JVM teardown
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
       logger.warn("JVM shutdown hook fired (unexpected exit) — releasing lock as safety net")
       try { serverFileLock.release() }

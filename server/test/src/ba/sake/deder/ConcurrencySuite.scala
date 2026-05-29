@@ -64,7 +64,7 @@ class ConcurrencySuite extends munit.FunSuite {
     val clientFutures = (1 to clientsCount).map { _ =>
       clientExecutorService.submit(() => {
         val ctx = CliClientContext(clientId = UUID.randomUUID().toString, requestId = UUID.randomUUID().toString)
-        state.executeTasks(ctx, Seq("common"), "task1", Seq.empty, false, serverNotificationsLogger, false)
+        state.executeTasks(ctx.requestId, CallerType.Cli, Seq("common"), "task1", Seq.empty, false, serverNotificationsLogger, false)
       })
     }
     clientFutures.foreach(_.get()) // wait for all clients to finish
@@ -118,7 +118,7 @@ class ConcurrencySuite extends munit.FunSuite {
         // half of the clients always call "task2", the other half random tasks
         val taskName = if i % 2 == 0 then "task2" else taskNames(Random.nextInt(taskNames.length))
         val ctx = CliClientContext(clientId = UUID.randomUUID().toString, requestId = UUID.randomUUID().toString)
-        state.executeTasks(ctx, Seq("common"), taskName, Seq.empty, false, serverNotificationsLogger, false)
+        state.executeTasks(ctx.requestId, CallerType.Cli, Seq("common"), taskName, Seq.empty, false, serverNotificationsLogger, false)
       })
     }
     clientFutures.foreach(_.get()) // wait for all clients to finish
@@ -160,7 +160,7 @@ class ConcurrencySuite extends munit.FunSuite {
     val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
     val backgroundFuture = backgroundExecutor.submit(() => {
       try {
-        state.executeTasks(CliClientContext(clientId = requestId1, requestId = requestId1), Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
+        state.executeTasks(requestId1, CallerType.Cli, Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
       } catch {
         case _: Exception =>
       }
@@ -169,7 +169,7 @@ class ConcurrencySuite extends munit.FunSuite {
     Thread.sleep(500)
 
     val ex = intercept[TaskEvaluationException] {
-      state.executeTasks(CliClientContext(clientId = requestId2, requestId = requestId2), Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
+      state.executeTasks(requestId2, CallerType.Cli, Seq("common"), "slowTask", Seq.empty, false, serverNotificationsLogger, false)
     }
 
     assert(ex.getCause.isInstanceOf[TaskLockTimeoutException], s"Expected TaskLockTimeoutException, got: ${ex.getCause.getClass.getName}")
@@ -212,7 +212,7 @@ class ConcurrencySuite extends munit.FunSuite {
     val backgroundFuture = backgroundExecutor.submit(() => {
       try {
         lockAcquiredLatch.countDown()
-        state.executeTasks(CliClientContext(clientId = requestId1, requestId = requestId1), Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
+        state.executeTasks(requestId1, CallerType.Cli, Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
       } catch {
         case _: Exception =>
       }
@@ -220,7 +220,7 @@ class ConcurrencySuite extends munit.FunSuite {
 
     lockAcquiredLatch.await()
 
-    state.executeTasks(CliClientContext(clientId = requestId2, requestId = requestId2), Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
+    state.executeTasks(requestId2, CallerType.Cli, Seq("common"), "slowTaskZero", Seq.empty, false, serverNotificationsLogger, false)
 
     backgroundExecutor.shutdown()
   }

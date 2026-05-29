@@ -8,15 +8,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-public class DederCliClientReadThread extends Thread {
+public class DederCliClientSocketReader implements Runnable {
 
     private final Consumer<String> logger;
     private final AtomicBoolean running;
     private final InputStream is;
     private final JsonType<ServerMessage> messageType;
 
-    public DederCliClientReadThread(Consumer<String> logger, AtomicBoolean running, InputStream is, JsonType<ServerMessage> messageType) {
-        super("DederCliClientReadThread");
+    public DederCliClientSocketReader(Consumer<String> logger, AtomicBoolean running, InputStream is, JsonType<ServerMessage> messageType) {
         this.logger = logger;
         this.running = running;
         this.is = is;
@@ -42,7 +41,8 @@ public class DederCliClientReadThread extends Thread {
         // newline delimited JSON messages
         var reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8));
         String messageJson;
-        SubprocessRunningThread subprocessRunningThread = null;
+        SubprocessRunner subprocessRunner = null;
+        Thread subprocessRunnerThread = null;
         // System.err.println("Waiting for messages from server...");
         while (running.get() && (messageJson = reader.readLine()) != null) {
             var message = messageType.fromJson(messageJson);
@@ -52,21 +52,21 @@ public class DederCliClientReadThread extends Thread {
             } else if (message instanceof ServerMessage.Log(var logText, var level)) {
                 System.err.println(logText);
             } else if (message instanceof ServerMessage.RunSubprocess(String[] cmd, var envVars, boolean watch)) {
-                if (subprocessRunningThread != null && subprocessRunningThread.isAlive()) {
+                if (subprocessRunnerThread != null && subprocessRunnerThread.isAlive()) {
                     logger.accept("Interrupting current subprocess...");
-                    subprocessRunningThread.interrupt();
-                    subprocessRunningThread.join();
+                    subprocessRunnerThread.interrupt();
+                    subprocessRunnerThread.join();
                 }
-                subprocessRunningThread = new SubprocessRunningThread(cmd, envVars, logger);
-                subprocessRunningThread.start();
+                subprocessRunner = new SubprocessRunner(cmd, envVars, logger);
+                subprocessRunnerThread = Thread.ofVirtual().name("SubprocessRunner").start(subprocessRunner);
                 if (!watch) {
-                    subprocessRunningThread.join();
+                    subprocessRunnerThread.join();
                     running.set(false);
-                    System.exit(subprocessRunningThread.getExitCode());
+                    System.exit(subprocessRunner.getExitCode());
                 }
                 // else just let it run.. either new message will kill it, or user with CTRL+C
             } else if (message instanceof ServerMessage.Exit(int exitCode, boolean serverShuttingDown)) {
-                if (subprocessRunningThread != null && subprocessRunningThread.isAlive()) {
+                if (subprocessRunnerThread != null && subprocessRunnerThread.isAlive()) {
                     logger.accept("Subprocess still running, not exiting...");
                 } else {
                     if (serverShuttingDown) {

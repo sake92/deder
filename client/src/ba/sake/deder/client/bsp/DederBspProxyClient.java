@@ -30,36 +30,34 @@ public class DederBspProxyClient implements DederClient {
 		try (var channel = SocketChannel.open(StandardProtocolFamily.UNIX)) {
 			var connected = channel.connect(address);
 			log("Connected with server!");
-			serverWriteThread = new Thread(() -> {
-				try {
-					var os = Channels.newOutputStream(channel);
-					System.in.transferTo(os);
-				} catch (IOException e) {
-					if (isExpectedShutdown(e)) {
-						log("BSP client write thread interrupted during shutdown.");
-						return;
-					}
-					log("Error occurred while writing to server: " + e.getMessage());
-					throw new UncheckedIOException(e);
-				}
-				log("Client input stream ended, closing server write stream.");
-			}, "DederBspServerWriteThread");
-			serverReadThread = new Thread(() -> {
-				try {
-					var is = Channels.newInputStream(channel);
-					is.transferTo(System.out);
-				} catch (IOException e) {
-					if (isExpectedShutdown(e)) {
-						log("BSP client read thread interrupted during shutdown.");
-						return;
-					}
-					log("Error occurred while reading from server: " + e.getMessage());
-					throw new UncheckedIOException(e);
-				}
-				log("Server output stream ended, closing client read stream.");
-			}, "DederBspServerReadThread");
-			serverWriteThread.start();
-			serverReadThread.start();
+            serverWriteThread = Thread.ofVirtual().name("DederBspServerWriteThread").start(() -> {
+                try {
+                    var os = Channels.newOutputStream(channel);
+                    System.in.transferTo(os);
+                } catch (IOException e) {
+                    if (isExpectedShutdown(e)) {
+                        log("BSP client write thread interrupted during shutdown.");
+                        return;
+                    }
+                    log("Error occurred while writing to server: " + e.getMessage());
+                    throw new UncheckedIOException(e);
+                }
+                log("Client input stream ended, closing server write stream.");
+            });
+            serverReadThread = Thread.ofVirtual().name("DederBspServerReadThread").start(() -> {
+                try {
+                    var is = Channels.newInputStream(channel);
+                    is.transferTo(System.out);
+                } catch (IOException e) {
+                    if (isExpectedShutdown(e)) {
+                        log("BSP client read thread interrupted during shutdown.");
+                        return;
+                    }
+                    log("Error occurred while reading from server: " + e.getMessage());
+                    throw new UncheckedIOException(e);
+                }
+                log("Server output stream ended, closing client read stream.");
+            });
 			serverReadThread.join();
 			log("Server disconnected"); // channel.read == -1
 			serverWriteThread.interrupt(); // cancel the write thread

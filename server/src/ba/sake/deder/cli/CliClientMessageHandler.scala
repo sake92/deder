@@ -23,23 +23,24 @@ class CliClientMessageHandler(
     cliServer: DederCliServer
 ) extends StrictLogging {
 
-  def handle(ctx: CliClientContext, message: CliClientMessage): Unit = {
+  def handle(message: CliClientMessage): Unit = {
     message match {
-      case m: CliClientMessage.Help     => handleHelp(ctx, m)
-      case m: CliClientMessage.Version  => handleVersion(ctx)
-      case m: CliClientMessage.Modules  => handleModules(ctx, m)
-      case m: CliClientMessage.Tasks    => handleTasks(ctx, m)
-      case m: CliClientMessage.Plan     => handlePlan(ctx, m)
-      case m: CliClientMessage.Exec     => handleExec(ctx, m)
-      case m: CliClientMessage.Cancel   => handleCancel(ctx, m)
-      case m: CliClientMessage.Clean    => handleClean(ctx, m)
-      case m: CliClientMessage.Import   => handleImport(ctx, m)
-      case m: CliClientMessage.Complete => handleComplete(ctx, m)
-      case m: CliClientMessage.Shutdown => handleShutdown(ctx, m)
+      case m: CliClientMessage.Help     => handleHelp(m)
+      case m: CliClientMessage.Version  => handleVersion()
+      case m: CliClientMessage.Modules  => handleModules(m)
+      case m: CliClientMessage.Tasks    => handleTasks(m)
+      case m: CliClientMessage.Plan     => handlePlan(m)
+      case m: CliClientMessage.Exec     => handleExec(m)
+      case m: CliClientMessage.Cancel   => handleCancel(m)
+      case m: CliClientMessage.Clean    => handleClean(m)
+      case m: CliClientMessage.Import   => handleImport(m)
+      case m: CliClientMessage.Complete => handleComplete(m)
+      case m: CliClientMessage.Shutdown => handleShutdown(m)
     }
   }
 
-  private def handleHelp(ctx: CliClientContext, m: CliClientMessage.Help): Unit = {
+  private def handleHelp(m: CliClientMessage.Help): Unit = {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     val requestId = ctx.requestId
     OTEL.withSpan("cli.help")(
@@ -110,7 +111,8 @@ class CliClientMessageHandler(
     }
   }
 
-  private def handleVersion(ctx: CliClientContext): Unit = {
+  private def handleVersion(): Unit = {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     val requestId = ctx.requestId
     OTEL.withSpan("cli.version")(
@@ -121,7 +123,8 @@ class CliClientMessageHandler(
     }
   }
 
-  private def handleModules(ctx: CliClientContext, m: CliClientMessage.Modules): Unit = {
+  private def handleModules(m: CliClientMessage.Modules): Unit = {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
@@ -218,7 +221,8 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleTasks(ctx: CliClientContext, m: CliClientMessage.Tasks): Unit = {
+  private def handleTasks(m: CliClientMessage.Tasks): Unit = {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
@@ -327,7 +331,8 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handlePlan(ctx: CliClientContext, m: CliClientMessage.Plan): Unit = boundary {
+  private def handlePlan(m: CliClientMessage.Plan): Unit = boundary {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
@@ -452,7 +457,8 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleExec(ctx: CliClientContext, m: CliClientMessage.Exec): Unit = {
+  private def handleExec(m: CliClientMessage.Exec): Unit = {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
@@ -490,7 +496,6 @@ class CliClientMessageHandler(
               if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail
               else cliOptions.args.value
             projectState.executeCLI(
-              ctx,
               cliOptions.modules,
               cliOptions.task,
               args = argss,
@@ -503,7 +508,8 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleCancel(ctx: CliClientContext, m: CliClientMessage.Cancel): Unit = {
+  private def handleCancel(m: CliClientMessage.Cancel): Unit = {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     val requestId = ctx.requestId
     OTEL.withSpan("cli.cancel")(
@@ -516,7 +522,8 @@ class CliClientMessageHandler(
     }
   }
 
-  private def handleClean(ctx: CliClientContext, m: CliClientMessage.Clean): Unit = {
+  private def handleClean(m: CliClientMessage.Clean): Unit = {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
@@ -554,7 +561,8 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleImport(ctx: CliClientContext, m: CliClientMessage.Import): Unit = {
+  private def handleImport(m: CliClientMessage.Import): Unit = {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
@@ -597,7 +605,8 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleComplete(ctx: CliClientContext, m: CliClientMessage.Complete): Unit = {
+  private def handleComplete(m: CliClientMessage.Complete): Unit = {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     val requestId = ctx.requestId
     if m.args == Seq("--help") || m.args == Seq("-h") then
@@ -642,7 +651,8 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleShutdown(ctx: CliClientContext, m: CliClientMessage.Shutdown): Unit = {
+  private def handleShutdown(m: CliClientMessage.Shutdown): Unit = {
+    val ctx = RequestContext.cliContext
     val clientId = ctx.clientId
     OTEL.withSpan("cli.shutdown")(
       _.setAttribute("clientId", clientId)
