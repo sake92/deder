@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
-public class DederCliClientWriteThread extends Thread {
+public class DederCliClientSocketWriter implements Runnable {
 
     private final Consumer<String> logger;
     private final AtomicBoolean running;
@@ -20,8 +20,7 @@ public class DederCliClientWriteThread extends Thread {
     private final BlockingQueue<ClientMessage> clientMessages;
     private final JsonType<ClientMessage> messageType;
 
-    public DederCliClientWriteThread(Consumer<String> logger, AtomicBoolean running, OutputStream os, BlockingQueue<ClientMessage> clientMessages, JsonType<ClientMessage> messageType) {
-        super("DederCliClientWriteThread");
+    public DederCliClientSocketWriter(Consumer<String> logger, AtomicBoolean running, OutputStream os, BlockingQueue<ClientMessage> clientMessages, JsonType<ClientMessage> messageType) {
         this.logger = logger;
         this.running = running;
         this.os = os;

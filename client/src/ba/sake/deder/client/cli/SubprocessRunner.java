@@ -5,7 +5,7 @@ import java.util.function.Consumer;
 import java.io.*;
 import java.util.concurrent.TimeUnit;
 
-class SubprocessRunningThread extends Thread {
+class SubprocessRunner implements Runnable {
 
 	private final String[] command;
 	private final Map<String, String> envVars;
@@ -13,8 +13,7 @@ class SubprocessRunningThread extends Thread {
 	private Process runningSubprocess = null;
     private int exitCode = -1; // -1 means unknown
 
-	public SubprocessRunningThread(String[] command, Map<String, String> envVars, Consumer<String> log) {
-        super("DederCliSubprocessRunningThread");
+	public SubprocessRunner(String[] command, Map<String, String> envVars, Consumer<String> log) {
 		this.command = command;
 		this.envVars = envVars;
 		this.log = log;
