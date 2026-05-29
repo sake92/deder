@@ -21,10 +21,12 @@ import ba.sake.tupson.toJson
 import ba.sake.deder.scalajs.ScalaJsTasks
 import ba.sake.deder.scalanative.ScalaNativeTasks
 import ba.sake.deder.graalvm.GraalVmNativeImageTasks
+import ba.sake.deder.publish.PublishTasks
 
 class DederProjectState(
     coreTasks: CoreTasks,
     runTasks: RunTasks,
+    publishTasks: PublishTasks,
     scalaJsTasks: ScalaJsTasks,
     scalaNativeTasks: ScalaNativeTasks,
     graalvmNativeImageTasks: GraalVmNativeImageTasks,
@@ -109,7 +111,7 @@ class DederProjectState(
 
             // Load plugin tasks before TasksResolver so they are included in the execution graph.
             // Plugin tasks are kept separately and the effective registry is rebuilt per reload.
-            val coreTasksApi = CoreTasksApiAdapter(coreTasks, runTasks)
+            val coreTasksApi = CoreTasksApiAdapter(coreTasks, runTasks, publishTasks, graalvmNativeImageTasks)
             val scalaJsTasksApi = ScalaJsTasksApiAdapter(scalaJsTasks)
             val scalaNativeTasksApi = ScalaNativeTasksApiAdapter(scalaNativeTasks)
             val pluginLoader = PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver, internals)

@@ -138,6 +138,7 @@ object ServerMain extends StrictLogging {
     val projectState = DederProjectState(
       coreTasks,
       runTasks,
+      publishTasks,
       scalaJsTasks,
       scalaNativeTasks,
       graalvmNativeImageTasks,
