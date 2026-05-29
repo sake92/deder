@@ -12,7 +12,7 @@ import ch.epfl.scala.bsp4j.*
 import dependency.ScalaParameters
 import coursierapi.error.DownloadingArtifactsError
 import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
-import ba.sake.deder.*
+import ba.sake.deder.{CompileResult => _, _}
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.Dependency

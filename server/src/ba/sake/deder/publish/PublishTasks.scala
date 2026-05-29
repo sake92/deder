@@ -116,7 +116,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     .build { ctx =>
       val (localClasspath, resources, manifestEntries) = ctx.depResults
       val resultJarPath = ctx.out / s"${ctx.module.id}.jar"
-      val jarInputPaths = Seq(localClasspath.absPath) ++ resources.map(_.absPath)
+      val jarInputPaths = Seq(localClasspath.classesDir.absPath) ++ resources.map(_.absPath)
       JarUtils.createJar(
         resultJarPath,
         jarInputPaths,

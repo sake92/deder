@@ -24,7 +24,7 @@ class CoreTasksApiAdapter(coreTasks: CoreTasks, runTasks: RunTasks) extends Core
   def depsTreeTask: AbstractTask[DepTree] = coreTasks.depsTreeTask
   def classesTask: AbstractTask[DederPath] = coreTasks.classesTask
   def semanticdbDirTask: AbstractTask[DederPath] = coreTasks.semanticdbDirTask
-  def compileTask: AbstractTask[DederPath] = coreTasks.compileTask
+  def compileTask: AbstractTask[CompileResult] = coreTasks.compileTask
   def compileClasspathTask: AbstractTask[Seq[os.Path]] = coreTasks.compileClasspathTask
   def javaSemanticdbVersionTask: AbstractTask[String] = coreTasks.javaSemanticdbVersionTask
   def scalaSemanticdbVersionTask: AbstractTask[String] = coreTasks.scalaSemanticdbVersionTask

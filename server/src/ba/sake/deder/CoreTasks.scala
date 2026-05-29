@@ -5,6 +5,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import dependency.ScalaVersion
+import ba.sake.deder.compilation.CompilationSummary
 import ba.sake.deder.zinc.{DederZincLogger, JdkUtils, ZincCompilersCache}
 import xsbti.compile.CompileOrder
 import ba.sake.deder.publish.GitSemVer
@@ -674,7 +675,7 @@ class CoreTasks() extends StrictLogging {
 
   // returns classes dir
   val compileTask = TaskBuilder
-    .make[DederPath](
+    .make[CompileResult](
       name = "compile",
       transitive = true,
       category = "Build"
@@ -696,7 +697,8 @@ class CoreTasks() extends StrictLogging {
     .dependsOn(javaSemanticdbVersionTask)
     .dependsOn(scalaSemanticdbVersionTask)
     .dependsOn(semanticdbEnabledTask)
-    .build { ctx =>
+    .buildSummarized[CompilationSummary](
+      execute = { ctx =>
       val (
         sourceFiles,
         generatedSourcesDir,
@@ -804,7 +806,7 @@ class CoreTasks() extends StrictLogging {
           }
       }
 
-      ZincCompilersCache
+      val zincResult = ZincCompilersCache
         .get(scalaVersion, ctx.dependencyResolver)
         .compile(
           javaHome = javaHome.map(_.toNIO),
@@ -821,8 +823,16 @@ class CoreTasks() extends StrictLogging {
           moduleId = ctx.module.id,
           notifications = ctx.notifications
         )
-      DederPath(classesDir)
-    }
+
+      CompileResult(
+        classesDir = DederPath(classesDir),
+        errors = zincResult.errors,
+        warnings = zincResult.warnings,
+        sourceCount = zincResult.sourceCount
+      )
+      },
+      isResultSuccessful = _.errors == 0
+    )
 
   val jvmOptionsTask = ConfigValueTask[Seq[String]](
     name = "jvmOptions",
