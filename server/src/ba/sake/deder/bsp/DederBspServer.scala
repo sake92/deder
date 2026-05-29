@@ -92,7 +92,8 @@ class DederBspServer(
     ServerNotificationsLogger { sn =>
       sn match {
         case n: ServerNotification.Log =>
-        // we have everything in server logs
+          if n.level == ServerNotification.LogLevel.ERROR then
+            client.onBuildShowMessage(new ShowMessageParams(MessageType.ERROR, n.message))
         case cs: ServerNotification.CompileStarted =>
           // dont send notification if compile was triggered transitively by another task
           // e.g. mainClasses -> compile
