@@ -5,7 +5,6 @@ import java.time.{Duration, Instant}
 import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.Executors
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 import scala.util.Using
@@ -196,7 +195,6 @@ class DederProjectState(
           watch = watch,
           serverNotificationsLogger,
           useLastGood = useLastGood,
-         // clientParams = clientParams,
           callerType = CallerType.Cli
         )
         // summarize across modules
@@ -305,7 +303,6 @@ class DederProjectState(
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean,
-      //clientParams: CliClientParams = CliClientParams(Map.empty),
       callerType: CallerType = CallerType.Cli
   ): Seq[TaskExecResult] =
     val requestStartNanos = System.nanoTime()
@@ -496,28 +493,27 @@ class DederProjectState(
   }
 
   private def scheduleInactiveShutdownChecker(): Unit = {
-    val executor = Executors.newSingleThreadScheduledExecutor()
-    executor.scheduleAtFixedRate(
-      () => {
+    Thread.ofVirtual().name("inactivity-checker").start(() => {
+      while (!shutdownStarted) {
         try {
-          val lastEnded = lastRequestEndedAt.get()
-          if inFlightRequests.get() == 0 then {
+          Thread.sleep(TimeUnit.MINUTES.toMillis(1))
+          if (inFlightRequests.get() == 0) {
             val now = Instant.now()
+            val lastEnded = lastRequestEndedAt.get()
             val inactiveDuration = Duration.between(lastEnded, now)
-            if inactiveDuration.compareTo(maxInactiveDuration) > 0 then {
+            if (inactiveDuration.compareTo(maxInactiveDuration) > 0) {
               logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
               shutdown()
+              return
             }
           }
         } catch {
+          case _: InterruptedException => return
           case NonFatal(e) =>
             logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
         }
-      },
-      1,
-      1,
-      TimeUnit.MINUTES
-    )
+      }
+    })
   }
 
   def triggerFileWatchedTasks(changedPaths: Set[os.Path]): Unit = {
