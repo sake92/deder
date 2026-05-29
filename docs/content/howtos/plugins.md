@@ -44,7 +44,7 @@ class MyPluginImpl extends DederPluginApi:
 
 Register the implementation via `META-INF/services/ba.sake.deder.DederPluginApi` (standard ServiceLoader).
 
-If your plugin owns resources (thread pools, connections, etc.), override `close()` to release them when the server shuts down.
+If your plugin owns resources (thread pools, connections, etc.), override `close()` to release them when the plugin is being reloaded/unloaded and when server shuts down.
 
 `PluginInitParams` provides everything you need in one place: plugin config, core task APIs, server internals, and the full `DederProject`.
 

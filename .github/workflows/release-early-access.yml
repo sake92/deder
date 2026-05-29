@@ -46,6 +46,7 @@ jobs:
         id: vars
         shell: bash
         run: |
+          ./scripts/gen-config-bindings.sh
           VERSION=$(deder exec --json -t version -m server | jq -r '.["server"]')
           echo "VERSION=$(echo $VERSION)" >> $GITHUB_OUTPUT
 
