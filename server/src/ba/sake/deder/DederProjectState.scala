@@ -188,14 +188,14 @@ class DederProjectState(
         if isTaskSingleton && relevantModuleIds.length > 1 then
           throw RuntimeException(s"Task '${taskName}' is singleton, cannot execute it on multiple modules at once")
         val results = executeTasks(
-          ctx,
+          ctx.requestId,
+          CallerType.Cli,
           relevantModuleIds,
           taskName,
           args,
           watch = watch,
           serverNotificationsLogger,
           useLastGood = useLastGood,
-          callerType = CallerType.Cli
         )
         // summarize across modules
         if results.nonEmpty then {
@@ -271,11 +271,10 @@ class DederProjectState(
     try {
       Using.resource(span.makeCurrent()) { scope =>
         val reqId = if requestId != null then requestId else UUID.randomUUID().toString
-        val baseCtx =
-          RequestContext.clientContext.get().getOrElse(CliClientContext(clientId = "internal", requestId = reqId))
         val res =
           executeTasks(
-            baseCtx.copy(requestId = reqId),
+            reqId,
+            callerType,
             Seq(moduleId),
             task.name,
             args,
@@ -296,18 +295,18 @@ class DederProjectState(
 
   // execute a single task on many modules
   def executeTasks(
-      ctx: CliClientContext,
+      requestId: String,
+      callerType: CallerType,
       moduleIds: Seq[String], // nonempty please :')
       taskName: String,
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
       useLastGood: Boolean,
-      callerType: CallerType = CallerType.Cli
   ): Seq[TaskExecResult] =
     val requestStartNanos = System.nanoTime()
     val requestStartInstant = java.time.Instant.now()
-    internals.recordRequestStarted(ctx.requestId, callerType, taskName, moduleIds, requestStartInstant)
+    internals.recordRequestStarted(requestId, callerType, taskName, moduleIds, requestStartInstant)
     try {
       inFlightRequests.incrementAndGet()
       if shutdownStarted then throw TaskEvaluationException("Cannot execute tasks - server is shutting down")
@@ -340,7 +339,7 @@ class DederProjectState(
             taskInstance.lock.lock()
           acquiredLocks += taskInstance
         }
-        DederGlobals.cancellationTokens.put(ctx.requestId, new AtomicBoolean(false))
+        DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
         val result = tasksExecutor.execute(
           tasksExecStages,
           moduleIds,
@@ -350,18 +349,18 @@ class DederProjectState(
           serverNotificationsLogger
         )
         val duration = scala.concurrent.duration.FiniteDuration(System.nanoTime() - requestStartNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
-        internals.recordRequestCompleted(ctx.requestId, taskName, success = true, duration, callerType)
+        internals.recordRequestCompleted(requestId, taskName, success = true, duration, callerType)
         result
       } finally {
         acquiredLocks.reverse.foreach { taskInstance =>
           taskInstance.lock.unlock()
         }
-        DederGlobals.cancellationTokens.remove(ctx.requestId)
+        DederGlobals.cancellationTokens.remove(requestId)
       }
     } catch {
       case NonFatal(e) =>
         val duration = scala.concurrent.duration.FiniteDuration(System.nanoTime() - requestStartNanos, java.util.concurrent.TimeUnit.NANOSECONDS)
-        internals.recordRequestCompleted(ctx.requestId, taskName, success = false, duration, callerType)
+        internals.recordRequestCompleted(requestId, taskName, success = false, duration, callerType)
         // send notification about failure to client
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
         if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
@@ -568,7 +567,8 @@ class DederProjectState(
                   )
                 )
                 executeTasks(
-                  ctx,
+                  ctx.requestId,
+                  CallerType.Cli,
                   Seq(watchedTask.taskInstance.moduleId),
                   watchedTask.taskInstance.task.name,
                   watchedTask.args,
