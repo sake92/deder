@@ -251,6 +251,12 @@ class DederBspServer(
       logger.debug("workspaceBuildTargets called")
       ensureRunning()
       projectState.reloadProject()
+      // Report current config errors even when lastGood provides fallback targets
+      projectState.readState(useLastGood = false).left.foreach { errorMessage =>
+        client.onBuildShowMessage(
+          new ShowMessageParams(MessageType.ERROR, s"Failed to load project config: ${errorMessage}")
+        )
+      }
       val buildTargets = projectState.readState(useLastGood = true) match {
         case Left(errorMessage) =>
           client.onBuildShowMessage(
