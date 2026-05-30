@@ -54,4 +54,45 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
       executeDederCommand(consumerPath, "shutdown")
     }
   }
+
+  test("plugins are preserved across deder.pkl reload when unchanged") {
+    val tempParent = os.pwd / "tmp" / s"selective-reload-${System.currentTimeMillis()}"
+    val pluginPath = stageSiblingProject(tempParent, "hello-plugin")
+    val consumerPath = stageSiblingProject(tempParent, "hello-plugin-consumer")
+
+    try {
+      // Publish the plugin
+      val publishRes = executeDederCommand(pluginPath, "exec", "-m", "hello-plugin", "-t", "publishLocal")
+      assert(
+        publishRes.exitCode == 0,
+        s"publishLocal failed: exit=${publishRes.exitCode}\nstderr=${publishRes.err.text()}\nstdout=${publishRes.out.text()}"
+      )
+
+      // First run: plugin should load fresh and work
+      val res1 = executeDederCommand(consumerPath, "exec", "-m", "app", "-t", "hello")
+      assert(
+        res1.exitCode == 0,
+        s"first hello task failed: exit=${res1.exitCode}\nstderr=${res1.err.text()}\nstdout=${res1.out.text()}"
+      )
+      val out1 = res1.out.text() + res1.err.text()
+      assert(out1.contains("Hello from typed config!"), s"Expected typed greeting, got: $out1")
+
+      // Touch deder.pkl to trigger server reload (no actual content change)
+      val dederPkl = consumerPath / "deder.pkl"
+      os.write.append(dederPkl, "\n")
+      Thread.sleep(2000) // give file watcher time to detect and reload
+
+      // Second run: plugin should still work (proves it survived selective reload)
+      val res2 = executeDederCommand(consumerPath, "exec", "-m", "app", "-t", "hello")
+      assert(
+        res2.exitCode == 0,
+        s"second hello task after reload failed: exit=${res2.exitCode}\nstderr=${res2.err.text()}\nstdout=${res2.out.text()}"
+      )
+      val out2 = res2.out.text() + res2.err.text()
+      assert(out2.contains("Hello from typed config!"), s"Expected typed greeting after reload, got: $out2")
+    } finally {
+      executeDederCommand(pluginPath, "shutdown")
+      executeDederCommand(consumerPath, "shutdown")
+    }
+  }
 }
