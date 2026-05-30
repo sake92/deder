@@ -12,7 +12,7 @@ import ch.epfl.scala.bsp4j.*
 import dependency.ScalaParameters
 import coursierapi.error.DownloadingArtifactsError
 import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
-import ba.sake.deder.*
+import ba.sake.deder.{CompileResult => _, _}
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.Dependency
@@ -382,9 +382,13 @@ class DederBspServer(
             moduleId = Some(moduleId),
             isCompileTask = true
           )
-          tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty, originId = params.getOriginId) { _ =>
-            allCompileSucceeded = false
-          }
+          val compileResult = try {
+              executeTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty, params.getOriginId)
+            } catch {
+              case _: TaskEvaluationException =>
+                ba.sake.deder.CompileResult(ba.sake.deder.DederPath(os.root), errors = 1, warnings = 0, sourceCount = 0)
+            }
+            if compileResult.errors > 0 then allCompileSucceeded = false
         }
       }
       val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR

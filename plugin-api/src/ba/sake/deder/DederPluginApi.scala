@@ -66,7 +66,7 @@ trait CoreTasksApi {
   def depsTreeTask: AbstractTask[DepTree]
   def classesTask: AbstractTask[DederPath]
   def semanticdbDirTask: AbstractTask[DederPath]
-  def compileTask: AbstractTask[DederPath]
+  def compileTask: AbstractTask[CompileResult]
   def compileClasspathTask: AbstractTask[Seq[os.Path]]
   def javaSemanticdbVersionTask: AbstractTask[String]
   def scalaSemanticdbVersionTask: AbstractTask[String]

@@ -84,6 +84,12 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
     analysisCache.invalidateAll()
   }
 
+  case class ZincCompileResult(
+      errors: Int,
+      warnings: Int,
+      sourceCount: Int
+  )
+
   private def compilerSetupKey(
       compilerJars: Seq[os.Path],
       scalaLibraryJars: Seq[os.Path],
@@ -164,7 +170,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       zincLogger: xsbti.Logger,
       moduleId: String,
       notifications: ServerNotificationsLogger
-  ): Unit = {
+  ): ZincCompileResult = {
     val scalaLibraryPrefixes = Seq(
       "scala-library",
       "scala3-library",
@@ -217,7 +223,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       zincLogger: xsbti.Logger,
       moduleId: String,
       notifications: ServerNotificationsLogger
-  ): Unit = {
+  ): ZincCompileResult = {
     val converter = MappedFileConverter.empty
     val sourcesVFs = sources.map(s => converter.toVirtualFile(s.toNIO)).toArray
     val classpathVFs = compileClasspath.map(f => converter.toVirtualFile(f.toNIO)).toArray
@@ -320,13 +326,16 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
       case NonFatal(e) =>
         if !reporter.printSummaryCalled then {
           val problems = reporter.problems()
-          if problems.isEmpty then
+          if problems.isEmpty then {
             notifications.add(
               ServerNotification.logError(
                 "Compilation failed but no diagnostic messages were reported by the compiler.",
                 Some(moduleId)
               )
             )
+            reporter.printSummaryCalled = true
+            throw e
+          }
           val errorsCount = problems.count(_.severity == xsbti.Severity.Error)
           val warningsCount = problems.count(_.severity == xsbti.Severity.Warn)
           notifications.add(
@@ -334,7 +343,6 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
           )
           reporter.printSummaryCalled = true
         }
-        throw e
     } finally {
       if !reporter.printSummaryCalled then {
         val problems = reporter.problems()
@@ -346,6 +354,11 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
           notifications.add(ServerNotification.CompileFinished(moduleId, 0, 0))
       }
     }
+
+    val problems = reporter.problems()
+    val errorsCount = problems.count(_.severity == xsbti.Severity.Error)
+    val warningsCount = problems.count(_.severity == xsbti.Severity.Warn)
+    ZincCompileResult(errorsCount, warningsCount, sources.size)
   }
 
   private def getSetup(
