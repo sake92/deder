@@ -333,6 +333,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
                 Some(moduleId)
               )
             )
+            reporter.printSummaryCalled = true
             throw e
           }
           val errorsCount = problems.count(_.severity == xsbti.Severity.Error)
