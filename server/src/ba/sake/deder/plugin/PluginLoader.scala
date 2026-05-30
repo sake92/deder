@@ -55,11 +55,13 @@ class PluginLoader(
           logger.warn(s"Failed to serialize plugin config for '${pluginConfig.id}': $err. Skipping plugin.", err)
           None
         case Right(serializedPluginConfig) =>
-          val pluginDeps = pluginConfig.deps.asScala.toSeq.map(depStr => Dependency.make(depStr, scalaVer))
+          val rawDeps = pluginConfig.deps.asScala.toSeq
+          val pluginDeps = rawDeps.map(depStr => Dependency.make(depStr, scalaVer))
           val pluginJarPaths = dependencyResolver.fetchFiles(pluginDeps, None)
           loadPluginFromPaths(
             pluginId = pluginConfig.id,
             configText = serializedPluginConfig,
+            deps = rawDeps,
             pluginJarPaths = pluginJarPaths,
             dederProject = dederProject
           ) match {
@@ -108,6 +110,7 @@ class PluginLoader(
   private def loadPluginFromPaths(
       pluginId: String,
       configText: String,
+      deps: Seq[String],
       pluginJarPaths: Seq[os.Path],
       dederProject: DederProject
   ): Either[String, LoadedPlugin] = {
@@ -132,7 +135,8 @@ class PluginLoader(
             case Right(tasks) =>
               // TODO validate task names, check for duplicates across plugins, etc
               logger.debug(s"Plugin '$pluginId' contributed ${tasks.size} tasks: ${tasks.map(_.name).mkString(", ")}")
-              Right(LoadedPlugin(plugin, configText, tasks, pluginClassLoader))
+              val configHash = HashUtils.hashStr(configText + deps.sorted.mkString("\n"))
+              Right(LoadedPlugin(plugin, configText, deps, configHash, tasks, pluginClassLoader))
           }
         case None =>
           closeClassLoaderQuietly(pluginClassLoader)
@@ -166,6 +170,8 @@ class PluginLoader(
 case class LoadedPlugin(
     plugin: DederPluginApi,
     configText: String,
+    deps: Seq[String],
+    configHash: String,
     tasks: Seq[AbstractTask[?]],
     classLoader: URLClassLoader
 ) {
