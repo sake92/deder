@@ -4,13 +4,13 @@ import ba.sake.deder.{DederPluginApi, PluginInitParams, AbstractTask}
 
 class PluginLoaderSuite extends munit.FunSuite {
 
-  private def mkLoadedPlugin(id: String, hash: String): LoadedPlugin = {
+  private def mkLoadedPlugin(pluginId: String, hash: String): LoadedPlugin = {
     val plugin = new DederPluginApi {
-      def id: String = id
-      def init(params: PluginInitParams): Either[String, Seq[AbstractTask[?]]] = Right(Seq.empty)
+      def id: String = pluginId
+      override def init(params: PluginInitParams): Either[String, Seq[AbstractTask[?]]] = Right(Seq.empty)
       override def close(): Unit = ()
     }
-    LoadedPlugin(plugin, s"config-$id", Seq.empty, hash, Seq.empty, null)
+    LoadedPlugin(plugin, s"config-$pluginId", Seq.empty, hash, Seq.empty, null)
   }
 
   test("partitionPlugins keeps all plugins when all hashes match") {
