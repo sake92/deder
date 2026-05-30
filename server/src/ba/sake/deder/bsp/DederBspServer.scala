@@ -15,6 +15,7 @@ import io.opentelemetry.api.trace.StatusCode as OtelStatusCode
 import ba.sake.deder.{CompileResult => _, _}
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
+import ba.sake.deder.config.{ConfigDiagnostic, InvalidConfig, ValidConfig}
 import ba.sake.deder.deps.Dependency
 import ba.sake.deder.config.DederProject.ModuleType
 import ba.sake.deder.scalajs.ScalaJsTasks
@@ -39,6 +40,9 @@ class DederBspServer(
   var clientParams: Option[InitializeBuildParams] = None
 
   private val running = AtomicBoolean(true)
+
+  // Last config diagnostic notified to this session — used for target-change dedupe.
+  @volatile private var lastNotifiedDiagnostic: Option[ConfigDiagnostic] = None
 
   // Per-module-keyed buffer for in-flight compilations.
   // Each InFlightCompilation is registered under EVERY module ID it covers,
@@ -252,12 +256,6 @@ class DederBspServer(
       logger.debug("workspaceBuildTargets called")
       ensureRunning()
       projectState.reloadProject()
-      // Report current config errors even when lastGood provides fallback targets
-      projectState.readState(useLastGood = false).left.foreach { errorMessage =>
-        client.onBuildShowMessage(
-          new ShowMessageParams(MessageType.ERROR, s"Failed to load project config: ${errorMessage}")
-        )
-      }
       val buildTargets = projectState.readState(useLastGood = true) match {
         case Left(errorMessage) =>
           client.onBuildShowMessage(
@@ -989,6 +987,67 @@ class DederBspServer(
       }
       try { onExit() } catch { case _: Exception => }
     })
+  }
+
+  /** Called by [[ba.sake.deder.DederProjectState]] whenever the config diagnostic changes.
+    *
+    * - [[InvalidConfig]]: publishes an ERROR diagnostic against the deder.pkl URI so Metals
+    *   surfaces it in the Problems panel.
+    * - [[ValidConfig]]: publishes empty diagnostics to clear any previous error; emits
+    *   [[DidChangeBuildTarget]] when the set of visible modules changed.
+    *
+    * Safe to call from any thread. No-op when the BSP session has been shut down.
+    */
+  def notifyConfigDiagnostic(diagnostic: ConfigDiagnostic, configFileUri: String): Unit = {
+    if !running.get then return // session is already closed
+    val prev = lastNotifiedDiagnostic
+    lastNotifiedDiagnostic = Some(diagnostic)
+    val textDoc = new TextDocumentIdentifier(configFileUri)
+    diagnostic match {
+      case inv: InvalidConfig =>
+        logger.debug(s"Publishing config error diagnostic: ${inv.message}")
+        // BSP lines are 0-based; Pkl lines are 1-based
+        val line = math.max(0, inv.startLine - 1)
+        val col  = math.max(0, inv.startCol)
+        val pos  = new bsp4j.Position(line, col)
+        val range = new bsp4j.Range(pos, pos)
+        val bspDiag = new bsp4j.Diagnostic(range, inv.message)
+        bspDiag.setSeverity(DiagnosticSeverity.ERROR)
+        bspDiag.setSource("deder")
+        // targetId = null: config error is not tied to any specific build target
+        val params = new PublishDiagnosticsParams(textDoc, null, List(bspDiag).asJava, true)
+        client.onBuildPublishDiagnostics(params)
+
+      case valid: ValidConfig =>
+        // Clear any existing config diagnostics
+        logger.debug("Clearing config diagnostics (config is now valid)")
+        val clearParams = new PublishDiagnosticsParams(textDoc, null, List.empty.asJava, true)
+        client.onBuildPublishDiagnostics(clearParams)
+
+        // Emit buildTarget/didChange when visible modules changed
+        val prevVisibleIds = prev.collect { case ValidConfig(ids) => ids }.getOrElse(Set.empty)
+        if prevVisibleIds != valid.visibleModuleIds then {
+          logger.debug(s"Visible BSP modules changed, emitting buildTarget/didChange")
+          val addedTargets = (valid.visibleModuleIds -- prevVisibleIds).map { id =>
+            new BuildTargetEvent(new BuildTargetIdentifier(s"${DederGlobals.projectRootDir.toURI}#$id"))
+          }
+          val removedTargets = (prevVisibleIds -- valid.visibleModuleIds).map { id =>
+            val ev = new BuildTargetEvent(new BuildTargetIdentifier(s"${DederGlobals.projectRootDir.toURI}#$id"))
+            ev.setKind(BuildTargetEventKind.DELETED)
+            ev
+          }
+          val changedTargets = valid.visibleModuleIds
+            .intersect(prevVisibleIds)
+            .map { id =>
+              val ev = new BuildTargetEvent(new BuildTargetIdentifier(s"${DederGlobals.projectRootDir.toURI}#$id"))
+              ev.setKind(BuildTargetEventKind.CHANGED)
+              ev
+            }
+          val allEvents = (addedTargets ++ removedTargets ++ changedTargets).toList
+          if allEvents.nonEmpty then
+            client.onBuildTargetDidChange(new DidChangeBuildTarget(allEvents.asJava))
+        }
+    }
   }
 
   private def cancelInFlightCompilationsOnShutdown(): Unit = {
