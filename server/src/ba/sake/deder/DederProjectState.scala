@@ -12,8 +12,7 @@ import com.typesafe.scalalogging.StrictLogging
 import io.opentelemetry.api.trace.StatusCode
 import scala.jdk.CollectionConverters.*
 import ox.*
-import ba.sake.deder.config.{ConfigDiagnostic, ConfigParser, DederProject, InvalidConfig, ValidConfig}
-import ba.sake.deder.bsp.BspVisibleTargets
+import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
 import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
 import ba.sake.deder.plugin.{LoadedPlugin, PluginLoader, PluginLoaderApi}
@@ -51,10 +50,6 @@ class DederProjectState(
   private var current: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
   // used for BSP
   private var lastGood: Either[String, DederProjectStateData] = Left("Project state is uninitialized")
-
-  // Last diagnostic fingerprint that was fanned-out to registered BSP servers.
-  // Guarded by stateLock.
-  private var lastFanOutDiagnostic: Option[ConfigDiagnostic] = None
 
   private val lastRequestEndedAt = new java.util.concurrent.atomic.AtomicReference[Instant](Instant.now())
   private val inFlightRequests = new AtomicInteger(0)
@@ -96,17 +91,13 @@ class DederProjectState(
         s"No deder.pkl found at '${configFile}'. Create a deder.pkl configuration file in your project root to get started."
       logger.warn(errorMessage)
       current = Left(errorMessage)
-      fanOutDiagnostic(InvalidConfig(errorMessage, None, 1, 0))
     } else
       try {
         val newProjectConfig = configParser.parse(configFile)
         newProjectConfig match {
-          case Left(invalidConfig) =>
-            logger.warn(s"Failed to load project config: ${invalidConfig.message}")
-            current = Left(invalidConfig.message)
-            // Resolve the file URI in case the parser couldn't (e.g. for the file itself)
-            val resolvedFileUri = invalidConfig.fileUri.orElse(Some(configFile.toNIO.toUri.toString))
-            fanOutDiagnostic(invalidConfig.copy(fileUri = resolvedFileUri))
+          case Left(errorMessage) =>
+            logger.warn(s"Failed to load project config: $errorMessage")
+            current = Left(errorMessage)
           case Right(newConfig) =>
             val userRepoUrls = newConfig.repositories.asScala.map(_.url).toSeq
             val assembledRepos =
@@ -115,7 +106,6 @@ class DederProjectState(
                 case e: IllegalArgumentException =>
                   logger.warn(s"Invalid repository configuration: ${e.getMessage}")
                   current = Left(e.getMessage)
-                  fanOutDiagnostic(InvalidConfig(e.getMessage, Some(configFile.toNIO.toUri.toString), 1, 0))
                   return
             val dependencyResolver = new DependencyResolver(assembledRepos)
 
@@ -137,8 +127,6 @@ class DederProjectState(
               DederProjectStateData(newConfig, effectiveRegistry, tasksResolver, executionPlanner, dependencyResolver)
             lastGood = Right(goodProjectStateData)
             current = Right(goodProjectStateData)
-            val visibleIds = BspVisibleTargets.visibleModuleIds(newConfig.modules.asScala.toSeq)
-            fanOutDiagnostic(ValidConfig(visibleIds))
             triggerConfigWatchedTasks()
         }
       } catch {
@@ -146,26 +134,7 @@ class DederProjectState(
           val errorMessage = s"Error during project load: ${e.getMessage}"
           logger.warn(errorMessage)
           current = Left(errorMessage)
-          fanOutDiagnostic(InvalidConfig(errorMessage, Some(configFile.toNIO.toUri.toString), 1, 0))
       }
-  }
-
-  /** Fan-out a config diagnostic to all registered BSP servers if the fingerprint changed.
-    * Must be called while holding stateLock.
-    */
-  private def fanOutDiagnostic(diagnostic: ConfigDiagnostic): Unit = {
-    val changed = lastFanOutDiagnostic.forall(_.fingerprint != diagnostic.fingerprint)
-    if changed then {
-      lastFanOutDiagnostic = Some(diagnostic)
-      val configFileUri = configFile.toNIO.toUri.toString
-      val prevDiagnostic = lastFanOutDiagnostic // same value, just captured for lambda capture
-      val snapshot = bspServers.iterator().asScala.toSeq
-      if snapshot.nonEmpty then
-        snapshot.foreach { bspServer =>
-          try bspServer.notifyConfigDiagnostic(diagnostic, configFileUri)
-          catch { case NonFatal(e) => logger.warn(s"Error sending config diagnostic to BSP client: ${e.getMessage}") }
-        }
-    }
   }
 
   def executeCLI(
@@ -721,18 +690,8 @@ class DederProjectState(
     onShutdown()
   }
 
-  def registerBspServer(server: ba.sake.deder.bsp.DederBspServer): Unit = {
+  def registerBspServer(server: ba.sake.deder.bsp.DederBspServer): Unit =
     bspServers.add(server)
-    // Immediately send the current diagnostic so a reconnecting client sees the current state
-    // without requiring a file change.
-    stateLock.synchronized {
-      lastFanOutDiagnostic.foreach { diagnostic =>
-        val configFileUri = configFile.toNIO.toUri.toString
-        try server.notifyConfigDiagnostic(diagnostic, configFileUri)
-        catch { case NonFatal(e) => logger.warn(s"Error sending initial config diagnostic to BSP client: ${e.getMessage}") }
-      }
-    }
-  }
 
   def unregisterBspServer(server: ba.sake.deder.bsp.DederBspServer): Unit =
     bspServers.remove(server)
