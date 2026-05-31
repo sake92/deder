@@ -65,7 +65,7 @@ class TabCompleterSuite extends munit.FunSuite {
 
     assertEquals(
       completer.complete("deder ", cs("deder ")).toSet,
-      Set("version", "clean", "complete", "modules", "tasks", "plan", "exec", "shutdown", "import", "bsp", "help")
+      Set("version", "clean", "complete", "modules", "tasks", "plugins", "plan", "exec", "shutdown", "import", "bsp", "help")
     )
 
     assertEquals(completer.complete("deder c", cs("deder c")).toSet, Set("clean", "complete"))
@@ -327,7 +327,7 @@ class TabCompleterSuite extends munit.FunSuite {
     // After -c / --command, complete with known subcommands
     assertEquals(
       completer.complete("deder help -c ", cs("deder help -c ")).toSet,
-      Set("version", "clean", "complete", "modules", "tasks", "plan", "exec", "shutdown", "import", "bsp", "help")
+      Set("version", "clean", "complete", "modules", "tasks", "plugins", "plan", "exec", "shutdown", "import", "bsp", "help")
     )
 
     assertEquals(

@@ -13,6 +13,7 @@ import io.avaje.jsonb.Json;
 @Json.SubType(type = ClientMessage.Clean.class, name = "Clean")
 @Json.SubType(type = ClientMessage.Import.class, name = "Import")
 @Json.SubType(type = ClientMessage.Complete.class, name = "Complete")
+@Json.SubType(type = ClientMessage.Plugins.class, name = "Plugins")
 @Json.SubType(type = ClientMessage.Shutdown.class, name = "Shutdown")
 public sealed interface ClientMessage {
 
@@ -44,6 +45,9 @@ public sealed interface ClientMessage {
     }
 
     record Complete(String[] args) implements ClientMessage {
+    }
+
+    record Plugins(String[] args) implements ClientMessage {
     }
 
     record Shutdown() implements ClientMessage {
