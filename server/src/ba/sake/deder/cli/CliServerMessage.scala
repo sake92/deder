@@ -14,6 +14,22 @@ enum CliServerMessage derives JsonRW {
 }
 
 object CliServerMessage {
+  def info(text: String): CliServerMessage.Log =
+    log(text, LogLevel.INFO)
+
+  def log(text: String, level: LogLevel, moduleId: Option[String] = None): CliServerMessage.Log = {
+    val levelString = level.toString.toLowerCase
+    val coloredLevel = level match {
+      case cli.LogLevel.ERROR   => fansi.Color.Red(levelString)
+      case cli.LogLevel.WARNING => fansi.Color.Yellow(levelString)
+      case cli.LogLevel.INFO    => fansi.Color.Green(levelString)
+      case cli.LogLevel.DEBUG   => fansi.Color.LightGreen(levelString)
+      case cli.LogLevel.TRACE   => fansi.Color.LightGray(levelString)
+    }
+    val modulePrefix = moduleId.map(mod => fansi.Color.Cyan(s" [${mod}]")).getOrElse("")
+    CliServerMessage.Log(s"[${coloredLevel}]${modulePrefix} ${text}", level)
+  }
+
   def fromServerNotification(sn: ServerNotification): Option[CliServerMessage] = sn match {
     case m: ServerNotification.Output =>
       Some(CliServerMessage.Output(m.text))
@@ -25,16 +41,7 @@ object CliServerMessage {
         case ServerNotification.LogLevel.DEBUG   => LogLevel.DEBUG
         case ServerNotification.LogLevel.TRACE   => LogLevel.TRACE
       }
-      val levelString = m.level.toString.toLowerCase
-      val coloredLevel = level match {
-        case cli.LogLevel.ERROR   => fansi.Color.Red(levelString)
-        case cli.LogLevel.WARNING => fansi.Color.Yellow(levelString)
-        case cli.LogLevel.INFO    => fansi.Color.Green(levelString)
-        case cli.LogLevel.DEBUG   => fansi.Color.LightGreen(levelString)
-        case cli.LogLevel.TRACE   => fansi.Color.LightGray(levelString)
-      }
-      val modulePrefix = m.moduleId.map(mod => fansi.Color.Cyan(s" [${mod}]")).getOrElse("")
-      Some(CliServerMessage.Log(s"[${coloredLevel}]${modulePrefix} ${m.message}", level))
+      Some(CliServerMessage.log(m.message, level, m.moduleId))
     case tp: ServerNotification.TaskProgress =>
       None
     case cs: ServerNotification.CompileStarted =>
