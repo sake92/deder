@@ -1,7 +1,6 @@
 package ba.sake.deder.plugin
 
 import java.net.URLClassLoader
-import java.security.MessageDigest
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 import scala.util.{Using, Try}
@@ -48,7 +47,7 @@ class PluginLoader(
     val serializedMap: Map[String, (String, Seq[String], String)] = pluginConfigs.flatMap { cfg =>
       serializePluginConfig(pklFile, cfg.id) match {
         case Left(err) =>
-          logger.warn(s"Failed to serialize plugin config for '${cfg.id}': $err. Skipping plugin.", err)
+          logger.warn(s"Failed to serialize plugin config for '${cfg.id}': $err. Skipping plugin.")
           None
         case Right(configText) =>
           val rawDeps = cfg.deps.asScala.toSeq
@@ -72,18 +71,19 @@ class PluginLoader(
     val toLoadConfigs = serializedMap.filterKeys(id => !keepIds.contains(id))
 
     // Step 5: Load new/changed plugins
-    val toLoad = toLoadConfigs.flatMap { case (pluginId, (configText, rawDeps, _)) =>
+    val toLoad = toLoadConfigs.flatMap { case (pluginId, (configText, rawDeps, hash)) =>
       val pluginDeps = rawDeps.map(depStr => Dependency.make(depStr, scalaVer))
       val pluginJarPaths = dependencyResolver.fetchFiles(pluginDeps, None)
       loadPluginFromPaths(
         pluginId = pluginId,
         configText = configText,
         deps = rawDeps,
+        configHash = hash,
         pluginJarPaths = pluginJarPaths,
         dederProject = dederProject
       ) match {
         case Left(err) =>
-          logger.warn(s"Failed to load plugin '$pluginId': $err. Skipping plugin.", err)
+          logger.warn(s"Failed to load plugin '$pluginId': $err. Skipping plugin.")
           None
         case Right(loadedPlugin) =>
           Some(loadedPlugin)
@@ -128,6 +128,7 @@ class PluginLoader(
       pluginId: String,
       configText: String,
       deps: Seq[String],
+      configHash: String,
       pluginJarPaths: Seq[os.Path],
       dederProject: DederProject
   ): Either[String, LoadedPlugin] = {
@@ -152,7 +153,6 @@ class PluginLoader(
             case Right(tasks) =>
               // TODO validate task names, check for duplicates across plugins, etc
               logger.debug(s"Plugin '$pluginId' contributed ${tasks.size} tasks: ${tasks.map(_.name).mkString(", ")}")
-              val configHash = HashUtils.hashStr(configText + deps.sorted.mkString("\n"))
               Right(LoadedPlugin(plugin, configText, deps, configHash, tasks, pluginClassLoader))
           }
         case None =>
