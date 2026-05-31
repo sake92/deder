@@ -1,6 +1,6 @@
 package ba.sake.deder
 
-import java.util.concurrent.{Callable, ExecutionException, ExecutorService, TimeUnit}
+import java.util.concurrent.{Callable, ConcurrentHashMap, ExecutionException, ExecutorService, TimeUnit}
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -35,7 +35,7 @@ class TasksExecutor(
   ): Seq[TaskExecResult] = {
     var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
     val finalTaskResults = Seq.newBuilder[TaskExecResult]
-    val failedModuleIds = scala.collection.mutable.Set.empty[String]
+    val failedModuleIds = ConcurrentHashMap.newKeySet[String]()
     for (taskInstances, stageIndex) <- stages.zipWithIndex do {
       val stageSpan = OTEL.TRACER.spanBuilder(s"Stage $stageIndex").startSpan()
       try {
@@ -87,8 +87,8 @@ class TasksExecutor(
                   taskSpan.recordException(e)
                   taskSpan.setStatus(StatusCode.ERROR)
                   // mark the module as failed — other modules continue
-                  failedModuleIds += taskInstance.moduleId
-                  (taskInstance.id, None, false, Some(e.getMessage))
+                  failedModuleIds.add(taskInstance.moduleId)
+                  (taskInstance.id, None, false, Some(Option(e.getMessage).getOrElse(e.getClass.getSimpleName)))
               } finally {
                 taskSpan.end()
               }
