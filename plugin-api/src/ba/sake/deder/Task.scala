@@ -22,12 +22,13 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
     transitive: Boolean,
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType],
+    enabled: PartialFunction[DederModule, Boolean],
     category: String,
     kind: TaskKind,
     internal: Boolean
 )(using ev: TaskDeps[Deps] =:= true, summarizable: Summarizable[T, S]) {
   def dependsOn[T2](t: AbstractTask[T2]): TaskBuilder[T, Deps :* AbstractTask[T2], S] =
-    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind, internal)
+    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, enabled, category, kind, internal)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps, S] =
     TaskImpl(
@@ -37,6 +38,7 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       transitive,
       singleton,
       supportedModuleTypes,
+      enabled = enabled,
       category = category,
       kind = kind,
       internal = internal
@@ -53,6 +55,7 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       transitive,
       singleton,
       supportedModuleTypes,
+      enabled = enabled,
       category = category,
       kind = kind,
       isResultSuccessful = isResultSuccessful,
@@ -67,6 +70,7 @@ object TaskBuilder {
       transitive: Boolean = false,
       singleton: Boolean = false,
       supportedModuleTypes: Set[ModuleType] = Set.empty,
+      enabled: PartialFunction[DederModule, Boolean] = { case _ => true },
       category: String = "",
       kind: TaskKind = TaskKind.Standard,
       internal: Boolean = false
@@ -77,6 +81,7 @@ object TaskBuilder {
       transitive,
       singleton,
       supportedModuleTypes,
+      enabled,
       category,
       kind,
       internal
@@ -91,12 +96,13 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
     transitive: Boolean,
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType],
+    enabled: PartialFunction[DederModule, Boolean],
     category: String,
     kind: TaskKind,
     internal: Boolean
 )(using ev: TaskDeps[Deps] =:= true, summarizable: Summarizable[T, S]) {
   def dependsOn[T2](t: AbstractTask[T2]): CachedTaskBuilder[T, Deps :* AbstractTask[T2], S] =
-    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, category, kind, internal)
+    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, enabled, category, kind, internal)
 
   def build(execute: TaskExecContext[T, Deps] => T)(using Deps <:< NonEmptyTuple): Task[T, Deps, S] =
     CachedTask(
@@ -106,6 +112,7 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       transitive,
       singleton,
       supportedModuleTypes,
+      enabled = enabled,
       category = category,
       kind = kind,
       internal = internal
@@ -119,6 +126,7 @@ object CachedTaskBuilder {
       transitive: Boolean = false,
       singleton: Boolean = false,
       supportedModuleTypes: Set[ModuleType] = Set.empty,
+      enabled: PartialFunction[DederModule, Boolean] = { case _ => true },
       category: String = "",
       kind: TaskKind = TaskKind.Standard,
       internal: Boolean = false
@@ -129,6 +137,7 @@ object CachedTaskBuilder {
       transitive,
       singleton,
       supportedModuleTypes,
+      enabled,
       category,
       kind,
       internal
@@ -169,6 +178,7 @@ sealed trait AbstractTask[T] {
   def category: String
   def kind: TaskKind
   def supportedModuleTypes: Set[ModuleType]
+  def enabled: PartialFunction[DederModule, Boolean]
   def transitive: Boolean
   def singleton: Boolean
 
@@ -231,6 +241,7 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple, S](
     val transitive: Boolean = false,
     val singleton: Boolean = false,
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
+    override val enabled: PartialFunction[DederModule, Boolean] = { case _ => true },
     val description: String = "",
     val category: String = "",
     val kind: TaskKind = TaskKind.Standard,
@@ -288,6 +299,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
     val transitive: Boolean = false,
     val singleton: Boolean = false,
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
+    override val enabled: PartialFunction[DederModule, Boolean] = { case _ => true },
     val description: String = "",
     val category: String = "",
     val kind: TaskKind = TaskKind.Standard,
@@ -373,6 +385,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
 class SourceFileTask(
     name: String,
     supportedModuleTypes: Set[ModuleType] = Set.empty,
+    enabled: PartialFunction[DederModule, Boolean] = { case _ => true },
     execute: TaskExecContext[DederPath, EmptyTuple] => DederPath,
     description: String = "",
     category: String = "",
@@ -384,6 +397,7 @@ class SourceFileTask(
       transitive = false,
       singleton = false,
       supportedModuleTypes,
+      enabled = enabled,
       description,
       category,
       internal = internal
@@ -395,6 +409,7 @@ class SourceFilesTask(
     name: String,
     execute: TaskExecContext[Seq[DederPath], EmptyTuple] => Seq[DederPath],
     supportedModuleTypes: Set[ModuleType] = Set.empty,
+    enabled: PartialFunction[DederModule, Boolean] = { case _ => true },
     description: String = "",
     category: String = "",
     override val internal: Boolean = false
@@ -405,6 +420,7 @@ class SourceFilesTask(
       transitive = false,
       singleton = false,
       supportedModuleTypes,
+      enabled = enabled,
       description,
       category,
       internal = internal
@@ -416,6 +432,7 @@ class ConfigValueTask[T: JsonRW: Hashable](
     name: String,
     execute: TaskExecContext[T, EmptyTuple] => T,
     supportedModuleTypes: Set[ModuleType] = Set.empty,
+    enabled: PartialFunction[DederModule, Boolean] = { case _ => true },
     description: String = "",
     category: String = "",
     override val internal: Boolean = false
@@ -426,6 +443,7 @@ class ConfigValueTask[T: JsonRW: Hashable](
       transitive = false,
       singleton = false,
       supportedModuleTypes,
+      enabled = enabled,
       description,
       category,
       internal = internal
@@ -440,6 +458,7 @@ class FanInTask[T: JsonRW: Hashable](
     val name: String,
     val collectKind: TaskKind,
     val supportedModuleTypes: Set[ModuleType] = Set.empty,
+    val enabled: PartialFunction[DederModule, Boolean] = { case _ => true },
     val description: String = "",
     val category: String = "",
     override val internal: Boolean = false

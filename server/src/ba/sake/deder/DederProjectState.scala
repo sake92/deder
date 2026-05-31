@@ -284,7 +284,7 @@ class DederProjectState(
     try {
       Using.resource(span.makeCurrent()) { scope =>
         val reqId = if requestId != null then requestId else UUID.randomUUID().toString
-        val res =
+        val resOpt =
           executeTasks(
             reqId,
             callerType,
@@ -294,7 +294,15 @@ class DederProjectState(
             watch,
             serverNotificationsLogger,
             useLastGood
-          ).head
+          )
+        
+        val res = resOpt match {
+          case Seq(singleResult) => singleResult
+          case Seq() =>
+            throw TaskEvaluationException(s"Task '${task.name}' on module '${moduleId}' did not produce a result")
+          case _ =>
+            throw TaskEvaluationException(s"Multiple results returned for task '${task.name}' on module '${moduleId}'")
+        }
 
         if res.moduleError.isDefined then
           throw TaskEvaluationException(

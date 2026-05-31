@@ -125,7 +125,7 @@ class TasksResolverSuite extends munit.FunSuite {
       val uberTestModuleTasks = taskInstancesPerModule(uberTestModule.id)
       assertEquals(
         uberTestModuleTasks.map(_.task.name).toSet,
-        baseTasks ++ Set("testClasses", "test", "testInMemory"),
+        baseTasks ++ Set("testClasses", "test", "testInMemory") -- publishTaskNames,
         "uber-test module tasks mismatch"
       )
     }
@@ -156,7 +156,7 @@ class TasksResolverSuite extends munit.FunSuite {
           transitiveScalaModuleTaskEdges("backend", "common") ++
           transitiveScalaModuleTaskEdges("uber", "frontend") ++
           transitiveScalaModuleTaskEdges("uber", "backend") ++
-          transitiveScalaModuleTaskEdges("uber-test", "uber")
+          transitiveScalaTestModuleTaskEdges("uber-test", "uber")
       locally {
         val diff1 = expectedEdges.diff(taskInstanceEdgeIdsGraph)
         assert(
@@ -174,6 +174,8 @@ class TasksResolverSuite extends munit.FunSuite {
     }
   }
 
+  private val publishTaskNames = Set("publishLocal", "publish")
+
   private def scalaModuleTaskEdges(moduleId: String): Set[(String, String)] =
     baseScalaModuleTaskEdges(moduleId) ++ Set(
       (s"${moduleId}.finalMainClass", s"${moduleId}.mainClasses"),
@@ -183,7 +185,10 @@ class TasksResolverSuite extends munit.FunSuite {
     )
 
   private def scalaTestModuleTaskEdges(moduleId: String): Set[(String, String)] =
-    scalaModuleTaskEdges(moduleId) ++ Set(
+    // test modules have publish=false so publish tasks are not instantiated
+    scalaModuleTaskEdges(moduleId).filterNot { case (src, _) =>
+      publishTaskNames.exists(n => src == s"${moduleId}.$n")
+    } ++ Set(
       (s"${moduleId}.test", s"${moduleId}.runClasspath"),
       (s"${moduleId}.test", s"${moduleId}.jvmOptions"),
       (s"${moduleId}.test", s"${moduleId}.javaHome"),
@@ -301,4 +306,10 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.publishLocal", s"${dependencyModuleId}.publishLocal"),
       (s"${moduleId}.publish", s"${dependencyModuleId}.publish")
     )
+
+  private def transitiveScalaTestModuleTaskEdges(moduleId: String, dependencyModuleId: String): Set[(String, String)] =
+    transitiveScalaModuleTaskEdges(moduleId, dependencyModuleId)
+      .filterNot { case (src, _) =>
+        publishTaskNames.exists(n => src == s"${moduleId}.$n")
+      }
 }
