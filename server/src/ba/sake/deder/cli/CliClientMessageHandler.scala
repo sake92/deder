@@ -485,25 +485,30 @@ class CliClientMessageHandler(
               .setAttribute("cli.watch", cliOptions.watch.value)
               .setAttribute("cli.format", ctx.outputFormat.toString)
           ) { _ =>
-            val notificationCallback: ServerNotification => Unit = {
-              case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
-              // skip
-              case sn =>
-                CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
-            }
-            val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
-            val argss =
-              if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail
-              else cliOptions.args.value
-            projectState.executeCLI(
-              cliOptions.modules,
-              cliOptions.task,
-              args = argss,
-              serverNotificationsLogger,
-              startWatch = cliOptions.watch.value,
-              exitOnEnd = !cliOptions.watch.value,
-              watch = cliOptions.watch.value,
-            )
+            val heartbeat = new CliExecHeartbeat(emit = serverMessages.put)
+            try
+              val notificationCallback: ServerNotification => Unit = {
+                case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
+                // skip
+                case sn =>
+                  heartbeat.recordServerNotification(sn)
+                  CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
+              }
+              val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
+              val argss =
+                if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail
+                else cliOptions.args.value
+              projectState.executeCLI(
+                cliOptions.modules,
+                cliOptions.task,
+                args = argss,
+                serverNotificationsLogger,
+                startWatch = cliOptions.watch.value,
+                exitOnEnd = !cliOptions.watch.value,
+                watch = cliOptions.watch.value,
+              )
+            finally
+              heartbeat.close()
           }
       }
   }
