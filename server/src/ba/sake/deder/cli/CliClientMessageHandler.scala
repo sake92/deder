@@ -35,6 +35,7 @@ class CliClientMessageHandler(
       case m: CliClientMessage.Clean    => handleClean(m)
       case m: CliClientMessage.Import   => handleImport(m)
       case m: CliClientMessage.Complete => handleComplete(m)
+      case m: CliClientMessage.Plugins => handlePlugins(m)
       case m: CliClientMessage.Shutdown => handleShutdown(m)
     }
   }
@@ -53,6 +54,7 @@ class CliClientMessageHandler(
           |  version                 Show client and server versions
           |  modules [options]       List modules
           |  tasks [options]         List tasks
+          |  plugins [options]       List loaded plugins
           |  plan [options]          Show execution plan for a task
           |  exec [options]          Execute a task
           |  clean [options]         Clean modules
@@ -80,6 +82,10 @@ class CliClientMessageHandler(
             case "tasks" =>
               serverMessages.put(
                 CliServerMessage.Output(mainargs.Parser[DederCliTasksOptions].helpText())
+              )
+            case "plugins" =>
+              serverMessages.put(
+                CliServerMessage.Output(mainargs.Parser[DederCliPluginsOptions].helpText())
               )
             case "plan" =>
               serverMessages.put(
@@ -327,6 +333,51 @@ class CliClientMessageHandler(
                     serverMessages.put(CliServerMessage.Output(output))
                     serverMessages.put(CliServerMessage.Exit(0))
             }
+          }
+      }
+  }
+
+  private def handlePlugins(m: CliClientMessage.Plugins): Unit = {
+    val ctx = RequestContext.cliContext
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
+    if m.args == Seq("--help") || m.args == Seq("-h") then
+      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliPluginsOptions].helpText()))
+      serverMessages.put(CliServerMessage.Exit(0))
+    else
+      mainargs.Parser[DederCliPluginsOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+        case Left(error) =>
+          OTEL.withSpan("cli.plugins")(
+            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+          ) { span =>
+            span.setStatus(StatusCode.ERROR)
+            span.setAttribute("error", error)
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          }
+        case Right(cliOptions) =>
+          OTEL.withSpan("cli.plugins")(
+            _.setAttribute("clientId", clientId)
+              .setAttribute("request.id", requestId)
+          ) { _ =>
+            val plugins = projectState.internals.loadedPlugins
+            cliOptions.format match
+              case format @ (OutputFormat.Json | OutputFormat.DenseJson) =>
+                val jsonMap = plugins.map(p => p.id -> p).toMap
+                val json = format match
+                  case OutputFormat.Json =>
+                    jsonMap.toJson(spaces = 2, sort = true)
+                  case OutputFormat.DenseJson =>
+                    jsonMap.toJson(spaces = 0, sort = false)
+                serverMessages.put(CliServerMessage.Output(json))
+              case OutputFormat.PlainText =>
+                val output =
+                  if plugins.isEmpty then "No plugins loaded."
+                  else plugins.map(p => s"${p.id} (${p.taskNames.mkString(", ")})").mkString("\n")
+                serverMessages.put(CliServerMessage.Output(output))
+              case _ =>
+                serverMessages.put(CliServerMessage.Log("Format not supported for plugins (try plain, json, or densejson)", LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(0))
           }
       }
   }

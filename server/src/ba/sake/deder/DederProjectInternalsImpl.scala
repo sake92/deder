@@ -65,10 +65,16 @@ class DederProjectInternalsImpl private (
   override def totalRequestsServed: Long = totalServed.get()
   override def totalErrors: Long = totalErrCount.get()
 
+  private var _loadedPlugins: Seq[LoadedPluginInfo] = Seq.empty
+  override def loadedPlugins: Seq[LoadedPluginInfo] = _loadedPlugins
+
   override def serverUptime: Duration =
     Duration.ofMillis(System.currentTimeMillis() - startTime.toEpochMilli)
 
   // -- Write methods --
+
+  private[deder] def setLoadedPlugins(plugins: Seq[LoadedPluginInfo]): Unit =
+    _loadedPlugins = plugins
 
   private[deder] def recordRequestStarted(
       requestId: String,

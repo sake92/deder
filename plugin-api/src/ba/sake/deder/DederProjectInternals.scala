@@ -1,6 +1,7 @@
 package ba.sake.deder
 
 import java.time.{Duration, Instant}
+import ba.sake.tupson.JsonRW
 
 enum CallerType:
   case Cli, Bsp
@@ -40,6 +41,11 @@ case class TaskStats(
     duration: DurationDistribution
 )
 
+case class LoadedPluginInfo(
+    id: String,
+    taskNames: Seq[String]
+) derives JsonRW
+
 trait DederProjectInternals:
   /** Currently executing top-level requests (CLI or BSP). */
   def currentRequests: Seq[LiveRequest]
@@ -54,6 +60,9 @@ trait DederProjectInternals:
   /** Lifetime counters across all callers and tasks. */
   def totalRequestsServed: Long
   def totalErrors: Long
+
+  /** Currently loaded plugins and their registered tasks. */
+  def loadedPlugins: Seq[LoadedPluginInfo]
 
   /** Server metadata. */
   def serverUptime: Duration

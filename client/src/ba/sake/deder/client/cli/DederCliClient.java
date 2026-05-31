@@ -79,6 +79,7 @@ public class DederCliClient implements DederClient {
                     case "clean" -> new ClientMessage.Clean(leftoverArgs);
                     case "modules" -> new ClientMessage.Modules(leftoverArgs);
                     case "tasks" -> new ClientMessage.Tasks(leftoverArgs);
+                    case "plugins" -> new ClientMessage.Plugins(leftoverArgs);
                     case "plan" -> new ClientMessage.Plan(leftoverArgs);
                     case "exec" -> new ClientMessage.Exec(requestId, leftoverArgs, System.getenv());
                     case "shutdown" -> new ClientMessage.Shutdown();

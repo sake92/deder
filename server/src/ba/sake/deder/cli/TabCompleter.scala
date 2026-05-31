@@ -10,6 +10,7 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
     "clean",
     "modules",
     "tasks",
+    "plugins",
     "plan",
     "exec",
     "shutdown",
@@ -20,7 +21,7 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
   )
 
   enum ValueType:
-    case ModuleIds, TaskNames, ShellTypes, ImportFrom, Subcommands, OutputFormats
+    case ModuleIds, TaskNames, ShellTypes, ImportFrom, Subcommands, OutputFormats, LogLevels
 
   case class FlagDef(long: String, short: Option[String], valueType: Option[ValueType])
 
@@ -35,6 +36,9 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
       FlagDef("--module", Some("-m"), Some(ValueType.ModuleIds)),
       FlagDef("--format", Some("-f"), Some(ValueType.OutputFormats))
     ),
+    "plugins" -> Seq(
+      FlagDef("--format", Some("-f"), Some(ValueType.OutputFormats))
+    ),
     "plan" -> Seq(
       FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
       FlagDef("--task", Some("-t"), Some(ValueType.TaskNames)),
@@ -47,7 +51,7 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
     "exec" -> Seq(
       FlagDef("--task", Some("-t"), Some(ValueType.TaskNames)),
       FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
-      FlagDef("--log-level", Some("-l"), None),
+      FlagDef("--log-level", Some("-l"), Some(ValueType.LogLevels)),
       FlagDef("--format", Some("-f"), Some(ValueType.OutputFormats)),
       FlagDef("--watch", Some("-w"), None)
     ),
@@ -123,6 +127,7 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
       case ValueType.ImportFrom    => ImportBuildTool.values.map(_.toString).toSeq
       case ValueType.Subcommands   => allSubcommands
       case ValueType.OutputFormats => Seq("plain", "json", "densejson", "dot", "mermaid")
+      case ValueType.LogLevels => Seq("error", "warning", "info", "debug", "trace")
     }
     candidates.filter(_.startsWith(prefix))
   }
