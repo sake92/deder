@@ -1,7 +1,6 @@
 package ba.sake.deder.plugin
 
 import java.net.URLClassLoader
-import java.security.MessageDigest
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 import scala.util.{Using, Try}
@@ -44,34 +43,54 @@ class PluginLoader(
       pklFile: os.Path,
       dederProject: DederProject
   ): PluginsLoadResult = {
-    // TODO optimize, unload only the necessary plugins, compare config hashes, etc
-    loadedPlugins.foreach { loadedPlugin =>
+    // Step 1: Serialize all new configs and compute hashes
+    val serializedMap: Map[String, (String, Seq[String], String)] = pluginConfigs.flatMap { cfg =>
+      serializePluginConfig(pklFile, cfg.id) match {
+        case Left(err) =>
+          logger.warn(s"Failed to serialize plugin config for '${cfg.id}': $err. Skipping plugin.")
+          None
+        case Right(configText) =>
+          val rawDeps = cfg.deps.asScala.toSeq
+          val hash = ba.sake.deder.HashUtils.hashStr(configText + rawDeps.sorted.mkString("\n"))
+          Some(cfg.id -> (configText, rawDeps, hash))
+      }
+    }.toMap
+
+    // Step 2: Partition existing plugins — keep unchanged, unload changed/removed
+    val newHashes = serializedMap.view.mapValues(_._3).toMap
+    val (toKeep, toUnload) = partitionPlugins(loadedPlugins, newHashes)
+
+    // Step 3: Unload changed or removed plugins
+    toUnload.foreach { loadedPlugin =>
       Try(loadedPlugin.plugin.close())
       closeClassLoaderQuietly(loadedPlugin.classLoader)
     }
-    val newLoadedPlugins = pluginConfigs.flatMap { pluginConfig =>
-      serializePluginConfig(pklFile, pluginConfig.id) match {
+
+    // Step 4: Determine which configs to load (new or changed)
+    val keepIds = toKeep.map(_.plugin.id).toSet
+    val toLoadConfigs = serializedMap.filterKeys(id => !keepIds.contains(id))
+
+    // Step 5: Load new/changed plugins
+    val toLoad = toLoadConfigs.flatMap { case (pluginId, (configText, rawDeps, hash)) =>
+      val pluginDeps = rawDeps.map(depStr => Dependency.make(depStr, scalaVer))
+      val pluginJarPaths = dependencyResolver.fetchFiles(pluginDeps, None)
+      loadPluginFromPaths(
+        pluginId = pluginId,
+        configText = configText,
+        deps = rawDeps,
+        configHash = hash,
+        pluginJarPaths = pluginJarPaths,
+        dederProject = dederProject
+      ) match {
         case Left(err) =>
-          logger.warn(s"Failed to serialize plugin config for '${pluginConfig.id}': $err. Skipping plugin.", err)
+          logger.warn(s"Failed to load plugin '$pluginId': $err. Skipping plugin.")
           None
-        case Right(serializedPluginConfig) =>
-          val pluginDeps = pluginConfig.deps.asScala.toSeq.map(depStr => Dependency.make(depStr, scalaVer))
-          val pluginJarPaths = dependencyResolver.fetchFiles(pluginDeps, None)
-          loadPluginFromPaths(
-            pluginId = pluginConfig.id,
-            configText = serializedPluginConfig,
-            pluginJarPaths = pluginJarPaths,
-            dederProject = dederProject
-          ) match {
-            case Left(err) =>
-              logger.warn(s"Failed to load plugin '${pluginConfig.id}': $err. Skipping plugin.", err)
-              None
-            case Right(loadedPlugin) =>
-              Some(loadedPlugin)
-          }
+        case Right(loadedPlugin) =>
+          Some(loadedPlugin)
       }
     }
-    PluginsLoadResult(newLoadedPlugins)
+
+    PluginsLoadResult(toKeep ++ toLoad)
   }
 
   /** Serialize a single plugin config as JSON via Pkl's evaluator with OutputFormat.JSON. The plugin can re-evaluate
@@ -108,6 +127,8 @@ class PluginLoader(
   private def loadPluginFromPaths(
       pluginId: String,
       configText: String,
+      deps: Seq[String],
+      configHash: String,
       pluginJarPaths: Seq[os.Path],
       dederProject: DederProject
   ): Either[String, LoadedPlugin] = {
@@ -132,7 +153,7 @@ class PluginLoader(
             case Right(tasks) =>
               // TODO validate task names, check for duplicates across plugins, etc
               logger.debug(s"Plugin '$pluginId' contributed ${tasks.size} tasks: ${tasks.map(_.name).mkString(", ")}")
-              Right(LoadedPlugin(plugin, configText, tasks, pluginClassLoader))
+              Right(LoadedPlugin(plugin, configText, deps, configHash, tasks, pluginClassLoader))
           }
         case None =>
           closeClassLoaderQuietly(pluginClassLoader)
@@ -166,6 +187,8 @@ class PluginLoader(
 case class LoadedPlugin(
     plugin: DederPluginApi,
     configText: String,
+    deps: Seq[String],
+    configHash: String,
     tasks: Seq[AbstractTask[?]],
     classLoader: URLClassLoader
 ) {
@@ -176,6 +199,16 @@ case class LoadedPlugin(
 case class PluginsLoadResult(
     loadedPlugins: Seq[LoadedPlugin]
 )
+
+private[deder] def partitionPlugins(
+    existing: Seq[LoadedPlugin],
+    newConfigHashes: Map[String, String]
+): (Seq[LoadedPlugin], Seq[LoadedPlugin]) = {
+  val (toKeep, toUnload) = existing.partition { loaded =>
+    newConfigHashes.get(loaded.plugin.id).contains(loaded.configHash)
+  }
+  (toKeep, toUnload)
+}
 
 private def closeClassLoaderQuietly(pluginClassLoader: URLClassLoader): Unit =
   try pluginClassLoader.close()
