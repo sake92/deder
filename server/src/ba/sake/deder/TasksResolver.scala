@@ -30,7 +30,9 @@ class TasksResolver(
   lazy val taskInstancesPerModule: Map[String, Seq[TaskInstance]] = {
     // make Tasks graph
     allModules.map { module =>
-      val taskInstances = tasksRegistry.resolve(module.`type`).map(t => TaskInstance(module, t))
+      val taskInstances = tasksRegistry.resolve(module.`type`)
+        .filter(t => t.enabled.isDefinedAt(module) && t.enabled(module))
+        .map(t => TaskInstance(module, t))
       module.id -> taskInstances
     }.toMap
   }

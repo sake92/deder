@@ -408,6 +408,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
   val publishLocalTask = TaskBuilder
     .make[Option[os.Path]](
       name = "publishLocal",
+      enabled = { case jm: JavaModule => jm.publish },
       category = "Publishing",
       transitive = true
     )
@@ -458,6 +459,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
   val publishTask = TaskBuilder
     .make[String](
       name = "publish",
+      enabled = { case jm: JavaModule => jm.publish },
       category = "Publishing",
       transitive = true
     )
