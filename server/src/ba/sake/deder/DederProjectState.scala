@@ -232,26 +232,37 @@ class DederProjectState(
         )
         // summarize across modules
         if results.nonEmpty then {
-          val task = results.head.taskInstance.task
-          val moduleResults = results.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.res)
-          // Render cross-module summary in the chosen output format
-          val summary = task.summarizeValueUnsafe(moduleResults)
-          val format = ctx.outputFormat
-          given JsonRW[Any] = task.summarizable.jsonRW.asInstanceOf[JsonRW[Any]]
-          given PlainTextWritable[Any] = task.summarizable.plainTextW.asInstanceOf[PlainTextWritable[Any]]
-          given MermaidWritable[Any] = task.summarizable.mermaidW.asInstanceOf[MermaidWritable[Any]]
-          given DotWritable[Any] = task.summarizable.dotW.asInstanceOf[DotWritable[Any]]
-          val output = format match
-            case OutputFormat.Json =>
-              summon[JsonRW[Any]].write(summary).toJson(spaces = 2, sort = true)
-            case OutputFormat.DenseJson =>
-              summon[JsonRW[Any]].write(summary).toJson(spaces = 0, sort = false)
-            case OutputFormat.Mermaid =>
-              summon[MermaidWritable[Any]].write(summary)
-            case OutputFormat.Dot =>
-              summon[DotWritable[Any]].write(summary)
-            case _ => summon[PlainTextWritable[Any]].write(summary)
-          serverNotificationsLogger.add(ServerNotification.Output(output))
+          // report module-level errors (build/link failures)
+          val moduleErrors = results.filter(_.moduleError.isDefined).sortBy(_.taskInstance.moduleId)
+          moduleErrors.foreach { r =>
+            serverNotificationsLogger.add(
+              ServerNotification.logError(s"${r.taskInstance.moduleId}: ${r.moduleError.get}")
+            )
+          }
+          // generate cross-module summary from successful results (non-null, no module error)
+          val successResults = results.filter(r => r.moduleError.isEmpty && r.res != null)
+          if successResults.nonEmpty then {
+            val task = successResults.head.taskInstance.task
+            val moduleResults = successResults.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.res)
+            // Render cross-module summary in the chosen output format
+            val summary = task.summarizeValueUnsafe(moduleResults)
+            val format = ctx.outputFormat
+            given JsonRW[Any] = task.summarizable.jsonRW.asInstanceOf[JsonRW[Any]]
+            given PlainTextWritable[Any] = task.summarizable.plainTextW.asInstanceOf[PlainTextWritable[Any]]
+            given MermaidWritable[Any] = task.summarizable.mermaidW.asInstanceOf[MermaidWritable[Any]]
+            given DotWritable[Any] = task.summarizable.dotW.asInstanceOf[DotWritable[Any]]
+            val output = format match
+              case OutputFormat.Json =>
+                summon[JsonRW[Any]].write(summary).toJson(spaces = 2, sort = true)
+              case OutputFormat.DenseJson =>
+                summon[JsonRW[Any]].write(summary).toJson(spaces = 0, sort = false)
+              case OutputFormat.Mermaid =>
+                summon[MermaidWritable[Any]].write(summary)
+              case OutputFormat.Dot =>
+                summon[DotWritable[Any]].write(summary)
+              case _ => summon[PlainTextWritable[Any]].write(summary)
+            serverNotificationsLogger.add(ServerNotification.Output(output))
+          }
         }
         if startWatch then {
           relevantModuleAndTasks.foreach { case (moduleId, taskInstance) =>
@@ -276,7 +287,7 @@ class DederProjectState(
           }
         }
         if exitOnEnd then {
-          val allSuccessful = results.forall(r => r.taskInstance.task.isResultSuccessfulUnsafe(r.res))
+          val allSuccessful = results.forall(r => r.moduleError.isEmpty && r.taskInstance.task.isResultSuccessfulUnsafe(r.res))
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = allSuccessful))
         }
     }
@@ -315,6 +326,11 @@ class DederProjectState(
             serverNotificationsLogger,
             useLastGood
           ).head
+
+        if res.moduleError.isDefined then
+          throw TaskEvaluationException(
+            s"Error during execution of task '${task.name}' on ${moduleId}: ${res.moduleError.get}"
+          )
 
         (res.res.asInstanceOf[T], res.changed)
       }
