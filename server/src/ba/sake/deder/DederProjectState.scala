@@ -202,20 +202,19 @@ class DederProjectState(
         )
         // summarize across modules
         if results.nonEmpty then {
-          // report module-level errors (build/link failures)
-          val moduleErrors = results.filter(_.moduleError.isDefined).sortBy(_.taskInstance.moduleId)
-          moduleErrors.foreach { r =>
-            serverNotificationsLogger.add(
-              ServerNotification.logError(s"${r.taskInstance.moduleId}: ${r.moduleError.get}")
-            )
+          val successes = results.collect { case s: TaskExecResult.Success => s }
+          val failures = results.collect {
+            case f: TaskExecResult.Failure =>
+              ModuleFailure(f.taskInstance.moduleId, f.error, None)
+            case s: TaskExecResult.Skipped =>
+              ModuleFailure(s.taskInstance.moduleId, s.because.error, Some(s.because.taskInstance.moduleId))
           }
-          // generate cross-module summary from successful results (non-null, no module error)
-          val successResults = results.filter(r => r.moduleError.isEmpty && r.res != null)
-          if successResults.nonEmpty then {
-            val task = successResults.head.taskInstance.task
-            val moduleResults = successResults.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.res)
+          // generate cross-module summary from successful results
+          if successes.nonEmpty then {
+            val task = successes.head.taskInstance.task
+            val moduleResults = successes.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.value)
             // Render cross-module summary in the chosen output format
-            val summary = task.summarizeValueUnsafe(moduleResults)
+            val summary = task.summarizeValueUnsafe(moduleResults, failures)
             val format = ctx.outputFormat
             given JsonRW[Any] = task.summarizable.jsonRW.asInstanceOf[JsonRW[Any]]
             given PlainTextWritable[Any] = task.summarizable.plainTextW.asInstanceOf[PlainTextWritable[Any]]
@@ -257,7 +256,7 @@ class DederProjectState(
           }
         }
         if exitOnEnd then {
-          val allSuccessful = results.forall(r => r.moduleError.isEmpty && r.taskInstance.task.isResultSuccessfulUnsafe(r.res))
+          val allSuccessful = results.forall(_.isInstanceOf[TaskExecResult.Success])
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = allSuccessful))
         }
     }
@@ -305,12 +304,12 @@ class DederProjectState(
             throw TaskEvaluationException(s"Multiple results returned for task '${task.name}' on module '${moduleId}'")
         }
 
-        if res.moduleError.isDefined then
-          throw TaskEvaluationException(
-            s"Error during execution of task '${task.name}' on ${moduleId}: ${res.moduleError.get}"
-          )
-
-        (res.res.asInstanceOf[T], res.changed)
+        res match
+          case TaskExecResult.Success(_, value, changed) => (value.asInstanceOf[T], changed)
+          case TaskExecResult.Failure(ti, error) =>
+            throw TaskEvaluationException(s"${ti.id}: $error")
+          case TaskExecResult.Skipped(ti, because) =>
+            throw TaskEvaluationException(s"${ti.id}: Skipped — ${because.taskInstance.id} failed: ${because.error}")
       }
     } catch {
       case e: Throwable =>
