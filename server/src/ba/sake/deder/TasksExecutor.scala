@@ -59,9 +59,9 @@ class TasksExecutor(
           }
 
           outcomes.foreach { oc =>
-            oc.taskResult.foreach(tr => taskResults += (oc.result.taskInstance.id -> tr))
             oc.result match {
               case s: TaskExecResult.Success =>
+                oc.taskResult.foreach(tr => taskResults += (s.taskInstance.id -> tr))
                 if isTargetTask(s.taskInstance, taskName, moduleIds) then targetResults += s
               case f: TaskExecResult.Failure =>
                 moduleFailures.getOrElseUpdate(f.taskInstance.moduleId, f)
