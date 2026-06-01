@@ -3,7 +3,7 @@ package ba.sake.deder.importing
 import ba.sake.deder.config.DederProject
 
 object DederPklRenderer {
-  val DederVersion = "v0.11.1"
+  val DederVersion = "v0.14.0"
 
   private enum ScalaVersionCtx:
     case Placeholder

@@ -16,7 +16,7 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
 
     os.write.over(
       stagedPath / ".deder/server.properties",
-      s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\n",
+      s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\nmaxConnectSeconds=300\n",
       createFolders = true
     )
     stagedPath

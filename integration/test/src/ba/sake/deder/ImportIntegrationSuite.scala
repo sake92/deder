@@ -64,10 +64,19 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
       assert(os.exists(tempDir / "deder.pkl"), "deder.pkl was not created by import")
       // Tweak amends to use local config (so we don't need network)
       val dederPklContent = os.read(tempDir / "deder.pkl")
-      val tweakedContent = dederPklContent.replaceFirst(
-        s"amends \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederProject.pkl\"",
-        "amends \"../../config/DederProject.pkl\""
-      )
+      val tweakedContent = dederPklContent
+        .replaceFirst(
+          s"amends \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederProject.pkl\"",
+          "amends \"../../config/DederProject.pkl\""
+        )
+        .replace(
+          s"import \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederTypelevel.pkl\"",
+          "import \"../../config/DederTypelevel.pkl\""
+        )
+        .replace(
+          s"import \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederTpolecat.pkl\"",
+          "import \"../../config/DederTpolecat.pkl\""
+        )
       os.write.over(tempDir / "deder.pkl", tweakedContent)
 
       // Shutdown server so next command starts fresh
