@@ -15,7 +15,7 @@ class CliClientSocketWriter(
     serverMessages: BlockingQueue[CliServerMessage]
 ) extends Runnable, StrictLogging {
 
-  private val MaxOutputChunkSize = 40_000
+  private val MaxOutputChunkSize = 30_000
 
   override def run(): Unit = {
     try {
