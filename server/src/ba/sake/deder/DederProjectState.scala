@@ -17,7 +17,6 @@ import ba.sake.deder.cli.TabCompleter
 import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
 import ba.sake.deder.plugin.{LoadedPlugin, PluginLoader, PluginLoaderApi}
 import ba.sake.tupson.JsonRW
-import ba.sake.tupson.toJson
 import ba.sake.deder.scalajs.ScalaJsTasks
 import ba.sake.deder.scalanative.ScalaNativeTasks
 import ba.sake.deder.graalvm.GraalVmNativeImageTasks
@@ -215,21 +214,11 @@ class DederProjectState(
             val moduleResults = successes.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.value)
             // Render cross-module summary in the chosen output format
             val summary = task.summarizeValueUnsafe(moduleResults, failures)
-            val format = ctx.outputFormat
             given JsonRW[Any] = task.summarizable.jsonRW.asInstanceOf[JsonRW[Any]]
             given PlainTextWritable[Any] = task.summarizable.plainTextW.asInstanceOf[PlainTextWritable[Any]]
             given MermaidWritable[Any] = task.summarizable.mermaidW.asInstanceOf[MermaidWritable[Any]]
             given DotWritable[Any] = task.summarizable.dotW.asInstanceOf[DotWritable[Any]]
-            val output = format match
-              case OutputFormat.Json =>
-                summon[JsonRW[Any]].write(summary).toJson(spaces = 2, sort = true)
-              case OutputFormat.DenseJson =>
-                summon[JsonRW[Any]].write(summary).toJson(spaces = 0, sort = false)
-              case OutputFormat.Mermaid =>
-                summon[MermaidWritable[Any]].write(summary)
-              case OutputFormat.Dot =>
-                summon[DotWritable[Any]].write(summary)
-              case _ => summon[PlainTextWritable[Any]].write(summary)
+            val output = OutputFormat.render[Any](summary, ctx.outputFormat)
             serverNotificationsLogger.add(ServerNotification.Output(output))
           }
         }
