@@ -117,8 +117,8 @@ class IntegrationSuite extends BaseIntegrationSuite {
     withTestProject("sample-projects/multi") { projectPath =>
       locally {
         val dederOutputJson = executeDederCommand(projectPath, "exec", "-m", "uber", "-t", "compileClasspath", "--format", "json").out.text()
-        val dederOutput = dederOutputJson.parseJson[Map[String, Map[String, List[String]]]]
-        val uberCompileClasspath = dederOutput("results")("uber")
+        val dederOutput = dederOutputJson.parseJson[MultiModuleResults[Seq[String]]]
+        val uberCompileClasspath = dederOutput.results("uber")
         assert(uberCompileClasspath(0).endsWith("/.deder/out/uber/classes"))
         assert(uberCompileClasspath(1).endsWith("/.deder/out/backend/classes"))
         assert(uberCompileClasspath(2).endsWith("/.deder/out/frontend/classes"))

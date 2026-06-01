@@ -204,8 +204,14 @@ class DederProjectState(
           val successes = results.collect { case s: TaskExecResult.Success => s }
           val failures = results.collect {
             case f: TaskExecResult.Failure =>
+              serverNotificationsLogger.add(
+                ServerNotification.logError(s"${f.taskInstance.moduleId}: ${f.error}")
+              )
               ModuleFailure(f.taskInstance.moduleId, f.error, None)
             case s: TaskExecResult.Skipped =>
+              serverNotificationsLogger.add(
+                ServerNotification.logError(s"${s.taskInstance.moduleId}: Skipped — ${s.because.taskInstance.moduleId} failed: ${s.because.error}")
+              )
               ModuleFailure(s.taskInstance.moduleId, s.because.error, Some(s.because.taskInstance.moduleId))
           }
           // generate cross-module summary from successful results
@@ -245,7 +251,10 @@ class DederProjectState(
           }
         }
         if exitOnEnd then {
-          val allSuccessful = results.forall(_.isInstanceOf[TaskExecResult.Success])
+          val allSuccessful = results.forall {
+            case TaskExecResult.Success(ti, value, _) => ti.task.isResultSuccessfulUnsafe(value)
+            case _ => false // Failure and Skipped are always unsuccessful
+          }
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = allSuccessful))
         }
     }
