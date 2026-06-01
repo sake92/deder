@@ -224,8 +224,8 @@ sealed trait Task[T, Deps <: Tuple, S](using
   ): (res: TaskResult[T], changed: Boolean)
 
   /** Type-erased cross-module aggregation returning the summary value. */
-  private[deder] def summarizeValueUnsafe(results: Seq[(String, Any)]): S =
-    summarizable.summarize(results.asInstanceOf[Seq[(String, T)]])
+  private[deder] def summarizeValueUnsafe(results: Seq[(String, Any)], failures: Seq[ModuleFailure]): S =
+    summarizable.summarize(results.asInstanceOf[Seq[(String, T)]], failures)
 
   /** Type-erased success check for use by the execution engine */
   private[deder] def isResultSuccessfulUnsafe(result: Any): Boolean =
