@@ -151,7 +151,9 @@ class SourceGeneratorsSuite extends munit.FunSuite {
         useLastGood = false
       )
       assertEquals(results.size, 1)
-      val collected = results.head.res.asInstanceOf[Seq[os.Path]]
+      val collected = results.head match
+        case TaskExecResult.Success(_, value, _) => value.asInstanceOf[Seq[os.Path]]
+        case _ => fail("expected Success")
       assertEquals(collected.size, 1)
       assert(os.exists(collected.head / "marker.txt"))
     } finally pool.shutdownNow()

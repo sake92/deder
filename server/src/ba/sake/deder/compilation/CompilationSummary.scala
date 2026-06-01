@@ -1,7 +1,7 @@
 package ba.sake.deder.compilation
 
 import ba.sake.tupson.JsonRW
-import ba.sake.deder.{CompileResult, PlainTextWritable, Summarizable}
+import ba.sake.deder.{CompileResult, ModuleFailure, PlainTextWritable, Summarizable}
 
 case class CompilationSummary(
     success: Boolean,
@@ -55,7 +55,7 @@ object CompilationSummary {
   }
 
   given Summarizable[CompileResult, CompilationSummary] with
-    def summarize(resultsMap: Seq[(String, CompileResult)]): CompilationSummary = {
+    def summarize(resultsMap: Seq[(String, CompileResult)], failures: Seq[ModuleFailure]): CompilationSummary = {
       val allResults = resultsMap.map(_._2)
       val modules = resultsMap.map { case (id, cr) =>
         id -> CompileModuleInfo(cr.errors, cr.warnings, cr.sourceCount)

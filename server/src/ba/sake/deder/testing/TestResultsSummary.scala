@@ -1,7 +1,7 @@
 package ba.sake.deder.testing
 
 import java.time.Duration
-import ba.sake.deder.{ServerNotification, ServerNotificationsLogger, PlainTextWritable, Summarizable}
+import ba.sake.deder.{ModuleFailure, ServerNotification, ServerNotificationsLogger, PlainTextWritable, Summarizable}
 import ba.sake.tupson.JsonRW
 
 case class TestResultsSummary(
@@ -66,7 +66,7 @@ object TestResultsSummary {
   }
 
   given Summarizable[DederTestResults, TestResultsSummary] with
-    def summarize(resultsMap: Seq[(String, DederTestResults)]): TestResultsSummary = {
+    def summarize(resultsMap: Seq[(String, DederTestResults)], failures: Seq[ModuleFailure]): TestResultsSummary = {
       val allResults = resultsMap.map(_._2)
       TestResultsSummary(
         success = allResults.forall(_.success),

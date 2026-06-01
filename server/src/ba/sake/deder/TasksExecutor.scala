@@ -17,13 +17,14 @@ class TasksExecutor(
     projectConfig: DederProject,
     modulesGraph: SimpleDirectedGraph[DederModule, DefaultEdge],
     tasksGraph: SimpleDirectedGraph[TaskInstance, DefaultEdge],
-   // tasksExecutorService: ExecutorService,
     dependencyResolver: DependencyResolver,
     internals: DederProjectInternalsImpl
 ) extends StrictLogging {
 
-  // (taskInstance.id, Option[TaskResult], changed, Option[errorMessage])
-  private type StageResult = (String, Option[TaskResult[?]], Boolean, Option[String])
+  private case class ExecutionOutcome(result: TaskExecResult, taskResult: Option[TaskResult[?]])
+
+  private def isTargetTask(ti: TaskInstance, taskName: String, moduleIds: Seq[String]): Boolean =
+    ti.task.name == taskName && moduleIds.contains(ti.moduleId)
 
   def execute(
       stages: Seq[Seq[TaskInstance]],
@@ -33,94 +34,93 @@ class TasksExecutor(
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger
   ): Seq[TaskExecResult] = {
-    var taskResults = Map.empty[String, TaskResult[?]] // taskInstance.id -> TaskResult
-    val finalTaskResults = Seq.newBuilder[TaskExecResult]
-    val failedModuleIds = ConcurrentHashMap.newKeySet[String]()
+    val taskResults = scala.collection.mutable.Map.empty[String, TaskResult[?]]
+    val moduleFailures = scala.collection.mutable.Map.empty[String, TaskExecResult.Failure]
+    val targetResults = Seq.newBuilder[TaskExecResult]
+
     for (taskInstances, stageIndex) <- stages.zipWithIndex do {
       val stageSpan = OTEL.TRACER.spanBuilder(s"Stage $stageIndex").startSpan()
       try {
         Using.resource(stageSpan.makeCurrent()) { _ =>
-          // filter out tasks belonging to already-failed modules
-          val executableTasks = taskInstances.filterNot(ti => failedModuleIds.contains(ti.moduleId))
-          // record skipped tasks (for failed modules) with error results
-          val skippedTasks = taskInstances.filter(ti => failedModuleIds.contains(ti.moduleId))
-          skippedTasks.foreach { ti =>
-            if ti.task.name == taskName && moduleIds.contains(ti.moduleId) then
-              finalTaskResults.addOne(
-                TaskExecResult(ti, null, changed = false, moduleError = Some(s"Module ${ti.moduleId} skipped due to earlier failure"))
-              )
-          }
-          val taskExecutions: Seq[() => StageResult] = for taskInstance <- executableTasks yield {
-            val allTaskDeps = tasksGraph.outgoingEdgesOf(taskInstance).asScala.toSeq
-            val depResults = allTaskDeps.flatMap { depEdge =>
-              val d = tasksGraph.getEdgeTarget(depEdge)
-              val depRes = taskResults(d.id)
-              Option.when(d.module == taskInstance.module)(depRes)
-            }
-            val transitiveResults = getTransitiveResults(taskInstance, taskResults, allTaskDeps)
+          val (skipped, executable) = taskInstances.partition(ti => moduleFailures.contains(ti.moduleId))
 
-            () =>
-              val taskStartNanos = System.nanoTime()
-              val taskSpan = OTEL.TRACER.spanBuilder(taskInstance.id).startSpan()
-              try {
-                Using.resource(taskSpan.makeCurrent()) { scope =>
-                  val (taskRes, changed) = taskInstance.task
-                    .executeUnsafe(
-                      projectConfig,
-                      taskInstance.module,
-                      depResults,
-                      transitiveResults,
-                      args,
-                      watch,
-                      serverNotificationsLogger,
-                      dependencyResolver
-                    )
-                  val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
-                  internals.recordTaskExecution(taskInstance.task.name, taskDuration, !changed)
-                  (taskInstance.id, Some(taskRes), changed, None)
-                }
-              } catch {
-                case NonFatal(e) =>
-                  val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
-                  internals.recordTaskExecution(taskInstance.task.name, taskDuration, cacheHit = false)
-                  logger.error(s"Error during execution of task ${taskInstance.id}", e)
-                  taskSpan.recordException(e)
-                  taskSpan.setStatus(StatusCode.ERROR)
-                  // mark the module as failed — other modules continue
-                  failedModuleIds.add(taskInstance.moduleId)
-                  (taskInstance.id, None, false, Some(Option(e.getMessage).getOrElse(e.getClass.getSimpleName)))
-              } finally {
-                taskSpan.end()
+          skipped.foreach { ti =>
+            if isTargetTask(ti, taskName, moduleIds) then
+              targetResults += TaskExecResult.Skipped(ti, moduleFailures(ti.moduleId))
+          }
+
+          val outcomes: Seq[ExecutionOutcome] = supervised {
+            val taskResultsSnapshot = taskResults.toMap
+            executable.map { ti =>
+              forkUser {
+                executeSingleTask(ti, projectConfig, taskResultsSnapshot, args, watch, serverNotificationsLogger, dependencyResolver)
               }
+            }.map(_.join())
           }
-          val results: Seq[StageResult] = supervised {
-            val forks = taskExecutions.map(te => forkUser { te() })
-            forks.map(_.join())
+
+          outcomes.foreach { oc =>
+            oc.result match {
+              case s: TaskExecResult.Success =>
+                oc.taskResult.foreach(tr => taskResults += (s.taskInstance.id -> tr))
+                if isTargetTask(s.taskInstance, taskName, moduleIds) then targetResults += s
+              case f: TaskExecResult.Failure =>
+                moduleFailures.getOrElseUpdate(f.taskInstance.moduleId, f)
+                if isTargetTask(f.taskInstance, taskName, moduleIds) then targetResults += f
+              case _: TaskExecResult.Skipped =>
+            }
           }
-          // collect successful results for dependency resolution
-          val goodResults = results.collect { case (id, Some(taskRes), changed, None) => (id, taskRes, changed) }
-          taskResults ++= goodResults.map { case (id, taskRes, _) => id -> taskRes }
-          // record failed target tasks with error info
-          val failedResults = results.collect { case (id, None, _, Some(errMsg)) => (id, errMsg) }
-          failedResults.foreach { case (id, errMsg) =>
-            val ti = executableTasks.find(_.id == id).get
-            if ti.task.name == taskName && moduleIds.contains(ti.moduleId) then
-              finalTaskResults.addOne(TaskExecResult(ti, null, changed = false, moduleError = Some(errMsg)))
-          }
-          // collect final task results on the caller thread (after all futures have completed)
-          // to avoid a data race: multiple worker threads writing to finalTaskResults concurrently
-          for (taskInstance, (_, taskResOpt, changed, errorOpt)) <- executableTasks.zip(results) do
-            if taskInstance.task.name == taskName && moduleIds.contains(taskInstance.moduleId) && errorOpt.isEmpty then
-              finalTaskResults.addOne(TaskExecResult(taskInstance, taskResOpt.get.value, changed))
         }
       } catch {
         case NonFatal(e) =>
           stageSpan.recordException(e)
           stageSpan.setStatus(StatusCode.ERROR)
-          // don't re-throw — module-level failures are already handled above
       } finally stageSpan.end()
     }
-    finalTaskResults.result()
+
+    targetResults.result()
+  }
+
+  private def executeSingleTask(
+      ti: TaskInstance,
+      projectConfig: DederProject,
+      taskResults: Map[String, TaskResult[?]],
+      args: Seq[String],
+      watch: Boolean,
+      serverNotificationsLogger: ServerNotificationsLogger,
+      dependencyResolver: DependencyResolver
+  ): ExecutionOutcome = {
+    val allTaskDeps = tasksGraph.outgoingEdgesOf(ti).asScala.toSeq
+    val depResults = allTaskDeps.flatMap { depEdge =>
+      val d = tasksGraph.getEdgeTarget(depEdge)
+      val depRes = taskResults(d.id)
+      Option.when(d.module == ti.module)(depRes)
+    }
+    val transitiveResults = getTransitiveResults(ti, taskResults, allTaskDeps)
+
+    val taskStartNanos = System.nanoTime()
+    val taskSpan = OTEL.TRACER.spanBuilder(ti.id).startSpan()
+    try {
+      Using.resource(taskSpan.makeCurrent()) { scope =>
+        val (taskRes, changed) = ti.task.executeUnsafe(
+          projectConfig, ti.module, depResults, transitiveResults,
+          args, watch, serverNotificationsLogger, dependencyResolver
+        )
+        val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
+        internals.recordTaskExecution(ti.task.name, taskDuration, !changed)
+        ExecutionOutcome(TaskExecResult.Success(ti, taskRes.value, changed), Some(taskRes))
+      }
+    } catch {
+      case NonFatal(e) =>
+        val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
+        internals.recordTaskExecution(ti.task.name, taskDuration, cacheHit = false)
+        logger.error(s"Error during execution of task ${ti.id}", e)
+        taskSpan.recordException(e)
+        taskSpan.setStatus(StatusCode.ERROR)
+        val errMsg = Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
+        ExecutionOutcome(TaskExecResult.Failure(ti, errMsg), None)
+    } finally {
+      taskSpan.end()
+    }
   }
 
   private def getTransitiveResults(
@@ -158,9 +158,7 @@ class TasksExecutor(
   }
 }
 
-case class TaskExecResult(
-    taskInstance: TaskInstance,
-    res: Any,
-    changed: Boolean,
-    moduleError: Option[String] = None
-)
+enum TaskExecResult:
+  case Success(taskInstance: TaskInstance, value: Any, changed: Boolean)
+  case Failure(taskInstance: TaskInstance, error: String)
+  case Skipped(taskInstance: TaskInstance, because: Failure)
