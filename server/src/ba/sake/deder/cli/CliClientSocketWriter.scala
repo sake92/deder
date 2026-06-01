@@ -15,6 +15,8 @@ class CliClientSocketWriter(
     serverMessages: BlockingQueue[CliServerMessage]
 ) extends Runnable, StrictLogging {
 
+  private val MaxOutputChunkSize = 40_000
+
   override def run(): Unit = {
     try {
       val outputStream = Channels.newOutputStream(clientChannel)
@@ -22,9 +24,18 @@ class CliClientSocketWriter(
       while running do {
         // newline delimited JSON messages
         val message = serverMessages.take()
-        // very important to have ZERO SPACES/NEWLINES!!!
-        val jsonMessage = message.toJson(spaces = 0, sort = false)
-        outputStream.write((jsonMessage + '\n').getBytes(StandardCharsets.UTF_8))
+        message match
+          case CliServerMessage.Output(text) if text.length > MaxOutputChunkSize =>
+            // split large output to avoid exceeding client's JSON parser string limit (avaje-jsonb 50K)
+            text.grouped(MaxOutputChunkSize).foreach { chunk =>
+              val chunkMsg = CliServerMessage.Output(chunk)
+              val json = chunkMsg.toJson(spaces = 0, sort = false)
+              outputStream.write((json + '\n').getBytes(StandardCharsets.UTF_8))
+            }
+          case _ =>
+            // very important to have ZERO SPACES/NEWLINES!!!
+            val jsonMessage = message.toJson(spaces = 0, sort = false)
+            outputStream.write((jsonMessage + '\n').getBytes(StandardCharsets.UTF_8))
         running = !message.isInstanceOf[CliServerMessage.Exit] // to exit this thread..
       }
     } catch {
