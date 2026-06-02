@@ -7,6 +7,7 @@ import ba.sake.deder.deps.DependencyResolverApi
 import scala.util.control.Breaks.{break, breakable}
 import scala.Tuple.:*
 import ba.sake.tupson.{*, given}
+import java.time.Duration
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import os.write.over
@@ -224,8 +225,8 @@ sealed trait Task[T, Deps <: Tuple, S](using
   ): (res: TaskResult[T], changed: Boolean)
 
   /** Type-erased cross-module aggregation returning the summary value. */
-  private[deder] def summarizeValueUnsafe(results: Seq[(String, Any)], failures: Seq[ModuleFailure]): S =
-    summarizable.summarize(results.asInstanceOf[Seq[(String, T)]], failures)
+  private[deder] def summarizeValueUnsafe(results: Seq[(String, Any)], failures: Seq[ModuleFailure], totalDuration: Duration): S =
+    summarizable.summarize(results.asInstanceOf[Seq[(String, T)]], failures, totalDuration)
 
   /** Type-erased success check for use by the execution engine */
   private[deder] def isResultSuccessfulUnsafe(result: Any): Boolean =
