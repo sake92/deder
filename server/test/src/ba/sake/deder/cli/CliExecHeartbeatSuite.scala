@@ -93,7 +93,7 @@ class CliExecHeartbeatSuite extends munit.FunSuite {
       autoClose: Boolean
   )(testCode: (ManualClock, ConcurrentLinkedQueue[CliServerMessage], CliExecHeartbeat) => Unit): Unit = {
     supervised {
-      RequestContext.clientContext.supervisedWhere(Some(CliClientContext("client-1", "request-1", outputFormat = OutputFormat.Json))) {
+      RequestContext.clientContext.supervisedWhere(CliClientContext("client-1", "request-1", outputFormat = OutputFormat.Json)) {
         val clock = new ManualClock()
         val emitted = new ConcurrentLinkedQueue[CliServerMessage]()
         val heartbeat = new CliExecHeartbeat(

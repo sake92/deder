@@ -147,7 +147,7 @@ object ForkedTestOrchestrator extends StrictLogging {
       flushIntervalMs: Long
   ): Option[ForkedTestResultsPayload] = {
     val cancelled = () => {
-      val requestId = RequestContext.clientContext.get().map(_.requestId).orNull
+      val requestId = RequestContext.clientContext.get().requestId
       requestId != null && {
         val tok = DederGlobals.cancellationTokens.get(requestId)
         tok != null && tok.get()

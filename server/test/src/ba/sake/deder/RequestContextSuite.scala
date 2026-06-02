@@ -13,34 +13,28 @@ class RequestContextSuite extends munit.FunSuite {
     )
 
     val forkCtx = supervised {
-      RequestContext.clientContext.supervisedWhere(Some(expectedCtx)) {
+      RequestContext.clientContext.supervisedWhere(expectedCtx) {
         forkUser {
           RequestContext.clientContext.get()
         }.join()
       }
     }
 
-    assertEquals(forkCtx, Some(expectedCtx))
+    assertEquals(forkCtx, expectedCtx)
   }
 
-  test("clientContext is None outside supervisedWhere") {
-    assertEquals(RequestContext.clientContext.get(), None)
+  test("clientContext returns defaults outside supervisedWhere") {
+    assertEquals(RequestContext.clientContext.get().clientId, "unknown")
 
     supervised {
       RequestContext.clientContext.supervisedWhere(
-        Some(CliClientContext(clientId = "client-2", requestId = "request-2"))
+        CliClientContext(clientId = "client-2", requestId = "request-2")
       ) {
-        assertEquals(RequestContext.clientContext.get().map(_.requestId), Some("request-2"))
+        assertEquals(RequestContext.clientContext.get().requestId, "request-2")
       }
     }
 
-    assertEquals(RequestContext.clientContext.get(), None)
+    assertEquals(RequestContext.clientContext.get().clientId, "unknown")
 
-    val forkCtxAfterScope = supervised {
-      forkUser {
-        RequestContext.clientContext.get()
-      }.join()
-    }
-    assertEquals(forkCtxAfterScope, None)
   }
 }

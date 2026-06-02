@@ -55,7 +55,7 @@ class CliClientSocketReader(
         .start(() =>
           supervised {
             try {
-              RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+              RequestContext.clientContext.supervisedWhere(ctx) {
                 handler.handle(message)
               }
             } catch {

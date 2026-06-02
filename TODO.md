@@ -1,5 +1,6 @@
 
 # Misc
+- stats for watched files??
 - custom ignore paths and maybe stats ??
 - show total time in summary
 - publish pkl configs as proper Pkl modules, good for offline/caching
