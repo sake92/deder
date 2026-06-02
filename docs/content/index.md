@@ -48,6 +48,6 @@ Run `deder bsp install` and then open with VSCode or IntelliJ (open as a BSP pro
 
 Generate an SVG of the dependency graph for a specific task:
 ```shell
-deder plan -m common -t compileClasspath --dot | dot -Tsvg > bla.svg
+deder plan -m common -t compileClasspath -f dot | dot -Tsvg > bla.svg
 deder modules -f mermaid | mmdc -i - -o modules.svg
 ```
