@@ -16,7 +16,7 @@ object CacheStatsRegistry:
     import com.github.blemale.scaffeine.Cache as SCache
 
     /** Reads Caffeine stats and converts to plugin-api InMemCacheStats. */
-    def statsOf(cache: SCache[_, _]): InMemCacheStats =
+    def statsOf(cache: SCache[?, ?]): InMemCacheStats =
         val s = cache.stats()
         InMemCacheStats(
             hitCount = s.hitCount(),

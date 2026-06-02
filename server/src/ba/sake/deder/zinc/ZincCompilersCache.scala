@@ -2,7 +2,7 @@ package ba.sake.deder.zinc
 
 import scala.concurrent.duration.*
 import com.github.blemale.scaffeine.*
-import ba.sake.deder.{CacheStatsRegistry, DependencyResolverApi}
+import ba.sake.deder.CacheStatsRegistry
 import ba.sake.deder.deps.*
 
 class ZincCompilersCache(cacheRegistry: CacheStatsRegistry):
