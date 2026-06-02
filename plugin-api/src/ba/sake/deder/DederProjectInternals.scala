@@ -64,5 +64,11 @@ trait DederProjectInternals:
   /** Currently loaded plugins and their registered tasks. */
   def loadedPlugins: Seq[LoadedPluginInfo]
 
+  /** Per-cache stats keyed by cache identifier.
+   *  Keys: "dep-resolver", "zinc-compilers", "zinc-analysis:<version>",
+   *        "zinc-setup:<version>", "test-classloaders"
+   */
+  def inMemoryCachesStats: Map[String, InMemCacheStats]
+
   /** Server metadata. */
   def serverUptime: Duration
