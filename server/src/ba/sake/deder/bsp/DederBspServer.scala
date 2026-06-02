@@ -496,7 +496,7 @@ class DederBspServer(
       withLastGoodState(_ => CleanCacheResult(false)) { projectStateData =>
         val cleaned = resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).forall { case (_, module) =>
           val moduleId = module.id
-          projectState.cleanModules(Seq(moduleId))
+          projectState.cleanModules(Seq(moduleId), _ => ())
         }
         val result = CleanCacheResult(cleaned)
         logger.debug(s"buildTargetCleanCache for params ${params} return: ${result}")
