@@ -10,21 +10,27 @@ import coursierapi.FetchResult
 import coursierapi.Dependency as CoursierDependency
 import coursierapi.{MavenRepository as CsMavenRepository, Repository as CsRepository}
 import dependency.api.ops.*
-import ba.sake.deder.{OTEL, ServerNotificationsLogger}
+import ba.sake.deder.{OTEL, ServerNotificationsLogger, CacheStatsRegistry}
 import ba.sake.deder.ServerNotification
 import ba.sake.deder.deps.{DepTree, DepNode, DepConflict}
 import com.typesafe.scalalogging.StrictLogging
 
-class DependencyResolver(val repositories: Seq[CsRepository]) extends DependencyResolverApi with StrictLogging {
+class DependencyResolver(
+    val repositories: Seq[CsRepository],
+    cacheRegistry: CacheStatsRegistry
+) extends DependencyResolverApi with StrictLogging {
 
   // In-process cache for resolved file paths, keyed by sorted dependency
   // coordinates. Scoped to this resolver instance, so repos implicitly key
   // the cache: a new project config → new resolver → new cache.
   private val fetchFilesCache: Cache[String, Seq[os.Path]] =
     Scaffeine()
+      .recordStats()
       .expireAfterAccess(5.minute)
       .maximumSize(50)
       .build()
+
+  cacheRegistry.register("dep-resolver", () => CacheStatsRegistry.statsOf(fetchFilesCache))
 
   def doFetch(
       coursierDependencies: Seq[CoursierDependency],
