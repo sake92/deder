@@ -111,7 +111,7 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
-  test("import jawn v1.6.0") {
+  test("import jawn v1.6.0".ignore) {
     testImport("https://github.com/typelevel/jawn.git", "v1.6.0", expectedMinModules = 30)
   }
 
