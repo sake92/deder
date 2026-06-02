@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters.*
 
 import ox.*
-import ba.sake.deder.{CliClientContext, OutputFormat, RequestContext, ServerNotification}
+import ba.sake.deder.{OutputFormat, RequestContext, ServerNotification}
 
 class CliExecHeartbeatSuite extends munit.FunSuite {
 
