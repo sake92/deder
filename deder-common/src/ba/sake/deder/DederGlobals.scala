@@ -17,8 +17,8 @@ object DederGlobals {
   val cancellationTokens: ConcurrentHashMap[String, AtomicBoolean] = new ConcurrentHashMap()
 
   /** Caps the number of forked test JVMs alive at any one time across the whole server.
-    * Initialized once in ServerMain. Acquired/released around each fork's spawn/exit
-    * inside ForkedTestOrchestrator.
+    * Configured from `deder.pkl` (`maxConcurrentTestForks`), defaulting to available CPU cores.
+    * Acquired/released around each fork's spawn/exit inside ForkedTestOrchestrator.
     */
   @volatile private var _testForkSemaphore: Semaphore = new Semaphore(Runtime.getRuntime.availableProcessors(), true)
 
@@ -26,6 +26,17 @@ object DederGlobals {
     _testForkSemaphore = new Semaphore(math.max(1, permits), true)
 
   def testForkSemaphore: Semaphore = _testForkSemaphore
+
+  /** Caps the number of concurrent Zinc compilations across the whole server.
+    * Configured from `deder.pkl` (`maxActiveCompilers`), defaulting to available CPU cores.
+    * Acquired/released around each Zinc `compile()` call in CoreTasks.
+    */
+  @volatile private var _compileSemaphore: Semaphore = new Semaphore(Runtime.getRuntime.availableProcessors(), true)
+
+  def setCompileSemaphore(permits: Int): Unit =
+    _compileSemaphore = new Semaphore(math.max(1, permits), true)
+
+  def compileSemaphore: Semaphore = _compileSemaphore
 
   /** Interval in milliseconds for periodic flushing of suite output from forked test JVMs.
     * Set to 0 to disable (output only appears when each suite completes).
