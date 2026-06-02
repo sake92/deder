@@ -98,10 +98,10 @@ Valid range: `1`–`64`.
 
 ### Server-wide fork cap (`maxConcurrentTestForks`)
 
-The server-wide semaphore in `.deder/server.properties` caps the total number of live forked JVMs across **all** concurrent test tasks. Per-module `maxTestForks` is capped by this value.
+The `maxConcurrentTestForks` field in `deder.pkl` caps the total number of live forked JVMs across **all** concurrent test tasks. Per-module `maxTestForks` is capped by this value.
 
-```properties
-maxConcurrentTestForks=16   # default: Runtime.availableProcessors()
+```pkl
+maxConcurrentTestForks = 16   // 0 = auto-detect (Runtime.availableProcessors())
 ```
 
 ### Summary
@@ -110,7 +110,7 @@ maxConcurrentTestForks=16   # default: Runtime.availableProcessors()
 |---|---|---|---|
 | `testParallelism` | Per module (Pkl) | `0` (all CPUs) | Test classes run concurrently per forked JVM |
 | `maxTestForks` | Per module (Pkl) | `0` (all CPUs) | Forked JVMs per module |
-| `maxConcurrentTestForks` | Server-wide (`.deder/server.properties`) | CPU cores | Hard cap on total live forks |
+| `maxConcurrentTestForks` | Project-wide (`deder.pkl`) | `0` (all CPUs) | Hard cap on total live forks |
 
 Example: `maxTestForks=4`, `testParallelism=8`, `maxConcurrentTestForks=16` — up to 4 JVMs for the module, each running 8 class threads, server allows at most 16 forks total across all modules.
 
