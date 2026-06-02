@@ -5,13 +5,13 @@ object DederCleaner {
   /** Walk dir tree and return total bytes. Returns 0 if dir doesn't exist. */
   def scanSize(dir: os.Path): Long =
     if os.exists(dir) then
-      os.walk(dir).filter(os.isFile).map(_.size).sum
+      os.walk(dir).filter(os.isFile).map(os.size).sum
     else 0L
 
   /** Delete the directory. Returns bytes freed. Throws on failure. */
   def cleanDir(dir: os.Path): Long =
     val size = scanSize(dir)
-    os.remove.all(dir, ignoreErrors = false)
+    if os.exists(dir) then os.remove.all(dir)
     size
 
   /** Format bytes as human-readable string (e.g. "8.1 MB", "432 KB", "0 B"). */
