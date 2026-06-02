@@ -4,8 +4,8 @@ import ox.*
 
 class RequestContextSuite extends munit.FunSuite {
 
-  test("clientContext propagates into forkUser") {
-    val expectedCtx = CliClientContext(
+  test("current propagates into forkUser") {
+    val expectedCtx = RequestContext(
       clientId = "client-1",
       requestId = "request-1",
       envVars = Map("FOO" -> "BAR"),
@@ -13,9 +13,9 @@ class RequestContextSuite extends munit.FunSuite {
     )
 
     val forkCtx = supervised {
-      RequestContext.clientContext.supervisedWhere(expectedCtx) {
+      RequestContext.current.supervisedWhere(expectedCtx) {
         forkUser {
-          RequestContext.clientContext.get()
+          RequestContext.current.get()
         }.join()
       }
     }
@@ -23,18 +23,23 @@ class RequestContextSuite extends munit.FunSuite {
     assertEquals(forkCtx, expectedCtx)
   }
 
-  test("clientContext returns defaults outside supervisedWhere") {
-    assertEquals(RequestContext.clientContext.get().clientId, "unknown")
+  test("current returns defaults outside supervisedWhere") {
+    assertEquals(RequestContext.current.get().clientId, "unknown")
 
     supervised {
-      RequestContext.clientContext.supervisedWhere(
-        CliClientContext(clientId = "client-2", requestId = "request-2")
+      RequestContext.current.supervisedWhere(
+        RequestContext(
+          clientId = "client-2",
+          requestId = "request-2",
+          envVars = Map.empty,
+          outputFormat = OutputFormat.Json
+        )
       ) {
-        assertEquals(RequestContext.clientContext.get().requestId, "request-2")
+        assertEquals(RequestContext.current.get().requestId, "request-2")
       }
     }
 
-    assertEquals(RequestContext.clientContext.get().clientId, "unknown")
+    assertEquals(RequestContext.current.get().clientId, "unknown")
 
   }
 }

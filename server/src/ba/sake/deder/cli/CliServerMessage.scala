@@ -27,7 +27,7 @@ object CliServerMessage {
       case LogLevel.DEBUG   => fansi.Color.LightGreen(msgLevelString)
       case LogLevel.TRACE   => fansi.Color.LightGray(msgLevelString)
     }
-    val showLevel = RequestContext.clientContext.get().logLevel.ordinal >= LogLevel.DEBUG.ordinal
+    val showLevel = RequestContext.current.get().logLevel.ordinal >= LogLevel.DEBUG.ordinal
     val prefix = (showLevel, moduleId) match {
       case (false, None) => ""
       case (true, None)  => s"[${msgLevelAnsi}] "

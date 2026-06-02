@@ -38,7 +38,7 @@ object InMemoryTestOrchestrator {
     try {
       val logger = DederTestLogger(notifications, moduleId)
       val isCancelled: () => Boolean = () => {
-        val requestId = RequestContext.clientContext.get().requestId
+        val requestId = RequestContext.current.get().requestId
         requestId != null && {
           val tok = DederGlobals.cancellationTokens.get(requestId)
           tok != null && tok.get()

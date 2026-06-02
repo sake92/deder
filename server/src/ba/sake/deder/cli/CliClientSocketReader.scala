@@ -48,14 +48,14 @@ class CliClientSocketReader(
             CliClientMessage.Help(Seq.empty)
         }
       val requestId = message.getRequestId
-      val ctx = cliClientContext(clientId, requestId, message)
+      val ctx = requestContext(clientId, requestId, message)
 
       Thread
         .ofVirtual()
         .start(() =>
           supervised {
             try {
-              RequestContext.clientContext.supervisedWhere(ctx) {
+              RequestContext.current.supervisedWhere(ctx) {
                 handler.handle(message)
               }
             } catch {
@@ -73,7 +73,7 @@ class CliClientSocketReader(
     }
   }
 
-  private def cliClientContext(clientId: String, requestId: String, message: CliClientMessage): CliClientContext =
+  private def requestContext(clientId: String, requestId: String, message: CliClientMessage): RequestContext =
     message match {
       case m: CliClientMessage.Exec =>
         val opts = mainargs
@@ -82,8 +82,8 @@ class CliClientSocketReader(
           .toOption
         val outputFormat = opts.map(_.format).getOrElse(OutputFormat.PlainText)
         val logLevel = opts.map(_.logLevel).getOrElse(cli.LogLevel.INFO)
-        CliClientContext(clientId, requestId, m.envVars, outputFormat, logLevel)
+        RequestContext(clientId, requestId, m.envVars, outputFormat, logLevel)
       case _ =>
-        CliClientContext(clientId, requestId)
+        RequestContext(clientId, requestId)
     }
 }

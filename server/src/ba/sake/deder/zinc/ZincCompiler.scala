@@ -388,7 +388,7 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
         notifications.add(
           ServerNotification.TaskProgress(moduleId, "compile", current.toLong, total.toLong)
         )
-        val currentRequestId = RequestContext.clientContext.get().requestId
+        val currentRequestId = RequestContext.current.get().requestId
         if currentRequestId == null then true
         else !Option(DederGlobals.cancellationTokens.get(currentRequestId)).exists(_.get())
       }
