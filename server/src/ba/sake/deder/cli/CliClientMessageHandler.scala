@@ -485,11 +485,12 @@ class CliClientMessageHandler(
               .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
               .pipe(b => cliOptions.task.fold(b)(t => b.setAttribute("cli.task", t)))
           ) { span =>
+            val onOutput: String => Unit = msg => serverMessages.put(CliServerMessage.Output(msg))
             val success = cliOptions.task match {
               case Some(taskName) =>
-                projectState.cleanTasks(cliOptions.modules, taskName)
+                projectState.cleanTasks(cliOptions.modules, taskName, onOutput)
               case None =>
-                projectState.cleanModules(cliOptions.modules)
+                projectState.cleanModules(cliOptions.modules, onOutput)
             }
             if !success then
               span.setStatus(StatusCode.ERROR)
