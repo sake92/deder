@@ -1,6 +1,7 @@
 package ba.sake.deder.zinc
 
 import java.net.URLClassLoader
+import ba.sake.deder.CacheStatsRegistry
 
 class ZincCompilerCacheSuite extends munit.FunSuite {
 
@@ -10,7 +11,7 @@ class ZincCompilerCacheSuite extends munit.FunSuite {
     val jos = new java.util.jar.JarOutputStream(new java.io.FileOutputStream(dummyJar.toIO))
     jos.close()
 
-    val compiler = ZincCompiler(dummyJar)
+    val compiler = ZincCompiler(dummyJar, CacheStatsRegistry(), "3.7.0")
 
     // Access private caches via reflection
     val setupField = compiler.getClass.getDeclaredField("setupCache")

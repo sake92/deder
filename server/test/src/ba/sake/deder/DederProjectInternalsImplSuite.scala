@@ -13,7 +13,7 @@ class DederProjectInternalsImplSuite extends munit.FunSuite {
       .setMeterProvider(SdkMeterProvider.builder().build())
       .build()
     val meter = sdk.getMeter("test")
-    DederProjectInternalsImpl(meter)
+    DederProjectInternalsImpl(meter, CacheStatsRegistry())
 
   test("currentRequests tracks live requests") {
     val internals = testInternals()
