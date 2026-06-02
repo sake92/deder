@@ -1,32 +1,24 @@
 package ba.sake.deder
 
-import scala.util.control.NonFatal
-import com.typesafe.scalalogging.StrictLogging
-import org.pkl.core.stdlib.math.MathNodes.log
+object DederCleaner {
 
-object DederCleaner extends StrictLogging {
-  def cleanModules(moduleIds: Seq[String]): Boolean =
-    moduleIds.forall { moduleId =>
-      val moduleOutDir = DederGlobals.projectRootDir / ".deder/out" / moduleId
-      try {
-        os.remove.all(moduleOutDir, ignoreErrors = false)
-        true
-      } catch {
-        case NonFatal(e) =>
-          logger.warn(s"Error while cleaning module '$moduleId'", e)
-          false
-      }
-    }
+  /** Walk dir tree and return total bytes. Returns 0 if dir doesn't exist. */
+  def scanSize(dir: os.Path): Long =
+    if os.exists(dir) then
+      os.walk(dir).filter(os.isFile).map(_.size).sum
+    else 0L
 
-  def cleanTask(moduleId: String, taskName: String): Boolean = {
-    val taskOutDir = DederGlobals.projectRootDir / ".deder/out" / moduleId / taskName
-    try {
-      os.remove.all(taskOutDir, ignoreErrors = false)
-      true
-    } catch {
-      case NonFatal(e) =>
-        logger.warn(s"Error while cleaning task '$moduleId.$taskName'", e)
-        false
-    }
-  }
+  /** Delete the directory. Returns bytes freed. Throws on failure. */
+  def cleanDir(dir: os.Path): Long =
+    val size = scanSize(dir)
+    os.remove.all(dir, ignoreErrors = false)
+    size
+
+  /** Format bytes as human-readable string (e.g. "8.1 MB", "432 KB", "0 B"). */
+  def humanReadable(bytes: Long): String =
+    bytes match
+      case b if b >= 1_000_000_000L => f"${b.toDouble / 1_000_000_000L}%.1f GB"
+      case b if b >= 1_000_000L      => f"${b.toDouble / 1_000_000L}%.1f MB"
+      case b if b >= 1_000L          => f"${b.toDouble / 1_000L}%.0f KB"
+      case b                         => s"$b B"
 }
