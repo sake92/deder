@@ -27,8 +27,12 @@ import ba.sake.deder.deps.{DepTree, given}
 import ba.sake.deder.testing.*
 import ba.sake.deder.testing.forked.ForkedTestOrchestrator
 import ba.sake.deder.testing.inmemory.InMemoryTestOrchestrator
+import ba.sake.deder.CacheStatsRegistry
 
-class CoreTasks() extends StrictLogging {
+class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) extends StrictLogging {
+
+  private val zincCompilersCache = ZincCompilersCache(cacheStatsRegistry)
+  private val inMemoryTestOrchestrator = InMemoryTestOrchestrator(cacheStatsRegistry)
 
   /** source folders */
   val sourcesTask = SourceFilesTask(
@@ -806,7 +810,7 @@ class CoreTasks() extends StrictLogging {
           }
       }
 
-      val zincResult = ZincCompilersCache
+      val zincResult = zincCompilersCache
         .get(scalaVersion, ctx.dependencyResolver)
         .compile(
           javaHome = javaHome.map(_.toNIO),
@@ -1098,7 +1102,7 @@ class CoreTasks() extends StrictLogging {
             case _                  => cpus
           }
           val testOptions = DederTestOptions(ctx.args)
-          val results = InMemoryTestOrchestrator.run(
+          val results = inMemoryTestOrchestrator.run(
             discoveredTests = discoveredTests,
             runtimeClasspath = runClasspath,
             testOptions = testOptions,
