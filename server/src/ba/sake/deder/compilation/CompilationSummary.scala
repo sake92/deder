@@ -9,6 +9,7 @@ case class CompilationSummary(
     totalErrors: Int,
     totalWarnings: Int,
     totalSourceCount: Int,
+    totalDurationMillis: Long,
     modules: Map[String, CompileModuleInfo]
 ) derives JsonRW
 
@@ -55,7 +56,7 @@ object CompilationSummary {
   }
 
   given Summarizable[CompileResult, CompilationSummary] with
-    def summarize(resultsMap: Seq[(String, CompileResult)], failures: Seq[ModuleFailure]): CompilationSummary = {
+    def summarize(resultsMap: Seq[(String, CompileResult)], failures: Seq[ModuleFailure], totalDuration: java.time.Duration): CompilationSummary = {
       val allResults = resultsMap.map(_._2)
       val modules = resultsMap.map { case (id, cr) =>
         id -> CompileModuleInfo(cr.errors, cr.warnings, cr.sourceCount)
@@ -66,6 +67,7 @@ object CompilationSummary {
         totalErrors = allResults.map(_.errors).sum,
         totalWarnings = allResults.map(_.warnings).sum,
         totalSourceCount = allResults.map(_.sourceCount).sum,
+        totalDurationMillis = totalDuration.toMillis(),
         modules = modules
       )
     }

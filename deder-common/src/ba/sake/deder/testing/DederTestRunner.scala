@@ -7,6 +7,7 @@ import java.util.concurrent.{ExecutionException, Executors, Future as JFuture}
 import scala.collection.mutable
 import sbt.testing.{Task as SbtTestTask, *}
 import ba.sake.deder.*
+import ba.sake.deder.toPrettyString
 import ba.sake.deder.testing.forked.{ForkRunnerHooks, ForkedTestEnvelope}
 
 class DederTestRunner(
@@ -294,10 +295,3 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
   }
 }
 
-extension (d: Duration) {
-  def toPrettyString: String =
-    d.toString
-      .substring(2)
-      .replaceAll("(\\d[HMS])(?!$)", "$1")
-      .toLowerCase()
-}

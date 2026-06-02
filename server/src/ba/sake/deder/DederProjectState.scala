@@ -16,6 +16,7 @@ import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
 import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
 import ba.sake.deder.plugin.{LoadedPlugin, PluginLoader, PluginLoaderApi}
+import ba.sake.deder.toPrettyString
 import ba.sake.tupson.JsonRW
 import ba.sake.deder.scalajs.ScalaJsTasks
 import ba.sake.deder.scalanative.ScalaNativeTasks
@@ -190,6 +191,7 @@ class DederProjectState(
         val isTaskSingleton = relevantModuleAndTasks.exists(_._2.task.singleton)
         if isTaskSingleton && relevantModuleIds.length > 1 then
           throw RuntimeException(s"Task '${taskName}' is singleton, cannot execute it on multiple modules at once")
+        val execStartNanos = System.nanoTime()
         val results = executeTasks(
           ctx.requestId,
           CallerType.Cli,
@@ -200,6 +202,7 @@ class DederProjectState(
           serverNotificationsLogger,
           useLastGood = useLastGood
         )
+        val totalDuration = Duration.ofNanos(System.nanoTime() - execStartNanos)
         // summarize across modules
         if results.nonEmpty then {
           val successes = results.collect { case s: TaskExecResult.Success => s }
@@ -222,12 +225,15 @@ class DederProjectState(
             val task = successes.head.taskInstance.task
             val moduleResults = successes.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.value)
             // Render cross-module summary in the chosen output format
-            val summary = task.summarizeValueUnsafe(moduleResults, failures)
+            val summary = task.summarizeValueUnsafe(moduleResults, failures, totalDuration)
             given JsonRW[Any] = task.summarizable.jsonRW.asInstanceOf[JsonRW[Any]]
             given PlainTextWritable[Any] = task.summarizable.plainTextW.asInstanceOf[PlainTextWritable[Any]]
             given MermaidWritable[Any] = task.summarizable.mermaidW.asInstanceOf[MermaidWritable[Any]]
             given DotWritable[Any] = task.summarizable.dotW.asInstanceOf[DotWritable[Any]]
-            val output = OutputFormat.render[Any](summary, ctx.outputFormat)
+            val rendered = OutputFormat.render[Any](summary, ctx.outputFormat)
+            val output = ctx.outputFormat match
+              case OutputFormat.PlainText => rendered + s"\nTotal time: ${totalDuration.toPrettyString}"
+              case _                      => rendered
             serverNotificationsLogger.add(ServerNotification.Output(output))
           }
         }
