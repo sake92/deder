@@ -1,5 +1,9 @@
 
 # Misc
+- fix docs flags..
+- stats for watched files??
+- custom ignore paths and maybe stats ??
+- show jdk version, server/client etc in web dash
 - show total time in summary
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - init like giter8, autoimport from sbt?
