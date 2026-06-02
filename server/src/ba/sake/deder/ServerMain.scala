@@ -6,8 +6,6 @@ import java.nio.channels.OverlappingFileLockException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 
-import java.util.concurrent.Semaphore
-
 import java.util as ju
 import scala.compiletime.uninitialized
 import scala.jdk.CollectionConverters.*
@@ -26,6 +24,7 @@ import ba.sake.deder.cli.DederCliServer
 import ba.sake.deder.bsp.DederBspProxyServer
 import ba.sake.deder.publish.PublishTasks
 import ba.sake.deder.graalvm.GraalVmNativeImageTasks
+import ba.sake.deder.config.ConfigParser
 
 object ServerMain extends StrictLogging {
 
@@ -78,12 +77,34 @@ object ServerMain extends StrictLogging {
     }
 
     val cfg = ServerProperties.from(props)
-    DederGlobals.setTestForkSemaphore(Runtime.getRuntime.availableProcessors())
     DederGlobals.setForkTestFlushIntervalMs(cfg.forkTestFlushIntervalMs)
     val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger]
     rootLogger.setLevel(Level.toLevel(cfg.logLevel))
 
     val watchDebounceMs = cfg.watchDebounceMillis
+
+    // Early parse of deder.pkl for boot-time project settings (bspEnabled, maxActiveCompilers, maxConcurrentTestForks).
+    // Fall back to sensible defaults if parsing fails — the server must always boot.
+    val cpus = Runtime.getRuntime.availableProcessors()
+    val (bspEnabled, maxActiveCompilers, maxConcurrentTestForks) =
+      if os.exists(projectRoot / "deder.pkl") && os.isFile(projectRoot / "deder.pkl") then
+        val parser = ConfigParser(writeJson = false)
+        parser.parse(projectRoot / "deder.pkl") match {
+          case Right(project) =>
+            // Java primitives are auto-unboxed to Scala types — no null possible
+            val bsp = project.bspEnabled
+            val compilers = if project.maxActiveCompilers <= 0 then cpus else project.maxActiveCompilers.toInt
+            val forks = if project.maxConcurrentTestForks <= 0 then cpus else project.maxConcurrentTestForks.toInt
+            (bsp, compilers, forks)
+          case Left(error) =>
+            logger.warn(s"Failed to parse deder.pkl for boot settings, using defaults: $error")
+            (true, cpus, cpus)
+        }
+      else
+        (true, cpus, cpus)
+
+    DederGlobals.setCompileSemaphore(maxActiveCompilers)
+    DederGlobals.setTestForkSemaphore(maxConcurrentTestForks)
 
     // TODO check if OTEL still works with virutal threads
     // Use the global OTEL instance for metrics.
@@ -214,7 +235,7 @@ object ServerMain extends StrictLogging {
     cliServerThread.start()
 
     // Platform thread — root accept loop keeping the JVM alive
-    if true then {
+    if bspEnabled then {
       bspProxyServer = DederBspProxyServer(coreTasks, runTasks, scalaJsTasks, scalaNativeTasks, projectState)
       val bspProxyServerThread = new Thread(() => bspProxyServer.nn.start(), "DederBspProxyServer")
       bspProxyServerThread.start()
@@ -294,9 +315,6 @@ object ServerMain extends StrictLogging {
     try { debounceThread.join(3000) }
     catch { case _: Exception => }
   }
-
-  private[deder] def newCompileSemaphore(cfg: ServerProperties): Semaphore =
-    new Semaphore(Runtime.getRuntime.availableProcessors())
 
   private def acquireServerLock(projectRoot: os.Path): Unit = {
     val serverLockFile = projectRoot / ".deder/server.lock"
