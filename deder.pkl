@@ -11,9 +11,6 @@ local const versions = new {
   scalaLogging = "3.9.5"
 }
 
-local const sonatypeRepo = new SonatypeCentralRepo {
-  id = "sonatype"
-}
 
 local const function pom(artId: String, artName: String) = new PomSettings {
   groupId = "ba.sake"
@@ -48,7 +45,6 @@ local const config = new JavaModule {
   }
   pomSettings = pom("deder-config", "Deder config")
   publish = true
-  publishTo = sonatypeRepo
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
 }
 
@@ -58,7 +54,6 @@ local const dederCommonModules =
     template = new {
       scalaVersion = scalaVer
       publish = true
-      publishTo = sonatypeRepo
       publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
       pomSettings = pom("deder-common", "Deder common")
       deps {
@@ -95,7 +90,6 @@ local const pluginApi = new ScalaModule {
   moduleDeps { config; dederCommonModules.main }
   pomSettings = pom("deder-plugin-api", "Deder plugin API")
   publish = true
-  publishTo = sonatypeRepo
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
   deps {
     "ba.sake::tupson:\(versions.tupson)"
