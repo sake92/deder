@@ -1,7 +1,6 @@
 package ba.sake.deder.cli
 
 import mainargs.*
-import ba.sake.deder.ServerNotification.LogLevel
 import ba.sake.deder.OutputFormat
 
 given TokensReader.Simple[LogLevel] with {

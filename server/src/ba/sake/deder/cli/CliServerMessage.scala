@@ -2,6 +2,7 @@ package ba.sake.deder.cli
 
 import ba.sake.deder.{ServerNotification, cli, DederGlobals}
 import ba.sake.tupson.JsonRW
+import ba.sake.deder.RequestContext
 
 enum LogLevel derives JsonRW:
   case ERROR, WARNING, INFO, DEBUG, TRACE
@@ -17,17 +18,26 @@ object CliServerMessage {
   def info(text: String): CliServerMessage.Log =
     log(text, LogLevel.INFO)
 
-  def log(text: String, level: LogLevel, moduleId: Option[String] = None): CliServerMessage.Log = {
-    val levelString = level.toString.toLowerCase
-    val coloredLevel = level match {
-      case cli.LogLevel.ERROR   => fansi.Color.Red(levelString)
-      case cli.LogLevel.WARNING => fansi.Color.Yellow(levelString)
-      case cli.LogLevel.INFO    => fansi.Color.Green(levelString)
-      case cli.LogLevel.DEBUG   => fansi.Color.LightGreen(levelString)
-      case cli.LogLevel.TRACE   => fansi.Color.LightGray(levelString)
+  def log(text: String, msgLevel: LogLevel, moduleId: Option[String] = None): CliServerMessage.Log = {
+    val msgLevelString = msgLevel.toString.toLowerCase
+    val msgLevelAnsi = msgLevel match {
+      case LogLevel.ERROR   => fansi.Color.Red(msgLevelString)
+      case LogLevel.WARNING => fansi.Color.Yellow(msgLevelString)
+      case LogLevel.INFO    => fansi.Color.Green(msgLevelString)
+      case LogLevel.DEBUG   => fansi.Color.LightGreen(msgLevelString)
+      case LogLevel.TRACE   => fansi.Color.LightGray(msgLevelString)
     }
-    val modulePrefix = moduleId.map(mod => fansi.Color.Cyan(s" [${mod}]")).getOrElse("")
-    CliServerMessage.Log(s"[${coloredLevel}]${modulePrefix} ${text}", level)
+    val showLevel = RequestContext.clientContext.get().exists(_.logLevel.ordinal >= LogLevel.DEBUG.ordinal)
+    val prefix = (showLevel, moduleId) match {
+      case (false, None) => ""
+      case (true, None)  => s"[${msgLevelAnsi}] "
+      case (false, Some(mod)) =>
+        "" + fansi.Color.Cyan(s"[${mod}] ")
+      case (true, Some(mod)) =>
+        val coloredMod = fansi.Color.Cyan(s"[${mod}]")
+        s"[${msgLevelAnsi}] ${coloredMod} "
+    }
+    CliServerMessage.Log(s"${prefix}${text}", msgLevel)
   }
 
   def fromServerNotification(sn: ServerNotification): Option[CliServerMessage] = sn match {
@@ -41,27 +51,21 @@ object CliServerMessage {
         case ServerNotification.LogLevel.DEBUG   => LogLevel.DEBUG
         case ServerNotification.LogLevel.TRACE   => LogLevel.TRACE
       }
-      Some(CliServerMessage.log(m.message, level, m.moduleId))
+      Some(log(m.message, level, m.moduleId))
     case tp: ServerNotification.TaskProgress =>
       None
     case cs: ServerNotification.CompileStarted =>
       None
     case cd: ServerNotification.CompileDiagnostic =>
-      val sev = cd.problem.severity() match
+      val level = cd.problem.severity() match
         case xsbti.Severity.Error => LogLevel.ERROR
         case xsbti.Severity.Warn  => LogLevel.WARNING
-        case _                     => LogLevel.INFO
-      val levelString = sev.toString.toLowerCase
-      val coloredLevel = sev match
-        case cli.LogLevel.ERROR   => fansi.Color.Red(levelString)
-        case cli.LogLevel.WARNING => fansi.Color.Yellow(levelString)
-        case _                    => fansi.Color.Green(levelString)
-      val modulePrefix = fansi.Color.Cyan(s" [${cd.moduleId}]")
+        case _                    => LogLevel.INFO
       val location = formatDiagnosticLocation(cd.problem)
       val text = location match
-        case Some(loc) => s"[${coloredLevel}]${modulePrefix} $loc: ${cd.problem.message()}"
-        case None      => s"[${coloredLevel}]${modulePrefix} ${cd.problem.message()}"
-      Some(CliServerMessage.Log(text, sev))
+        case Some(loc) => s"$loc: ${cd.problem.message()}"
+        case None      => cd.problem.message()
+      Some(log(text, level, Some(cd.moduleId)))
     case cs: ServerNotification.CompileFinished =>
       None
     case cf: ServerNotification.CompileFailed =>
@@ -79,8 +83,7 @@ object CliServerMessage {
       val f = srcOpt.get()
       val abs = os.Path(f.toPath.toAbsolutePath())
       val relPath =
-        if abs.startsWith(DederGlobals.projectRootDir) then
-          abs.relativeTo(DederGlobals.projectRootDir).toString()
+        if abs.startsWith(DederGlobals.projectRootDir) then abs.relativeTo(DederGlobals.projectRootDir).toString()
         else abs.toString()
       val line = pos.startLine().orElse(0)
       val col = pos.startColumn().orElse(0)

@@ -113,10 +113,11 @@ class DederProjectState(
             val coreTasksApi = CoreTasksApiAdapter(coreTasks, runTasks, publishTasks, graalvmNativeImageTasks)
             val scalaJsTasksApi = ScalaJsTasksApiAdapter(scalaJsTasks)
             val scalaNativeTasksApi = ScalaNativeTasksApiAdapter(scalaNativeTasks)
-            val pluginLoader = PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver, internals)
+            val pluginLoader =
+              PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver, internals)
             loadedPlugins = pluginLoader.load(loadedPlugins, configFile, newConfig).loadedPlugins
             internals.setLoadedPlugins(loadedPlugins.map(lp => LoadedPluginInfo(lp.plugin.id, lp.tasks.map(_.name))))
-            // TODO prepend plugin id to task name to avoid conflicts?
+            // TODO prepend plugin id to task name to avoid conflicts? e.g myplugin:compile ?
             val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?, ?]])
             val effectiveRegistry = TasksRegistry(baseTasks ++ pluginTasks)
             val tasksResolver = TasksResolver(newConfig, effectiveRegistry)
@@ -145,7 +146,7 @@ class DederProjectState(
       useLastGood: Boolean = false,
       startWatch: Boolean = false,
       exitOnEnd: Boolean = true,
-      watch: Boolean = false,
+      watch: Boolean = false
   ): Unit = try {
     val ctx = RequestContext.cliContext
     val state = readState(useLastGood) match
@@ -197,7 +198,7 @@ class DederProjectState(
           args,
           watch = watch,
           serverNotificationsLogger,
-          useLastGood = useLastGood,
+          useLastGood = useLastGood
         )
         // summarize across modules
         if results.nonEmpty then {
@@ -210,7 +211,9 @@ class DederProjectState(
               ModuleFailure(f.taskInstance.moduleId, f.error, None)
             case s: TaskExecResult.Skipped =>
               serverNotificationsLogger.add(
-                ServerNotification.logError(s"${s.taskInstance.moduleId}: Skipped — ${s.because.taskInstance.moduleId} failed: ${s.because.error}")
+                ServerNotification.logError(
+                  s"${s.taskInstance.moduleId}: Skipped — ${s.because.taskInstance.moduleId} failed: ${s.because.error}"
+                )
               )
               ModuleFailure(s.taskInstance.moduleId, s.because.error, Some(s.because.taskInstance.moduleId))
           }
@@ -253,7 +256,7 @@ class DederProjectState(
         if exitOnEnd then {
           val allSuccessful = results.forall {
             case TaskExecResult.Success(ti, value, _) => ti.task.isResultSuccessfulUnsafe(value)
-            case _ => false // Failure and Skipped are always unsuccessful
+            case _                                    => false // Failure and Skipped are always unsuccessful
           }
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = allSuccessful))
         }
@@ -271,7 +274,7 @@ class DederProjectState(
       serverNotificationsLogger: ServerNotificationsLogger,
       watch: Boolean = false,
       useLastGood: Boolean = false,
-      requestId: String = null,
+      requestId: Option[String] = None,
       callerType: CallerType = CallerType.Cli
   ): (res: T, changed: Boolean) = {
     val span = OTEL.TRACER
@@ -281,7 +284,7 @@ class DederProjectState(
       .startSpan()
     try {
       Using.resource(span.makeCurrent()) { scope =>
-        val reqId = if requestId != null then requestId else UUID.randomUUID().toString
+        val reqId = requestId.getOrElse(UUID.randomUUID().toString)
         val resOpt =
           executeTasks(
             reqId,
@@ -293,7 +296,7 @@ class DederProjectState(
             serverNotificationsLogger,
             useLastGood
           )
-        
+
         val res = resOpt match {
           case Seq(singleResult) => singleResult
           case Seq() =>
@@ -326,7 +329,7 @@ class DederProjectState(
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
-      useLastGood: Boolean,
+      useLastGood: Boolean
   ): Seq[TaskExecResult] =
     val requestStartNanos = System.nanoTime()
     val requestStartInstant = java.time.Instant.now()
@@ -357,10 +360,9 @@ class DederProjectState(
             if !acquired then
               throw TaskLockTimeoutException(
                 s"Timed out waiting for lock on task '${taskInstance.id}' after ${taskLockTimeoutSeconds}s. " +
-                s"The lock is held by another in-flight request. Consider increasing 'taskLockTimeoutSeconds' in .deder/server.properties."
+                  s"The lock is held by another in-flight request. Consider increasing 'taskLockTimeoutSeconds' in .deder/server.properties."
               )
-          else
-            taskInstance.lock.lock()
+          else taskInstance.lock.lock()
           acquiredLocks += taskInstance
         }
         DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
@@ -440,10 +442,9 @@ class DederProjectState(
                   if !acquired then
                     throw TaskLockTimeoutException(
                       s"Timed out waiting for lock on task '${taskInstance.id}' while cleaning after ${taskLockTimeoutSeconds}s. " +
-                      s"The lock is held by another in-flight request."
+                        s"The lock is held by another in-flight request."
                     )
-                else
-                  taskInstance.lock.lock()
+                else taskInstance.lock.lock()
                 acquiredCleanLocks += taskInstance
               }
               DederCleaner.cleanModules(moduleIds)
@@ -498,10 +499,9 @@ class DederProjectState(
                       if !acquired then
                         throw TaskLockTimeoutException(
                           s"Timed out waiting for lock on task '${taskInstance.id}' while cleaning after ${taskLockTimeoutSeconds}s. " +
-                          s"The lock is held by another in-flight request."
+                            s"The lock is held by another in-flight request."
                         )
-                    else
-                      taskInstance.lock.lock()
+                    else taskInstance.lock.lock()
                     acquiredCleanTaskLocks += taskInstance
                   }
                   taskInstances.forall { (moduleId, taskInstance) =>
@@ -516,28 +516,31 @@ class DederProjectState(
   }
 
   private def scheduleInactiveShutdownChecker(): Unit = {
-    Thread.ofVirtual().name("inactivity-checker").start(() => {
-      var running = true
-      while (running && !shutdownStarted) {
-        try {
-          Thread.sleep(TimeUnit.MINUTES.toMillis(1))
-          if (inFlightRequests.get() == 0) {
-            val now = Instant.now()
-            val lastEnded = lastRequestEndedAt.get()
-            val inactiveDuration = Duration.between(lastEnded, now)
-            if (inactiveDuration.compareTo(maxInactiveDuration) > 0) {
-              logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
-              shutdown()
-              running = false
+    Thread
+      .ofVirtual()
+      .name("inactivity-checker")
+      .start(() => {
+        var running = true
+        while (running && !shutdownStarted) {
+          try {
+            Thread.sleep(TimeUnit.MINUTES.toMillis(1))
+            if (inFlightRequests.get() == 0) {
+              val now = Instant.now()
+              val lastEnded = lastRequestEndedAt.get()
+              val inactiveDuration = Duration.between(lastEnded, now)
+              if (inactiveDuration.compareTo(maxInactiveDuration) > 0) {
+                logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
+                shutdown()
+                running = false
+              }
             }
+          } catch {
+            case _: InterruptedException => running = false
+            case NonFatal(e) =>
+              logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
           }
-        } catch {
-          case _: InterruptedException => running = false
-          case NonFatal(e) =>
-            logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
         }
-      }
-    })
+      })
   }
 
   def triggerFileWatchedTasks(changedPaths: Set[os.Path]): Unit = {
@@ -581,32 +584,34 @@ class DederProjectState(
       }
       if affected then {
         val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
-        Thread.ofVirtual().start(() =>
-          try
-            supervised {
-              RequestContext.clientContext.supervisedWhere(Some(ctx)) {
-                watchedTask.serverNotificationsLogger.add(
-                  ServerNotification.logInfo(
-                    s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-                    watchedTask.taskInstance.moduleId
+        Thread
+          .ofVirtual()
+          .start(() =>
+            try
+              supervised {
+                RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+                  watchedTask.serverNotificationsLogger.add(
+                    ServerNotification.logInfo(
+                      s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                      watchedTask.taskInstance.moduleId
+                    )
                   )
-                )
-                executeTasks(
-                  ctx.requestId,
-                  CallerType.Cli,
-                  Seq(watchedTask.taskInstance.moduleId),
-                  watchedTask.taskInstance.task.name,
-                  watchedTask.args,
-                  true, // tell client we are in watch mode
-                  watchedTask.serverNotificationsLogger,
-                  watchedTask.useLastGood
-                )
+                  executeTasks(
+                    ctx.requestId,
+                    CallerType.Cli,
+                    Seq(watchedTask.taskInstance.moduleId),
+                    watchedTask.taskInstance.task.name,
+                    watchedTask.args,
+                    true, // tell client we are in watch mode
+                    watchedTask.serverNotificationsLogger,
+                    watchedTask.useLastGood
+                  )
+                }
               }
-            }
-          catch
-            case NonFatal(e) =>
-              logger.warn(s"Watch rerun for ${watchedTask.taskInstance.id} failed: ${e.getMessage}")
-        )
+            catch
+              case NonFatal(e) =>
+                logger.warn(s"Watch rerun for ${watchedTask.taskInstance.id} failed: ${e.getMessage}")
+          )
       }
     }
   }
@@ -644,32 +649,34 @@ class DederProjectState(
           s"Config value dependencies of watched task ${watchedTask.taskInstance.id} have changed, re-executing..."
         )
         val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
-        Thread.ofVirtual().start(() =>
-          try
-            supervised {
-              RequestContext.clientContext.supervisedWhere(Some(ctx)) {
-                watchedTask.serverNotificationsLogger.add(
-                  ServerNotification.logInfo(
-                    s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-                    watchedTask.taskInstance.moduleId
+        Thread
+          .ofVirtual()
+          .start(() =>
+            try
+              supervised {
+                RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+                  watchedTask.serverNotificationsLogger.add(
+                    ServerNotification.logInfo(
+                      s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                      watchedTask.taskInstance.moduleId
+                    )
                   )
-                )
-                executeCLI(
-                  Seq(watchedTask.taskInstance.moduleId),
-                  watchedTask.taskInstance.task.name,
-                  watchedTask.args,
-                  watchedTask.serverNotificationsLogger,
-                  watchedTask.useLastGood,
-                  startWatch = false,
-                  exitOnEnd = false,
-                  watch = true,
-                )
+                  executeCLI(
+                    Seq(watchedTask.taskInstance.moduleId),
+                    watchedTask.taskInstance.task.name,
+                    watchedTask.args,
+                    watchedTask.serverNotificationsLogger,
+                    watchedTask.useLastGood,
+                    startWatch = false,
+                    exitOnEnd = false,
+                    watch = true
+                  )
+                }
               }
-            }
-          catch
-            case NonFatal(e) =>
-              logger.warn(s"Watch rerun for ${watchedTask.taskInstance.id} failed: ${e.getMessage}")
-        )
+            catch
+              case NonFatal(e) =>
+                logger.warn(s"Watch rerun for ${watchedTask.taskInstance.id} failed: ${e.getMessage}")
+          )
       }
     }
   }

@@ -15,7 +15,8 @@ class CliClientSocketReader(
     clientChannel: SocketChannel,
     clientId: String,
     serverMessages: BlockingQueue[CliServerMessage]
-) extends Runnable, StrictLogging {
+) extends Runnable,
+      StrictLogging {
   override def run(): Unit = {
     try clientRead(clientChannel, clientId, serverMessages)
     catch {
@@ -49,23 +50,25 @@ class CliClientSocketReader(
       val requestId = message.getRequestId
       val ctx = cliClientContext(clientId, requestId, message)
 
-      Thread.ofVirtual().start(() =>
-        supervised {
-          try {
-            RequestContext.clientContext.supervisedWhere(Some(ctx)) {
-              handler.handle(message)
+      Thread
+        .ofVirtual()
+        .start(() =>
+          supervised {
+            try {
+              RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+                handler.handle(message)
+              }
+            } catch {
+              case e: IOException =>
+                // probably client disconnected... but log just in case..
+                logger.error(s"IO error processing message from client $clientId, probably client disconnected", e)
+              case e: Throwable =>
+                logger.error(s"Unhandled error processing message from client $clientId", e)
+                serverMessages.put(CliServerMessage.Log(s"Internal error: ${e.getMessage}", LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
             }
-          } catch {
-            case e: IOException =>
-              // probably client disconnected... but log just in case..
-              logger.error(s"IO error processing message from client $clientId, probably client disconnected", e)
-            case e: Throwable =>
-              logger.error(s"Unhandled error processing message from client $clientId", e)
-              serverMessages.put(CliServerMessage.Log(s"Internal error: ${e.getMessage}", LogLevel.ERROR))
-              serverMessages.put(CliServerMessage.Exit(1))
           }
-        }
-      )
+        )
       // run in another thread so we can cancel it if needed
     }
   }
@@ -73,12 +76,13 @@ class CliClientSocketReader(
   private def cliClientContext(clientId: String, requestId: String, message: CliClientMessage): CliClientContext =
     message match {
       case m: CliClientMessage.Exec =>
-        val outputFormat = mainargs.Parser[DederCliExecOptions]
+        val opts = mainargs
+          .Parser[DederCliExecOptions]
           .constructEither(m.args, autoPrintHelpAndExit = None)
           .toOption
-          .map(_.format)
-          .getOrElse(OutputFormat.PlainText)
-        CliClientContext(clientId, requestId, m.envVars, outputFormat)
+        val outputFormat = opts.map(_.format).getOrElse(OutputFormat.PlainText)
+        val logLevel = opts.map(_.logLevel).getOrElse(cli.LogLevel.INFO)
+        CliClientContext(clientId, requestId, m.envVars, outputFormat, logLevel)
       case _ =>
         CliClientContext(clientId, requestId)
     }
