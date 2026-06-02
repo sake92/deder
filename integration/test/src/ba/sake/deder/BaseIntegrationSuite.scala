@@ -25,20 +25,37 @@ trait BaseIntegrationSuite extends munit.FunSuite {
     os.write.over(tempDir / "deder.pkl", tweakedLines.mkString("\n"), createFolders = true)
   }
 
+  /** Stages a test project and writes server.properties, returning the project path. The
+    * caller is responsible for server lifecycle (shutdown in afterAll, etc.). Use this for
+    * suites where many tests share one server to avoid per-test JVM startup overhead.
+    *
+    * @param dirSuffix appended to the temp directory name for uniqueness; defaults to
+    *                  currentTimeMillis (sufficient for per-suite use). Per-test callers
+    *                  should pass System.nanoTime() for higher-resolution uniqueness.
+    */
+  protected def stagedServerProject(
+      testProjectPath: os.RelPath,
+      extraProperties: Map[String, String] = Map.empty,
+      dirSuffix: String = System.currentTimeMillis().toString
+  ): os.Path = {
+    val tempDir = os.pwd / "tmp" / s"${testProjectPath.last}-$dirSuffix"
+    stageTestProject(testProjectPath, tempDir)
+    val allServerProperties = extraProperties ++ Map(
+      "localPath" -> dederServerPath,
+      "testRunnerLocalPath" -> dederTestRunnerPath,
+      "maxConnectSeconds" -> "300"
+    )
+    val serverPropertiesContent = allServerProperties.map((k, v) => s"$k=$v").mkString("\n") + "\n"
+    os.write.over(tempDir / ".deder/server.properties", serverPropertiesContent, createFolders = true)
+    tempDir
+  }
+
   def withTestProject(
       testProjectPath: os.RelPath,
       serverProperties: Map[String, String] = Map.empty
   )(testCode: os.Path => Unit): Unit = {
-    val tempDir = os.pwd / "tmp" / s"${testProjectPath.last}-${System.nanoTime()}"
+    val tempDir = stagedServerProject(testProjectPath, serverProperties, dirSuffix = System.nanoTime().toString)
     try {
-      stageTestProject(testProjectPath, tempDir)
-      val allServerProperties = serverProperties ++ Map(
-        "localPath" -> dederServerPath,
-        "testRunnerLocalPath" -> dederTestRunnerPath,
-        "maxConnectSeconds" -> "300"
-      )
-      val serverPropertiesContent = allServerProperties.map((k, v) => s"${k}=${v}").mkString("\n") + "\n"
-      os.write.over(tempDir / ".deder/server.properties", serverPropertiesContent, createFolders = true)
       testCode(tempDir)
     } finally {
       executeDederCommand(tempDir, "shutdown")

@@ -4,27 +4,24 @@ import scala.concurrent.duration.*
 
 class CachedTaskSuite extends BaseIntegrationSuite {
 
-  test("cached tasks: first run should compute results") {
+  test("cached tasks: first run computes, second run uses cache") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
-      val res = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
-      val logLines = os.read.lines(projectPath / ".deder/logs/server.log")
+      // First run — should compute the result
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
+      val logAfterFirst = os.read.lines(projectPath / ".deder/logs/server.log")
       assert(
-        logLines.exists(_.contains("Computed result for compileClasspath")),
+        logAfterFirst.exists(_.contains("Computed result for compileClasspath")),
         "Expected 'Computed result for compileClasspath' in log on first run"
       )
       assert(
-        !logLines.exists(_.contains("Using cached result for compileClasspath")),
+        !logAfterFirst.exists(_.contains("Using cached result for compileClasspath")),
         "Did not expect 'Using cached result for compileClasspath' in log on first run"
       )
-    }
-  }
 
-  test("cached tasks: second run should use cached results") {
-    withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
+      // Second run — should use the cached result
+      val offsetAfterFirst = serverLogOffset(projectPath)
       executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
-      val offsetAfterFirstRun = serverLogOffset(projectPath)
-      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
-      val newLines = readNewServerLogLines(projectPath, offsetAfterFirstRun)
+      val newLines = readNewServerLogLines(projectPath, offsetAfterFirst)
       assert(
         newLines.exists(_.contains("Using cached result for compileClasspath")),
         "Expected 'Using cached result for compileClasspath' in second run log"
