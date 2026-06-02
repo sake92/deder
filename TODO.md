@@ -13,7 +13,7 @@
 - sbt-updates for deps
 - report core/build issues to metals: e.g. when dep doesnt exist
 - run pkldoc on each tag, and publish to ghpages https://pkl-lang.org/main/current/pkl-doc/index.html
-- move some settings from server.properties to deder.pkl like maxConcurrentTestForks?
+- move some settings from server.properties to deder.pkl like maxConcurrentTestForks? or remove maxConcurrentTestForks
 
 
 
