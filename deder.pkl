@@ -11,7 +11,6 @@ local const versions = new {
   scalaLogging = "3.9.5"
 }
 
-
 local const function pom(artId: String, artName: String) = new PomSettings {
   groupId = "ba.sake"
   artifactId = artId
@@ -187,11 +186,12 @@ local const integrationTest = new ScalaTestModule {
   deps {
     "org.scalameta::munit:1.2.1"
   }
-  junitXmlReport {
-    enabled = true
-  }
+  maxTestForks = 16
   forkEnv {
     ["DEDER_PLUGIN_API_VERSION"] = "it-test-version"
+  }
+  junitXmlReport {
+    enabled = true
   }
 }
 
