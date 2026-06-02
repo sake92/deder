@@ -2,13 +2,16 @@ package ba.sake.deder
 
 import ox.ForkLocal
 
-object RequestContext {
-  val clientContext: ForkLocal[Option[CliClientContext]] = ForkLocal(None)
+case class RequestContext(
+    clientId: String = "unknown",
+    requestId: String = scala.util.Random.alphanumeric.take(8).mkString,
+    envVars: Map[String, String] = Map.empty,
+    outputFormat: OutputFormat = OutputFormat.PlainText,
+    logLevel: cli.LogLevel = cli.LogLevel.INFO
+)
 
-  /** Convenience accessor for CLI request context. Throws if no context is set. */
-  def cliContext: CliClientContext = clientContext.get().getOrElse(
-    throw new IllegalStateException("No CLI client context available on the current virtual thread")
-  )
+object RequestContext {
+  val current: ForkLocal[RequestContext] = ForkLocal(RequestContext())
 
   // BSP-only; stays ThreadLocal (not on CLI path)
   val traceparent: ThreadLocal[String] = new ThreadLocal()

@@ -149,7 +149,7 @@ class DederProjectState(
       exitOnEnd: Boolean = true,
       watch: Boolean = false
   ): Unit = try {
-    val ctx = RequestContext.cliContext
+    val ctx = RequestContext.current.get()
     val state = readState(useLastGood) match
       case Left(err) => throw TaskEvaluationException(s"Project state is not available: ${err}")
       case Right(s)  => s
@@ -595,7 +595,7 @@ class DederProjectState(
           .start(() =>
             try
               supervised {
-                RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+                RequestContext.current.supervisedWhere(ctx) {
                   watchedTask.serverNotificationsLogger.add(
                     ServerNotification.logInfo(
                       s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
@@ -660,7 +660,7 @@ class DederProjectState(
           .start(() =>
             try
               supervised {
-                RequestContext.clientContext.supervisedWhere(Some(ctx)) {
+                RequestContext.current.supervisedWhere(ctx) {
                   watchedTask.serverNotificationsLogger.add(
                     ServerNotification.logInfo(
                       s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
@@ -750,7 +750,7 @@ case class DederProjectStateData(
 )
 
 case class WatchedTaskData(
-    ctx: CliClientContext,
+    ctx: RequestContext,
     taskInstance: TaskInstance,
     args: Seq[String],
     serverNotificationsLogger: ServerNotificationsLogger,

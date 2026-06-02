@@ -7,6 +7,7 @@ rule javax.** javax.@1
 rule scala.** scala.@1
 rule sun.** sun.@1
 rule jdk.** jdk.@1
+rule org.apache.commons.codec.** shaded.org.apache.commons.codec.@1
 
 # Keep sbt test-interface unshaded — both the test-runner and test
 # frameworks (munit etc.) must agree on the same sbt.testing.*

@@ -503,7 +503,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
         else
           None
 
-        val clientEnv = RequestContext.clientContext.get().map(_.envVars).getOrElse(Map.empty)
+        val clientEnv = RequestContext.current.get().envVars
 
         val creds = CredentialsResolver.resolve(publishTo, credentialsOpt, clientEnv, sys.env)
 
