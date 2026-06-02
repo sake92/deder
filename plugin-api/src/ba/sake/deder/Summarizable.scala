@@ -1,5 +1,6 @@
 package ba.sake.deder
 
+import java.time.Duration
 import ba.sake.tupson.JsonRW
 
 case class ModuleFailure(moduleId: String, error: String, causedBy: Option[String]) derives JsonRW
@@ -11,10 +12,10 @@ trait Summarizable[T, S](using
     val mermaidW: MermaidWritable[S],
     val dotW: DotWritable[S]
 ):
-  def summarize(results: Seq[(String, T)], failures: Seq[ModuleFailure]): S
+  def summarize(results: Seq[(String, T)], failures: Seq[ModuleFailure], totalDuration: Duration): S
 
 /** Default result wrapper for multi-module task execution. */
-case class MultiModuleResults[T](results: Map[String, T], failures: Seq[ModuleFailure]) derives JsonRW
+case class MultiModuleResults[T](results: Map[String, T], failures: Seq[ModuleFailure], totalDurationMillis: Long) derives JsonRW
 
 object MultiModuleResults:
   given [T](using ptw: PlainTextWritable[T]): PlainTextWritable[MultiModuleResults[T]] with
@@ -36,5 +37,5 @@ object MultiModuleResults:
       Seq(successSection, failureBlock).filter(_.nonEmpty).mkString("\n")
 
   given [T: JsonRW: PlainTextWritable: MermaidWritable: DotWritable]: Summarizable[T, MultiModuleResults[T]] with
-    def summarize(results: Seq[(String, T)], failures: Seq[ModuleFailure]): MultiModuleResults[T] =
-      MultiModuleResults(results.toMap, failures)
+    def summarize(results: Seq[(String, T)], failures: Seq[ModuleFailure], totalDuration: Duration): MultiModuleResults[T] =
+      MultiModuleResults(results.toMap, failures, totalDuration.toMillis())
