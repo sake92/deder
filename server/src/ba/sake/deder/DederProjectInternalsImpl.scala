@@ -18,7 +18,8 @@ class DederProjectInternalsImpl private (
     private val taskAccumulators: ConcurrentHashMap[String, TaskStatsAccumulator],
     private val totalServed: AtomicLong,
     private val totalErrCount: AtomicLong,
-    private val meter: Meter
+    private val meter: Meter,
+    private val cacheStatsRegistry: CacheStatsRegistry
 ) extends DederProjectInternals, StrictLogging:
 
   logger.info(s"DederProjectInternals initialized")
@@ -71,6 +72,11 @@ class DederProjectInternalsImpl private (
   override def serverUptime: Duration =
     Duration.ofMillis(System.currentTimeMillis() - startTime.toEpochMilli)
 
+  private[deder] def registry: CacheStatsRegistry = cacheStatsRegistry
+
+  override def inMemoryCachesStats: Map[String, InMemCacheStats] =
+    cacheStatsRegistry.getAllStats
+
   // -- Write methods --
 
   private[deder] def setLoadedPlugins(plugins: Seq[LoadedPluginInfo]): Unit =
@@ -121,7 +127,7 @@ class DederProjectInternalsImpl private (
     taskDurationHistogram.record(duration.toMillis, attrs)
 
 object DederProjectInternalsImpl:
-  def apply(meter: Meter): DederProjectInternalsImpl =
+  def apply(meter: Meter, cacheStatsRegistry: CacheStatsRegistry): DederProjectInternalsImpl =
     new DederProjectInternalsImpl(
       startTime = Instant.now(),
       currentReqs = new ConcurrentHashMap[String, LiveRequest](),
@@ -130,7 +136,8 @@ object DederProjectInternalsImpl:
       taskAccumulators = new ConcurrentHashMap[String, TaskStatsAccumulator](),
       totalServed = new AtomicLong(0),
       totalErrCount = new AtomicLong(0),
-      meter = meter
+      meter = meter,
+      cacheStatsRegistry = cacheStatsRegistry
     )
 
 private class TaskStatsAccumulator(sampleCapacity: Int):
