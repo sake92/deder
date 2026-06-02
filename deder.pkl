@@ -1,4 +1,4 @@
-amends "https://sake92.github.io/deder/config/v0.14.1/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/v0.12.0/DederProject.pkl"
 
 //amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
@@ -52,18 +52,21 @@ local const config = new JavaModule {
   publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
 }
 
-local const testCommonModules =
+local const dederCommonModules =
   new CreateScalaModules {
-    root = "test-common"
+    root = "deder-common"
     template = new {
       scalaVersion = scalaVer
-      publish = false
-      moduleDeps { pluginApi }
+      publish = true
+      publishTo = sonatypeRepo
+      publishLocalTo = read?("env:DEDER_TMP_M2_REPO")
+      pomSettings = pom("deder-common", "Deder common")
       deps {
         "ba.sake::tupson:\(versions.tupson)"
         "com.lihaoyi::os-lib:\(versions.osLib)"
         "org.scala-sbt:test-interface:1.0"
         "com.lihaoyi::fansi:0.5.1"
+        "commons-codec:commons-codec:\(versions.commonsCodec)"
       }
     }
     testTemplate = (template.asTest()) {
@@ -80,7 +83,7 @@ local const testRunner = new ScalaModule {
   id = "test-runner"
   scalaVersion = scalaVer
   publish = false
-  moduleDeps { testCommonModules.main }
+  moduleDeps { dederCommonModules.main }
   mainClass = "ba.sake.deder.testing.forked.ForkedTestMain"
   shadeRulesFile = "shade.rules"
 }
@@ -89,7 +92,7 @@ local const pluginApi = new ScalaModule {
   id = "plugin-api"
   root = "plugin-api"
   scalaVersion = scalaVer
-  moduleDeps { config }
+  moduleDeps { config; dederCommonModules.main }
   pomSettings = pom("deder-plugin-api", "Deder plugin API")
   publish = true
   publishTo = sonatypeRepo
@@ -97,13 +100,11 @@ local const pluginApi = new ScalaModule {
   deps {
     "ba.sake::tupson:\(versions.tupson)"
     "com.lihaoyi::os-lib:\(versions.osLib)"
-    "commons-codec:commons-codec:\(versions.commonsCodec)"
     "com.typesafe.scala-logging::scala-logging:\(versions.scalaLogging)"
     "ch.qos.logback:logback-classic:1.5.23"
     "io.get-coursier::dependency:0.3.2"
     "io.get-coursier::dependency-interface:0.3.2"
     "io.opentelemetry:opentelemetry-api:1.58.0"
-    "org.scala-sbt:test-interface:1.0"
   }
 }
 
@@ -113,7 +114,7 @@ local const serverModules =
     template = new ScalaModule {
       scalaVersion = scalaVer
       publish = false
-      moduleDeps { config; testCommonModules.main; pluginApi }
+      moduleDeps { config; dederCommonModules.main; pluginApi }
       mainClass = "ba.sake.deder.ServerMain"
       scalacOptions {
         "-Yretain-trees"
@@ -203,7 +204,7 @@ local const integrationTest = new ScalaTestModule {
 modules {
   config
   pluginApi
-  ...testCommonModules.all
+  ...dederCommonModules.all
   testRunner
   ...serverModules.all
   client

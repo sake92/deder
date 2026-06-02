@@ -1055,7 +1055,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
             case _ => (Map.empty, cpus, cpus)
           }
           val testOptions = DederTestOptions(ctx.args)
-          val clientEnv = RequestContext.clientContext.get().map(_.envVars).getOrElse(Map.empty)
+          val clientEnv = RequestContext.current.get().envVars
           val mergedEnv = clientEnv ++ forkEnv // forkEnv wins on conflict
           val flushInterval = DederGlobals.forkTestFlushIntervalMs
           val forkedRun = ForkedTestOrchestrator.run(

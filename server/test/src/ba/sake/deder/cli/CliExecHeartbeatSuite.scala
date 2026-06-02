@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters.*
 
 import ox.*
-import ba.sake.deder.{CliClientContext, OutputFormat, RequestContext, ServerNotification}
+import ba.sake.deder.{OutputFormat, RequestContext, ServerNotification}
 
 class CliExecHeartbeatSuite extends munit.FunSuite {
 
@@ -31,17 +31,17 @@ class CliExecHeartbeatSuite extends munit.FunSuite {
 
     visibleNotifications.foreach { notification =>
       withHeartbeat { (clock, emitted, heartbeat) =>
-          clock.awaitSleepers(1)
-          clock.advanceBy(Duration.ofSeconds(59))
-          heartbeat.recordServerNotification(notification)
-          clock.advanceBy(Duration.ofSeconds(59))
-          clock.awaitSleepCount(2)
-          assertNoHeartbeat(emitted)
+        clock.awaitSleepers(1)
+        clock.advanceBy(Duration.ofSeconds(59))
+        heartbeat.recordServerNotification(notification)
+        clock.advanceBy(Duration.ofSeconds(59))
+        clock.awaitSleepCount(2)
+        assertNoHeartbeat(emitted)
 
-          clock.advanceBy(Duration.ofSeconds(1))
-          eventually() {
-            assertEquals(heartbeatLogs(emitted).map(_.level), Seq(LogLevel.INFO))
-          }
+        clock.advanceBy(Duration.ofSeconds(1))
+        eventually() {
+          assertEquals(heartbeatLogs(emitted).map(_.level), Seq(LogLevel.INFO))
+        }
       }
     }
   }
@@ -56,14 +56,14 @@ class CliExecHeartbeatSuite extends munit.FunSuite {
 
     hiddenNotifications.foreach { notification =>
       withHeartbeat { (clock, emitted, heartbeat) =>
-          clock.awaitSleepers(1)
-          clock.advanceBy(Duration.ofSeconds(59))
-          heartbeat.recordServerNotification(notification)
-          clock.advanceBy(Duration.ofSeconds(1))
+        clock.awaitSleepers(1)
+        clock.advanceBy(Duration.ofSeconds(59))
+        heartbeat.recordServerNotification(notification)
+        clock.advanceBy(Duration.ofSeconds(1))
 
-          eventually() {
-            assertEquals(heartbeatLogs(emitted).map(_.level), Seq(LogLevel.INFO))
-          }
+        eventually() {
+          assertEquals(heartbeatLogs(emitted).map(_.level), Seq(LogLevel.INFO))
+        }
       }
     }
   }
@@ -93,7 +93,9 @@ class CliExecHeartbeatSuite extends munit.FunSuite {
       autoClose: Boolean
   )(testCode: (ManualClock, ConcurrentLinkedQueue[CliServerMessage], CliExecHeartbeat) => Unit): Unit = {
     supervised {
-      RequestContext.clientContext.supervisedWhere(Some(CliClientContext("client-1", "request-1", outputFormat = OutputFormat.Json))) {
+      RequestContext.current.supervisedWhere(
+        RequestContext("client-1", "request-1", outputFormat = OutputFormat.Json)
+      ) {
         val clock = new ManualClock()
         val emitted = new ConcurrentLinkedQueue[CliServerMessage]()
         val heartbeat = new CliExecHeartbeat(
@@ -148,8 +150,7 @@ class CliExecHeartbeatSuite extends munit.FunSuite {
 
       try
         lock.synchronized {
-          while current.isBefore(deadline) do
-            lock.wait()
+          while current.isBefore(deadline) do lock.wait()
         }
       finally
         lock.synchronized {

@@ -64,7 +64,7 @@ class ConcurrencySuite extends munit.FunSuite {
     val clientExecutorService = java.util.concurrent.Executors.newFixedThreadPool(32)
     val clientFutures = (1 to clientsCount).map { _ =>
       clientExecutorService.submit(() => {
-        val ctx = CliClientContext(clientId = UUID.randomUUID().toString, requestId = UUID.randomUUID().toString)
+        val ctx = RequestContext(clientId = UUID.randomUUID().toString, requestId = UUID.randomUUID().toString)
         state.executeTasks(ctx.requestId, CallerType.Cli, Seq("common"), "task1", Seq.empty, false, serverNotificationsLogger, false)
       })
     }
@@ -119,7 +119,7 @@ class ConcurrencySuite extends munit.FunSuite {
       clientExecutorService.submit(() => {
         // half of the clients always call "task2", the other half random tasks
         val taskName = if i % 2 == 0 then "task2" else taskNames(Random.nextInt(taskNames.length))
-        val ctx = CliClientContext(clientId = UUID.randomUUID().toString, requestId = UUID.randomUUID().toString)
+        val ctx = RequestContext(clientId = UUID.randomUUID().toString, requestId = UUID.randomUUID().toString)
         state.executeTasks(ctx.requestId, CallerType.Cli, Seq("common"), taskName, Seq.empty, false, serverNotificationsLogger, false)
       })
     }
