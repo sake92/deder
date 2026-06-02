@@ -34,8 +34,10 @@ class SbtImporter(
     val exportBuildStructurePluginSource =
       s"""addSbtPlugin("ba.sake" % "sbt-build-extract" % "$sbtExportBuildVersion")
          |libraryDependencies += "ba.sake" %% "sbt-build-extract-core" % "$sbtExportBuildVersion"
+         |ThisBuild / libraryDependencySchemes += "com.lihaoyi" % "upickle" % VersionScheme.Always
          |""".stripMargin
     val exportBuildStructurePluginPath = os.pwd / "project/exportBuildStructure.sbt"
+    os.makeDir.all(exportBuildStructurePluginPath / os.up)
     os.write.over(exportBuildStructurePluginPath, exportBuildStructurePluginSource)
     try {
       val exitCode = runSbtExportCommand(sbtCmd)
