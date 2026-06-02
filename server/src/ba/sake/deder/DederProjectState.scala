@@ -107,7 +107,7 @@ class DederProjectState(
                   logger.warn(s"Invalid repository configuration: ${e.getMessage}")
                   current = Left(e.getMessage)
                   return
-            val dependencyResolver = new DependencyResolver(assembledRepos)
+            val dependencyResolver = new DependencyResolver(assembledRepos, internals.registry)
 
             // Load plugin tasks before TasksResolver so they are included in the execution graph.
             // Plugin tasks are kept separately and the effective registry is rebuilt per reload.

@@ -11,10 +11,11 @@ import ba.sake.deder.testing.*
   * and shared across modules with identical classpaths. Entries expire after 5 minutes of inactivity
   * and are closed on eviction via the removal listener.
   */
-object InMemoryTestOrchestrator {
+class InMemoryTestOrchestrator(cacheRegistry: CacheStatsRegistry):
 
   private val classLoaderCache: Cache[String, URLClassLoader] =
     Scaffeine()
+      .recordStats()
       .expireAfterAccess(5.minute)
       .maximumSize(20)
       .removalListener[String, URLClassLoader] { (_, cl, _) =>
@@ -22,6 +23,8 @@ object InMemoryTestOrchestrator {
         catch { case _: Exception => () }
       }
       .build()
+
+  cacheRegistry.register("test-classloaders", () => CacheStatsRegistry.statsOf(classLoaderCache))
 
   def run(
       discoveredTests: Seq[DiscoveredFrameworkTests],
@@ -50,4 +53,3 @@ object InMemoryTestOrchestrator {
       Thread.currentThread().setContextClassLoader(oldClassloader)
     }
   }
-}

@@ -89,7 +89,8 @@ object ServerMain extends StrictLogging {
     // Use the global OTEL instance for metrics.
     // Export is handled externally (OTEL Java agent, env vars, etc.).
     val metricsMeter = GlobalOpenTelemetry.get().getMeter("deder-server")
-    val internals = DederProjectInternalsImpl(metricsMeter)
+    val cacheStatsRegistry = CacheStatsRegistry()
+    val internals = DederProjectInternalsImpl(metricsMeter, cacheStatsRegistry)
 
 
 
@@ -125,7 +126,7 @@ object ServerMain extends StrictLogging {
         s"No deder.pkl found at '${configFile}'. Create a deder.pkl configuration file in your project root to get started."
       )
 
-    val coreTasks = CoreTasks()
+    val coreTasks = CoreTasks(cacheStatsRegistry)
     val runTasks = RunTasks(coreTasks)
     val publishTasks = PublishTasks(coreTasks)
     val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)

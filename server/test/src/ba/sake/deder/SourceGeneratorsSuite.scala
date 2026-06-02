@@ -13,7 +13,7 @@ class SourceGeneratorsSuite extends munit.FunSuite {
     val sdk = OpenTelemetrySdk.builder()
       .setMeterProvider(SdkMeterProvider.builder().build())
       .build()
-    DederProjectInternalsImpl(sdk.getMeter("test"))
+    DederProjectInternalsImpl(sdk.getMeter("test"), CacheStatsRegistry())
 
   private var testProjectDir: os.Path = scala.compiletime.uninitialized
 

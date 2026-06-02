@@ -1,5 +1,6 @@
 package ba.sake.deder.deps
 
+import ba.sake.deder.CacheStatsRegistry
 import ba.sake.deder.deps.Dependency
 
 class DependencyResolverCacheSuite extends munit.FunSuite {
@@ -15,13 +16,13 @@ class DependencyResolverCacheSuite extends munit.FunSuite {
   }
 
   test("fetchFiles returns empty for empty deps") {
-    val resolver = new DependencyResolver(Seq.empty)
+    val resolver = new DependencyResolver(Seq.empty, CacheStatsRegistry())
     val result = resolver.fetchFiles(Seq.empty)
     assertEquals(result, Seq.empty)
   }
 
   test("buildDepTree detects requested version clashes even after resolution picks one winner") {
-    val resolver = new DependencyResolver(Seq.empty)
+    val resolver = new DependencyResolver(Seq.empty, CacheStatsRegistry())
     val deps = Seq(
       Dependency.make("org.jsoup:jsoup:1.21.1", "3.7.4"),
       Dependency.make("org.jsoup:jsoup:1.16.2", "3.7.4"),
