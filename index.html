@@ -114,7 +114,7 @@
    <p>Run <code>deder bsp install</code> and then open with VSCode or IntelliJ (open as a BSP project).</p>
    <h2 id="tips--tricks">Tips &amp; Tricks<a href="#tips--tricks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Generate an SVG of the dependency graph for a specific task:</p>
-   <pre><code class="language-shell hljs" data-highlighted="yes">deder plan -m common -t compileClasspath --dot | dot -Tsvg &gt; bla.svg
+   <pre><code class="language-shell hljs" data-highlighted="yes">deder plan -m common -t compileClasspath -f dot | dot -Tsvg &gt; bla.svg
 deder modules -f mermaid | mmdc -i - -o modules.svg
 </code></pre>
   </main>
