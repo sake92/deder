@@ -28,23 +28,34 @@ import xsbti.compile.{
 import scala.util.control.NonFatal
 import com.typesafe.scalalogging.StrictLogging
 import sbt.internal.inc.ScalaInstance
-import ba.sake.deder.{DederGlobals, OTEL, RequestContext, ServerNotification, ServerNotificationsLogger}
+import ba.sake.deder.{CacheStatsRegistry, DederGlobals, OTEL, RequestContext, ServerNotification, ServerNotificationsLogger}
 
 object ZincCompiler {
-  def apply(compilerBridgeJar: os.Path): ZincCompiler =
-    new ZincCompiler(compilerBridgeJar)
+  def apply(
+      compilerBridgeJar: os.Path,
+      cacheRegistry: CacheStatsRegistry,
+      scalaVersion: String
+  ): ZincCompiler =
+    new ZincCompiler(compilerBridgeJar, cacheRegistry, scalaVersion)
 }
 
-class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
+class ZincCompiler(
+    compilerBridgeJar: os.Path,
+    cacheRegistry: CacheStatsRegistry,
+    scalaVersion: String
+) extends StrictLogging {
 
   private val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
 
   // In-memory cache for Zinc analysis, avoids re-reading inc_compile.zip from disk
   private val analysisCache: Cache[os.Path, AnalysisContents] =
     Scaffeine()
+      .recordStats()
       .expireAfterAccess(5.minute)
       .maximumSize(50)
       .build()
+
+  cacheRegistry.register(s"zinc-analysis:$scalaVersion", () => CacheStatsRegistry.statsOf(analysisCache))
 
   // Cached compiler setup: classloaders, ScalaInstance, and Compilers
   // are expensive to create (JAR scanning, reflection) and can be reused
@@ -72,12 +83,15 @@ class ZincCompiler(compilerBridgeJar: os.Path) extends StrictLogging {
 
   private val setupCache: Cache[String, CachedCompilerSetup] =
     Scaffeine()
+      .recordStats()
       .expireAfterAccess(5.minute)
       .maximumSize(20)
       .removalListener[String, CachedCompilerSetup] { (_, setup, _) =>
         if setup != null then setup.closeClassloaders()
       }
       .build()
+
+  cacheRegistry.register(s"zinc-setup:$scalaVersion", () => CacheStatsRegistry.statsOf(setupCache))
 
   def close(): Unit = {
     setupCache.invalidateAll()
