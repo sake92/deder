@@ -78,7 +78,7 @@ object ServerMain extends StrictLogging {
     }
 
     val cfg = ServerProperties.from(props)
-    DederGlobals.setTestForkSemaphore(cfg.maxConcurrentTestForks)
+    DederGlobals.setTestForkSemaphore(Runtime.getRuntime.availableProcessors())
     DederGlobals.setForkTestFlushIntervalMs(cfg.forkTestFlushIntervalMs)
     val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger]
     rootLogger.setLevel(Level.toLevel(cfg.logLevel))
@@ -214,7 +214,7 @@ object ServerMain extends StrictLogging {
     cliServerThread.start()
 
     // Platform thread — root accept loop keeping the JVM alive
-    if cfg.bspEnabled then {
+    if true then {
       bspProxyServer = DederBspProxyServer(coreTasks, runTasks, scalaJsTasks, scalaNativeTasks, projectState)
       val bspProxyServerThread = new Thread(() => bspProxyServer.nn.start(), "DederBspProxyServer")
       bspProxyServerThread.start()
@@ -296,7 +296,7 @@ object ServerMain extends StrictLogging {
   }
 
   private[deder] def newCompileSemaphore(cfg: ServerProperties): Semaphore =
-    new Semaphore(cfg.maxActiveCompilers)
+    new Semaphore(Runtime.getRuntime.availableProcessors())
 
   private def acquireServerLock(projectRoot: os.Path): Unit = {
     val serverLockFile = projectRoot / ".deder/server.lock"

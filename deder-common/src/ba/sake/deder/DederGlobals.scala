@@ -17,8 +17,7 @@ object DederGlobals {
   val cancellationTokens: ConcurrentHashMap[String, AtomicBoolean] = new ConcurrentHashMap()
 
   /** Caps the number of forked test JVMs alive at any one time across the whole server.
-    * Initialized once in ServerMain from the `maxConcurrentTestForks` server property
-    * (default: Runtime.availableProcessors()). Acquired/released around each fork's spawn/exit
+    * Initialized once in ServerMain. Acquired/released around each fork's spawn/exit
     * inside ForkedTestOrchestrator.
     */
   @volatile private var _testForkSemaphore: Semaphore = new Semaphore(Runtime.getRuntime.availableProcessors(), true)
