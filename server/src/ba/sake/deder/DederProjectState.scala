@@ -402,9 +402,10 @@ class DederProjectState(
     if token != null then token.set(true)
   }
 
-  def cleanModules(moduleSelectors: Seq[String]): Boolean = {
+  def cleanModules(moduleSelectors: Seq[String], onOutput: String => Unit): Boolean = {
     readCurrentOrLastGood match {
       case Left(err) =>
+        onOutput(s"✗ Cannot clean modules, project state is not available: $err")
         logger.error(s"Cannot clean modules, project state is not available: ${err}")
         false
       case Right(state) =>
@@ -416,20 +417,12 @@ class DederProjectState(
         resolvedModuleIds match {
           case Left(recommendations) =>
             val msg =
-              if recommendations.isEmpty then s"No modules found for selectors: ${moduleSelectors.mkString(", ")}"
-              else s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
+              if recommendations.isEmpty then s"✗ No modules found for selectors: ${moduleSelectors.mkString(", ")}"
+              else s"✗ No modules found, did you mean: ${recommendations.mkString(", ")} ?"
+            onOutput(msg)
             logger.error(msg)
             false
           case Right(moduleIds) =>
-            // log what will be cleaned
-            val shown = moduleIds.take(10)
-            shown.foreach { moduleId =>
-              val moduleOutDir = DederGlobals.projectRootDir / ".deder/out" / moduleId
-              logger.info(s"Cleaning module '${moduleId}' output directory: ${moduleOutDir}")
-            }
-            val remaining = moduleIds.size - shown.size
-            if remaining > 0 then logger.info(s"...and ${remaining} more module(s)")
-
             val modulesTaskInstances = moduleIds
               .flatMap(state.tasksResolver.taskInstancesPerModule.get)
               .flatten
@@ -447,7 +440,29 @@ class DederProjectState(
                 else taskInstance.lock.lock()
                 acquiredCleanLocks += taskInstance
               }
-              DederCleaner.cleanModules(moduleIds)
+
+              var totalSuccesses = 0
+              var totalFailures = 0
+              var totalBytes = 0L
+
+              moduleIds.foreach { moduleId =>
+                val outDir = DederGlobals.projectRootDir / ".deder/out" / moduleId
+                try {
+                  val estSize = DederCleaner.scanSize(outDir)
+                  onOutput(s"Cleaning $moduleId (${DederCleaner.humanReadable(estSize)})...")
+                  val actualSize = DederCleaner.cleanDir(outDir)
+                  totalSuccesses += 1
+                  totalBytes += actualSize
+                } catch {
+                  case NonFatal(e) =>
+                    onOutput(s"  ✗ $moduleId: ${e.getMessage}")
+                    totalFailures += 1
+                }
+              }
+
+              val summary = buildCleanSummary(totalSuccesses, totalFailures, totalBytes, "module")
+              onOutput(summary)
+              totalFailures == 0
             } finally {
               acquiredCleanLocks.reverse.foreach(_.lock.unlock())
             }
@@ -455,9 +470,10 @@ class DederProjectState(
     }
   }
 
-  def cleanTasks(moduleSelectors: Seq[String], taskPattern: String): Boolean = {
+  def cleanTasks(moduleSelectors: Seq[String], taskPattern: String, onOutput: String => Unit): Boolean = {
     readCurrentOrLastGood match {
       case Left(err) =>
+        onOutput(s"✗ Cannot clean tasks, project state is not available: $err")
         logger.error(s"Cannot clean tasks, project state is not available: ${err}")
         false
       case Right(state) =>
@@ -469,27 +485,21 @@ class DederProjectState(
         resolvedModuleIds match {
           case Left(recommendations) =>
             val msg =
-              if recommendations.isEmpty then s"No modules found for selectors: ${moduleSelectors.mkString(", ")}"
-              else s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
+              if recommendations.isEmpty then s"✗ No modules found for selectors: ${moduleSelectors.mkString(", ")}"
+              else s"✗ No modules found, did you mean: ${recommendations.mkString(", ")} ?"
+            onOutput(msg)
             logger.error(msg)
             false
           case Right(moduleIds) =>
             state.executionPlanner.getTaskInstancesMatching(moduleIds, taskPattern) match {
               case Left(recommendations) =>
                 val msg =
-                  if recommendations.isEmpty then s"No '${taskPattern}' tasks found"
-                  else s"No '${taskPattern}' tasks found, did you mean: ${recommendations.mkString(", ")} ?"
+                  if recommendations.isEmpty then s"✗ No '$taskPattern' tasks found"
+                  else s"✗ No '$taskPattern' tasks found, did you mean: ${recommendations.mkString(", ")} ?"
+                onOutput(msg)
                 logger.error(msg)
                 false
               case Right(taskInstances) =>
-                val shown = taskInstances.take(10)
-                shown.foreach { (moduleId, taskInstance) =>
-                  val taskOutDir = DederGlobals.projectRootDir / ".deder/out" / moduleId / taskInstance.task.name
-                  logger.info(s"Cleaning task '${taskInstance.task.name}' on module '${moduleId}': ${taskOutDir}")
-                }
-                val remaining = taskInstances.size - shown.size
-                if remaining > 0 then logger.info(s"...and ${remaining} more task/module combo(s)")
-
                 val sorted = taskInstances.map(_._2).sortBy(_.id)
                 val acquiredCleanTaskLocks = ArrayBuffer.empty[TaskInstance]
                 try {
@@ -504,9 +514,30 @@ class DederProjectState(
                     else taskInstance.lock.lock()
                     acquiredCleanTaskLocks += taskInstance
                   }
-                  taskInstances.forall { (moduleId, taskInstance) =>
-                    DederCleaner.cleanTask(moduleId, taskInstance.task.name)
+
+                  var totalSuccesses = 0
+                  var totalFailures = 0
+                  var totalBytes = 0L
+
+                  taskInstances.foreach { (moduleId, taskInstance) =>
+                    val taskName = taskInstance.task.name
+                    val outDir = DederGlobals.projectRootDir / ".deder/out" / moduleId / taskName
+                    try {
+                      val estSize = DederCleaner.scanSize(outDir)
+                      onOutput(s"Cleaning task '$taskName' on $moduleId (${DederCleaner.humanReadable(estSize)})...")
+                      val actualSize = DederCleaner.cleanDir(outDir)
+                      totalSuccesses += 1
+                      totalBytes += actualSize
+                    } catch {
+                      case NonFatal(e) =>
+                        onOutput(s"  ✗ $moduleId: ${e.getMessage}")
+                        totalFailures += 1
+                    }
                   }
+
+                  val summary = buildCleanSummary(totalSuccesses, totalFailures, totalBytes, "task")
+                  onOutput(summary)
+                  totalFailures == 0
                 } finally {
                   acquiredCleanTaskLocks.reverse.foreach(_.lock.unlock())
                 }
@@ -514,6 +545,14 @@ class DederProjectState(
         }
     }
   }
+
+  private def buildCleanSummary(successes: Int, failures: Int, bytes: Long, item: String): String =
+    val sizeStr = DederCleaner.humanReadable(bytes)
+    (successes, failures) match
+      case (s, 0) if s == 0 => s"✗ No ${item}s cleaned. $sizeStr freed"
+      case (_, 0)           => s"✓ Cleaned $successes ${item}s. $sizeStr freed"
+      case (0, f)           => s"✗ All $f ${item}s failed. $sizeStr freed"
+      case (s, f)           => s"✓ Cleaned $s ${item}s, $f ${item}s failed. $sizeStr freed"
 
   private def scheduleInactiveShutdownChecker(): Unit = {
     Thread
