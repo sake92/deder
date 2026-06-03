@@ -150,8 +150,8 @@
    <p>Multi-fork and <code>testParallelism</code> compose: each of the N forks independently runs up to <code>testParallelism</code> classes in parallel.</p>
    <p>Valid range: <code>1</code>–<code>64</code>.</p>
    <h3 id="server-wide-fork-cap-maxconcurrenttestforks">Server-wide fork cap (<code>maxConcurrentTestForks</code>)<a href="#server-wide-fork-cap-maxconcurrenttestforks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
-   <p>The server-wide semaphore in <code>.deder/server.properties</code> caps the total number of live forked JVMs across <strong>all</strong> concurrent test tasks. Per-module <code>maxTestForks</code> is capped by this value.</p>
-   <pre><code class="language-properties hljs" data-highlighted="yes"><span class="hljs-attr">maxConcurrentTestForks</span>=<span class="hljs-string">16   # default: Runtime.availableProcessors()</span>
+   <p>The <code>maxConcurrentTestForks</code> field in <code>deder.pkl</code> caps the total number of live forked JVMs across <strong>all</strong> concurrent test tasks. Per-module <code>maxTestForks</code> is capped by this value.</p>
+   <pre><code class="language-pkl">maxConcurrentTestForks = 16   // 0 = auto-detect (Runtime.availableProcessors())
 </code></pre>
    <h3 id="summary">Summary<a href="#summary" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <table>
@@ -178,8 +178,8 @@
      </tr>
      <tr>
       <td><code>maxConcurrentTestForks</code></td>
-      <td>Server-wide (<code>.deder/server.properties</code>)</td>
-      <td>CPU cores</td>
+      <td>Project-wide (<code>deder.pkl</code>)</td>
+      <td><code>0</code> (all CPUs)</td>
       <td>Hard cap on total live forks</td>
      </tr>
     </tbody>
