@@ -33,7 +33,6 @@ object ServerMain extends StrictLogging {
   private var serverFileLock: FileLock = uninitialized
 
   @volatile private var gitignorePatterns: Seq[String] = Seq.empty
-  @volatile private var projectState: DederProjectState = uninitialized
 
   // Watcher fields — used by stopFileWatcher/stopDebounceScheduler during shutdown
   @volatile private var watcherThread: Thread = uninitialized
@@ -137,7 +136,7 @@ object ServerMain extends StrictLogging {
     val allTasks =
       coreTasks.all ++ runTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
-    projectState = DederProjectState(
+    val projectState = DederProjectState(
       coreTasks,
       runTasks,
       publishTasks,
@@ -244,8 +243,8 @@ object ServerMain extends StrictLogging {
                 else if paths.exists(p => p == projectRoot / ".gitignore") then
                   logger.debug(s".gitignore changed, reloading...")
                   loadGitignore()
-                else if paths.exists(isTaskTriggerCandidate) then
-                  val candidates = paths.filter(isTaskTriggerCandidate)
+                else if paths.exists(p => isTaskTriggerCandidate(p, projectState)) then
+                  val candidates = paths.filter(p => isTaskTriggerCandidate(p, projectState))
                   if candidates.nonEmpty then {
                     accumulatedChangedPaths.addAll(candidates.asJava)
                     debounceLock.synchronized {
@@ -374,10 +373,10 @@ object ServerMain extends StrictLogging {
   private def isProjectConfigFile(p: os.Path): Boolean =
     p == DederGlobals.projectRootDir / "deder.pkl"
 
-  private def isTaskTriggerCandidate(p: os.Path): Boolean =
+  private def isTaskTriggerCandidate(p: os.Path, projectState: DederProjectState): Boolean =
     !isServerConfigFile(p) && (
       isProjectConfigFile(p) ||
-        !(isDederArtifact(p) || isDevArtifact(p) || isIgnoredByGitignore(p))
+        !(isDederArtifact(p) || isDevArtifact(p) || isIgnoredByGitignore(p, projectState))
     )
 
   private def isDederArtifact(p: os.Path): Boolean =
@@ -392,7 +391,7 @@ object ServerMain extends StrictLogging {
     logger.debug(s"Loaded ${gitignorePatterns.size} .gitignore patterns from ${gitignoreFile}")
   }
 
-  private def isIgnoredByGitignore(p: os.Path): Boolean = {
+  private def isIgnoredByGitignore(p: os.Path, projectState: DederProjectState): Boolean = {
     val relativePath = p.relativeTo(DederGlobals.projectRootDir).toString.replace(java.io.File.separatorChar, '/')
     val isDir = os.isDir(p)
     val pklPatterns = projectState.getWatchIgnorePatterns()
