@@ -1,8 +1,8 @@
 package ba.sake.deder
 
 import java.nio.charset.StandardCharsets
-import org.apache.commons.codec.digest.Blake3;
-import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.codec.digest.Blake3
+import org.apache.commons.codec.binary.Hex
 
 object HashUtils {
   def hash(bytes: Array[Byte]): Array[Byte] = {

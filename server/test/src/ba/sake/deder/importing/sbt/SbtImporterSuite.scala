@@ -52,6 +52,7 @@ class SbtImporterSuite extends FunSuite {
 
   private def withExportBuildPluginPath(body: => Unit): Unit = {
     val projectDir = os.pwd / "project"
+    os.makeDir.all(projectDir)
     val pluginPath = projectDir / "exportBuildStructure.sbt"
     val backupPath = projectDir / "exportBuildStructure-sbt-importer-suite-backup.sbt"
     val createdProjectDir = !os.exists(projectDir)
