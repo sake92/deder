@@ -328,7 +328,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
     val outDir = DederGlobals.projectRootDir / ".deder/out" / module.id / name
 
     val allDepResults = depResults ++ transitiveResults.headOption.getOrElse(Seq.empty) // only first level for hashing
-    val inputsHash = HashUtils.hashStr(allDepResults.map(_.outputHash).mkString("-"))
+    val inputsHash = HashUtils.hashStr(allDepResults.map(_.outputHash).mkString("-") + "|" + args.mkString("|"))
 
     def computeTaskResult(): TaskResult[T] = {
       val depResultsUnsafe = Tuple.fromArray(depResults.map(_.value).toArray).asInstanceOf[TaskDepResults[Deps]]
