@@ -193,4 +193,59 @@ class FileWatchUtilsSuite extends munit.FunSuite {
     assert(FileWatchUtils.isIgnoredByGitignore("foo/x/bar", isDir = false, patterns))
     assert(!FileWatchUtils.isIgnoredByGitignore("foo/x/y/bar", isDir = false, patterns))
   }
+
+  // ========= Merged .gitignore + Pkl watchIgnore =========
+
+  test("merged patterns: Pkl pattern can ignore what .gitignore doesn't") {
+    val gitignorePatterns = Seq("*.class")
+    val pklPatterns = Seq("*.log")
+    val merged = gitignorePatterns ++ pklPatterns
+
+    // .gitignore alone would NOT ignore this
+    assert(!FileWatchUtils.isIgnoredByGitignore("debug.log", isDir = false, gitignorePatterns))
+    // merged patterns DO ignore it (Pkl adds *.log)
+    assert(FileWatchUtils.isIgnoredByGitignore("debug.log", isDir = false, merged))
+    // .gitignore pattern still works
+    assert(FileWatchUtils.isIgnoredByGitignore("Foo.class", isDir = false, merged))
+  }
+
+  test("merged patterns: Pkl negation overrides .gitignore (last match wins)") {
+    val gitignorePatterns = Seq("*.log")        // ignore all logs
+    val pklPatterns = Seq("!important.log")     // but NOT important.log
+    val merged = gitignorePatterns ++ pklPatterns
+
+    // important.log is NOT ignored (Pkl ! overrides .gitignore *)
+    assert(!FileWatchUtils.isIgnoredByGitignore("important.log", isDir = false, merged))
+    // other .log files ARE still ignored
+    assert(FileWatchUtils.isIgnoredByGitignore("debug.log", isDir = false, merged))
+  }
+
+  test("merged patterns: empty Pkl list = same behavior as .gitignore alone") {
+    val gitignorePatterns = Seq("*.class", "build/")
+    val pklPatterns = Seq.empty[String]
+    val merged = gitignorePatterns ++ pklPatterns
+
+    assert(FileWatchUtils.isIgnoredByGitignore("Foo.class", isDir = false, merged))
+    assert(FileWatchUtils.isIgnoredByGitignore("build", isDir = true, merged))
+    assert(!FileWatchUtils.isIgnoredByGitignore("Main.scala", isDir = false, merged))
+  }
+
+  test("merged patterns: Pkl directory pattern with trailing slash") {
+    val gitignorePatterns = Seq.empty[String]
+    val pklPatterns = Seq("generated/")
+    val merged = gitignorePatterns ++ pklPatterns
+
+    assert(FileWatchUtils.isIgnoredByGitignore("generated", isDir = true, merged))
+    assert(!FileWatchUtils.isIgnoredByGitignore("generated", isDir = false, merged))
+  }
+
+  test("merged patterns: Pkl ** pattern matches nested paths") {
+    val gitignorePatterns = Seq.empty[String]
+    val pklPatterns = Seq("**/deprecated/**")
+    val merged = gitignorePatterns ++ pklPatterns
+
+    assert(FileWatchUtils.isIgnoredByGitignore("src/deprecated/Old.scala", isDir = false, merged))
+    assert(FileWatchUtils.isIgnoredByGitignore("a/b/deprecated/x/y/Foo.java", isDir = false, merged))
+    assert(!FileWatchUtils.isIgnoredByGitignore("src/new/Feature.scala", isDir = false, merged))
+  }
 }
