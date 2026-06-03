@@ -52,11 +52,10 @@ class SbtImporterSuite extends FunSuite {
 
   private def withExportBuildPluginPath(body: => Unit): Unit = {
     val projectDir = os.pwd / "project"
+    val createdProjectDir = !os.exists(projectDir)
     os.makeDir.all(projectDir)
     val pluginPath = projectDir / "exportBuildStructure.sbt"
     val backupPath = projectDir / "exportBuildStructure-sbt-importer-suite-backup.sbt"
-    val createdProjectDir = !os.exists(projectDir)
-    if createdProjectDir then os.makeDir.all(projectDir)
     if os.exists(backupPath) then os.remove(backupPath)
     if os.exists(pluginPath) then os.move(pluginPath, backupPath)
     try body

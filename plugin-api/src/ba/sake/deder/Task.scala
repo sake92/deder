@@ -328,7 +328,8 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
     val outDir = DederGlobals.projectRootDir / ".deder/out" / module.id / name
 
     val allDepResults = depResults ++ transitiveResults.headOption.getOrElse(Seq.empty) // only first level for hashing
-    val inputsHash = HashUtils.hashStr(allDepResults.map(_.outputHash).mkString("-") + "|" + args.mkString("|"))
+    val inputsPayload = CacheInputsHash(allDepResults.map(_.outputHash), args)
+    val inputsHash = HashUtils.hashStr(inputsPayload.toJson(spaces = 0, sort = true))
 
     def computeTaskResult(): TaskResult[T] = {
       val depResultsUnsafe = Tuple.fromArray(depResults.map(_.value).toArray).asInstanceOf[TaskDepResults[Deps]]
@@ -525,6 +526,8 @@ object TaskInstance {
   def apply(module: DederModule, task: Task[?, ?, ?]): TaskInstance =
     new TaskInstance(module, task, new ReentrantLock())
 }
+
+private case class CacheInputsHash(depOutputHashes: Seq[String], args: Seq[String]) derives JsonRW
 
 enum FeatureTag(val emoji: String, val jsonKey: String, val description: String):
   case SourceAware extends FeatureTag("📁", "source-aware", "watches sources")
