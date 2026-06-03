@@ -49,6 +49,13 @@ repositories: Listing<MavenRepository> = new Listing {}
 /// If false, `repositories` must be non-empty.
 includeDefaultRepos: Boolean = true
 
+/// Custom watch-ignore patterns in gitignore syntax.
+/// Matched paths will NOT trigger rebuilds in watch mode.
+/// Supports: `*`, `**`, `?`, trailing `/` for directories, `!` negation.
+/// Merged with `.gitignore` patterns — last match wins across both lists.
+/// Patterns are relative to the project root.
+watchIgnore: Listing<String> = new {}
+
 /// Base class for publish repository configuration.
 /// Credentials for the repository are looked up by `id` in `~/.deder/credentials.pkl`.
 abstract class PublishRepo {
