@@ -29,7 +29,7 @@ class DederTestDiscovery(
     }
 
   private def discoverFrameworks(): Seq[Framework] =
-    val frameworks = frameworkClassNames.flatMap { className =>
+    val frameworks = frameworkClassNames.distinct.flatMap { className =>
       try {
         val cls = classLoader.loadClass(className)
         Some(cls.getDeclaredConstructor().newInstance().asInstanceOf[Framework])

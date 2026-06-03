@@ -37,43 +37,54 @@ class DederTestRunner(
         s"Found ${discoveredTests.size} test framework(s): ${discoveredTests.map(_.frameworkName).mkString(", ")}"
       )
       val allResults = discoveredTests.flatMap { t =>
-        val testClassNames = t.testClasses.map(_.className)
-        val selectedTestClasses: Seq[(String, Fingerprint, Selector)] =
-          if options.testSelectors.isEmpty then
-            t.testClasses.map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
-          else {
-            // Separate class-only selectors (no #) to handle negation via multi-matcher
-            val (classOnlySelectors, methodSelectors) = options.testSelectors.partition(!_.contains("#"))
-
-            // Class-only selectors: use multi-matcher with negation support
-            val matchedClassNames = WildcardUtils.getMatches(testClassNames, classOnlySelectors).toSet
-            val resultsFromClassOnly = matchedClassNames.toSeq
-              .flatMap { n => t.testClasses.find(_.className == n) }
-              .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
-
-            // #method selectors: processed individually (negation not supported for #method)
-            val resultsFromMethod = methodSelectors.flatMap { ts =>
-              ts.split("#") match {
-                case Array(classNameSelector, testSelector) =>
-                  val mcn = WildcardUtils.getMatches(testClassNames, classNameSelector)
-                  mcn
-                    .flatMap { n => t.testClasses.find(_.className == n) }
-                    .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new TestSelector(testSelector)))
-                case _ => Seq.empty
-              }
-            }
-
-            resultsFromClassOnly ++ resultsFromMethod
-          }
-        val framework = frameworkOverrides.getOrElse(
-          t.frameworkClassName,
-          classLoader.loadClass(t.frameworkClassName).getDeclaredConstructor().newInstance().asInstanceOf[Framework]
-        )
-        runFramework(framework, selectedTestClasses)
+        if t.testClasses.isEmpty then {
+          Seq.empty
+        } else {
+          val testClassNames = t.testClasses.map(_.className)
+          val selectedTestClasses: Seq[(String, Fingerprint, Selector)] =
+            filterClasses(t.testClasses, options.testSelectors)
+          val framework = frameworkOverrides.getOrElse(
+            t.frameworkClassName,
+            classLoader.loadClass(t.frameworkClassName).getDeclaredConstructor().newInstance().asInstanceOf[Framework]
+          )
+          runFramework(framework, selectedTestClasses)
+        }
       }
       DederTestResults.aggregate(allResults)
     }
     res
+  }
+
+  private def filterClasses(
+      testClasses: Seq[DiscoveredFrameworkTest],
+      testSelectors: Seq[String]
+  ): Seq[(String, Fingerprint, Selector)] = {
+    val testClassNames = testClasses.map(_.className)
+    if testSelectors.isEmpty then
+      testClasses.map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
+    else {
+      // Separate class-only selectors (no #) to handle negation via multi-matcher
+      val (classOnlySelectors, methodSelectors) = testSelectors.partition(!_.contains("#"))
+
+      // Class-only selectors: use multi-matcher with negation support
+      val matchedClassNames = WildcardUtils.getMatches(testClassNames, classOnlySelectors).toSet
+      val resultsFromClassOnly = matchedClassNames.toSeq
+        .flatMap { n => testClasses.find(_.className == n) }
+        .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
+
+      // #method selectors: processed individually (negation not supported for #method)
+      val resultsFromMethod = methodSelectors.flatMap { ts =>
+        ts.split("#") match {
+          case Array(classNameSelector, testSelector) =>
+            val mcn = WildcardUtils.getMatches(testClassNames, classNameSelector)
+            mcn
+              .flatMap { n => testClasses.find(_.className == n) }
+              .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new TestSelector(testSelector)))
+          case _ => Seq.empty
+        }
+      }
+      resultsFromClassOnly ++ resultsFromMethod
+    }
   }
 
   private def runFramework(
@@ -96,9 +107,9 @@ class DederTestRunner(
       // class name WITHOUT trailing "$". The discovery step already strips it, but
       // this is a safety net in case a framework uses isModule = true.
       val fpIsModule = fingerprint match {
-        case sub: SubclassFingerprint => sub.isModule
+        case sub: SubclassFingerprint  => sub.isModule
         case ann: AnnotatedFingerprint => ann.isModule
-        case _ => false
+        case _                         => false
       }
       val tweakedClassName = if fpIsModule then className.stripSuffix("$") else className
       val taskDef = new TaskDef(
@@ -120,10 +131,8 @@ class DederTestRunner(
 
     _perClassStats ++= handler.perClassStats
 
-val results = handler.results
-    val failedTests = results.filter(r =>
-      r.status == DederTestStatus.Failure || r.status == DederTestStatus.Error
-    )
+    val results = handler.results
+    val failedTests = results.filter(r => r.status == DederTestStatus.Failure || r.status == DederTestStatus.Error)
     if (failedTests.nonEmpty) {
       logger.info("Failed tests:")
       failedTests.foreach { t =>
@@ -198,7 +207,7 @@ val results = handler.results
                 logger.warn("Cancelling remaining tests...")
                 futures.foreach(_.cancel(true))
               case Some(cause) => throw cause
-              case None => throw e
+              case None        => throw e
             }
         }
       } finally {
@@ -227,8 +236,8 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
     }
     val testName =
       if frameworkName == "Jupiter" &&
-          testCaseName != suiteName &&
-          !testCaseName.startsWith(s"$suiteName#")
+        testCaseName != suiteName &&
+        !testCaseName.startsWith(s"$suiteName#")
       then s"$suiteName#$testCaseName"
       else testCaseName
     val duration = Duration.ofMillis(event.duration())
@@ -294,4 +303,3 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
     }
   }
 }
-
