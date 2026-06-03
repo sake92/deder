@@ -280,7 +280,16 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     .dependsOn(dependenciesTask)
     .build { ctx =>
       val deps = ctx.depResults._1
-      (deps ++ ctx.transitiveResults.flatten.flatten).distinct
+      val result = DependencyDedup.deduplicate(deps)
+      result.conflicts.foreach { conflict =>
+        ctx.notifications.add(
+          ServerNotification.logWarning(
+            s"Dependency `${conflict.coordinate}` has multiple versions: [${conflict.versions.mkString(", ")}]. Keeping last: ${conflict.keptVersion}",
+            Some(ctx.module.id)
+          )
+        )
+      }
+      (result.deduplicated ++ ctx.transitiveResults.flatten.flatten).distinct
     }
 
 
