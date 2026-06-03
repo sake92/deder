@@ -810,23 +810,29 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
           }
       }
 
-      val zincResult = zincCompilersCache
-        .get(scalaVersion, ctx.dependencyResolver)
-        .compile(
-          javaHome = javaHome.map(_.toNIO),
-          scalaVersion = scalaVersion,
-          compilerJars = compilerJars,
-          compileClasspath = fullCompileClasspath,
-          zincCacheFile = zincCacheFile,
-          sources = (sourceFiles ++ allGeneratedSourceFiles).distinct.map(_.absPath),
-          classesDir = classesDir,
-          scalacOptions = finalScalacOptions,
-          javacOptions = finalJavacOptions,
-          compileOrder = compileOrder,
-          zincLogger = zincLogger,
-          moduleId = ctx.module.id,
-          notifications = ctx.notifications
-        )
+      val sem = DederGlobals.compileSemaphore
+      sem.acquire()
+      val zincResult = try {
+        zincCompilersCache
+          .get(scalaVersion, ctx.dependencyResolver)
+          .compile(
+            javaHome = javaHome.map(_.toNIO),
+            scalaVersion = scalaVersion,
+            compilerJars = compilerJars,
+            compileClasspath = fullCompileClasspath,
+            zincCacheFile = zincCacheFile,
+            sources = (sourceFiles ++ allGeneratedSourceFiles).distinct.map(_.absPath),
+            classesDir = classesDir,
+            scalacOptions = finalScalacOptions,
+            javacOptions = finalJavacOptions,
+            compileOrder = compileOrder,
+            zincLogger = zincLogger,
+            moduleId = ctx.module.id,
+            notifications = ctx.notifications
+          )
+      } finally {
+        sem.release()
+      }
 
       CompileResult(
         classesDir = DederPath(classesDir),

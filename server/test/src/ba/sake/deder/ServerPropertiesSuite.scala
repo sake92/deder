@@ -2,35 +2,43 @@ package ba.sake.deder
 
 class ServerPropertiesSuite extends munit.FunSuite {
 
-  test("maxActiveCompilers uses explicit override") {
-    val props = mkProps(
-      "maxActiveCompilers" -> "3"
-    )
+  test("parses properties with defaults") {
+    val props = mkProps()
     val cfg = ServerProperties.from(props)
-    assertEquals(cfg.maxActiveCompilers, 3)
+    assertEquals(cfg.logLevel, "INFO")
+    assertEquals(cfg.maxInactiveSeconds, 1800)
+    assertEquals(cfg.taskLockTimeoutSeconds, 600)
+    assertEquals(cfg.forkTestFlushIntervalMs, 1000L)
+    assertEquals(cfg.watchDebounceMillis, 300)
   }
 
-  test("maxActiveCompilers falls back to available processors when invalid") {
+  test("parses property overrides") {
     val props = mkProps(
-      "maxActiveCompilers" -> "abc"
+      "logLevel" -> "DEBUG",
+      "maxInactiveSeconds" -> "300",
+      "taskLockTimeoutSeconds" -> "1200",
+      "forkTestFlushIntervalMs" -> "500",
+      "watchDebounceMillis" -> "100"
     )
     val cfg = ServerProperties.from(props)
-    assertEquals(cfg.maxActiveCompilers, Runtime.getRuntime.availableProcessors())
+    assertEquals(cfg.logLevel, "DEBUG")
+    assertEquals(cfg.maxInactiveSeconds, 300)
+    assertEquals(cfg.taskLockTimeoutSeconds, 1200)
+    assertEquals(cfg.forkTestFlushIntervalMs, 500L)
+    assertEquals(cfg.watchDebounceMillis, 100)
   }
 
-  test("ServerMain compile semaphore uses maxActiveCompilers") {
-    val cfg = ServerProperties(
-      logLevel = "INFO",
-      maxInactiveSeconds = 1800,
-      taskLockTimeoutSeconds = 600,
-      maxActiveCompilers = 2,
-      bspEnabled = true,
-      maxConcurrentTestForks = Runtime.getRuntime.availableProcessors(),
-      forkTestFlushIntervalMs = 1000L,
-      watchDebounceMillis = 300
+  test("silently ignores removed keys (bspEnabled, maxActiveCompilers, maxConcurrentTestForks)") {
+    val props = mkProps(
+      "bspEnabled" -> "false",
+      "maxActiveCompilers" -> "4",
+      "maxConcurrentTestForks" -> "2"
     )
-    val sem = ServerMain.newCompileSemaphore(cfg)
-    assertEquals(sem.availablePermits(), 2)
+    val cfg = ServerProperties.from(props)
+    // Defaults are used — removed keys have no effect
+    assertEquals(cfg.logLevel, "INFO")
+    assertEquals(cfg.maxInactiveSeconds, 1800)
+    assertEquals(cfg.taskLockTimeoutSeconds, 600)
   }
 
   private def mkProps(entries: (String, String)*): java.util.Properties = {

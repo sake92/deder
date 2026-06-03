@@ -1,5 +1,7 @@
 amends "../../../../../config/DederProject.pkl"
 
+bspEnabled = true
+
 local const scalaVersions = List("2.12.21", "2.13.18", "3.7.4")
 
 local const commonModules: List<ScalaModule> =
