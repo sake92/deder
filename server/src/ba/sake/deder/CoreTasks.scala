@@ -283,6 +283,13 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       (deps ++ ctx.transitiveResults.flatten.flatten).distinct
     }
 
+  private val depthPattern = "--depth (\\d+)".r
+
+  private def parseDepth(args: Seq[String]): Option[Int] =
+    args.mkString(" ") match {
+      case depthPattern(n) => n.toIntOption.filter(_ > 0)
+      case _               => None
+    }
 
   val depsTreeTask = CachedTaskBuilder
     .make[DepTree](
@@ -294,7 +301,8 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       val allResolved = ctx.depResults._1
       val resolver = ctx.dependencyResolver
       val tree = resolver.buildDepTree(allResolved)
-      tree.copy(module = ctx.module.id)
+      val maxDepth = parseDepth(ctx.args)
+      tree.copy(module = ctx.module.id, maxDepth = maxDepth)
     }
 
   val mandatoryDependenciesTask = CachedTaskBuilder
