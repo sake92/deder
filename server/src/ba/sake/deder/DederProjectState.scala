@@ -83,6 +83,18 @@ class DederProjectState(
   private def readCurrentOrLastGood: Either[String, DederProjectStateData] =
     stateLock.synchronized { current.orElse(lastGood) }
 
+  /** Returns watch-ignore patterns from the Pkl project config.
+    * Uses lastGood state as a fallback (consistent with BSP behavior).
+    * Returns an empty Seq if no valid project config is loaded. */
+  def getWatchIgnorePatterns(): Seq[String] =
+    readCurrentOrLastGood match {
+      case Right(data) =>
+        val watchIgnore = data.projectConfig.watchIgnore
+        if watchIgnore != null then watchIgnore.asScala.toSeq
+        else Seq.empty
+      case Left(_) => Seq.empty
+    }
+
   def reloadProject(): Unit = stateLock.synchronized {
     // TODO make sure no requests are running
     // because we need to make sure locks are not held while we refresh the state (new locks are instantiated)

@@ -265,8 +265,8 @@ object ServerMain extends StrictLogging {
                 else if paths.exists(p => p == projectRoot / ".gitignore") then
                   logger.debug(s".gitignore changed, reloading...")
                   loadGitignore()
-                else if paths.exists(isTaskTriggerCandidate) then
-                  val candidates = paths.filter(isTaskTriggerCandidate)
+                else if paths.exists(p => isTaskTriggerCandidate(p, projectState)) then
+                  val candidates = paths.filter(p => isTaskTriggerCandidate(p, projectState))
                   if candidates.nonEmpty then {
                     accumulatedChangedPaths.addAll(candidates.asJava)
                     debounceLock.synchronized {
@@ -392,10 +392,10 @@ object ServerMain extends StrictLogging {
   private def isProjectConfigFile(p: os.Path): Boolean =
     p == DederGlobals.projectRootDir / "deder.pkl"
 
-  private def isTaskTriggerCandidate(p: os.Path): Boolean =
+  private def isTaskTriggerCandidate(p: os.Path, projectState: DederProjectState): Boolean =
     !isServerConfigFile(p) && (
       isProjectConfigFile(p) ||
-        !(isDederArtifact(p) || isDevArtifact(p) || isIgnoredByGitignore(p))
+        !(isDederArtifact(p) || isDevArtifact(p) || isIgnoredByGitignore(p, projectState))
     )
 
   private def isDederArtifact(p: os.Path): Boolean =
@@ -410,10 +410,12 @@ object ServerMain extends StrictLogging {
     logger.debug(s"Loaded ${gitignorePatterns.size} .gitignore patterns from ${gitignoreFile}")
   }
 
-  private def isIgnoredByGitignore(p: os.Path): Boolean = {
+  private def isIgnoredByGitignore(p: os.Path, projectState: DederProjectState): Boolean = {
     val relativePath = p.relativeTo(DederGlobals.projectRootDir).toString.replace(java.io.File.separatorChar, '/')
     val isDir = os.isDir(p)
-    FileWatchUtils.isIgnoredByGitignore(relativePath, isDir, gitignorePatterns)
+    val pklPatterns = projectState.getWatchIgnorePatterns()
+    val allPatterns = gitignorePatterns ++ pklPatterns
+    FileWatchUtils.isIgnoredByGitignore(relativePath, isDir, allPatterns)
   }
 
 }

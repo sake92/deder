@@ -49,6 +49,12 @@ repositories: Listing<MavenRepository> = new Listing {}
 /// If false, `repositories` must be non-empty.
 includeDefaultRepos: Boolean = true
 
+/// Custom watch-ignore patterns in gitignore syntax.
+/// Matched paths will NOT trigger rebuilds in watch mode.
+/// Supports: `*`, `**`, `?`, trailing `/` for directories, `!` negation.
+/// Merged with `.gitignore` patterns — last match wins across both lists.
+/// Patterns are relative to the project root.
+watchIgnore: Listing<String> = new {}
 /// Enable BSP (Build Server Protocol). Disabled in CI by default.
 bspEnabled: Boolean = read?("env:CI") == null
 
