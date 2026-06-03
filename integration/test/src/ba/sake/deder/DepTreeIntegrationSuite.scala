@@ -85,4 +85,46 @@ class DepTreeIntegrationSuite extends BaseIntegrationSuite {
       "depsTree should handle modules gracefully"
     )
   }
+
+  // --- depth parameter tests (use scalajs project which has transitive deps) ---
+
+  private val scalajsProjectPath = os.RelPath("sample-projects/scalajs")
+
+  test("depsTree --depth 1 shows root deps with hidden markers") {
+    withTestProject(scalajsProjectPath) { stagedPath =>
+      val result = executeDederCommand(stagedPath, "exec", "-t", "depsTree", "-m", "frontend", "--depth", "1")
+      assertEquals(result.exitCode, 0)
+      val output = result.out.text()
+      assert(output.contains("Direct Dependencies:"), s"Should show header, got: $output")
+      // frontend has scalajs-dom which has transitive deps, so depth=1 should show hidden markers
+      assert(output.contains("deps hidden"), s"Depth=1 should show hidden transitive deps, got: $output")
+    }
+  }
+
+  test("depsTree --depth 2 shows deeper tree with hidden markers at cutoff") {
+    withTestProject(scalajsProjectPath) { stagedPath =>
+      val result = executeDederCommand(stagedPath, "exec", "-t", "depsTree", "-m", "frontend", "--depth", "2")
+      assertEquals(result.exitCode, 0)
+      val output = result.out.text()
+      assert(output.contains("deps hidden"), s"Depth=2 should show hidden deps for transitive trees, got: $output")
+    }
+  }
+
+  test("depsTree without --depth shows full tree without hidden markers") {
+    withTestProject(scalajsProjectPath) { stagedPath =>
+      val result = executeDederCommand(stagedPath, "exec", "-t", "depsTree", "-m", "frontend")
+      assertEquals(result.exitCode, 0)
+      val output = result.out.text()
+      assert(!output.contains("deps hidden"), s"Full tree should not contain hidden markers, got: $output")
+    }
+  }
+
+  test("depsTree with --depth 0 shows full tree (invalid depth ignored)") {
+    withTestProject(scalajsProjectPath) { stagedPath =>
+      val result = executeDederCommand(stagedPath, "exec", "-t", "depsTree", "-m", "frontend", "--depth", "0")
+      assertEquals(result.exitCode, 0)
+      val output = result.out.text()
+      assert(!output.contains("deps hidden"), s"Depth 0 should be ignored (full tree), got: $output")
+    }
+  }
 }
