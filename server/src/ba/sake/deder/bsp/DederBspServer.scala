@@ -555,24 +555,23 @@ class DederBspServer(
         val moduleId = module.id
         val dependencies = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)(Seq.empty)
         val fetchRes = projectStateData.dependencyResolver.fetch(dependencies)
-        val depSources = fetchRes.getDependencies.asScala.map { dep =>
-          dep.withClassifier("sources").withType("jar").withConfiguration("sources")
-        }
-        logger.debug(s"Fetching sources for dependencies: ${depSources.map(_.toString).mkString(", ")}")
-        val sourceArtifactFiles =
+        val sourceArtifactFiles = fetchRes.getDependencies.asScala.flatMap { coursierDep =>
+          val sourceDep = coursierDep.withClassifier("sources")
           try {
             projectStateData.dependencyResolver
-              .doFetch(depSources.toSeq)
+              .doFetch(Seq(sourceDep))
               .getArtifacts
               .asScala
               .map(_.getValue())
-              .toSeq
-              .filter(_.getName.endsWith("-sources.jar")) // TODO coursier returns main artifact too..???
+              .filter(_.getName.endsWith("-sources.jar"))
+              .map(_.toURI.toString)
           } catch {
-            // if a dep doesnt have source jars, coursier throws an error, we can ignore and return empty sources...
-            case _: DownloadingArtifactsError => Seq.empty
+            case _: DownloadingArtifactsError =>
+              logger.debug(s"No sources for: ${coursierDep.getModule}")
+              Seq.empty
           }
-        DependencySourcesItem(targetId, sourceArtifactFiles.map(f => f.toURI.toString).asJava)
+        }
+        DependencySourcesItem(targetId, sourceArtifactFiles.asJava)
       }
     }
     val result = DependencySourcesResult(items.asJava)
