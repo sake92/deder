@@ -73,12 +73,12 @@ class DependencyDedupSuite extends munit.FunSuite {
     )
     val result = DependencyDedup.deduplicate(deps)
     assertEquals(result.deduplicated.length, 3)
-    val libB = result.deduplicated.find(_.applied.module.name.value == "lib-b_3").get
+    val libB = result.deduplicated.find(_.applied.module.name == "lib-b_3").get
     assertEquals(libB.applied.version, "3.0")
-    val libA = result.deduplicated.filter(_.applied.module.name.value == "lib-a_3")
+    val libA = result.deduplicated.filter(_.applied.module.name == "lib-a_3")
     assertEquals(libA.length, 1)
     assertEquals(libA.head.applied.version, "2.0")
-    val munit = result.deduplicated.find(_.applied.module.name.value == "munit_3").get
+    val munit = result.deduplicated.find(_.applied.module.name == "munit_3").get
     assertEquals(munit.applied.version, "1.1.0")
     assertEquals(result.conflicts.length, 1)
     assertEquals(result.conflicts.head.versions, Seq("1.0", "2.0"))
