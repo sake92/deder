@@ -20,23 +20,27 @@ object DependencyDedup {
       val mod = dep.applied.module
       (mod.organization, mod.name)
     }
-    val (deduped, conflicts) = grouped.values.partition(_.size == 1)
-    val keptSingletons = deduped.flatten.toSeq
-    val (duplicateResults, conflictInfos) = conflicts.map { group =>
-      val versions = group.map(_.applied.version)
-      val kept = group.last
-      val mod = kept.applied.module
-      val coordinate = s"${mod.organization}:${mod.name}"
-      val conflict = DedupConflict(
-        coordinate = coordinate,
-        versions = versions,
-        keptVersion = kept.applied.version
-      )
-      (kept, conflict)
-    }.unzip
-
+    // Iterate keys in first-seen order (groupBy values are non-deterministic)
+    val keys = deps.map(d => (d.applied.module.organization, d.applied.module.name)).distinct
+    val deduped = Seq.newBuilder[Dependency]
+    val conflictInfos = Seq.newBuilder[DedupConflict]
+    keys.foreach { key =>
+      val group = grouped(key)
+      if group.size == 1 then deduped += group.head
+      else
+        val versions = group.map(_.applied.version)
+        val kept = group.last
+        val mod = kept.applied.module
+        val coordinate = s"${mod.organization}:${mod.name}"
+        deduped += kept
+        conflictInfos += DedupConflict(
+          coordinate = coordinate,
+          versions = versions,
+          keptVersion = kept.applied.version
+        )
+    }
     DedupResult(
-      deduplicated = (keptSingletons ++ duplicateResults),
-      conflicts = conflictInfos.toSeq
+      deduplicated = deduped.result(),
+      conflicts = conflictInfos.result()
     )
 }
