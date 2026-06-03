@@ -87,9 +87,10 @@ object ServerMain extends StrictLogging {
     // Fall back to sensible defaults if parsing fails — the server must always boot.
     val cpus = Runtime.getRuntime.availableProcessors()
     val (bspEnabled, maxActiveCompilers, maxConcurrentTestForks) =
-      if os.exists(projectRoot / "deder.pkl") && os.isFile(projectRoot / "deder.pkl") then
+      val dederFile = DederPath(os.SubPath("deder.pkl")).absPath
+      if os.exists(dederFile) && os.isFile(dederFile) then
         val parser = ConfigParser(writeJson = false)
-        parser.parse(projectRoot / "deder.pkl") match {
+        parser.parse(dederFile) match {
           case Right(project) =>
             // Java primitives are auto-unboxed to Scala types — no null possible
             val bsp = project.bspEnabled

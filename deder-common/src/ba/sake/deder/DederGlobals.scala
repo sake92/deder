@@ -22,8 +22,12 @@ object DederGlobals {
     */
   @volatile private var _testForkSemaphore: Semaphore = new Semaphore(Runtime.getRuntime.availableProcessors(), true)
 
-  def setTestForkSemaphore(permits: Int): Unit =
-    _testForkSemaphore = new Semaphore(math.max(1, permits), true)
+  def setTestForkSemaphore(permits: Int): Unit = {
+    val target = math.max(1, permits)
+    val current = _testForkSemaphore
+    current.drainPermits()
+    current.release(target)
+  }
 
   def testForkSemaphore: Semaphore = _testForkSemaphore
 
@@ -33,8 +37,12 @@ object DederGlobals {
     */
   @volatile private var _compileSemaphore: Semaphore = new Semaphore(Runtime.getRuntime.availableProcessors(), true)
 
-  def setCompileSemaphore(permits: Int): Unit =
-    _compileSemaphore = new Semaphore(math.max(1, permits), true)
+  def setCompileSemaphore(permits: Int): Unit = {
+    val target = math.max(1, permits)
+    val current = _compileSemaphore
+    current.drainPermits()
+    current.release(target)
+  }
 
   def compileSemaphore: Semaphore = _compileSemaphore
 
