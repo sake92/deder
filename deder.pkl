@@ -1,4 +1,4 @@
-amends "https://sake92.github.io/deder/config/v0.12.0/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/v0.15.0/DederProject.pkl"
 
 //amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
@@ -186,7 +186,7 @@ local const integrationTest = new ScalaTestModule {
   deps {
     "org.scalameta::munit:1.2.1"
   }
-  maxTestForks = 16
+//  maxTestForks = 16
   forkEnv {
     ["DEDER_PLUGIN_API_VERSION"] = "it-test-version"
   }

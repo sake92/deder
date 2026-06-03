@@ -20,6 +20,30 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
     assume(gitAvailable, "git not found on PATH - skipping import tests")
   }
 
+  test("import sbt hello-world") {
+    testImportFromFixture("import-sbt-hello-world")
+  }
+
+  test("import sbt cross-versions") {
+    testImportFromFixture("import-sbt-cross-versions")
+  }
+
+  test("import sbt cross-full".ignore) {
+    testImportFromFixture("import-sbt-cross-full")
+  }
+
+  test("import sbt tpolecat".ignore) {
+    testImportFromFixture("import-sbt-tpolecat")
+  }
+
+  test("import sbt typelevel".ignore) {
+    testImportFromFixture("import-sbt-typelevel", initGit = true)
+  }
+
+  test("import jawn v1.6.0".ignore) {
+    testImport("https://github.com/typelevel/jawn.git", "v1.6.0", expectedMinModules = 30)
+  }
+
   /** Force-stop any deder server running in the given directory. */
   private def forceShutdownServer(dir: os.Path): Unit = {
     try executeDederCommand(dir, "shutdown")
@@ -131,32 +155,6 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
       val modOut = modRes.out.text()
       val pattern = """\S+-jvm-test-\S+""".r
       pattern.findAllIn(modOut).toSeq.distinct
-  }
-
-  // --- Test cases ---
-
-  test("import sbt hello-world") {
-    testImportFromFixture("import-sbt-hello-world")
-  }
-
-  test("import sbt cross-versions".ignore) {
-    testImportFromFixture("import-sbt-cross-versions")
-  }
-
-  test("import sbt cross-full".ignore) {
-    testImportFromFixture("import-sbt-cross-full")
-  }
-
-  test("import sbt tpolecat".ignore) {
-    testImportFromFixture("import-sbt-tpolecat")
-  }
-
-  test("import sbt typelevel".ignore) {
-    testImportFromFixture("import-sbt-typelevel", initGit = true)
-  }
-
-  test("import jawn v1.6.0".ignore) {
-    testImport("https://github.com/typelevel/jawn.git", "v1.6.0", expectedMinModules = 30)
   }
 
   /** Clone a repo at a specific tag, run deder import, validate output. */
