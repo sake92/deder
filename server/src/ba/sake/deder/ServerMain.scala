@@ -33,6 +33,7 @@ object ServerMain extends StrictLogging {
   private var serverFileLock: FileLock = uninitialized
 
   @volatile private var gitignorePatterns: Seq[String] = Seq.empty
+  @volatile private var projectState: DederProjectState = uninitialized
 
   // Watcher fields — used by stopFileWatcher/stopDebounceScheduler during shutdown
   @volatile private var watcherThread: Thread = uninitialized
@@ -136,7 +137,7 @@ object ServerMain extends StrictLogging {
     val allTasks =
       coreTasks.all ++ runTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
     val tasksRegistry = TasksRegistry(allTasks)
-    val projectState = DederProjectState(
+    projectState = DederProjectState(
       coreTasks,
       runTasks,
       publishTasks,
@@ -394,7 +395,9 @@ object ServerMain extends StrictLogging {
   private def isIgnoredByGitignore(p: os.Path): Boolean = {
     val relativePath = p.relativeTo(DederGlobals.projectRootDir).toString.replace(java.io.File.separatorChar, '/')
     val isDir = os.isDir(p)
-    FileWatchUtils.isIgnoredByGitignore(relativePath, isDir, gitignorePatterns)
+    val pklPatterns = projectState.getWatchIgnorePatterns()
+    val allPatterns = gitignorePatterns ++ pklPatterns
+    FileWatchUtils.isIgnoredByGitignore(relativePath, isDir, allPatterns)
   }
 
 }
