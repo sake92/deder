@@ -138,9 +138,9 @@ function mkBaseJsTest(version: P.ScalaBinaryVersion, mode: String): P.ScalaJsTes
     "org.scalacheck.ScalaCheckFramework"
   }
   deps {
-    "org.scalameta::munit:1.1.0"
-    "org.scalacheck::scalacheck:1.18.1"
-    "org.typelevel::discipline-munit:2.0.0"
+    "org.scalameta::munit::1.1.0"
+    "org.scalacheck::scalacheck::1.18.1"
+    "org.typelevel::discipline-munit::2.0.0"
   }
 }
 
@@ -158,9 +158,9 @@ function mkBaseNativeTest(version: P.ScalaBinaryVersion, mode: String): P.ScalaN
     "org.scalacheck.ScalaCheckFramework"
   }
   deps {
-    "org.scalameta::munit:1.1.0"
-    "org.scalacheck::scalacheck:1.18.1"
-    "org.typelevel::discipline-munit:2.0.0"
+    "org.scalameta::munit::1.1.0"
+    "org.scalacheck::scalacheck::1.18.1"
+    "org.typelevel::discipline-munit::2.0.0"
   }
 }
 
