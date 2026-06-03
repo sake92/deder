@@ -1,5 +1,7 @@
 amends "../../../../../config/DederProject.pkl"
 
+bspEnabled = true
+
 local const baseModule: ScalaModule = new {
   scalaVersion = "3.7.1"
   publish = false

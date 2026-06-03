@@ -55,6 +55,17 @@ includeDefaultRepos: Boolean = true
 /// Merged with `.gitignore` patterns — last match wins across both lists.
 /// Patterns are relative to the project root.
 watchIgnore: Listing<String> = new {}
+/// Enable BSP (Build Server Protocol). Disabled in CI by default.
+bspEnabled: Boolean = read?("env:CI") == null
+
+/// Maximum number of concurrent Zinc compilations server-wide.
+/// 0 = detect automatically (number of available CPU cores).
+maxActiveCompilers: Int(isBetween(0, 256)) = 0
+
+/// Maximum number of forked test JVMs alive server-wide at any one time.
+/// 0 = detect automatically (number of available CPU cores).
+/// Per-module `maxTestForks` is capped by this value.
+maxConcurrentTestForks: Int(isBetween(0, 64)) = 0
 
 /// Base class for publish repository configuration.
 /// Credentials for the repository are looked up by `id` in `~/.deder/credentials.pkl`.

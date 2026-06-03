@@ -141,6 +141,12 @@ class DederProjectState(
               DederProjectStateData(newConfig, effectiveRegistry, tasksResolver, executionPlanner, dependencyResolver)
             lastGood = Right(goodProjectStateData)
             current = Right(goodProjectStateData)
+            // Update global semaphores from project config
+            val cpus = Runtime.getRuntime.availableProcessors()
+            val activeCompilers = if newConfig.maxActiveCompilers <= 0 then cpus else newConfig.maxActiveCompilers.toInt
+            val concurrentForks = if newConfig.maxConcurrentTestForks <= 0 then cpus else newConfig.maxConcurrentTestForks.toInt
+            DederGlobals.setCompileSemaphore(activeCompilers)
+            DederGlobals.setTestForkSemaphore(concurrentForks)
             triggerConfigWatchedTasks()
         }
       } catch {
