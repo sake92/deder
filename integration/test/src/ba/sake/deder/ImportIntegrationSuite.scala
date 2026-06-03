@@ -32,11 +32,11 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
     testImportFromFixture("import-sbt-cross-full")
   }
 
-  test("import sbt tpolecat".ignore) {
+  test("import sbt tpolecat") {
     testImportFromFixture("import-sbt-tpolecat")
   }
 
-  test("import sbt typelevel".ignore) {
+  test("import sbt typelevel") {
     testImportFromFixture("import-sbt-typelevel", initGit = true)
   }
 
@@ -66,7 +66,8 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
       initGit: Boolean = false
   ): Unit = {
     val fixturePath = os.RelPath("sample-projects") / fixtureName
-    val tempDir = os.pwd / "tmp" / s"$fixtureName-${System.currentTimeMillis()}"
+    // not in ./tmp coz sbt-typelevel would look at deder git repo tags..
+    val tempDir = os.temp.dir(prefix = s"$fixtureName-${System.currentTimeMillis()}")
 
     try {
       // Stage the fixture (copy all files except .deder/)

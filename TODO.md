@@ -1,10 +1,6 @@
 
 # Misc
-- fix docs flags..
-- stats for watched files??
-- custom ignore paths and maybe stats ??
-- show jdk version, server/client etc in web dash
-
+- depsTree depth
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - init like giter8, autoimport from sbt?
 - import from other maven effective POM etc
@@ -13,7 +9,6 @@
 - sbt-updates for deps
 - report core/build issues to metals: e.g. when dep doesnt exist
 - run pkldoc on each tag, and publish to ghpages https://pkl-lang.org/main/current/pkl-doc/index.html
-- move some settings from server.properties to deder.pkl like maxConcurrentTestForks? or remove maxConcurrentTestForks
 - show error level log in red? too much?
 
 
