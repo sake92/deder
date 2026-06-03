@@ -11,7 +11,6 @@ import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import io.opentelemetry.api.trace.StatusCode
 import scala.jdk.CollectionConverters.*
-import ox.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
 import ba.sake.deder.cli.TabCompleter
 import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
@@ -651,7 +650,7 @@ class DederProjectState(
           .ofVirtual()
           .start(() =>
             try
-              supervised {
+              ox.supervised {
                 RequestContext.current.supervisedWhere(ctx) {
                   watchedTask.serverNotificationsLogger.add(
                     ServerNotification.logInfo(
@@ -716,7 +715,7 @@ class DederProjectState(
           .ofVirtual()
           .start(() =>
             try
-              supervised {
+              ox.supervised {
                 RequestContext.current.supervisedWhere(ctx) {
                   watchedTask.serverNotificationsLogger.add(
                     ServerNotification.logInfo(

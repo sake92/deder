@@ -28,7 +28,7 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
     testImportFromFixture("import-sbt-cross-versions")
   }
 
-  test("import sbt cross-full".ignore) {
+  test("import sbt cross-full") {
     testImportFromFixture("import-sbt-cross-full")
   }
 
