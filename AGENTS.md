@@ -10,6 +10,18 @@ Prefer to use these tools/skills if available:
 - "scalex" for scala/java definitions, implementations, usages, imports, members, scaladoc, codebase overview, package 
 API surface, files, annotated symbols, file contents etc
 
+## Git Worktree (READ THIS FIRST)
+
+**NEVER work directly on `main` unless the user explicitly tells you to.**
+
+Before making any code changes:
+1. Create an isolated worktree: `git worktree add .worktrees/<descriptive-branch-name>`
+2. The branch name should describe the change (e.g., `fix/server-restart-hardening`, `feat/watch-ignore-paths`)
+3. All edits, commits, and builds happen inside the worktree
+4. This keeps `main` clean and avoids conflicts with the running Deder server
+
+**Every feature, fix, or refactor starts with a worktree. No exceptions.**
+
 ## Architecture
 
 ```
@@ -78,7 +90,7 @@ CLI communication uses newline-delimited JSON over Unix sockets. Message types a
 - **Examples**: `examples/` contains working sample projects (multi-module, cross-platform, ScalaJS, etc.). Each has a `reset.sh` that copies the server JAR and runs `deder bsp install`
 - **Design docs**: Never commit files in `docs/superpowers/` directory
 - **Git**: Do not commit anything without explicit user permission
-- **Git**: ALWAYS create a new worktree in ./.worktrees/ directory . Use `git worktree add` with a descriptive branch name (e.g., `fix/server-restart-hardening`). This keeps `main` clean and avoids conflicts with the running Deder server. Never work directly on `main` unless explicitly told by user!!!
+- **Git**: See the `## Git Worktree` section at the top of this file — always use worktrees for code changes
 
 ## Output Layout
 
