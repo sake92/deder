@@ -28,7 +28,8 @@ case class DepTree(
     rootDeps: Seq[DepNode],
     conflicts: Seq[DepConflict],
     totalSizeBytes: Long,
-    totalUniqueSizeBytes: Long
+    totalUniqueSizeBytes: Long,
+    maxDepth: Option[Int] = None
 ) derives JsonRW {
   def conflictCount: Int = conflicts.count(_.isConflict)
 }
@@ -42,7 +43,7 @@ object DepTree:
         buf ++= s"⚠️  Conflicts: ${tree.conflictCount}\n"
       buf ++= "Direct Dependencies:\n"
       for node <- tree.rootDeps do
-        renderNodeTree(node, tree, buf, "", isLast = true)
+        renderNodeTree(node, tree, buf, "", isLast = true, currentDepth = 1)
       if tree.conflicts.exists(_.isConflict) then
         buf ++= "\n\n⚠️  Version Conflicts:\n"
         for conflict <- tree.conflicts.filter(_.isConflict) do
@@ -57,7 +58,8 @@ object DepTree:
       tree: DepTree,
       buf: StringBuilder,
       prefix: String,
-      isLast: Boolean
+      isLast: Boolean,
+      currentDepth: Int
   ): Unit =
     val connector = if isLast then "└── " else "├── "
     val directSize = formatBytes(node.fileSizeBytes)
@@ -67,10 +69,16 @@ object DepTree:
     )
     val conflictMark = if conflict.isDefined then " [⚠️ CONFLICT]" else ""
     buf ++= s"$prefix$connector${node.coordinate} ($directSize | $transitiveSize)$conflictMark\n"
+
     val children = tree.allDeps.filter(_.parents.contains(node.coordinate))
-    for (child, idx) <- children.zipWithIndex do
-      val newPrefix = prefix + (if isLast then "    " else "│   ")
-      renderNodeTree(child, tree, buf, newPrefix, idx == children.length - 1)
+    val atDepthLimit = tree.maxDepth.exists(_ <= currentDepth)
+
+    if atDepthLimit && children.nonEmpty then
+      buf ++= s"$prefix${if isLast then "    " else "│   "}... ${children.size} deps hidden\n"
+    else
+      for (child, idx) <- children.zipWithIndex do
+        val newPrefix = prefix + (if isLast then "    " else "│   ")
+        renderNodeTree(child, tree, buf, newPrefix, idx == children.length - 1, currentDepth + 1)
 
   private def calculateTransitiveSize(node: DepNode, tree: DepTree): Long =
     node.fileSizeBytes +
