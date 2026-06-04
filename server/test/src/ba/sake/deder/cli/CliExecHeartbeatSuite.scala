@@ -16,9 +16,8 @@ class CliExecHeartbeatSuite extends munit.FunSuite {
       assertNoHeartbeat(emitted)
 
       clock.advanceBy(Duration.ofSeconds(1))
-      eventually() {
-        assertEquals(heartbeatLogs(emitted).map(_.level), Seq(LogLevel.INFO))
-      }
+      clock.awaitSleepCount(2)
+      assertEquals(heartbeatLogs(emitted).map(_.level), Seq(LogLevel.INFO))
     }
   }
 
