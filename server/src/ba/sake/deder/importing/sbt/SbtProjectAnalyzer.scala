@@ -30,8 +30,22 @@ class SbtProjectAnalyzer(
       .map { case (rootPath, modules) => RawGroup(rootPath, modules) }
       .toSeq
 
+    val (retainedGroups, skippedGroups) = skipAggregateOnlyRootGroups(grouped)
+    skippedGroups.foreach { case (rawGroup, reasons) =>
+      val root = rawGroup.rootPath.relativeTo(os.pwd).toString match {
+        case "" => "."
+        case r  => r
+      }
+      val ids = rawGroup.modules.map(_.id).distinct.sorted.mkString(",")
+      serverNotificationsLogger.add(
+        ServerNotification.logInfo(
+          s"Skipping aggregate-only sbt group '$ids' at '$root' because: ${reasons.mkString(", ")}"
+        )
+      )
+    }
+
     // Build group infos and global id mapping
-    val groupInfos = grouped.map(buildGroupInfo)
+    val groupInfos = retainedGroups.map(buildGroupInfo)
     val globalIdMap: Map[(String, String), ResolvedModuleRef] = groupInfos.flatMap(_.sbtIdToRef).toMap
     val refsByProject: Map[String, Seq[(String, ResolvedModuleRef)]] =
       groupInfos.flatMap(gi => gi.concreteExports.map(ce =>
@@ -44,7 +58,7 @@ class SbtProjectAnalyzer(
 
     serverNotificationsLogger.add(
       ServerNotification.logInfo(
-        s"Resolved ${groupInfos.size} module groups, ${globalIdMap.size} id mappings"
+        s"Resolved ${groupInfos.size} module groups, ${globalIdMap.size} id mappings (skipped ${skippedGroups.size} aggregate-only roots)"
       )
     )
 
@@ -392,6 +406,79 @@ class SbtProjectAnalyzer(
         Option.when(refs.size == 1)(refs.head._2)
       }
     }
+
+  private def skipAggregateOnlyRootGroups(
+      groups: Seq[RawGroup]
+  ): (Seq[RawGroup], Seq[(RawGroup, Seq[String])]) = {
+    val decisions = groups.map { group =>
+      val projectIds = group.modules.map(_.id).toSet
+      val atProjectRoot = group.rootPath == os.pwd
+      val hasSiblingGroups = groups.exists(_.rootPath != group.rootPath)
+      val hasIncomingRefs = groups
+        .filterNot(_ == group)
+        .exists(_.modules.exists(_.interProjectDependencies.exists(dep => projectIds.contains(dep.project))))
+      val noIncomingRefs = !hasIncomingRefs
+      val noOutgoingRefs = group.modules.forall(_.interProjectDependencies.isEmpty)
+      val noCompileTestDeps = group.modules.forall { pe =>
+        val (compileDeps, _, testDeps, _) = partitionDeps(pe)
+        compileDeps.isEmpty && testDeps.isEmpty
+      }
+      val noRealSourcesOnDisk =
+        if atProjectRoot && hasSiblingGroups then group.modules.forall(pe => !hasRealSourcesOnDisk(pe))
+        else false
+      val hasRootLikeNameCue = group.modules.exists(pe =>
+        looksLikeRootName(pe.id) || looksLikeRootName(pe.name) || looksLikeRootName(pe.artifactName)
+      )
+
+      val scoredSignals = Seq(
+        atProjectRoot -> "project root group",
+        noIncomingRefs -> "no incoming refs",
+        noOutgoingRefs -> "no outgoing inter-project deps",
+        noCompileTestDeps -> "no compile/test deps",
+        noRealSourcesOnDisk -> "no source/resource files on disk",
+        hasSiblingGroups -> "other non-root groups exist",
+        hasRootLikeNameCue -> "root-like naming cue",
+      )
+      val score = scoredSignals.count(_._1)
+      val mandatory = atProjectRoot && noRealSourcesOnDisk && hasSiblingGroups
+      val shouldSkip = mandatory && score >= 4
+      val reasons = scoredSignals.collect { case (true, reason) => reason }
+
+      (group, shouldSkip, reasons)
+    }
+
+    val kept = decisions.collect { case (group, false, _) => group }
+    val skipped = decisions.collect { case (group, true, reasons) => (group, reasons) }
+    (kept, skipped)
+  }
+
+  private def hasRealSourcesOnDisk(pe: ExportedProjectExportFile): Boolean = {
+    val base = os.Path(pe.base)
+
+    def resolveDir(rawDir: String): Option[os.Path] =
+      try {
+        val p = os.Path(rawDir, base)
+        Option.when(os.exists(p) && os.isDir(p))(p)
+      } catch case _: IllegalArgumentException => None
+
+    def dirContainsAnyFile(dir: os.Path, filePredicate: os.Path => Boolean): Boolean =
+      os.walk.stream(dir).exists(path => os.isFile(path) && filePredicate(path))
+
+    val sourceLikeDirs = (pe.sourceDirs ++ pe.testSourceDirs).flatMap(resolveDir)
+    val resourceDirs = (pe.resourceDirs ++ pe.testResourceDirs).flatMap(resolveDir)
+
+    val hasSourceFile = sourceLikeDirs.exists(dir =>
+      dirContainsAnyFile(dir, path => path.ext == "scala" || path.ext == "java")
+    )
+    val hasResourceFile = resourceDirs.exists(dir => dirContainsAnyFile(dir, _ => true))
+
+    hasSourceFile || hasResourceFile
+  }
+
+  private def looksLikeRootName(value: String): Boolean = {
+    val lower = value.toLowerCase
+    lower == "root" || lower.contains("-root") || lower.contains("_root")
+  }
 }
 
 object SbtProjectAnalyzer {
