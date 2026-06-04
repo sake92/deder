@@ -1,6 +1,6 @@
 
 # Misc
-- depsTree depth
+- init() plugin in new thread?
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - init like giter8, autoimport from sbt?
 - import from other maven effective POM etc
@@ -31,15 +31,4 @@
 ## Packaging, publishing
 - test if user/pass works for other rpos: nexus etc
 - publish for github packages etc
-
-
-## Web server dashboard
-
-- filtering
-- list of tasks in each module
-- current locks being held
-- filtering of modules and tasks
-- execute a task, if not "run" ?
-
-
 
