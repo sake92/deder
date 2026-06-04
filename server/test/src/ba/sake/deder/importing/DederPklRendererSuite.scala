@@ -406,6 +406,40 @@ class DederPklRendererSuite extends FunSuite {
     ))
   }
 
+  test("cross-platform moduleDeps resolve to matching platform modules") {
+    val versions = Seq("3.3.5")
+    val lib = concreteCrossGroup(
+      "lib",
+      versions,
+      layout = DederProject.DirLayout.SBT_CROSS_FULL,
+      slices = Seq(
+        ("3.3.5", "jvm", emptyModule(scalaVersion = "3.3.5")),
+        ("3.3.5", "js", emptyModule(scalaVersion = "3.3.5", scalaJsVersion = Some("1.18.2"))),
+        ("3.3.5", "native", emptyModule(scalaVersion = "3.3.5", scalaNativeVersion = Some("0.5.10")))
+      )
+    )
+    val app = concreteCrossGroup(
+      "app",
+      versions,
+      layout = DederProject.DirLayout.SBT_CROSS_FULL,
+      slices = Seq(
+        ("3.3.5", "jvm", emptyModule(scalaVersion = "3.3.5", moduleDeps = Seq(ModuleDepRef("lib", "jvm", targetScalaVersion = Some("3.3.5"), isTest = false)))),
+        ("3.3.5", "js", emptyModule(scalaVersion = "3.3.5", scalaJsVersion = Some("1.18.2"), moduleDeps = Seq(ModuleDepRef("lib", "js", targetScalaVersion = Some("3.3.5"), isTest = false)))),
+        ("3.3.5", "native", emptyModule(scalaVersion = "3.3.5", scalaNativeVersion = Some("0.5.10"), moduleDeps = Seq(ModuleDepRef("lib", "native", targetScalaVersion = Some("3.3.5"), isTest = false))))
+      )
+    )
+    val build = DederBuild(Seq(lib, app), Seq.empty)
+    val mods = renderedModules(build)
+
+    val appJvm = scalaMod(findBy("app-jvm-3.3.5", mods))
+    val appJs = scalaMod(findBy("app-js-3.3.5", mods))
+    val appNative = scalaMod(findBy("app-native-3.3.5", mods))
+
+    assert(appJvm.moduleDeps.asScala.toSeq.map(_.id).contains("lib-jvm-3.3.5"))
+    assert(appJs.moduleDeps.asScala.toSeq.map(_.id).contains("lib-js-3.3.5"))
+    assert(appNative.moduleDeps.asScala.toSeq.map(_.id).contains("lib-native-3.3.5"))
+  }
+
   test("cross-version module dep on non-cross module uses direct accessor") {
     val versions = Seq("2.12.21", "2.13.18")
     val lib = ModuleGroup("lib", ".", DederProject.DirLayout.SBT, Seq.empty,

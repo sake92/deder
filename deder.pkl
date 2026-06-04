@@ -11,7 +11,7 @@ local const versions = new {
   scalaLogging = "3.9.5"
 }
 
-local const function pom(artId: String, artName: String) = new PomSettings {
+local const function pom(artId: String, artName: String): PomSettings = new {
   groupId = "ba.sake"
   artifactId = artId
   version = read?("env:VERSION")

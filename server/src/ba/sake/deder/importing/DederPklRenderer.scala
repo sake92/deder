@@ -641,7 +641,9 @@ object DederPklRenderer {
               amendExpr,
               m.copy(scalacPluginDeps = Seq.empty),
               scalaJsVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(jsVersion),
-              scalaNativeVersion = None
+              scalaNativeVersion = None,
+              scalaVersionCtx = Some(ScalaVersionCtx.Placeholder),
+              groupLookup = groupLookup
             )
             s"  $body"
           }
@@ -662,7 +664,9 @@ object DederPklRenderer {
               amendExpr,
               m.copy(scalacPluginDeps = Seq.empty),
               scalaJsVersion = None,
-              scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion)
+              scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion),
+              scalaVersionCtx = Some(ScalaVersionCtx.Placeholder),
+              groupLookup = groupLookup
             )
             s"  $body"
           }
@@ -793,7 +797,9 @@ object DederPklRenderer {
             amendExpr,
             m,
             scalaJsVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(jsVersion),
-            scalaNativeVersion = None
+            scalaNativeVersion = None,
+            scalaVersionCtx = scalaVersionCtx,
+            groupLookup = groupLookup
           )
           s"  $body"
         }
@@ -815,7 +821,9 @@ object DederPklRenderer {
             amendExpr,
             m,
             scalaJsVersion = None,
-            scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion)
+            scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion),
+            scalaVersionCtx = scalaVersionCtx,
+            groupLookup = groupLookup
           )
           s"  $body"
         }
@@ -927,7 +935,9 @@ object DederPklRenderer {
       amendExpr: String,
       m: ModuleDef,
       scalaJsVersion: Option[String],
-      scalaNativeVersion: Option[String]
+      scalaNativeVersion: Option[String],
+      scalaVersionCtx: Option[ScalaVersionCtx],
+      groupLookup: Map[String, ModuleGroup]
   ): String = {
     val versionProp = scalaJsVersion
       .map(v => s"""    scalaJsVersion = "$v"""")
@@ -936,14 +946,17 @@ object DederPklRenderer {
       )
       .getOrElse("")
 
-    val hasExtra = m.deps.nonEmpty || m.scalacPluginDeps.nonEmpty
+    val hasExtra = m.deps.nonEmpty || m.scalacPluginDeps.nonEmpty || m.moduleDeps.nonEmpty
     if (hasExtra) {
       val depsStr = renderDeps(m.deps, indent = 4)
       val pluginsStr = renderPluginDeps(m.scalacPluginDeps, indent = 4)
+      val moduleDepsStr = renderModuleDepsPkl(m.moduleDeps, indent = 4, scalaVersionCtx, groupLookup)
       s"""$label = ($amendExpr) {
          |$versionProp
          |${if (depsStr.nonEmpty) s"$depsStr\n" else ""}${
-          if (pluginsStr.nonEmpty) s"$pluginsStr\n" else ""
+         if (pluginsStr.nonEmpty) s"$pluginsStr\n" else ""
+        }${
+         if (moduleDepsStr.nonEmpty) s"$moduleDepsStr\n" else ""
         }  }""".stripMargin
     } else {
       s"""$label = ($amendExpr) { $versionProp }"""

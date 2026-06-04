@@ -8,6 +8,16 @@ class SbtProjectAnalyzerSuite extends FunSuite {
 
     private val noopLogger = ServerNotificationsLogger(_ => ())
 
+    private val scalajsLib = DependencyExport(
+                    organization = "org.scala-js",
+                    name = "scalajs-library",
+                    revision = "1.0.0",
+                    extraAttributes = Map.empty,
+                    configurations = None,
+                    excludes = Seq.empty,
+                    crossVersion = "none",
+                )
+
     private def baseModule(
         id: String,
         base: String,
@@ -169,9 +179,9 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         withDirs(Seq(root / "jvm", root / "js")) {
             val build = analyzer.analyze(IndexedSeq(
                 baseModule("core", s"$rootStr/jvm", "coreJVM", scalaVersion = "2.13.15", plugins = plugins),
-                baseModule("core", s"$rootStr/js", "coreJS", scalaVersion = "2.13.15", plugins = plugins),
+                baseModule("core", s"$rootStr/js", "coreJS", scalaVersion = "2.13.15", plugins = plugins, externalDeps = Seq(scalajsLib)),
                 baseModule("core", s"$rootStr/jvm", "coreJVM", scalaVersion = "3.3.5", plugins = plugins),
-                baseModule("core", s"$rootStr/js", "coreJS", scalaVersion = "3.3.5", plugins = plugins),
+                baseModule("core", s"$rootStr/js", "coreJS", scalaVersion = "3.3.5", plugins = plugins, externalDeps = Seq(scalajsLib)),
             ))
 
             val group = build.moduleGroups.head
@@ -312,6 +322,7 @@ class SbtProjectAnalyzerSuite extends FunSuite {
             name = "libraryJS",
             scalaVersion = "3.3.5",
             plugins = Seq("ScalaJSCrossPlugin"),
+            externalDeps = Seq(scalajsLib),
         )
         val analyzer = new SbtProjectAnalyzer(noopLogger)
         withDirs(Seq(root / "library" / "jvm", root / "library" / "js")) {
@@ -347,6 +358,7 @@ class SbtProjectAnalyzerSuite extends FunSuite {
             name = "libraryJS",
             scalaVersion = "3.3.5",
             plugins = Seq("ScalaJSCrossPlugin"),
+            externalDeps = Seq(scalajsLib),
         )
         val analyzer = new SbtProjectAnalyzer(noopLogger)
         withDirs(Seq(root / "library" / "jvm", root / "library" / "js")) {
@@ -378,7 +390,7 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         withDirs(Seq(root / "jvm", root / "js")) {
             analyzer.analyze(IndexedSeq(
                 baseModule("core", s"$rootStr/jvm", "coreJVM", scalaVersion = "2.13.15", plugins = plugins, externalDeps = Seq(dep213Jvm)),
-                baseModule("core", s"$rootStr/js", "coreJS", scalaVersion = "2.13.15", plugins = plugins, externalDeps = Seq(dep213Js)),
+                baseModule("core", s"$rootStr/js", "coreJS", scalaVersion = "2.13.15", plugins = plugins, externalDeps = Seq(scalajsLib, dep213Js)),
                 baseModule("core", s"$rootStr/jvm", "coreJVM", scalaVersion = "3.3.5", plugins = plugins, externalDeps = Seq(dep3Jvm)),
             ))
 

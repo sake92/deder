@@ -363,11 +363,11 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
                   scalaVersion,
                   ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
                 ),
-                Dependency.make(
+                /*Dependency.make(
                   s"org.scala-native::scalalib::${scalaSpecificVersion}",
                   scalaVersion,
                   ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
-                ),
+                ),*/
                 Dependency.make(
                   s"org.scala-native::javalib::${m.scalaNativeVersion}",
                   scalaVersion,
