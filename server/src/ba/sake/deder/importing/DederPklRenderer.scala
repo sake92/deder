@@ -629,7 +629,7 @@ object DederPklRenderer {
         val jsTmpl = repMods
           .get("js")
           .map { m =>
-            val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
+            val jsVersion = m.scalaJsVersion.get
             val amendExpr = platformAmendExpr(
               g,
               "Js",
@@ -650,7 +650,7 @@ object DederPklRenderer {
         val nativeTmpl = repMods
           .get("native")
           .map { m =>
-            val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
+            val nativeVersion = m.scalaNativeVersion.get
             val amendExpr = platformAmendExpr(
               g,
               "Native",
@@ -672,7 +672,7 @@ object DederPklRenderer {
           .get("js")
           .map { m =>
             if (m.testDeps.nonEmpty) {
-              val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
+              val jsVersion = m.scalaJsVersion.get
               val amendExpr = platformAmendExpr(
                 g,
                 "JsTest",
@@ -689,7 +689,7 @@ object DederPklRenderer {
           .get("native")
           .map { m =>
             if (m.testDeps.nonEmpty) {
-              val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
+              val nativeVersion = m.scalaNativeVersion.get
               val amendExpr = platformAmendExpr(
                 g,
                 "NativeTest",
@@ -780,7 +780,7 @@ object DederPklRenderer {
       val jsTmpl = modulesByPlatform
         .get("js")
         .map { m =>
-          val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
+          val jsVersion = m.scalaJsVersion.get
           val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
           val amendExpr = platformAmendExpr(
             g,
@@ -802,7 +802,7 @@ object DederPklRenderer {
       val nativeTmpl = modulesByPlatform
         .get("native")
         .map { m =>
-          val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
+          val nativeVersion = m.scalaNativeVersion.get
           val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
           val amendExpr = platformAmendExpr(
             g,
@@ -825,7 +825,7 @@ object DederPklRenderer {
         .get("js")
         .map { m =>
           if (m.testDeps.nonEmpty) {
-            val jsVersion = m.scalaJsVersion.getOrElse("1.18.2")
+            val jsVersion = m.scalaJsVersion.get
             val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
             val amendExpr = platformAmendExpr(
               g,
@@ -843,7 +843,7 @@ object DederPklRenderer {
         .get("native")
         .map { m =>
           if (m.testDeps.nonEmpty) {
-            val nativeVersion = m.scalaNativeVersion.getOrElse("0.5.10")
+            val nativeVersion = m.scalaNativeVersion.get
             val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
             val amendExpr = platformAmendExpr(
               g,

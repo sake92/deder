@@ -251,8 +251,8 @@ class SbtProjectAnalyzer(
       testDeps = testDeps,
       moduleDeps = moduleDeps,
       testModuleDeps = testModuleDeps,
-      scalaJsVersion = if (isJs) Some(SbtProjectAnalyzer.DefaultScalaJsVersion) else None,
-      scalaNativeVersion = if (isNative) Some(SbtProjectAnalyzer.DefaultScalaNativeVersion) else None,
+      scalaJsVersion = if (isJs) extractScalaJsVersion(pe.externalDependencies) else None,
+      scalaNativeVersion = if (isNative) extractScalaNativeVersion(pe.externalDependencies) else None,
       publish = publish,
       sources = finalSourceDirs,
       testSources = finalTestSourceDirs,
@@ -282,6 +282,12 @@ class SbtProjectAnalyzer(
       .distinct
     (compileDeps, pluginDeps, testDeps, ignoredCount)
   }
+
+  private def extractScalaJsVersion(deps: Seq[DependencyExport]): Option[String] =
+    deps.collectFirst { case d if d.organization == "org.scala-js" && d.name == "scalajs-library" => d.revision }
+
+  private def extractScalaNativeVersion(deps: Seq[DependencyExport]): Option[String] =
+    deps.collectFirst { case d if d.organization == "org.scala-native" && d.name == "nativelib" => d.revision }
 
   private def toDepDef(d: DependencyExport): DepDef = DepDef(
     formatted = SbtProjectAnalyzer.formatDependency(d),
@@ -387,9 +393,6 @@ class SbtProjectAnalyzer(
 }
 
 object SbtProjectAnalyzer {
-
-  val DefaultScalaJsVersion = "1.18.2"
-  val DefaultScalaNativeVersion = "0.5.10"
 
   private val IgnoredDeps = Set(
     ("org.scala-lang", "scala3-library"),
