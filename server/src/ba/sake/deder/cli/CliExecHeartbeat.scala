@@ -4,6 +4,7 @@ import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import ba.sake.deder.ServerNotification
+import ba.sake.deder.RequestContext
 
 final class CliExecHeartbeat(
     quietPeriod: Duration = Duration.ofSeconds(60),
@@ -12,6 +13,7 @@ final class CliExecHeartbeat(
     sleep: Duration => Unit = duration => Thread.sleep(duration.toMillis)
 ) extends AutoCloseable {
 
+  private val requestContext = RequestContext.current.get()
   private val lastVisibleActivityAt = new AtomicReference[Instant](now())
   private val closed = new AtomicBoolean(false)
   private val worker = Thread
@@ -37,7 +39,9 @@ final class CliExecHeartbeat(
         if remaining.isNegative || remaining.isZero then
           val heartbeatAt = now()
           if !closed.get() && lastVisibleActivityAt.compareAndSet(activityAt, heartbeatAt) then
-            emit(CliServerMessage.info("Still working..."))
+            RequestContext.current.supervisedWhere(requestContext) {
+              emit(CliServerMessage.info("Still working..."))
+            }
         else
           sleep(remaining)
     catch
