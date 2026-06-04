@@ -61,6 +61,7 @@ The core abstraction is `Task[T, Deps]` (`server/src/ba/sake/deder/Task.scala`).
 - `CachedTask` — skips re-execution when input hashes match (`metadata.json` in `.deder/out/<module>/<task>/`)
 - `TaskBuilder.make[T]("name").dependsOn(otherTask).build { ctx => ... }` — fluent task construction
 - Tasks are defined in `CoreTasks.scala` and registered via `TasksRegistry`
+- **CRITICAL**: Any data class that is a task result type (`T` in `Task[T, Deps, S]`) and contains `DederPath` or `os.Path` fields MUST have a custom `Hashable[T]` instance. The low-priority JSON-based `Hashable` fallback serializes paths as strings — missing actual file/directory content changes. Without a custom `Hashable`, downstream `CachedTask`s will hit stale cache entries because their `inputsHash` (computed from upstream `outputHash`es) never changes. See `CompileResult` for an example of a custom `Hashable` that includes content hashing.
 
 ### Task Execution Flow
 1. `TasksResolver` builds a JGraphT `SimpleDirectedGraph[TaskInstance, DefaultEdge]` from modules × tasks
