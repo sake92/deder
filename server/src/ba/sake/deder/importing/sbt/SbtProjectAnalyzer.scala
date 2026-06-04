@@ -240,16 +240,19 @@ class SbtProjectAnalyzer(
     } else None
 
     val moduleBasePath = os.Path(pe.base)
+    val sourceRelBase =
+      if (SbtProjectAnalyzer.shouldRelativizeToCrossRoot(layout, moduleBasePath.last)) moduleBasePath / os.up
+      else moduleBasePath
 
     val filteredSources = SbtProjectAnalyzer.filterManagedDirs(pe.sourceDirs)
     val filteredTestSources = SbtProjectAnalyzer.filterManagedDirs(pe.testSourceDirs)
     val filteredResources = SbtProjectAnalyzer.filterManagedDirs(pe.resourceDirs)
     val filteredTestResources = SbtProjectAnalyzer.filterManagedDirs(pe.testResourceDirs)
 
-    val relSourceDirs = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredSources)
-    val relTestSourceDirs = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredTestSources)
-    val relResourceDirs = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredResources)
-    val relTestResourceDirs = SbtProjectAnalyzer.relativizeTo(moduleBasePath, filteredTestResources)
+    val relSourceDirs = SbtProjectAnalyzer.relativizeTo(sourceRelBase, filteredSources)
+    val relTestSourceDirs = SbtProjectAnalyzer.relativizeTo(sourceRelBase, filteredTestSources)
+    val relResourceDirs = SbtProjectAnalyzer.relativizeTo(sourceRelBase, filteredResources)
+    val relTestResourceDirs = SbtProjectAnalyzer.relativizeTo(sourceRelBase, filteredTestResources)
 
     val finalSourceDirs = SbtProjectAnalyzer.filterStandardSbtDirs(relSourceDirs, layout)
     val finalTestSourceDirs = SbtProjectAnalyzer.filterStandardSbtDirs(relTestSourceDirs, layout)
@@ -550,6 +553,16 @@ object SbtProjectAnalyzer {
   def filterStandardSbtDirs(dirs: Seq[String], layout: DederProject.DirLayout): Seq[String] =
     if (!layout.toString.toLowerCase.startsWith("sbt")) dirs
     else dirs.filterNot(d => SbtStandardDirPattern.findFirstIn(d).isDefined)
+
+  def shouldRelativizeToCrossRoot(layout: DederProject.DirLayout, moduleBaseLastSegment: String): Boolean = {
+    val isSbtCrossLayout = layout == DederProject.DirLayout.SBT_CROSS_FULL ||
+      layout == DederProject.DirLayout.SBT_CROSS_PURE ||
+      layout == DederProject.DirLayout.SBT_CROSS_DUMMY
+    val isPlatformLeaf = lastIsPlatform(moduleBaseLastSegment, "jvm") ||
+      lastIsPlatform(moduleBaseLastSegment, "js") ||
+      lastIsPlatform(moduleBaseLastSegment, "native")
+    isSbtCrossLayout && isPlatformLeaf
+  }
 
   def detectLayout(plugins: Seq[String], projectBaseDir: String): DederProject.DirLayout = {
     val hasCrossProject = plugins.exists(p =>

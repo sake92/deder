@@ -662,6 +662,68 @@ class DederPklRendererSuite extends FunSuite {
     assert(rendered.contains("""local const coreModules = coreScalaVersions"""))
   }
 
+  test("typelevel cross-version falls back js/native moduleDeps from jvm deps when missing") {
+    val versions = Seq("2.13.18", "3.7.4")
+    val depSlices = for {
+      sv <- versions
+      platform <- Seq("jvm", "js", "native")
+    } yield ConcreteModule(
+      sbtProjectId = s"dep-$platform-$sv",
+      scalaVersion = sv,
+      platform = platform,
+      module = emptyModule(
+        scalaVersion = sv,
+        scalaJsVersion = Option.when(platform == "js")("1.18.2"),
+        scalaNativeVersion = Option.when(platform == "native")("0.5.10")
+      )
+    )
+    val depGroup = ModuleGroup(
+      builderVarName = "dep",
+      root = ".",
+      layout = DederProject.DirLayout.SBT_CROSS_FULL,
+      crossScalaVersions = versions,
+      concreteModules = depSlices
+    )
+
+    val appSlices = for {
+      sv <- versions
+      platform <- Seq("jvm", "js", "native")
+    } yield {
+      val jvmDeps = Seq(ModuleDepRef("dep", "jvm", Some(sv), isTest = false))
+      val jvmTestDeps = Seq(ModuleDepRef("dep", "jvm", Some(sv), isTest = true))
+      ConcreteModule(
+        sbtProjectId = s"app-$platform-$sv",
+        scalaVersion = sv,
+        platform = platform,
+        module = emptyModule(
+          scalaVersion = sv,
+          moduleDeps = Option.when(platform == "jvm")(jvmDeps).getOrElse(Seq.empty),
+          testModuleDeps = Option.when(platform == "jvm")(jvmTestDeps).getOrElse(Seq.empty),
+          scalaJsVersion = Option.when(platform == "js")("1.18.2"),
+          scalaNativeVersion = Option.when(platform == "native")("0.5.10")
+        )
+      )
+    }
+    val appGroup = ModuleGroup(
+      builderVarName = "app",
+      root = ".",
+      layout = DederProject.DirLayout.SBT_CROSS_FULL,
+      crossScalaVersions = versions,
+      concreteModules = appSlices,
+      usesTypelevel = true
+    )
+    val rendered = DederPklRenderer.render(DederBuild(Seq(depGroup, appGroup), Seq.empty))
+
+    assert(rendered.contains("""jsTemplate = (DederTypelevel.jsForVersion(sv, "1.18.2")) {"""))
+    assert(rendered.contains("""depModules.find((m) -> m.id == "dep-js-\(sv)")"""))
+    assert(rendered.contains("""nativeTemplate = (DederTypelevel.nativeForVersion(sv, "0.5.10")) {"""))
+    assert(rendered.contains("""depModules.find((m) -> m.id == "dep-native-\(sv)")"""))
+    assert(rendered.contains("""jsTestTemplate = (DederTypelevel.jsTestForVersion(sv, "1.18.2")) {"""))
+    assert(rendered.contains("""depModules.find((m) -> m.id == "dep-js-test-\(sv)")"""))
+    assert(rendered.contains("""nativeTestTemplate = (DederTypelevel.nativeTestForVersion(sv, "0.5.10")) {"""))
+    assert(rendered.contains("""depModules.find((m) -> m.id == "dep-native-test-\(sv)")"""))
+  }
+
   test("typelevel templates keep compiler plugin deps on test modules") {
     val pluginD = dep("org.wartremover", "wartremover", "3.5.0", crossVersion = "full")
     val build = DederBuild(

@@ -17,6 +17,15 @@ class SbtProjectAnalyzerSuite extends FunSuite {
                     excludes = Seq.empty,
                     crossVersion = "none",
                 )
+    private val scalanativeLib = DependencyExport(
+                    organization = "org.scala-native",
+                    name = "nativelib",
+                    revision = "0.5.2",
+                    extraAttributes = Map.empty,
+                    configurations = None,
+                    excludes = Seq.empty,
+                    crossVersion = "none",
+                )
 
     private def baseModule(
         id: String,
@@ -29,6 +38,10 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         scalacOptions: Seq[String] = Seq.empty,
         javacOptions: Seq[String] = Seq.empty,
         repositories: Seq[String] = Seq.empty,
+        sourceDirs: Seq[String] = Seq("src/main/scala"),
+        testSourceDirs: Seq[String] = Seq("src/test/scala"),
+        resourceDirs: Seq[String] = Seq.empty,
+        testResourceDirs: Seq[String] = Seq.empty,
     ): ExportedProjectExportFile = ExportedProjectExportFile(
         payload = ProjectExport(
             id = id,
@@ -40,10 +53,10 @@ class SbtProjectAnalyzerSuite extends FunSuite {
             interProjectDependencies = interProjectDeps,
             externalDependencies = externalDeps,
             repositories = repositories,
-            sourceDirs = Seq("src/main/scala"),
-            testSourceDirs = Seq("src/test/scala"),
-            resourceDirs = Seq.empty,
-            testResourceDirs = Seq.empty,
+            sourceDirs = sourceDirs,
+            testSourceDirs = testSourceDirs,
+            resourceDirs = resourceDirs,
+            testResourceDirs = testResourceDirs,
             plugins = plugins,
             organization = "com.example",
             artifactName = name,
@@ -229,6 +242,36 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         )
     }
 
+    test("cross-platform deps keep platform-specific targets") {
+        val root = os.pwd / "tmp" / "sbt-project-analyzer-suite" / "cross-platform-deps"
+        val rootStr = root.toString
+        val plugins = Seq("ScalaJSCrossPlugin", "ScalaNativeCrossPlugin")
+        withDirs(Seq(root / "parser" / "jvm", root / "parser" / "js", root / "parser" / "native", root / "util" / "jvm", root / "util" / "js", root / "util" / "native", root / "ast" / "jvm", root / "ast" / "js", root / "ast" / "native")) {
+            val analyzer = new SbtProjectAnalyzer(noopLogger)
+            val build = analyzer.analyze(IndexedSeq(
+                baseModule("parserJVM", s"$rootStr/parser/jvm", "parser", plugins = plugins),
+                baseModule("parserJS", s"$rootStr/parser/js", "parser", plugins = plugins, externalDeps = Seq(scalajsLib)),
+                baseModule("parserNative", s"$rootStr/parser/native", "parser", plugins = plugins, externalDeps = Seq(scalanativeLib)),
+                baseModule("utilJVM", s"$rootStr/util/jvm", "util", plugins = plugins, interProjectDeps = Seq(InterProjectDependencyExport("parserJVM", "compile->compile;test->test"))),
+                baseModule("utilJS", s"$rootStr/util/js", "util", plugins = plugins, externalDeps = Seq(scalajsLib), interProjectDeps = Seq(InterProjectDependencyExport("parserJS", "compile->compile;test->test"))),
+                baseModule("utilNative", s"$rootStr/util/native", "util", plugins = plugins, externalDeps = Seq(scalanativeLib), interProjectDeps = Seq(InterProjectDependencyExport("parserNative", "compile->compile;test->test"))),
+                baseModule("astJVM", s"$rootStr/ast/jvm", "ast", plugins = plugins, interProjectDeps = Seq(InterProjectDependencyExport("parserJVM", "compile->compile;test->test"), InterProjectDependencyExport("utilJVM", "compile->compile;test->test"))),
+                baseModule("astJS", s"$rootStr/ast/js", "ast", plugins = plugins, externalDeps = Seq(scalajsLib), interProjectDeps = Seq(InterProjectDependencyExport("parserJS", "compile->compile;test->test"), InterProjectDependencyExport("utilJS", "compile->compile;test->test"))),
+                baseModule("astNative", s"$rootStr/ast/native", "ast", plugins = plugins, externalDeps = Seq(scalanativeLib), interProjectDeps = Seq(InterProjectDependencyExport("parserNative", "compile->compile;test->test"), InterProjectDependencyExport("utilNative", "compile->compile;test->test"))),
+            ))
+
+            val astGroup = build.moduleGroups.find(_.builderVarName == "ast").get
+            assertEquals(
+                concreteModule(astGroup, "3.3.5", "js").module.moduleDeps.map(_.targetPlatform).sorted,
+                Seq("js", "js")
+            )
+            assertEquals(
+                concreteModule(astGroup, "3.3.5", "native").module.moduleDeps.map(_.targetPlatform).sorted,
+                Seq("native", "native")
+            )
+        }
+    }
+
     test("falls back to the only exported slice when inter-project deps cross scala patch versions") {
         val root = os.pwd / "target" / "sbt-project-analyzer-suite" / "snowplow-repro"
         val compatibility = baseModule(
@@ -406,6 +449,58 @@ class SbtProjectAnalyzerSuite extends FunSuite {
         val build = analyzer.analyze(IndexedSeq(mod))
         assertEquals(build.repositories.size, 1)
         assertEquals(build.repositories.head.url, "https://repo.example.com/maven")
+    }
+
+    test("cross-full modules retain non-standard shared source dirs outside platform base") {
+        val root = os.pwd / "tmp" / "sbt-project-analyzer-suite" / "cross-full-shared-dirs"
+        val plugins = Seq("ScalaJSCrossPlugin", "ScalaNativeCrossPlugin")
+        withDirs(Seq(root / "jvm", root / "js", root / "native", root / "shared", root / "js-jvm", root / "js-native", root / "jvm-native")) {
+            val jvmSources = Seq(
+                (root / "jvm" / "src" / "main" / "scala").toString,
+                (root / "shared" / "src" / "main" / "scala").toString,
+                (root / "js-jvm" / "src" / "main" / "scala").toString,
+                (root / "jvm-native" / "src" / "main" / "scala").toString,
+            )
+            val jsSources = Seq(
+                (root / "js" / "src" / "main" / "scala").toString,
+                (root / "shared" / "src" / "main" / "scala").toString,
+                (root / "js-jvm" / "src" / "main" / "scala").toString,
+                (root / "js-native" / "src" / "main" / "scala").toString,
+            )
+            val nativeSources = Seq(
+                (root / "native" / "src" / "main" / "scala").toString,
+                (root / "shared" / "src" / "main" / "scala").toString,
+                (root / "js-native" / "src" / "main" / "scala").toString,
+                (root / "jvm-native" / "src" / "main" / "scala").toString,
+            )
+            val analyzer = new SbtProjectAnalyzer(noopLogger)
+            val build = analyzer.analyze(IndexedSeq(
+                baseModule("astJVM", (root / "jvm").toString, "ast", plugins = plugins, sourceDirs = jvmSources),
+                baseModule("astJS", (root / "js").toString, "ast", plugins = plugins, externalDeps = Seq(scalajsLib), sourceDirs = jsSources),
+                baseModule(
+                    "astNative",
+                    (root / "native").toString,
+                    "ast",
+                    plugins = plugins,
+                    sourceDirs = nativeSources,
+                    externalDeps = Seq(scalanativeLib),
+                ),
+            ))
+
+            val group = build.moduleGroups.head
+            assertEquals(concreteModule(group, "3.3.5", "jvm").module.sources.sorted, Seq(
+                "js-jvm/src/main/scala",
+                "jvm-native/src/main/scala",
+            ))
+            assertEquals(concreteModule(group, "3.3.5", "js").module.sources.sorted, Seq(
+                "js-jvm/src/main/scala",
+                "js-native/src/main/scala",
+            ))
+            assertEquals(concreteModule(group, "3.3.5", "native").module.sources.sorted, Seq(
+                "js-native/src/main/scala",
+                "jvm-native/src/main/scala",
+            ))
+        }
     }
 
     test("filterManagedDirs removes src_managed, resource_managed, and target/ paths") {

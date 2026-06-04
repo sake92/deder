@@ -630,6 +630,9 @@ object DederPklRenderer {
           .get("js")
           .map { m =>
             val jsVersion = m.scalaJsVersion.getOrElse(throw new IllegalStateException(s"Missing scalaJsVersion for Scala.js module ${g.builderVarName}"))
+            val jsModuleDeps =
+              if (m.moduleDeps.nonEmpty) m.moduleDeps
+              else remapModuleDepsToPlatform(jvmModule.moduleDeps, "js", groupLookup)
             val amendExpr = platformAmendExpr(
               g,
               "Js",
@@ -639,7 +642,7 @@ object DederPklRenderer {
             val body = renderJsNativeOverride(
               "jsTemplate",
               amendExpr,
-              m.copy(scalacPluginDeps = Seq.empty),
+              m.copy(scalacPluginDeps = Seq.empty, moduleDeps = jsModuleDeps),
               scalaJsVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(jsVersion),
               scalaNativeVersion = None,
               scalaVersionCtx = Some(ScalaVersionCtx.Placeholder),
@@ -653,6 +656,9 @@ object DederPklRenderer {
           .get("native")
           .map { m =>
             val nativeVersion = m.scalaNativeVersion.getOrElse(throw new IllegalStateException(s"Missing scalaNativeVersion for Scala Native module ${g.builderVarName}"))
+            val nativeModuleDeps =
+              if (m.moduleDeps.nonEmpty) m.moduleDeps
+              else remapModuleDepsToPlatform(jvmModule.moduleDeps, "native", groupLookup)
             val amendExpr = platformAmendExpr(
               g,
               "Native",
@@ -662,7 +668,7 @@ object DederPklRenderer {
             val body = renderJsNativeOverride(
               "nativeTemplate",
               amendExpr,
-              m.copy(scalacPluginDeps = Seq.empty),
+              m.copy(scalacPluginDeps = Seq.empty, moduleDeps = nativeModuleDeps),
               scalaJsVersion = None,
               scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion),
               scalaVersionCtx = Some(ScalaVersionCtx.Placeholder),
@@ -675,7 +681,10 @@ object DederPklRenderer {
         val jsTestTmpl = repMods
           .get("js")
           .map { m =>
-            if (m.testDeps.nonEmpty) {
+            val jsTestModuleDeps =
+              if (m.testModuleDeps.nonEmpty) m.testModuleDeps
+              else remapModuleDepsToPlatform(jvmModule.testModuleDeps, "js", groupLookup)
+            if (m.testDeps.nonEmpty || jsTestModuleDeps.nonEmpty) {
               val jsVersion = m.scalaJsVersion.getOrElse(throw new IllegalStateException(s"Missing scalaJsVersion for Scala.js module ${g.builderVarName}"))
               val amendExpr = platformAmendExpr(
                 g,
@@ -684,7 +693,8 @@ object DederPklRenderer {
                 Some(jsVersion)
               )
               val depsStr = renderDeps(m.testDeps, indent = 6)
-              s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
+              val moduleDepsStr = renderModuleDepsPkl(jsTestModuleDeps, indent = 6, Some(ScalaVersionCtx.Placeholder), groupLookup)
+              s"  jsTestTemplate = ($amendExpr) {\n${if (depsStr.nonEmpty) depsStr + "\n" else ""}${if (moduleDepsStr.nonEmpty) moduleDepsStr + "\n" else ""}  }"
             } else ""
           }
           .getOrElse("")
@@ -692,7 +702,10 @@ object DederPklRenderer {
         val nativeTestTmpl = repMods
           .get("native")
           .map { m =>
-            if (m.testDeps.nonEmpty) {
+            val nativeTestModuleDeps =
+              if (m.testModuleDeps.nonEmpty) m.testModuleDeps
+              else remapModuleDepsToPlatform(jvmModule.testModuleDeps, "native", groupLookup)
+            if (m.testDeps.nonEmpty || nativeTestModuleDeps.nonEmpty) {
               val nativeVersion = m.scalaNativeVersion.getOrElse(throw new IllegalStateException(s"Missing scalaNativeVersion for Scala Native module ${g.builderVarName}"))
               val amendExpr = platformAmendExpr(
                 g,
@@ -701,7 +714,8 @@ object DederPklRenderer {
                 Some(nativeVersion)
               )
               val depsStr = renderDeps(m.testDeps, indent = 6)
-              s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
+              val moduleDepsStr = renderModuleDepsPkl(nativeTestModuleDeps, indent = 6, Some(ScalaVersionCtx.Placeholder), groupLookup)
+              s"  nativeTestTemplate = ($amendExpr) {\n${if (depsStr.nonEmpty) depsStr + "\n" else ""}${if (moduleDepsStr.nonEmpty) moduleDepsStr + "\n" else ""}  }"
             } else ""
           }
           .getOrElse("")
@@ -785,6 +799,9 @@ object DederPklRenderer {
         .get("js")
         .map { m =>
           val jsVersion = m.scalaJsVersion.getOrElse(throw new IllegalStateException(s"Missing scalaJsVersion for Scala.js module ${g.builderVarName}"))
+          val jsModuleDeps =
+            if (m.moduleDeps.nonEmpty) m.moduleDeps
+            else remapModuleDepsToPlatform(jvmModule.moduleDeps, "js", groupLookup)
           val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
           val amendExpr = platformAmendExpr(
             g,
@@ -795,7 +812,7 @@ object DederPklRenderer {
           val body = renderJsNativeOverride(
             "jsTemplate",
             amendExpr,
-            m,
+            m.copy(moduleDeps = jsModuleDeps),
             scalaJsVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(jsVersion),
             scalaNativeVersion = None,
             scalaVersionCtx = scalaVersionCtx,
@@ -809,6 +826,9 @@ object DederPklRenderer {
         .get("native")
         .map { m =>
           val nativeVersion = m.scalaNativeVersion.getOrElse(throw new IllegalStateException(s"Missing scalaNativeVersion for Scala Native module ${g.builderVarName}"))
+          val nativeModuleDeps =
+            if (m.moduleDeps.nonEmpty) m.moduleDeps
+            else remapModuleDepsToPlatform(jvmModule.moduleDeps, "native", groupLookup)
           val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
           val amendExpr = platformAmendExpr(
             g,
@@ -819,7 +839,7 @@ object DederPklRenderer {
           val body = renderJsNativeOverride(
             "nativeTemplate",
             amendExpr,
-            m,
+            m.copy(moduleDeps = nativeModuleDeps),
             scalaJsVersion = None,
             scalaNativeVersion = if (g.usesTpolecat || g.usesTypelevel) None else Some(nativeVersion),
             scalaVersionCtx = scalaVersionCtx,
@@ -832,7 +852,10 @@ object DederPklRenderer {
       val jsTestTmpl = modulesByPlatform
         .get("js")
         .map { m =>
-          if (m.testDeps.nonEmpty) {
+          val jsTestModuleDeps =
+            if (m.testModuleDeps.nonEmpty) m.testModuleDeps
+            else remapModuleDepsToPlatform(jvmModule.testModuleDeps, "js", groupLookup)
+          if (m.testDeps.nonEmpty || jsTestModuleDeps.nonEmpty) {
             val jsVersion = m.scalaJsVersion.getOrElse(throw new IllegalStateException(s"Missing scalaJsVersion for Scala.js module ${g.builderVarName}"))
             val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
             val amendExpr = platformAmendExpr(
@@ -842,7 +865,8 @@ object DederPklRenderer {
               Some(jsVersion)
             )
             val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  jsTestTemplate = ($amendExpr) {\n$depsStr  }"
+            val moduleDepsStr = renderModuleDepsPkl(jsTestModuleDeps, indent = 6, scalaVersionCtx, groupLookup)
+            s"  jsTestTemplate = ($amendExpr) {\n${if (depsStr.nonEmpty) depsStr + "\n" else ""}${if (moduleDepsStr.nonEmpty) moduleDepsStr + "\n" else ""}  }"
           } else ""
         }
         .getOrElse("")
@@ -850,7 +874,10 @@ object DederPklRenderer {
       val nativeTestTmpl = modulesByPlatform
         .get("native")
         .map { m =>
-          if (m.testDeps.nonEmpty) {
+          val nativeTestModuleDeps =
+            if (m.testModuleDeps.nonEmpty) m.testModuleDeps
+            else remapModuleDepsToPlatform(jvmModule.testModuleDeps, "native", groupLookup)
+          if (m.testDeps.nonEmpty || nativeTestModuleDeps.nonEmpty) {
             val nativeVersion = m.scalaNativeVersion.getOrElse(throw new IllegalStateException(s"Missing scalaNativeVersion for Scala Native module ${g.builderVarName}"))
             val resolvedCtx = scalaVersionCtx.getOrElse(ScalaVersionCtx.Literal(m.scalaVersion))
             val amendExpr = platformAmendExpr(
@@ -860,7 +887,8 @@ object DederPklRenderer {
               Some(nativeVersion)
             )
             val depsStr = renderDeps(m.testDeps, indent = 6)
-            s"  nativeTestTemplate = ($amendExpr) {\n$depsStr  }"
+            val moduleDepsStr = renderModuleDepsPkl(nativeTestModuleDeps, indent = 6, scalaVersionCtx, groupLookup)
+            s"  nativeTestTemplate = ($amendExpr) {\n${if (depsStr.nonEmpty) depsStr + "\n" else ""}${if (moduleDepsStr.nonEmpty) moduleDepsStr + "\n" else ""}  }"
           } else ""
         }
         .getOrElse("")
@@ -962,6 +990,22 @@ object DederPklRenderer {
       s"""$label = ($amendExpr) { $versionProp }"""
     }
   }
+
+  private def remapModuleDepsToPlatform(
+      deps: Seq[ModuleDepRef],
+      targetPlatform: String,
+      groupLookup: Map[String, ModuleGroup]
+  ): Seq[ModuleDepRef] =
+    deps.map { ref =>
+      groupLookup.get(ref.targetGroup) match {
+        case Some(group) if targetPlatform == "js" && group.hasJsModule =>
+          ref.copy(targetPlatform = "js")
+        case Some(group) if targetPlatform == "native" && group.hasNativeModule =>
+          ref.copy(targetPlatform = "native")
+        case _ =>
+          ref
+      }
+    }.distinct
 
   private def renderTestTemplate(
       g: ModuleGroup,
