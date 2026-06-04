@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_call:  # allow this workflow to be called from other workflows
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   checks: write
 
