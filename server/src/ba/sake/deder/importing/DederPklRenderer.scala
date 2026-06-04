@@ -1,9 +1,13 @@
 package ba.sake.deder.importing
 
 import ba.sake.deder.config.DederProject
+import ba.sake.deder.DederGlobals
 
 object DederPklRenderer {
-  val DederVersion = "v0.15.0"
+  val DederVersion: String = Option(DederGlobals.version).filter(_.nonEmpty) match {
+    case Some(ver) if !ver.contains("-SNAPSHOT") => s"v$ver"
+    case _                                       => "early-access"
+  }
 
   private enum ScalaVersionCtx:
     case Placeholder

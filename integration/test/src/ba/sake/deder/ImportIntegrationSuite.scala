@@ -1,7 +1,6 @@
 package ba.sake.deder
 
 import scala.concurrent.duration.*
-import ba.sake.deder.importing.DederPklRenderer
 
 class ImportIntegrationSuite extends BaseIntegrationSuite {
 
@@ -102,16 +101,16 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
       val dederPklContent = os.read(tempDir / "deder.pkl")
       val tweakedContent = dederPklContent
         .replaceFirst(
-          s"amends \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederProject.pkl\"",
-          "amends \"../../config/DederProject.pkl\""
+          """amends "https://sake92\.github\.io/deder/config/[^/]+/DederProject\.pkl"""",
+          """amends "../../config/DederProject.pkl""""
         )
-        .replace(
-          s"import \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederTypelevel.pkl\"",
-          "import \"../../config/DederTypelevel.pkl\""
+        .replaceAll(
+          """import "https://sake92\.github\.io/deder/config/[^/]+/DederTypelevel\.pkl"""",
+          """import "../../config/DederTypelevel.pkl""""
         )
-        .replace(
-          s"import \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederTpolecat.pkl\"",
-          "import \"../../config/DederTpolecat.pkl\""
+        .replaceAll(
+          """import "https://sake92\.github\.io/deder/config/[^/]+/DederTpolecat\.pkl"""",
+          """import "../../config/DederTpolecat.pkl""""
         )
       os.write.over(tempDir / "deder.pkl", tweakedContent)
 
@@ -182,16 +181,16 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
       val dederPklContent = os.read(tempDir / "deder.pkl")
       val tweakedContent = dederPklContent
         .replaceFirst(
-          s"amends \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederProject.pkl\"",
-          "amends \"../../config/DederProject.pkl\""
+          """amends "https://sake92\.github\.io/deder/config/[^/]+/DederProject\.pkl"""",
+          """amends "../../config/DederProject.pkl""""
         )
-        .replace(
-          s"import \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederTypelevel.pkl\"",
-          "import \"../../config/DederTypelevel.pkl\""
+        .replaceAll(
+          """import "https://sake92\.github\.io/deder/config/[^/]+/DederTypelevel\.pkl"""",
+          """import "../../config/DederTypelevel.pkl""""
         )
-        .replace(
-          s"import \"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}/DederTpolecat.pkl\"",
-          "import \"../../config/DederTpolecat.pkl\""
+        .replaceAll(
+          """import "https://sake92\.github\.io/deder/config/[^/]+/DederTpolecat\.pkl"""",
+          """import "../../config/DederTpolecat.pkl""""
         )
       os.write.over(tempDir / "deder.pkl", tweakedContent)
 

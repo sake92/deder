@@ -14,11 +14,19 @@ class DederPklRendererSuite extends FunSuite {
   private def evaluateRender(build: DederBuild): DederProject = {
     val pklText = DederPklRenderer.render(build)
     val configDir = os.pwd / "config"
-    val baseUrl = s"https://sake92.github.io/deder/config/${DederPklRenderer.DederVersion}"
     val rewritten = pklText
-      .replace(s""""$baseUrl/DederProject.pkl"""", s""""${configDir / "DederProject.pkl"}"""")
-      .replace(s""""$baseUrl/DederTpolecat.pkl"""", s""""${configDir / "DederTpolecat.pkl"}"""")
-      .replace(s""""$baseUrl/DederTypelevel.pkl"""", s""""${configDir / "DederTypelevel.pkl"}"""")
+      .replaceAll(
+        """"https://sake92\.github\.io/deder/config/[^/]+/DederProject\.pkl"""",
+        s""""${configDir / "DederProject.pkl"}""""
+      )
+      .replaceAll(
+        """"https://sake92\.github\.io/deder/config/[^/]+/DederTpolecat\.pkl"""",
+        s""""${configDir / "DederTpolecat.pkl"}""""
+      )
+      .replaceAll(
+        """"https://sake92\.github\.io/deder/config/[^/]+/DederTypelevel\.pkl"""",
+        s""""${configDir / "DederTypelevel.pkl"}""""
+      )
     val tmpDir = os.temp.dir()
     try {
       val pklFile = tmpDir / "deder.pkl"
@@ -86,8 +94,7 @@ class DederPklRendererSuite extends FunSuite {
       jsMod: Option[ModuleDef] = None,
       nativeMod: Option[ModuleDef] = None,
       layout: DederProject.DirLayout = DederProject.DirLayout.SBT,
-      crossScalaVersions: Seq[String] = Seq.empty,
-      dederVersion: String = DederPklRenderer.DederVersion
+      crossScalaVersions: Seq[String] = Seq.empty
   ): DederBuild = DederBuild(
     moduleGroups = Seq(
       ModuleGroup(
