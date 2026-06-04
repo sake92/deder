@@ -1,3 +1,5 @@
+#!/bin/bash
+set -euo pipefail
 
 ./scripts/gen-config-bindings.sh
 

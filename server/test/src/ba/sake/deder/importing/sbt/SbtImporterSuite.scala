@@ -61,7 +61,6 @@ class SbtImporterSuite extends FunSuite {
     finally {
       if os.exists(pluginPath) then os.remove(pluginPath)
       if os.exists(backupPath) then os.move(backupPath, pluginPath)
-      if createdProjectDir then os.remove(projectDir)
     }
   }
 

@@ -23,19 +23,19 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
     testImportFromFixture("import-sbt-hello-world")
   }
 
-  test("import sbt cross-versions".ignore) {
+  test("import sbt cross-versions") {
     testImportFromFixture("import-sbt-cross-versions")
   }
 
-  test("import sbt cross-full".ignore) {
+  test("import sbt cross-full") {
     testImportFromFixture("import-sbt-cross-full")
   }
 
-  test("import sbt tpolecat".ignore) {
+  test("import sbt tpolecat") {
     testImportFromFixture("import-sbt-tpolecat")
   }
 
-  test("import sbt typelevel".ignore) {
+  test("import sbt typelevel") {
     testImportFromFixture("import-sbt-typelevel", initGit = true)
   }
 
@@ -66,8 +66,10 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
   ): Unit = {
     val fixturePath = os.RelPath("sample-projects") / fixtureName
     // if initGit then use outside temp dit, coz sbt-typelevel would look at deder git repo tags..
-    val tempDir = if initGit then os.temp.dir(prefix = s"$fixtureName-${System.currentTimeMillis()}")
+    val tempDir = if initGit then os.temp.dir(prefix = s"$fixtureName-${System.currentTimeMillis()}") / "tmp" / fixtureName
       else os.pwd / "tmp" / s"$fixtureName-${System.currentTimeMillis()}"
+    
+    println(s"Testing import for fixture '$fixtureName' in temp dir: $tempDir")
 
     try {
       // Stage the fixture (copy all files except .deder/)
@@ -77,12 +79,14 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
         os.copy(entry, tempDir / entry.last, createFolders = true, replaceExisting = true)
 
       // Initialize a real git repo if needed (sbt-typelevel requires it)
-      if initGit then
+      if initGit then {
         os.proc("git", "init").call(cwd = tempDir)
         os.proc("git", "config", "user.email", "test@test.com").call(cwd = tempDir)
         os.proc("git", "config", "user.name", "Test").call(cwd = tempDir)
         os.proc("git", "add", ".").call(cwd = tempDir)
         os.proc("git", "commit", "-m", "init").call(cwd = tempDir, check = false)
+        os.copy.over(os.pwd / "config", tempDir / "../../config", createFolders = true, replaceExisting = true)
+      }
 
       // Write server properties
       val serverProps =
@@ -149,13 +153,14 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
     // Find module builder IDs whose test module variant is a JVM test
     val testIdPattern = """testId = "([^"]*)"""".r
     val explicitTestIds = testIdPattern.findAllMatchIn(pklContent).map(_.group(1)).toSeq
-    if explicitTestIds.nonEmpty then explicitTestIds
+    val res = if explicitTestIds.nonEmpty then explicitTestIds
     else
       // For cross-version modules, look for jvm-test- pattern in module list output
       val modRes = executeDederCommand(dir, "modules")
       val modOut = modRes.out.text()
       val pattern = """\S+-jvm-test-\S+""".r
       pattern.findAllIn(modOut).toSeq.distinct
+    res.map(_.replace("\\(sv)", "3.3.4")) // swap out scala version placeholder if present
   }
 
   /** Clone a repo at a specific tag, run deder import, validate output. */

@@ -1,7 +1,6 @@
 package ba.sake.deder.publish
 
-import ba.sake.deder.Hashable
-import ba.sake.deder.hashStr
+import ba.sake.deder.{*, given}
 import ba.sake.tupson.JsonRW
 
 case class PublishArtifactsRes(

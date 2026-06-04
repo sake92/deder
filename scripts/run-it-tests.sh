@@ -1,3 +1,5 @@
+#!/bin/bash
+set -euo pipefail
 
 rm -rf ./tmp
 
@@ -20,8 +22,8 @@ export DEDER_PLUGIN_API_VERSION="it-test-version"
 echo "Using plugin API version: $DEDER_PLUGIN_API_VERSION"
 
 # Restart server so it picks up VERSION env var (previous build-jars.sh left it running without it)
-deder shutdown >/dev/null 2>&1 || true
-sleep 1
+#deder shutdown >/dev/null 2>&1 || true
+#sleep 1
 
 # Publish plugin-api + config with a fixed version so the hello-plugin integration test can resolve them
 # (publishes to DEDER_TMP_M2_REPO when set, otherwise to ~/.m2)

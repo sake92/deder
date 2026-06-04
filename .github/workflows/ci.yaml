@@ -33,6 +33,7 @@ jobs:
       - name: Install pkl
         run: brew install pkl
       - name: Unit + config tests
+        shell: bash -eo pipefail {0}
         run: |
           ./scripts/gen-config-bindings.sh
           deder exec -t test -m server-test -m test-common-test
