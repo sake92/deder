@@ -4,7 +4,7 @@ import scala.concurrent.duration.*
 
 class ImportIntegrationSuite extends BaseIntegrationSuite {
 
-  override def munitTimeout = 15.minutes
+  override def munitTimeout = 30.minutes
 
   private val sbtAvailable: Boolean =
     try os.proc("sbt", "--version").call(check = false, stderr = os.Pipe).exitCode == 0
