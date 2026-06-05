@@ -1,6 +1,7 @@
 module ba.sake.deder.config.DederProject
 
 import "DederInternals.pkl" as I
+import "DederPlugin.pkl" as Pl
 
 // TODO write tests https://pkl-lang.org/blog/testing-in-pkl.html#writing-tests
 
@@ -17,22 +18,10 @@ hidden modulesValidation = (value: Listing<DederModule>) ->
 const function moduleById(listing: List<DederModule>, id: String): DederModule =
   listing.find((m) -> m.id == id)
 
-/// Base class for build tool plugin configurations.
-/// Plugin authors extend this with typed fields for plugin-specific settings.
-open class DederPlugin {
-  /// Unique identifier. Must match the `id` returned by the
-  /// DederPlugin implementation in the plugin JAR.
-  id: String(!isEmpty)
-
-  /// Maven coordinates for the JAR containing the DederPlugin
-  /// implementation, generated Java classes, and ServiceLoader entry.
-  deps: Listing<String>(!isEmpty)
-}
-
 /// Build tool plugins applied to this project.
-plugins: Listing<DederPlugin>(pluginsValidation) = new Listing {}
+plugins: Listing<Pl.DederPlugin>(pluginsValidation) = new Listing {}
 
-hidden pluginsValidation = (value: Listing<DederPlugin>) ->
+hidden pluginsValidation = (value: Listing<Pl.DederPlugin>) ->
   let (ids = value.toList().map((p) -> p.id))
   let (dups = ids.filter((id) -> ids.count((it) -> it == id) > 1).distinct)
     if (!dups.isEmpty)

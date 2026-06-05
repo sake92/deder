@@ -1,7 +1,7 @@
 module ba.sake.deder.examples.plugins.hello
 
-import "https://sake92.github.io/deder/config/early-access/DederProject.pkl" as P
-//import "../../../config/DederProject.pkl" as P
+import "https://sake92.github.io/deder/config/early-access/DederPlugin.pkl" as P
+//import "../../../config/DederPlugin.pkl" as P
 
 class HelloPlugin extends P.DederPlugin {
   id = "hello2"
