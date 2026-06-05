@@ -263,7 +263,8 @@ open class JavaModule extends DederModule {
   /// Optional JarJar shading rules file for assembly shading configuration.
   /// Relative paths resolve from the module root; absolute paths are used as-is.
   shadeRulesFile: String?
-  publish: Boolean = true
+  /// Whether this module should be published to the configured `publishTo` repository when running the `publish` task. Defaults to false.
+  publish: Boolean = false
   pomSettings: PomSettings?
   /// The repository to publish artifacts to.
   /// Default is Sonatype Central (stable releases).
