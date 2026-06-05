@@ -772,7 +772,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
           .when(allJavacAnnotationProcessors.nonEmpty)(
             Seq(
               "-s",
-              generatedSourcesDir.toString,
+              generatedSourcesDir.absPath.toString,
               "-processorpath",
               allJavacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator)
             )
