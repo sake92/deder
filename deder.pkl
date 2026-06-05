@@ -188,6 +188,7 @@ local const integrationTest = new ScalaTestModule {
   }
 //  maxTestForks = 16
   forkEnv {
+    ["DEDER_TMP_M2_REPO"] = read("env:DEDER_TMP_M2_REPO")
     ["DEDER_PLUGIN_API_VERSION"] = "it-test-version"
   }
   junitXmlReport {
