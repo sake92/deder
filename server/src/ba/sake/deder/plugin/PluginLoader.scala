@@ -8,7 +8,7 @@ import scala.util.control.NonFatal
 import com.typesafe.scalalogging.StrictLogging
 import ba.sake.deder.*
 import ba.sake.deder.config.DederProject
-import ba.sake.deder.config.DederPlugin.DederPlugin
+import ba.sake.deder.config.DederPlugins.DederPlugin
 import ba.sake.deder.config.DederProject.ScalaModule
 import ba.sake.deder.deps.{Dependency, DependencyResolverApi}
 

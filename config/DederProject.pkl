@@ -1,7 +1,7 @@
 module ba.sake.deder.config.DederProject
 
 import "DederInternals.pkl" as I
-import "DederPlugin.pkl" as Pl
+import "DederPlugins.pkl" as Pl
 
 // TODO write tests https://pkl-lang.org/blog/testing-in-pkl.html#writing-tests
 
