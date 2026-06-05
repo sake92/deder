@@ -216,7 +216,22 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
-  test("buildTargetDependencyModules returns Maven dependencies with artifacts") {
+  test("buildTargetDependencySources returns source JARs for module with dependencies") {
+    val params = new DependencySourcesParams(List(targetId("uber-test")).asJava)
+    val result = buildServer.buildTargetDependencySources(params).get(2, TimeUnit.MINUTES)
+    val items = result.getItems.asScala
+    assertEquals(items.size, 1, s"expected 1 DependencySourcesItem, got ${items.size}")
+    val item = items.head
+    assertEquals(item.getTarget.getUri, targetId("uber-test").getUri)
+    val sourceJars = item.getSources.asScala
+    assert(sourceJars.nonEmpty, "expected at least one source JAR for uber-test dependencies")
+    assert(
+      sourceJars.forall(_.endsWith("-sources.jar")),
+      s"all source entries should end with -sources.jar, got: $sourceJars"
+    )
+  }
+
+  test("buildTargetDependencyModules returns dependency modules for module with dependencies") {
     val params = new DependencyModulesParams(List(targetId("uber-test")).asJava)
     val result = buildServer.buildTargetDependencyModules(params).get(30, TimeUnit.SECONDS)
     val items = result.getItems.asScala

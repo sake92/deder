@@ -3,6 +3,7 @@ package ba.sake.deder
 import java.io.File
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
+import scala.util.control.NonFatal
 import com.typesafe.scalalogging.StrictLogging
 import dependency.ScalaVersion
 import ba.sake.deder.compilation.CompilationSummary
@@ -1142,6 +1143,28 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
 
   
 
+  /** Source JARs for all transitive dependencies (used by BSP). Fetches source JARs in parallel with per-dep timeout
+    * so a single slow or missing-sources artifact never stalls the whole import.
+    */
+  val depSourcesTask = CachedTaskBuilder
+    .make[Seq[os.Path]](
+      name = "depSources",
+      category = "Dependencies",
+      internal = true
+    )
+    .dependsOn(dependenciesTask)
+    .build { ctx =>
+      val dependencies = ctx.depResults._1
+      if dependencies.isEmpty then Seq.empty
+      else
+        try ctx.dependencyResolver.fetchSourceFiles(dependencies, Some(ctx.notifications))
+        catch {
+          case NonFatal(e) =>
+            logger.warn(s"[depSources] Failed to fetch source JARs: ${e.getMessage}")
+            Seq.empty
+        }
+    }
+
   // order matters for dependency resolution!!
   val all: Seq[Task[?, ?, ?]] = Seq(
     sourcesTask,
@@ -1171,6 +1194,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     dependenciesTask,
     allDependenciesTask,
     depsTreeTask,
+    depSourcesTask,
     classesTask,
     semanticdbDirTask,
     allClassesDirsTask,

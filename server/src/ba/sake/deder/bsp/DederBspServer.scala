@@ -515,28 +515,34 @@ class DederBspServer(
       val serverNotificationsLogger = makeServerNotificationsLogger()
       resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).map { case (targetId, module) =>
         val moduleId = module.id
-        val dependencies = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)(Seq.empty)
-        val fetchRes = projectStateData.dependencyResolver.fetch(dependencies)
-        // assuming that dependencies and artifacts are in the same order, 1:1 mapping
-        val depsWithArtifacts = fetchRes.getDependencies.asScala
-          .zip(fetchRes.getArtifacts.asScala)
-          .map { case (dep, entry) => (dep, entry.getKey, entry.getValue) }
-        val depItems = depsWithArtifacts.map { case (dep, artifact, file) =>
-          val mavenDependencyModuleArtifact = MavenDependencyModuleArtifact(file.toURI.toString)
-          if dep.getPublication != null then
-            mavenDependencyModuleArtifact.setClassifier(dep.getPublication.getClassifier)
-          val mavenDependencyModule = MavenDependencyModule(
-            dep.getModule.getOrganization,
-            dep.getModule.getName,
-            dep.getVersion,
-            List(mavenDependencyModuleArtifact).asJava
-          )
-          val depModule = DependencyModule(dep.getModule.getName, dep.getVersion)
-          depModule.setDataKind(DependencyModuleDataKind.MAVEN)
-          depModule.setData(mavenDependencyModule)
-          depModule
+        try {
+          val dependencies = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)(Seq.empty)
+          val fetchRes = projectStateData.dependencyResolver.fetch(dependencies)
+          // assuming that dependencies and artifacts are in the same order, 1:1 mapping
+          val depsWithArtifacts = fetchRes.getDependencies.asScala
+            .zip(fetchRes.getArtifacts.asScala)
+            .map { case (dep, entry) => (dep, entry.getKey, entry.getValue) }
+          val depItems = depsWithArtifacts.map { case (dep, artifact, file) =>
+            val mavenDependencyModuleArtifact = MavenDependencyModuleArtifact(file.toURI.toString)
+            if dep.getPublication != null then
+              mavenDependencyModuleArtifact.setClassifier(dep.getPublication.getClassifier)
+            val mavenDependencyModule = MavenDependencyModule(
+              dep.getModule.getOrganization,
+              dep.getModule.getName,
+              dep.getVersion,
+              List(mavenDependencyModuleArtifact).asJava
+            )
+            val depModule = DependencyModule(dep.getModule.getName, dep.getVersion)
+            depModule.setDataKind(DependencyModuleDataKind.MAVEN)
+            depModule.setData(mavenDependencyModule)
+            depModule
+          }
+          DependencyModulesItem(targetId, depItems.asJava)
+        } catch {
+          case NonFatal(e) =>
+            logger.error(s"buildTargetDependencyModules failed for module $moduleId", e)
+            DependencyModulesItem(targetId, List.empty.asJava)
         }
-        DependencyModulesItem(targetId, depItems.asJava)
       }
     }
     val result = DependencyModulesResult(items.asJava)
@@ -554,24 +560,9 @@ class DederBspServer(
       val serverNotificationsLogger = makeServerNotificationsLogger()
       resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).map { case (targetId, module) =>
         val moduleId = module.id
-        val dependencies = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)(Seq.empty)
-        val fetchRes = projectStateData.dependencyResolver.fetch(dependencies)
-        val sourceArtifactFiles = fetchRes.getDependencies.asScala.flatMap { coursierDep =>
-          val sourceDep = coursierDep.withClassifier("sources").withType("jar")
-          try {
-            projectStateData.dependencyResolver
-              .doFetch(Seq(sourceDep))
-              .getArtifacts
-              .asScala
-              .map(_.getValue())
-              .filter(_.getName.endsWith("-sources.jar"))
-              .map(_.toURI.toString)
-          } catch {
-            case NonFatal(e) =>
-              logger.error(s"No sources for: ${coursierDep.getModule}", e)
-              Seq.empty
-          }
-        }
+        val sourceArtifactFiles =
+          tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.depSourcesTask)(Seq.empty)
+            .map(_.toNIO.toUri.toString)
         DependencySourcesItem(targetId, sourceArtifactFiles.asJava)
       }
     }

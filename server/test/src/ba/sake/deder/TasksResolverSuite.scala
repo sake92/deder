@@ -82,6 +82,7 @@ class TasksResolverSuite extends munit.FunSuite {
       "scalacPlugins",
       "deps",
       "depsTree",
+      "depSources",
       "dependencies",
       "allDependencies",
       "mandatoryDependencies",
@@ -291,7 +292,8 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.fixCheck", s"${moduleId}.compile"),
       (s"${moduleId}.fixCheck", s"${moduleId}.compileClasspath"),
       (s"${moduleId}.fixCheck", s"${moduleId}.semanticdb"),
-      (s"${moduleId}.depsTree", s"${moduleId}.allDependencies")
+      (s"${moduleId}.depsTree", s"${moduleId}.allDependencies"),
+      (s"${moduleId}.depSources", s"${moduleId}.dependencies")
     )
 
   private def transitiveScalaModuleTaskEdges(moduleId: String, dependencyModuleId: String): Set[(String, String)] =

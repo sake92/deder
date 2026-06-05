@@ -4,6 +4,8 @@ import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
+import scala.util.control.NonFatal
+import ox.{supervised, forkUser, timeoutOption}
 import com.github.blemale.scaffeine.*
 import coursierapi.Fetch
 import coursierapi.FetchResult
@@ -82,6 +84,40 @@ class DependencyResolver(
 
   def fetchFile(dependency: Dependency): os.Path =
     fetchFiles(Seq(dependency)).head
+
+  def fetchSourceFiles(
+      dependencies: Seq[Dependency],
+      notifications: Option[ServerNotificationsLogger] = None
+  ): Seq[os.Path] = {
+    if dependencies.isEmpty then return Seq.empty
+    val fetchRes = fetch(dependencies, notifications)
+    val coursierDeps = fetchRes.getDependencies.asScala.toSeq
+    supervised {
+      val forks = coursierDeps.map { coursierDep =>
+        forkUser {
+          val sourceDep = coursierDep.withClassifier("sources").withType("jar")
+          try
+            timeoutOption(30.seconds) {
+              doFetch(Seq(sourceDep))
+                .getArtifacts
+                .asScala
+                .map(_.getValue())
+                .filter(_.getName.endsWith("-sources.jar"))
+                .map(f => os.Path(f.toPath))
+                .toSeq
+            }.getOrElse {
+              logger.warn(s"[fetchSourceFiles] Timed out fetching sources for ${coursierDep.getModule}")
+              Seq.empty[os.Path]
+            }
+          catch
+            case NonFatal(e) =>
+              logger.warn(s"[fetchSourceFiles] No sources for ${coursierDep.getModule}: ${e.getMessage}")
+              Seq.empty[os.Path]
+        }
+      }
+      forks.flatMap(_.join())
+    }
+  }
 
   // used from GraalVM tasks
   def resolveTransitiveCoordinates(
