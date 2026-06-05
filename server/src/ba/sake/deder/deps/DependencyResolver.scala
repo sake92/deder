@@ -97,7 +97,7 @@ class DependencyResolver(
         forkUser {
           val sourceDep = coursierDep.withClassifier("sources").withType("jar")
           try
-            timeoutOption(30.seconds) {
+            timeoutOption(10.seconds) {
               doFetch(Seq(sourceDep))
                 .getArtifacts
                 .asScala

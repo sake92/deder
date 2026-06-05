@@ -1,5 +1,6 @@
 
 # Misc
+- lower timeout for source jars 30s is too much
 - modules in stats empty?
 - init() plugin in new thread?
 - publish pkl configs as proper Pkl modules, good for offline/caching

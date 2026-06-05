@@ -1200,6 +1200,7 @@ class DederBspServer(
       case e: Throwable =>
         span.recordException(e)
         span.setStatus(OtelStatusCode.ERROR)
+        logger.error(s"Unhandled exception in BSP handler '$spanName'", e)
         throw e
     } finally {
       RequestContext.traceparent.remove()
