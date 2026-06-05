@@ -1,4 +1,6 @@
-amends "../../config/DederProject.pkl"
+// amends "../../config/DederProject.pkl"
+
+amends "https://sake92.github.io/deder/config/v0.16.1/DederProject.pkl"
 
 local const scalaVersions = List("2.12.21", "2.13.18", "3.7.4")
 
@@ -13,11 +15,21 @@ local const commonModules: List<ScalaModule> =
             "com.softwaremill.sttp.client3::core::3.11.0"
           }
         }
+        testTemplate = new {
+          scalaVersion = sv
+          deps { "org.scalameta::munit:1.2.1" }
+        }
         jsTemplate = (template.asJs()) {
           scalaJsVersion = "1.20.2"
         }
+        jsTestTemplate = (jsTemplate.asTest()) {
+          deps { "org.scalameta::munit::1.2.1" }
+        }
         nativeTemplate = (template.asNative()) {
           scalaNativeVersion = "0.5.10"
+        }
+        nativeTestTemplate = (nativeTemplate.asTest()) {
+          deps { "org.scalameta::munit::1.2.1" }
         }
       }
         .get
@@ -28,4 +40,3 @@ local const commonModules: List<ScalaModule> =
 modules {
   ...commonModules
 }
-

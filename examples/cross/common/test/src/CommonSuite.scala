@@ -1,2 +1,7 @@
+package common
 
-class CommonSuite
+class CommonSuite extends munit.FunSuite {
+  test("test") {
+    assertEquals(1, 1)
+  }
+}
