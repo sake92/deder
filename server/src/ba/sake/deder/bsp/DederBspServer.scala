@@ -5,6 +5,7 @@ import java.util.UUID
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.util.Using
+import scala.util.control.NonFatal
 import scala.jdk.CollectionConverters.*
 import com.typesafe.scalalogging.StrictLogging
 import ch.epfl.scala.bsp4j
@@ -556,7 +557,7 @@ class DederBspServer(
         val dependencies = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.dependenciesTask)(Seq.empty)
         val fetchRes = projectStateData.dependencyResolver.fetch(dependencies)
         val sourceArtifactFiles = fetchRes.getDependencies.asScala.flatMap { coursierDep =>
-          val sourceDep = coursierDep.withClassifier("sources")
+          val sourceDep = coursierDep.withClassifier("sources").withType("jar")
           try {
             projectStateData.dependencyResolver
               .doFetch(Seq(sourceDep))
@@ -566,8 +567,8 @@ class DederBspServer(
               .filter(_.getName.endsWith("-sources.jar"))
               .map(_.toURI.toString)
           } catch {
-            case _: DownloadingArtifactsError =>
-              logger.debug(s"No sources for: ${coursierDep.getModule}")
+            case NonFatal(e) =>
+              logger.error(s"No sources for: ${coursierDep.getModule}", e)
               Seq.empty
           }
         }

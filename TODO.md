@@ -1,6 +1,6 @@
 
 # Misc
-- replace ✓ with emoji
+- modules in stats empty?
 - init() plugin in new thread?
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - init like giter8, autoimport from sbt?

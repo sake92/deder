@@ -10,7 +10,7 @@ object Main {
     println(frontend.Frontend.value)
     println(backend.Backend.value)
 
-    println(s"ENV VARS: ${System.getenv().asScala.toMap.filterKeys(_.startsWith("MY_")).toMap}")
+    println(s"ENV VARS: ${System.getenv().asScala.view.filterKeys(_.startsWith("MY_")).toMap}")
 
     // org.jsoup.Jsoup.connect("https://example.com").get()
 
@@ -23,3 +23,4 @@ object Main {
 
   }
 }
+

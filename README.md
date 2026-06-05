@@ -4,7 +4,7 @@
 
 Config based, concurrent-first, client-server JVM build tool.
 
-:construction: Work in progress, expect rough edges and breaking changes.
+:construction: Work in progress, expect some rough edges and breaking changes.
 
 Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 
@@ -23,10 +23,10 @@ Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 ## Adoption and feedback
 Deder is used in some of my OSS projects:
 - https://github.com/sake92/deder (yes, it bootstraps itself!)
-- https://github.com/sake92/sharaf
 - https://github.com/sake92/regenesca
 - https://github.com/sake92/squery
 - https://github.com/sake92/tupson
+- https://github.com/sake92/sharaf
 
 ## Concepts
 - *project* is the root of your git repo
@@ -53,7 +53,7 @@ scoop bucket add sake92 https://github.com/sake92/scoop-bucket.git
 scoop install deder
 ```
 
-### Manual installation
+### Early-access client installation
 
 1. download `deder-client.jar` (or a native version) from [early release](https://github.com/sake92/deder/releases/tag/early-access)
 1. rename it to just `deder`
@@ -79,8 +79,9 @@ For the full command reference see the [Cheatsheet](https://sake92.github.io/ded
 
 ## IDE setup
 
-Run `deder bsp install` and just open with VSCode or IntelliJ (open as a BSP project).
-The `reset.sh` script does this for you in examples...
+Lates Metals version supports Deder import out of the box.
+
+For IntelliJ you need to run `deder bsp install` first and then open as a BSP project.
 
 Supported features:
 - import of project
@@ -88,10 +89,6 @@ Supported features:
 - compilation and diagnostics
 - run main classes
 - run tests
-
-If you work on server code, after you build it you can run `./reset.sh` in examples/multi
-
-
 
 ## Plugins
 
