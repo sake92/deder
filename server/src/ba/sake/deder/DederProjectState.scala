@@ -572,10 +572,10 @@ class DederProjectState(
   private def buildCleanSummary(successes: Int, failures: Int, bytes: Long, item: String): String =
     val sizeStr = DederCleaner.humanReadable(bytes)
     (successes, failures) match
-      case (s, 0) if s == 0 => s"✗ No ${item}s cleaned. $sizeStr freed"
-      case (_, 0)           => s"✓ Cleaned $successes ${item}s. $sizeStr freed"
-      case (0, f)           => s"✗ All $f ${item}s failed. $sizeStr freed"
-      case (s, f)           => s"✓ Cleaned $s ${item}s, $f ${item}s failed. $sizeStr freed"
+      case (s, 0) if s == 0 => s"🔴 No ${item}s cleaned. $sizeStr freed"
+      case (_, 0)           => s"✅ Cleaned $successes ${item}s. $sizeStr freed"
+      case (0, f)           => s"🔴 All $f ${item}s failed. $sizeStr freed"
+      case (s, f)           => s"✅ Cleaned $s ${item}s, $f ${item}s failed. $sizeStr freed"
 
   private def scheduleInactiveShutdownChecker(): Unit = {
     Thread
