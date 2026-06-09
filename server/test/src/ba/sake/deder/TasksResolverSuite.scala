@@ -175,7 +175,7 @@ class TasksResolverSuite extends munit.FunSuite {
     }
   }
 
-  private val publishTaskNames = Set("publishLocal", "publish")
+  private val publishTaskNames = Set("publish")
 
   private def scalaModuleTaskEdges(moduleId: String): Set[(String, String)] =
     baseScalaModuleTaskEdges(moduleId) ++ Set(
