@@ -1,16 +1,17 @@
-amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+// amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
+amends ".../config/DederProject.pkl"
 import "../hello-plugin/resources/HelloPlugin.pkl" as HP
 import "../hello-plugin2/resources/HelloPlugin.pkl" as HP2
 
 plugins {
   new HP.HelloPlugin {
-    config = new HP.HelloPluginConfig {
+    config = new {
       greeting = "Hello from plugin consumer!"
     }
   }
   new HP2.HelloPlugin {
-    config = new HP2.HelloPluginConfig {
+    config = new {
       greeting = "Hello2 from plugin consumer!"
     }
   }

@@ -1,14 +1,13 @@
 module ba.sake.deder.examples.plugins.hello
 
-import "https://sake92.github.io/deder/config/early-access/DederProject.pkl" as P
-//import "../../../config/DederProject.pkl" as P
+import "https://sake92.github.io/deder/config-api/DederPlugins.pkl" as P
 
 class HelloPlugin extends P.DederPlugin {
   id = "hello2"
   deps {
-    "ba.sake::deder-hello-plugin2:0.7.8-SNAPSHOT"
+    "ba.sake::deder-hello-plugin2:0.0.1-SNAPSHOT"
   }
-  config: HelloPluginConfig = new {}
+  config: HelloPluginConfig
 }
 
 class HelloPluginConfig {
@@ -16,4 +15,4 @@ class HelloPluginConfig {
 }
 
 // only used for parsing on the plugin side!
-config: HelloPluginConfig = new {}
+config: HelloPluginConfig

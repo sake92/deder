@@ -1,6 +1,4 @@
-amends "../../config/DederProject.pkl"
-
-//amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+amends ".../config/DederProject.pkl"
 
 modules {
   new ScalaModule {
@@ -9,13 +7,13 @@ modules {
     scalaVersion = "3.7.4"
     resources { "resources" }
     deps {
-      "ba.sake::deder-plugin-api:0.7.8-SNAPSHOT"
+      "ba.sake::deder-plugin-api:0.16.3-SNAPSHOT"
       "com.lihaoyi:os-lib_2.13:0.3.0"
     }
     pomSettings {
       groupId = "ba.sake"
       artifactId = "deder-hello-plugin"
-      version = "0.7.8-SNAPSHOT"
+      version = "0.0.1-SNAPSHOT"
       name = "Deder Hello Plugin"
       description = "Example Deder plugin that adds a 'hello' task"
     }

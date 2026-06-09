@@ -13,7 +13,8 @@ if [ ! -f pkl-codegen-java ]; then
     curl -L -o pkl-codegen-java https://github.com/apple/pkl/releases/download/0.30.2/pkl-codegen-java
 fi
 chmod +x pkl-codegen-java
-./pkl-codegen-java config/DederProject.pkl config/DederCredentials.pkl config/DederTpolecat.pkl config/DederTypelevel.pkl -o "$TMP_GEN"
+./pkl-codegen-java config/DederProject.pkl config/DederCredentials.pkl config/DederTpolecat.pkl config/DederTypelevel.pkl \
+    config-api/DederPlugins.pkl -o "$TMP_GEN"
 
 rsync -rc --delete --no-t "$TMP_GEN/java/ba" config/src/
 
@@ -31,3 +32,6 @@ for pklfile in config/*.pkl; do
         cp "$pklfile" config/resources/ba/sake/deder/config/
     fi
 done
+
+mkdir -p config/resources/ba/sake/deder/config-api
+cp config-api/DederPlugins.pkl config/resources/ba/sake/deder/config-api/

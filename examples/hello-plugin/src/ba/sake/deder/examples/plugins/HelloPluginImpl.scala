@@ -25,7 +25,7 @@ class HelloPluginImpl extends DederPluginApi {
       .dependsOn(params.coreTasks.compileTask)
       .build { ctx =>
         ctx.notifications.add(ServerNotification.logInfo(greeting))
-        greeting
+        "done"
       }
 
     Right(Seq(helloTask))
