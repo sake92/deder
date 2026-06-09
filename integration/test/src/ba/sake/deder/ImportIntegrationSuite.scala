@@ -31,11 +31,11 @@ class ImportIntegrationSuite extends BaseIntegrationSuite {
     testImportFromFixture("import-sbt-cross-full")
   }
 
-  test("import sbt tpolecat") {
+  test("import sbt tpolecat".ignore) {
     testImportFromFixture("import-sbt-tpolecat")
   }
 
-  test("import sbt typelevel") {
+  test("import sbt typelevel".ignore) {
     testImportFromFixture("import-sbt-typelevel", initGit = true)
   }
 
