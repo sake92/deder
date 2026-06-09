@@ -1,0 +1,14 @@
+// stable interface for build tool plugin configurations
+module ba.sake.deder.config.DederPlugins
+
+/// Base class for build tool plugin configurations.
+/// Plugin authors extend this with typed fields for plugin-specific settings.
+open class DederPlugin {
+  /// Unique identifier. Must match the `id` returned by the
+  /// DederPlugin implementation in the plugin JAR.
+  id: String(!isEmpty)
+
+  /// Maven coordinates for the JAR containing the DederPlugin
+  /// implementation, generated Java classes, and ServiceLoader entry.
+  deps: Listing<String>(!isEmpty)
+}
