@@ -1,6 +1,6 @@
 package ba.sake.deder.hello;
 
-import ba.sake.deder.config.DederProject;
+import ba.sake.deder.config.DederPlugins;
 import java.lang.Object;
 import java.lang.Override;
 import java.lang.String;
@@ -56,7 +56,7 @@ public final class HelloPluginModule {
     }
   }
 
-  public static final class HelloPlugin extends DederProject.DederPlugin {
+  public static final class HelloPlugin extends DederPlugins.DederPlugin {
     public final @NonNull HelloPluginConfig config;
 
     public HelloPlugin(@Named("id") @NonNull String id,
