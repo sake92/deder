@@ -2,12 +2,12 @@
 set -euo pipefail
 
 mkdir -p docs/static/config
+mkdir -p docs/static/config/early-access
+mkdir -p docs/static/config-api
 
 # Always include early-access config from main
 shopt -s extglob
-mkdir -p docs/static/config/early-access
-# copy one level of config files, excluding test files
-cp config/!(*Test.pkl) docs/static/config/early-access
+find config/ -maxdepth 1 -type f ! -name "*Test.pkl" -exec cp {} docs/static/config/early-access \;
 
 # skip early-access tags, as they are already included from main, see above
 for tag in $(git tag --sort=-creatordate | grep -v 'early-access'); do
@@ -22,6 +22,6 @@ for tag in $(git tag --sort=-creatordate | grep -v 'early-access'); do
 done
 
 # copy stable config api
-cp config-api/DederPlugins.pkl docs/static/config/
+cp config-api/DederPlugins.pkl docs/static/config-api/
 
 flatmark build -i docs
