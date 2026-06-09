@@ -19,7 +19,9 @@ for tag in $(git tag --sort=-creatordate | grep -v 'early-access'); do
       git show $tag:config/$file > docs/static/config/$tag/$file
     fi
   done
-
 done
+
+# copy stable config api
+cp config-api/DederPlugins.pkl docs/static/config/
 
 flatmark build -i docs
