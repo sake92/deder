@@ -11,9 +11,7 @@ local const lib1 = new ScalaModule {
     artifactId = "lib-incomplete"
     version = "1.0.0"
   }
-  publishTo = new SonatypeCentralRepo {
-    id = "sonatype"
-  }
+  publish = true
 }
 
 modules {

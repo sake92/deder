@@ -408,7 +408,6 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
   val publishLocalTask = TaskBuilder
     .make[Option[os.Path]](
       name = "publishLocal",
-      enabled = { case jm: JavaModule => jm.publish },
       category = "Publishing",
       transitive = true
     )
@@ -430,27 +429,19 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
         }
         ctx.module match {
           case javaModule: JavaModule =>
-            if javaModule.publish then {
-              val customRepoPath = Option(javaModule.publishLocalTo).map { pathStr =>
-                scala.util.Try(os.RelPath(pathStr))
-                  .map(rel => DederGlobals.projectRootDir / rel)
-                  .getOrElse(
-                    scala.util.Try(os.Path(pathStr))
-                      .getOrElse(throw RuntimeException(
-                        s"Invalid publishLocalTo path '${pathStr}' for module '${javaModule.id}'. " +
-                          "Provide a valid relative or absolute path."
-                      ))
-                  )
-              }
-              val publisher = Publisher(ctx.notifications, ctx.module.id)
-              Some(publisher.publishLocalM2(pom, allFiles, customRepoPath))
-            } else {
-              ctx.notifications.add(
-                ServerNotification
-                  .logInfo(s"Skipping publishing '${ctx.module.id}' because it is disabled", ctx.module.id)
-              )
-              None
+            val customRepoPath = Option(javaModule.publishLocalTo).map { pathStr =>
+              scala.util.Try(os.RelPath(pathStr))
+                .map(rel => DederGlobals.projectRootDir / rel)
+                .getOrElse(
+                  scala.util.Try(os.Path(pathStr))
+                    .getOrElse(throw RuntimeException(
+                      s"Invalid publishLocalTo path '${pathStr}' for module '${javaModule.id}'. " +
+                        "Provide a valid relative or absolute path."
+                    ))
+                )
             }
+            val publisher = Publisher(ctx.notifications, ctx.module.id)
+            Some(publisher.publishLocalM2(pom, allFiles, customRepoPath))
           case _ => None
         }
       }
