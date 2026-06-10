@@ -83,6 +83,7 @@ public class DederCliClient implements DederClient {
                     case "plan" -> new ClientMessage.Plan(leftoverArgs);
                     case "exec" -> new ClientMessage.Exec(requestId, leftoverArgs, System.getenv());
                     case "shutdown" -> new ClientMessage.Shutdown();
+                    case "tool" -> new ClientMessage.Tool(leftoverArgs);
                     case "import" -> new ClientMessage.Import(leftoverArgs);
                     case "complete" -> new ClientMessage.Complete(leftoverArgs);
                     case "help", "--help", "-h" -> new ClientMessage.Help(leftoverArgs);
