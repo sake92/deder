@@ -634,54 +634,52 @@ class CliClientMessageHandler(
         serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliToolOptions].helpText()))
         serverMessages.put(CliServerMessage.Exit(0))
       else
-        mainargs.Parser[DederCliToolOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+        val (toolName, toolArgs) = m.args match
+          case Seq() => (None, Seq.empty)
+          case "--" +: rest => (None, rest) // deder tool -- --port 8080
+          case name +: rest if !name.startsWith("-") => (Some(name), rest)
+          case other => (None, other)
+        projectState.readState(useLastGood = true) match {
           case Left(error) =>
             span.setStatus(StatusCode.ERROR)
             span.setAttribute("error", error)
-            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Log(s"Failed to load project config: $error", LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
-          case Right(cliOptions) =>
-            projectState.readState(useLastGood = true) match {
-              case Left(error) =>
-                span.setStatus(StatusCode.ERROR)
-                span.setAttribute("error", error)
-                serverMessages.put(CliServerMessage.Log(s"Failed to load project config: $error", LogLevel.ERROR))
-                serverMessages.put(CliServerMessage.Exit(1))
-              case Right(state) =>
-                val projectConfig = state.projectConfig
-                val toolsMap = projectConfig.tools
-                cliOptions.toolName match {
+          case Right(state) =>
+            val projectConfig = state.projectConfig
+            val toolsMap = projectConfig.tools
+            toolName match {
+              case None =>
+                if toolsMap == null || toolsMap.isEmpty then
+                  serverMessages.put(CliServerMessage.Output("No tools configured. Add a `tools` mapping in deder.pkl.\n"))
+                else
+                  val listing = toolsMap.asScala.map { case (name, tool) =>
+                    val desc = Option(tool.description).fold("")(d => s" — $d")
+                    s"  $name$desc"
+                  }.mkString("Available tools:\n", "\n", "\n")
+                  serverMessages.put(CliServerMessage.Output(listing))
+                serverMessages.put(CliServerMessage.Exit(0))
+              case Some(name) =>
+                val toolOpt = if toolsMap != null then Option(toolsMap.get(name)) else None
+                toolOpt match {
                   case None =>
-                    if toolsMap == null || toolsMap.isEmpty then
-                      serverMessages.put(CliServerMessage.Output("No tools configured. Add a `tools` mapping in deder.pkl.\n"))
-                    else
-                      val listing = toolsMap.asScala.map { case (name, tool) =>
-                        val desc = Option(tool.description).fold("")(d => s" — $d")
-                        s"  $name$desc"
-                      }.mkString("Available tools:\n", "\n", "\n")
-                      serverMessages.put(CliServerMessage.Output(listing))
+                    val available = if toolsMap != null then toolsMap.keySet().asScala.mkString(", ") else ""
+                    serverMessages.put(CliServerMessage.Log(
+                      s"Tool '$name' not found. Available tools: $available", LogLevel.ERROR))
+                    serverMessages.put(CliServerMessage.Exit(1))
+                  case Some(tool) =>
+                    val depStrs = tool.deps.asScala.toSeq
+                    val dependencies = depStrs.map(Dependency.make(_, "3.7.4"))
+                    val jars = state.dependencyResolver.fetchFiles(dependencies)
+                    val cp = jars.map(_.toString).mkString(java.io.File.pathSeparator)
+                    val toolArgsCfg = tool.args.asScala.toSeq
+                    // strip "--" separator if present
+                    val extraArgs =
+                      if toolArgs.headOption == Some("--") then toolArgs.tail
+                      else toolArgs
+                    val cmd = Seq("java", "-cp", cp, tool.mainClass) ++ toolArgsCfg ++ extraArgs
+                    serverMessages.put(CliServerMessage.RunSubprocess(cmd, Map.empty, watch = false))
                     serverMessages.put(CliServerMessage.Exit(0))
-                  case Some(toolName) =>
-                    val toolOpt = if toolsMap != null then Option(toolsMap.get(toolName)) else None
-                    toolOpt match {
-                      case None =>
-                        val available = if toolsMap != null then toolsMap.keySet().asScala.mkString(", ") else ""
-                        serverMessages.put(CliServerMessage.Log(
-                          s"Tool '$toolName' not found. Available tools: $available", LogLevel.ERROR))
-                        serverMessages.put(CliServerMessage.Exit(1))
-                      case Some(tool) =>
-                        val depStrs = tool.deps.asScala.toSeq
-                        val dependencies = depStrs.map(Dependency.make(_, "3.7.4"))
-                        val jars = state.dependencyResolver.fetchFiles(dependencies)
-                        val cp = jars.map(_.toString).mkString(java.io.File.pathSeparator)
-                        val toolArgs = tool.args.asScala.toSeq
-                        val extraArgs =
-                          if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail
-                          else cliOptions.args.value
-                        val cmd = Seq("java", "-cp", cp, tool.mainClass) ++ toolArgs ++ extraArgs
-                        serverMessages.put(CliServerMessage.RunSubprocess(cmd, Map.empty, watch = false))
-                        serverMessages.put(CliServerMessage.Exit(0))
-                    }
                 }
             }
         }

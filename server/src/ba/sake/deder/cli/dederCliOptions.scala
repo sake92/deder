@@ -130,8 +130,7 @@ given TokensReader.Simple[ShellType] with {
 @main("tool command", "Launch a server-level tool")
 case class DederCliToolOptions(
     @arg(doc = "Tool name to run (omit to list available tools)")
-    toolName: Option[String] = None,
-    @arg(doc = "Arguments to pass to the tool (after --)")
+    toolName: String = "",
     args: Leftover[String] = Leftover()
 )
 
