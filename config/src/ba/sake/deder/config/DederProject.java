@@ -28,7 +28,7 @@ public final class DederProject {
 
   public final long maxConcurrentTestForks;
 
-  public final @NonNull Map<@NonNull String, ? extends @NonNull ServerTool> tools;
+  public final Map<@NonNull String, ? extends @NonNull ServerTool> tools;
 
   public DederProject(@Named("modules") @NonNull List<? extends @NonNull DederModule> modules,
       @Named("plugins") @NonNull List<? extends DederPlugins. @NonNull DederPlugin> plugins,
@@ -37,7 +37,7 @@ public final class DederProject {
       @Named("watchIgnore") @NonNull List<@NonNull String> watchIgnore,
       @Named("bspEnabled") boolean bspEnabled, @Named("maxActiveCompilers") long maxActiveCompilers,
       @Named("maxConcurrentTestForks") long maxConcurrentTestForks,
-      @Named("tools") @NonNull Map<@NonNull String, ? extends @NonNull ServerTool> tools) {
+      @Named("tools") Map<@NonNull String, ? extends @NonNull ServerTool> tools) {
     this.modules = modules;
     this.plugins = plugins;
     this.repositories = repositories;
@@ -82,8 +82,7 @@ public final class DederProject {
     return new DederProject(modules, plugins, repositories, includeDefaultRepos, watchIgnore, bspEnabled, maxActiveCompilers, maxConcurrentTestForks, tools);
   }
 
-  public DederProject withTools(
-      @NonNull Map<@NonNull String, ? extends @NonNull ServerTool> tools) {
+  public DederProject withTools(Map<@NonNull String, ? extends @NonNull ServerTool> tools) {
     return new DederProject(modules, plugins, repositories, includeDefaultRepos, watchIgnore, bspEnabled, maxActiveCompilers, maxConcurrentTestForks, tools);
   }
 
