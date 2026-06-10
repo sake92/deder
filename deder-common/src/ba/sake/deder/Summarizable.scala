@@ -20,21 +20,25 @@ case class MultiModuleResults[T](results: Map[String, T], failures: Seq[ModuleFa
 object MultiModuleResults:
   given [T](using ptw: PlainTextWritable[T]): PlainTextWritable[MultiModuleResults[T]] with
     def write(mmr: MultiModuleResults[T]): String =
-      val successSection = mmr.results.toSeq
-        .sortBy(_._1)
-        .map { (moduleId, result) =>
-          val body = ptw.write(result)
-          Seq(s"[${moduleId}]", body).filter(_.trim.nonEmpty).mkString("\n")
-        }
-        .mkString("\n")
+      val totalModules = mmr.results.size + mmr.failures.size
+      val hasFailures = mmr.failures.nonEmpty
+      val moduleWord = if totalModules == 1 then "module" else "modules"
+      val header = if hasFailures then s"🔴 FAIL  $totalModules $moduleWord" else s"✅ OK  $totalModules $moduleWord"
 
-      val failureSection = mmr.failures.sortBy(_.moduleId).map { f =>
+      val successLines = mmr.results.toSeq
+        .sortBy(_._1)
+        .map { (moduleId, _) => s"  ✅ $moduleId" }
+
+      val failureLines = mmr.failures.sortBy(_.moduleId).map { f =>
         val cause = f.causedBy.map(m => s" (caused by failure in $m)").getOrElse("")
         s"  🔴 ${f.moduleId}: ${f.error}$cause"
-      }.mkString("\n")
+      }
 
-      val failureBlock = if failureSection.nonEmpty then s"\nFailed modules:\n$failureSection" else ""
-      Seq(successSection, failureBlock).filter(_.nonEmpty).mkString("\n")
+      val allLines = Seq(header) ++ successLines ++ failureLines
+      val sepWidth = allLines.map(_.length).max
+      val separator = "═" * sepWidth
+
+      (Seq(separator) ++ allLines ++ Seq(separator)).mkString("\n")
 
   given [T: JsonRW: PlainTextWritable: MermaidWritable: DotWritable]: Summarizable[T, MultiModuleResults[T]] with
     def summarize(results: Seq[(String, T)], failures: Seq[ModuleFailure], totalDuration: Duration): MultiModuleResults[T] =
