@@ -17,6 +17,7 @@ enum CliClientMessage derives JsonRW {
   case Complete(args: Seq[String])
   case Plugins(args: Seq[String])
   case Shutdown()
+  case Tool(args: Seq[String])
 
   def getRequestId: String = this match {
     case CliClientMessage.Exec(requestId, _, _) => requestId
