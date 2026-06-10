@@ -28,7 +28,9 @@ class CliClientMessageSuite extends munit.FunSuite {
       CliClientMessage.Clean(Seq.empty),
       CliClientMessage.Import(Seq.empty),
       CliClientMessage.Complete(Seq.empty),
-      CliClientMessage.Shutdown()
+      CliClientMessage.Plugins(Seq.empty),
+      CliClientMessage.Shutdown(),
+      CliClientMessage.Tool(Seq.empty)
     )
 
     messages.foreach { message =>

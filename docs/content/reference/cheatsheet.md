@@ -87,6 +87,11 @@ deder exec -t test uber.MyTestSuite1#test1
 # write BSP config file
 deder bsp install
 
+# launch a server-level tool
+deder tool                  # list available tools
+deder tool tui              # launch the TUI dashboard
+deder tool tui -- --port 8080  # pass args to the tool
+
 # fix with scalafix
 deder exec -t fix
 deder exec -t fixCheck
