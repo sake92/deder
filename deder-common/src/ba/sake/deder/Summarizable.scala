@@ -31,7 +31,7 @@ object MultiModuleResults:
           val statusLine = s"  ✅ $moduleId"
           val body = ptw.write(result)
           if body.trim.nonEmpty then
-            val indentedBody = body.split("\n").map(line => s"         $line")
+            val indentedBody = body.split("\n").map(line => s"      $line")
             statusLine +: indentedBody
           else Seq(statusLine)
         }

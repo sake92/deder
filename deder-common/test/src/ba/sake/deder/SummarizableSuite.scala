@@ -123,7 +123,7 @@ class SummarizableSuite extends munit.FunSuite {
     assert(serverIdx > 0, "server module line should be present")
     // Body text should be on the next line, indented
     assert(lines(serverIdx + 1).contains("some/output/path"), "body text should follow module line")
-    assert(lines(serverIdx + 1).startsWith("         "), "body text should be indented")
+    assert(lines(serverIdx + 1).startsWith("      "), "body text should be indented")
   }
 
   test("empty body text is not shown") {
