@@ -15,6 +15,7 @@ import ba.sake.deder.importing.Importer
 import io.opentelemetry.api.trace.StatusCode
 import ba.sake.deder.OTEL
 import ba.sake.deder.config.DederProject.DederModule
+import ba.sake.deder.deps.Dependency
 import org.jgrapht.Graph
 import org.jgrapht.graph.DefaultEdge
 
@@ -40,6 +41,7 @@ class CliClientMessageHandler(
       case m: CliClientMessage.Complete => handleComplete(m)
       case m: CliClientMessage.Plugins => handlePlugins(m)
       case m: CliClientMessage.Shutdown => handleShutdown(m)
+      case m: CliClientMessage.Tool     => handleTool(m)
     }
   }
 
@@ -65,6 +67,7 @@ class CliClientMessageHandler(
           |  bsp                     Start BSP server for this project
           |  import [options]        Import from other build tool
           |  complete [options]      Generate shell completion script
+          |  tool [options]          Launch a server-level tool
           |  shutdown                Shutdown the server
           |
           |Use help -c <command> for more details about each command.
@@ -112,6 +115,10 @@ class CliClientMessageHandler(
               )
             case "shutdown" =>
               serverMessages.put(CliServerMessage.Output("Shuts down the Deder server."))
+            case "tool" =>
+              serverMessages.put(
+                CliServerMessage.Output(mainargs.Parser[DederCliToolOptions].helpText())
+              )
             case _ =>
               serverMessages.put(CliServerMessage.Output(defaultHelpText))
           }
@@ -613,6 +620,71 @@ class CliClientMessageHandler(
       projectState.notifyBspClientsShuttingDown()
       Thread.sleep(500) // flush window for BSP clients to process disconnect
       projectState.shutdown()
+    }
+  }
+
+  private def handleTool(m: CliClientMessage.Tool): Unit = {
+    val ctx = RequestContext.current.get()
+    val clientId = ctx.clientId
+    val requestId = ctx.requestId
+    OTEL.withSpan("cli.tool")(
+      _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
+    ) { span =>
+      if m.args == Seq("--help") || m.args == Seq("-h") then
+        serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliToolOptions].helpText()))
+        serverMessages.put(CliServerMessage.Exit(0))
+      else
+        mainargs.Parser[DederCliToolOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
+          case Left(error) =>
+            span.setStatus(StatusCode.ERROR)
+            span.setAttribute("error", error)
+            serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
+            serverMessages.put(CliServerMessage.Exit(1))
+          case Right(cliOptions) =>
+            projectState.readState(useLastGood = true) match {
+              case Left(error) =>
+                span.setStatus(StatusCode.ERROR)
+                span.setAttribute("error", error)
+                serverMessages.put(CliServerMessage.Log(s"Failed to load project config: $error", LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
+              case Right(state) =>
+                val projectConfig = state.projectConfig
+                val toolsMap = projectConfig.tools
+                cliOptions.toolName match {
+                  case None =>
+                    if toolsMap == null || toolsMap.isEmpty then
+                      serverMessages.put(CliServerMessage.Output("No tools configured. Add a `tools` mapping in deder.pkl.\n"))
+                    else
+                      val listing = toolsMap.asScala.map { case (name, tool) =>
+                        val desc = Option(tool.description).fold("")(d => s" — $d")
+                        s"  $name$desc"
+                      }.mkString("Available tools:\n", "\n", "\n")
+                      serverMessages.put(CliServerMessage.Output(listing))
+                    serverMessages.put(CliServerMessage.Exit(0))
+                  case Some(toolName) =>
+                    val toolOpt = if toolsMap != null then Option(toolsMap.get(toolName)) else None
+                    toolOpt match {
+                      case None =>
+                        val available = if toolsMap != null then toolsMap.keySet().asScala.mkString(", ") else ""
+                        serverMessages.put(CliServerMessage.Log(
+                          s"Tool '$toolName' not found. Available tools: $available", LogLevel.ERROR))
+                        serverMessages.put(CliServerMessage.Exit(1))
+                      case Some(tool) =>
+                        val depStrs = tool.deps.asScala.toSeq
+                        val dependencies = depStrs.map(Dependency.make(_, "3.7.4"))
+                        val jars = state.dependencyResolver.fetchFiles(dependencies)
+                        val cp = jars.map(_.toString).mkString(java.io.File.pathSeparator)
+                        val toolArgs = tool.args.asScala.toSeq
+                        val extraArgs =
+                          if cliOptions.args.value.headOption == Some("--") then cliOptions.args.value.tail
+                          else cliOptions.args.value
+                        val cmd = Seq("java", "-cp", cp, tool.mainClass) ++ toolArgs ++ extraArgs
+                        serverMessages.put(CliServerMessage.RunSubprocess(cmd, Map.empty, watch = false))
+                        serverMessages.put(CliServerMessage.Exit(0))
+                    }
+                }
+            }
+        }
     }
   }
 }
