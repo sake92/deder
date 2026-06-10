@@ -62,6 +62,12 @@ class TasksExecutor(
             oc.result match {
               case s: TaskExecResult.Success =>
                 oc.taskResult.foreach(tr => taskResults += (s.taskInstance.id -> tr))
+                if !s.taskInstance.task.isResultSuccessfulUnsafe(s.value) then
+                  // Task produced an unsuccessful result (e.g. compile with errors).
+                  // Mark module as failed so downstream tasks get skipped, but keep
+                  // the Success in targetResults so the task's own summary still works.
+                  val f: TaskExecResult.Failure = TaskExecResult.Failure(s.taskInstance, "result was unsuccessful")
+                  moduleFailures.getOrElseUpdate(s.taskInstance.moduleId, f)
                 if isTargetTask(s.taskInstance, taskName, moduleIds) then targetResults += s
               case f: TaskExecResult.Failure =>
                 moduleFailures.getOrElseUpdate(f.taskInstance.moduleId, f)
