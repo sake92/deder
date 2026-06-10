@@ -24,8 +24,8 @@ class SummarizableSuite extends munit.FunSuite {
     assertEquals(lines(0), "═" * lines.map(_.length).max, "first line should be separator matching max line width")
     assertEquals(lines.last, "═" * lines.map(_.length).max, "last line should be separator matching max line width")
     assert(!rendered.contains("Failed modules"), "should not have old 'Failed modules:' text")
-    assert(!rendered.contains("body1"), "should not include body text from per-module results")
-    assert(!rendered.contains("body2"), "should not include body text from per-module results")
+    assert(lines.exists(_.contains("body1")), "should include body text from per-module results (indented)")
+    assert(lines.exists(_.contains("body2")), "should include body text from per-module results (indented)")
   }
 
   test("mixed success and failure - failures listed last inside box") {
@@ -107,5 +107,36 @@ class SummarizableSuite extends munit.FunSuite {
     val rendered = ptw.write(summary)
 
     assertEquals(rendered.split("\n")(1), "✅ OK  1 module", "header should use singular 'module'")
+  }
+
+  test("body text is included indented below module status") {
+    val summary = summarizable.summarize(
+      results = Seq("server" -> "some/output/path"),
+      failures = Seq.empty,
+      totalDuration = Duration.ofSeconds(1)
+    )
+
+    val rendered = ptw.write(summary)
+
+    val lines = rendered.split("\n")
+    val serverIdx = lines.indexWhere(_.contains("✅ server"))
+    assert(serverIdx > 0, "server module line should be present")
+    // Body text should be on the next line, indented
+    assert(lines(serverIdx + 1).contains("some/output/path"), "body text should follow module line")
+    assert(lines(serverIdx + 1).startsWith("         "), "body text should be indented")
+  }
+
+  test("empty body text is not shown") {
+    val summary = summarizable.summarize(
+      results = Seq("server" -> ""),
+      failures = Seq.empty,
+      totalDuration = Duration.ofSeconds(1)
+    )
+
+    val rendered = ptw.write(summary)
+
+    val lines = rendered.split("\n")
+    // Only header, one module line, and two separators = 4 lines
+    assertEquals(lines.length, 4, "should have header + 1 module + 2 separators = 4 lines")
   }
 }

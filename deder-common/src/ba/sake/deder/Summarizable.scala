@@ -27,7 +27,14 @@ object MultiModuleResults:
 
       val successLines = mmr.results.toSeq
         .sortBy(_._1)
-        .map { (moduleId, _) => s"  ✅ $moduleId" }
+        .flatMap { (moduleId, result) =>
+          val statusLine = s"  ✅ $moduleId"
+          val body = ptw.write(result)
+          if body.trim.nonEmpty then
+            val indentedBody = body.split("\n").map(line => s"         $line")
+            statusLine +: indentedBody
+          else Seq(statusLine)
+        }
 
       val failureLines = mmr.failures.sortBy(_.moduleId).map { f =>
         val cause = f.causedBy.map(m => s" (caused by failure in $m)").getOrElse("")
