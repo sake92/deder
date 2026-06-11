@@ -398,7 +398,8 @@ class DederProjectState(
           serverNotificationsLogger
         )
         val duration = Duration.ofNanos(System.nanoTime() - requestStartNanos)
-        internals.recordRequestCompleted(requestId, taskName, success = true, duration, callerType)
+        val cancelled = Option(DederGlobals.cancellationTokens.get(requestId)).exists(_.get())
+        internals.recordRequestCompleted(requestId, taskName, success = !cancelled, duration, callerType)
         result
       } finally {
         acquiredLocks.reverse.foreach { taskInstance =>
