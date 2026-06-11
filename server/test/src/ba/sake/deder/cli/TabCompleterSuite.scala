@@ -53,6 +53,7 @@ class TabCompleterSuite extends munit.FunSuite {
     "compileOnlyDeps",
     "compileOnlyDependencies"
   )
+  private val toolNames = Seq("tui", "dashboard", "formatter")
 
   def cs(s: String): Int = s.length
 
@@ -61,11 +62,11 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("TabCompleter completes subcommands") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder ", cs("deder ")).toSet,
-      Set("version", "clean", "complete", "modules", "tasks", "plugins", "plan", "exec", "shutdown", "import", "bsp", "help")
+      Set("version", "clean", "complete", "modules", "tasks", "plugins", "plan", "exec", "shutdown", "import", "bsp", "help", "tool")
     )
 
     assertEquals(completer.complete("deder c", cs("deder c")).toSet, Set("clean", "complete"))
@@ -76,7 +77,7 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("exec command completes all flags") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder exec ", cs("deder exec ")).toSet,
@@ -94,7 +95,7 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("modules command completes all flags") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder modules ", cs("deder modules ")).toSet,
@@ -108,7 +109,7 @@ class TabCompleterSuite extends munit.FunSuite {
   }
 
   test("modules command completes module values after -m") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder modules -m ", cs("deder modules -m ")).toSet,
@@ -131,7 +132,7 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("tasks command completes all flags") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder tasks ", cs("deder tasks ")).toSet,
@@ -149,7 +150,7 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("plan command completes all flags") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder plan ", cs("deder plan ")).toSet,
@@ -163,7 +164,7 @@ class TabCompleterSuite extends munit.FunSuite {
   }
 
   test("plan command completes module and task values") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder plan -m ", cs("deder plan -m ")).toSet,
@@ -234,7 +235,7 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("clean command completes all flags") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder clean ", cs("deder clean ")).toSet,
@@ -257,7 +258,7 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("import command completes flags and enum values") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder import ", cs("deder import ")).toSet,
@@ -280,7 +281,7 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("complete command completes flags") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder complete ", cs("deder complete ")).toSet,
@@ -294,7 +295,7 @@ class TabCompleterSuite extends munit.FunSuite {
   }
 
   test("complete command completes shell enum values") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder complete -s ", cs("deder complete -s ")).toSet,
@@ -317,7 +318,7 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("help command completes flags and subcommand values") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
 
     assertEquals(
       completer.complete("deder help ", cs("deder help ")).toSet,
@@ -327,7 +328,7 @@ class TabCompleterSuite extends munit.FunSuite {
     // After -c / --command, complete with known subcommands
     assertEquals(
       completer.complete("deder help -c ", cs("deder help -c ")).toSet,
-      Set("version", "clean", "complete", "modules", "tasks", "plugins", "plan", "exec", "shutdown", "import", "bsp", "help")
+      Set("version", "clean", "complete", "modules", "tasks", "plugins", "plan", "exec", "shutdown", "import", "bsp", "help", "tool")
     )
 
     assertEquals(
@@ -341,7 +342,7 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("shutdown command completes nothing") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
     assertEquals(completer.complete("deder shutdown ", cs("deder shutdown ")).toSet, Set.empty)
   }
 
@@ -350,7 +351,7 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("version command completes nothing") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
     assertEquals(completer.complete("deder version ", cs("deder version ")).toSet, Set.empty)
   }
 
@@ -359,8 +360,89 @@ class TabCompleterSuite extends munit.FunSuite {
   // ============================================================================
 
   test("bsp command completes install") {
-    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds)
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
     assertEquals(completer.complete("deder bsp ", cs("deder bsp ")).toSet, Set("install"))
+  }
+
+  // ============================================================================
+  // tool command
+  // ============================================================================
+
+  test("tool command completes tool names") {
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
+
+    assertEquals(
+      completer.complete("deder tool ", cs("deder tool ")).toSet,
+      Set("tui", "dashboard", "formatter")
+    )
+
+    assertEquals(
+      completer.complete("deder tool d", cs("deder tool d")).toSet,
+      Set("dashboard")
+    )
+  }
+
+  test("tool command completes nothing after tool name") {
+    val completer = new TabCompleter(moduleIds = moduleIds, taskIds = taskIds, toolNames = toolNames)
+
+    assertEquals(
+      completer.complete("deder tool tui ", cs("deder tool tui ")).toSet,
+      Set.empty
+    )
+
+    assertEquals(
+      completer.complete("deder tool tui --", cs("deder tool tui --")).toSet,
+      Set.empty
+    )
+  }
+
+  // ============================================================================
+  // Degraded completer (empty state — all dynamic data empty)
+  // ============================================================================
+
+  test("degraded completer (empty moduleIds/taskIds/toolNames) completes static subcommands") {
+    val completer = new TabCompleter(moduleIds = Seq.empty, taskIds = Seq.empty, toolNames = Seq.empty)
+
+    assertEquals(
+      completer.complete("deder ", cs("deder ")).toSet,
+      Set("version", "clean", "complete", "modules", "tasks", "plugins", "plan", "exec", "shutdown", "import", "bsp", "help", "tool")
+    )
+
+    assertEquals(
+      completer.complete("deder ver", cs("deder ver")).toSet,
+      Set("version")
+    )
+  }
+
+  test("degraded completer still completes shell types") {
+    val completer = new TabCompleter(moduleIds = Seq.empty, taskIds = Seq.empty, toolNames = Seq.empty)
+
+    assertEquals(
+      completer.complete("deder complete -s ", cs("deder complete -s ")).toSet,
+      Set("bash", "zsh", "fish", "powershell")
+    )
+  }
+
+  test("degraded completer returns empty for dynamic completions") {
+    val completer = new TabCompleter(moduleIds = Seq.empty, taskIds = Seq.empty, toolNames = Seq.empty)
+
+    // Module IDs come from state, should be empty
+    assertEquals(
+      completer.complete("deder exec -m ", cs("deder exec -m ")).toSet,
+      Set.empty
+    )
+
+    // Task names come from state, should be empty
+    assertEquals(
+      completer.complete("deder exec -t ", cs("deder exec -t ")).toSet,
+      Set.empty
+    )
+
+    // Tool names come from state, should be empty
+    assertEquals(
+      completer.complete("deder tool ", cs("deder tool ")).toSet,
+      Set.empty
+    )
   }
 
 }
