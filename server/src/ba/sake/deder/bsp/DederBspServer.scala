@@ -244,7 +244,7 @@ class DederBspServer(
   override def workspaceReload(): CompletableFuture[Object] = javaFuture("workspaceReload") {
     logger.debug(s"workspaceReload")
     ensureRunning()
-    // auto reloaded on file changes
+    // auto reloads on file changes, no action needed here
     ().asInstanceOf[Object]
   }
 
@@ -1112,9 +1112,6 @@ class DederBspServer(
 
   private def withLastGoodState[T](onError: String => T)(f: DederProjectStateData => T): T =
     withLastGoodState(Some(onError))(f)
-
-  private def withLastGoodState[T](f: DederProjectStateData => T): T =
-    withLastGoodState(None)(f)
 
   private def withLastGoodState[T](onError: Option[String => T])(f: DederProjectStateData => T): T =
     projectState.readState(useLastGood = true) match {

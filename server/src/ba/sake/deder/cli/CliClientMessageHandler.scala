@@ -650,7 +650,7 @@ class CliClientMessageHandler(
             val toolsMap = projectConfig.tools
             toolName match {
               case None =>
-                if toolsMap == null || toolsMap.isEmpty then
+                if toolsMap.isEmpty then
                   serverMessages.put(CliServerMessage.Output("No tools configured. Add a `tools` mapping in deder.pkl.\n"))
                 else
                   val listing = toolsMap.asScala.map { case (name, tool) =>
@@ -660,10 +660,10 @@ class CliClientMessageHandler(
                   serverMessages.put(CliServerMessage.Output(listing))
                 serverMessages.put(CliServerMessage.Exit(0))
               case Some(name) =>
-                val toolOpt = if toolsMap != null then Option(toolsMap.get(name)) else None
+                val toolOpt = Option(toolsMap.get(name))
                 toolOpt match {
                   case None =>
-                    val available = if toolsMap != null then toolsMap.keySet().asScala.mkString(", ") else ""
+                    val available = toolsMap.keySet().asScala.mkString(", ")
                     serverMessages.put(CliServerMessage.Log(
                       s"Tool '$name' not found. Available tools: $available", LogLevel.ERROR))
                     serverMessages.put(CliServerMessage.Exit(1))

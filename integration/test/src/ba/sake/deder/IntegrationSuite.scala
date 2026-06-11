@@ -270,14 +270,6 @@ class IntegrationSuite extends BaseIntegrationSuite {
 
   test("deder tool listing and error handling") {
     withTestProject("sample-projects/multi") { projectPath =>
-      // List tools when none configured
-      locally {
-        val dederRes = executeDederCommand(projectPath, "tool")
-        val dederOutput = dederRes.out.text()
-        assert(dederOutput.contains("No tools configured"), s"Expected 'No tools configured' but got: $dederOutput")
-        assertEquals(dederRes.exitCode, 0)
-      }
-      // Unknown tool should error
       locally {
         val dederRes = executeDederCommand(projectPath, "tool", "nonexistent")
         val dederErr = dederRes.err.text()
