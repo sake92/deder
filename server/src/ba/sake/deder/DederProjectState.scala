@@ -127,8 +127,20 @@ class DederProjectState(
             val scalaNativeTasksApi = ScalaNativeTasksApiAdapter(scalaNativeTasks)
             val pluginLoader =
               PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver, internals)
-            loadedPlugins = pluginLoader.load(loadedPlugins, configFile, newConfig).loadedPlugins
-            internals.setLoadedPlugins(loadedPlugins.map(lp => LoadedPluginInfo(lp.plugin.id, lp.tasks.map(_.name))))
+            val loadResult = pluginLoader.load(loadedPlugins, configFile, newConfig)
+            loadedPlugins = loadResult.loadedPlugins
+
+            // Build info for ALL configured plugins, including failed ones with errors.
+            val configuredIds = newConfig.plugins.asScala.map(_.id).toSeq
+            val loadedMap = loadedPlugins.map(lp => lp.plugin.id ->
+              LoadedPluginInfo(lp.plugin.id, lp.tasks.map(_.name))).toMap
+            val errorMap = loadResult.errors.map(e => e.pluginId -> e.error).toMap
+            val allPluginInfo = configuredIds.map { id =>
+              loadedMap.getOrElse(id,
+                LoadedPluginInfo(id, Seq.empty, Some(errorMap.getOrElse(id, "Not loaded")))
+              )
+            }
+            internals.setLoadedPlugins(allPluginInfo)
             // TODO prepend plugin id to task name to avoid conflicts? e.g myplugin:compile ?
             val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?, ?]])
             val effectiveRegistry = TasksRegistry(baseTasks ++ pluginTasks)

@@ -43,7 +43,8 @@ case class TaskStats(
 
 case class LoadedPluginInfo(
     id: String,
-    taskNames: Seq[String]
+    taskNames: Seq[String],
+    error: Option[String] = None
 ) derives JsonRW
 
 trait DederProjectInternals:
