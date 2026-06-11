@@ -510,8 +510,18 @@ class FanInTask[T: JsonRW: Hashable](
       dependencyResolver: DependencyResolverApi
   ): (res: TaskResult[Seq[T]], changed: Boolean) = {
     serverNotificationsLogger.add(ServerNotification.logDebug(s"Executing ${name}", Some(module.id)))
-    // TODO add a nice error message if the cast fails
-    val collected = depResults.map(_.value.asInstanceOf[T])
+    val collected =
+      try depResults.map(_.value.asInstanceOf[T])
+      catch {
+        case e: ClassCastException =>
+          serverNotificationsLogger.add(
+            ServerNotification.logError(
+              s"Task ${name} failed because it returns wrong result type for ${collectKind}. This is likely a plugin bug, please report it to the plugin author.",
+              Some(module.id)
+            )
+          )
+          throw e
+      }
     val outputHash = Hashable[Seq[T]].hashStr(collected)
     (TaskResult(collected, "", outputHash), true)
   }
