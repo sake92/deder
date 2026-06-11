@@ -389,7 +389,7 @@ object ForkedTestOrchestrator extends StrictLogging {
         streamStderr(proc, stderrLog, tag, notifications, moduleId)
       )
 
-      val finished = waitForForkProcess(proc, tag, moduleId, notifications)
+      val finished = waitForForkProcess(proc, cancelFilePath, tag, moduleId, notifications)
       stdoutThread.join(300)
       stderrThread.join(300)
 
@@ -553,14 +553,35 @@ object ForkedTestOrchestrator extends StrictLogging {
 
   private def waitForForkProcess(
       proc: os.SubProcess,
+      cancelFilePath: os.Path,
       tag: String,
       moduleId: String,
       notifications: ServerNotificationsLogger
   ): Boolean = {
-    val finished =
-      try proc.waitFor(MaxTestTimeMs)
-      catch case _: InterruptedException => false
-    if !finished then {
+    val cancelled = () => {
+      val requestId = RequestContext.current.get().requestId
+      requestId != null && {
+        val tok = DederGlobals.cancellationTokens.get(requestId)
+        tok != null && tok.get()
+      }
+    }
+
+    val deadline = System.currentTimeMillis() + MaxTestTimeMs
+    var finished = false
+    while (!finished && System.currentTimeMillis() < deadline) {
+      if (cancelled()) {
+        handleCancelledFork(proc, cancelFilePath, tag, moduleId, notifications)
+        return false
+      }
+      finished =
+        try !proc.wrapped.isAlive()
+        catch { case _: Exception => false }
+      if (!finished) {
+        Thread.sleep(500)
+      }
+    }
+
+    if (!finished) {
       proc.wrapped.destroyForcibly()
       notifications.add(
         ServerNotification.logError(
@@ -570,6 +591,61 @@ object ForkedTestOrchestrator extends StrictLogging {
       )
     }
     finished
+  }
+
+  /** Graceful-to-forceful escalation when a forked test JVM should be stopped due to
+    * cancellation. Creates the cancel file for the forked JVM to notice, then escalates
+    * through SIGTERM and SIGKILL with timeouts.
+    */
+  private def handleCancelledFork(
+      proc: os.SubProcess,
+      cancelFilePath: os.Path,
+      tag: String,
+      moduleId: String,
+      notifications: ServerNotificationsLogger
+  ): Unit = {
+    notifications.add(
+      ServerNotification.logDebug(
+        s"${tag}cancelling forked test process...",
+        Some(moduleId)
+      )
+    )
+
+    // Step 1: Create cancel file — forked JVM polls this
+    try os.write(cancelFilePath, "")
+    catch case _: Exception => () // best effort
+
+    // Step 2: Wait up to 5s for graceful exit
+    val graceDeadline = System.currentTimeMillis() + 5000
+    while (proc.wrapped.isAlive() && System.currentTimeMillis() < graceDeadline) {
+      Thread.sleep(200)
+    }
+
+    // Step 3: SIGTERM
+    if (proc.wrapped.isAlive()) {
+      notifications.add(
+        ServerNotification.logDebug(
+          s"${tag}forked test did not exit after cancel signal, sending SIGTERM...",
+          Some(moduleId)
+        )
+      )
+      proc.wrapped.destroy()
+      val termDeadline = System.currentTimeMillis() + 2000
+      while (proc.wrapped.isAlive() && System.currentTimeMillis() < termDeadline) {
+        Thread.sleep(200)
+      }
+    }
+
+    // Step 4: SIGKILL
+    if (proc.wrapped.isAlive()) {
+      notifications.add(
+        ServerNotification.logDebug(
+          s"${tag}forked test did not exit after SIGTERM, force-killing...",
+          Some(moduleId)
+        )
+      )
+      proc.wrapped.destroyForcibly()
+    }
   }
 
   private def readForkResults(
