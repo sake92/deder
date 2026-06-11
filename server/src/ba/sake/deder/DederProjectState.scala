@@ -757,7 +757,8 @@ class DederProjectState(
         // flags, shell types, etc.) still work
         new TabCompleter(Seq.empty, Seq.empty, Seq.empty).complete(commandLine, cursorPos)
       case Right(state) =>
-        val toolNames = state.projectConfig.tools.keySet().asScala.toSeq
+        val tools = state.projectConfig.tools
+        val toolNames = if tools != null then tools.keySet().asScala.toSeq else Seq.empty
         TabCompleter(state.tasksResolver, toolNames).complete(commandLine, cursorPos)
     }
 
