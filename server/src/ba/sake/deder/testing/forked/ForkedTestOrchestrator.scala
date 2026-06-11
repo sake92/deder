@@ -201,7 +201,14 @@ object ForkedTestOrchestrator extends StrictLogging {
     var crashErrorSuites = Vector.empty[DederTestSuiteReport]
     var retryAttempt = 0
 
-    while (currentSlice.nonEmpty) {
+    val cancelled = () => {
+      val requestId = RequestContext.current.get().requestId
+      requestId != null && {
+        val tok = DederGlobals.cancellationTokens.get(requestId)
+        tok != null && tok.get()
+      }
+    }
+    while (currentSlice.nonEmpty && !cancelled()) {
       // Safety net: don't retry forever if every attempt fails the same way.
       if (retryAttempt > MaxRetries) {
         val tag = if showForkTag then s"[fork-$forkId] " else ""
@@ -222,7 +229,7 @@ object ForkedTestOrchestrator extends StrictLogging {
           if (retryAttempt == 0) runDir / s"fork-$forkId"
           else runDir / s"fork-$forkId-retry-$retryAttempt"
 
-        spawnAndRun(
+        val outcome = spawnAndRun(
           forkId = forkId,
           slice = currentSlice,
           javaBinary = javaBinary,
@@ -236,7 +243,9 @@ object ForkedTestOrchestrator extends StrictLogging {
           notifications = notifications,
           moduleId = moduleId,
           flushIntervalMs = flushIntervalMs
-        ) match {
+        )
+        if cancelled() then return None
+        outcome match {
           case ForkOutcome.Success(payload) =>
             return Some(mergeCrashSuites(payload, crashErrorSuites))
 
@@ -389,7 +398,11 @@ object ForkedTestOrchestrator extends StrictLogging {
         streamStderr(proc, stderrLog, tag, notifications, moduleId)
       )
 
-      val finished = waitForForkProcess(proc, cancelFilePath, tag, moduleId, notifications)
+      val finished = try {
+        waitForForkProcess(proc, cancelFilePath, tag, moduleId, notifications)
+      } catch {
+        case _: CancelledException => false
+      }
       stdoutThread.join(300)
       stderrThread.join(300)
 
@@ -571,7 +584,7 @@ object ForkedTestOrchestrator extends StrictLogging {
     while (!finished && System.currentTimeMillis() < deadline) {
       if (cancelled()) {
         handleCancelledFork(proc, cancelFilePath, tag, moduleId, notifications)
-        return false
+        throw CancelledException("Forked test run cancelled")
       }
       finished =
         try !proc.wrapped.isAlive()
