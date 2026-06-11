@@ -116,7 +116,7 @@ class InternalTaskSuite extends munit.FunSuite {
 
     val tasksRegistry = TasksRegistry(coreTasks.all :+ internalTask)
     val tasksResolver = TasksResolver(projectConfig, tasksRegistry)
-    val completer = ba.sake.deder.cli.TabCompleter(tasksResolver)
+    val completer = ba.sake.deder.cli.TabCompleter(tasksResolver, toolNames = Seq.empty)
 
     val completions = completer.complete("deder exec -t ", 14).toSet
     assert(!completions.contains("hiddenHelper"), "internal task 'hiddenHelper' should not appear in tab completions")
