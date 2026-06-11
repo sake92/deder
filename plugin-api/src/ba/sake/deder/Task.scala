@@ -103,8 +103,21 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
     internal: Boolean
 )(using ev: TaskDeps[Deps] =:= true, summarizable: Summarizable[T, S]) {
   def dependsOn[T2](t: AbstractTask[T2]): CachedTaskBuilder[T, Deps :* AbstractTask[T2], S] =
-    CachedTaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, enabled, category, kind, internal)
+    CachedTaskBuilder(
+      name,
+      taskDeps :* t,
+      transitive,
+      singleton,
+      supportedModuleTypes,
+      enabled,
+      category,
+      kind,
+      internal
+    )
 
+  /** Requires nonempty dependencies because caching only makes sense if there are inputs to hash. If there are no
+    * dependencies, the task will always execute...
+    */
   def build(execute: TaskExecContext[T, Deps] => T)(using Deps <:< NonEmptyTuple): Task[T, Deps, S] =
     CachedTask(
       name,
@@ -225,7 +238,11 @@ sealed trait Task[T, Deps <: Tuple, S](using
   ): (res: TaskResult[T], changed: Boolean)
 
   /** Type-erased cross-module aggregation returning the summary value. */
-  private[deder] def summarizeValueUnsafe(results: Seq[(String, Any)], failures: Seq[ModuleFailure], totalDuration: Duration): S =
+  private[deder] def summarizeValueUnsafe(
+      results: Seq[(String, Any)],
+      failures: Seq[ModuleFailure],
+      totalDuration: Duration
+  ): S =
     summarizable.summarize(results.asInstanceOf[Seq[(String, T)]], failures, totalDuration)
 
   /** Type-erased success check for use by the execution engine */
@@ -533,5 +550,5 @@ private case class CacheInputsHash(depOutputHashes: Seq[String], args: Seq[Strin
 enum FeatureTag(val emoji: String, val jsonKey: String, val description: String):
   case SourceAware extends FeatureTag("📁", "source-aware", "watches sources")
   case ConfigAware extends FeatureTag("⚙", "config-aware", "watches config")
-  case FanIn      extends FeatureTag("🔀", "fan-in", "fan-in")
-  case Cached     extends FeatureTag("⚡", "cached", "cached")
+  case FanIn extends FeatureTag("🔀", "fan-in", "fan-in")
+  case Cached extends FeatureTag("⚡", "cached", "cached")

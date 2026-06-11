@@ -106,8 +106,7 @@ class PluginLoader(
          |            .filter((it) -> it.id == "$pluginId")
          |            .first
          |            .toMap()
-         |  .remove("id")
-         |  .remove("deps")
+         |  .filter((key, _) -> key == "config")
          |  .toDynamic()
          |}
          |""".stripMargin
