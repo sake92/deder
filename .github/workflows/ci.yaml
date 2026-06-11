@@ -26,6 +26,9 @@ jobs:
           distribution: 'zulu'
           java-version: 21
       - uses: coursier/cache-action@v7
+      - name: Set Homebrew env
+        shell: bash
+        run: echo "HOMEBREW_NO_SANDBOX_LINUX=1" >> $GITHUB_ENV
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder
