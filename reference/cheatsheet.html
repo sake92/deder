@@ -138,6 +138,11 @@ deder exec -t test uber.MyTestSuite1#test1
 <span class="hljs-meta prompt_"># </span><span class="language-bash">write BSP config file</span>
 deder bsp install
 <span class="hljs-meta prompt_">
+# </span><span class="language-bash">launch a server-level tool</span>
+deder tool                  # list available tools
+deder tool tui              # launch the TUI dashboard
+deder tool tui -- --port 8080  # pass args to the tool
+<span class="hljs-meta prompt_">
 # </span><span class="language-bash">fix with scalafix</span>
 deder exec -t fix
 deder exec -t fixCheck

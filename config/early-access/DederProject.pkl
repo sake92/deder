@@ -1,8 +1,9 @@
 module ba.sake.deder.config.DederProject
 
-import "DederInternals.pkl" as I
 // temporarily until we have proper Pkl packages
 import "https://sake92.github.io/deder/config-api/DederPlugins.pkl" as P
+
+import "DederInternals.pkl" as I
 
 /// list of modules in the project. Each module corresponds to a subproject with its own source directories, dependencies, and tasks.
 modules: Listing<DederModule>(modulesValidation)
@@ -54,6 +55,18 @@ maxActiveCompilers: Int(isBetween(0, 256)) = 0
 /// 0 = detect automatically (number of available CPU cores).
 /// Per-module `maxTestForks` is capped by this value.
 maxConcurrentTestForks: Int(isBetween(0, 64)) = 0
+
+/// Server-wide tools that can be launched via `deder tool <name> [args...]`.
+/// Tools run as long-lived subprocesses, independent of any module.
+/// Deder predefines a `tui` tool (terminal dashboard) when the `deder-http` plugin is loaded.
+tools: Mapping<String, ServerTool> = new {
+  ["tui"] = new {
+    deps {
+      "ba.sake::deder-tui-dashboard:0.3.0"
+    }
+    mainClass = "ba.sake.deder.tuidashboard.app.TuiDashboardMain"
+  }
+}
 
 /// Base class for publish repository configuration.
 /// Credentials for the repository are looked up by `id` in `~/.deder/credentials.pkl`.
@@ -209,11 +222,24 @@ class JUnitXmlReportSettings {
 
 open class MvnApp {
   /// Maven dependencies, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
-  deps: Listing<String> = new Listing { }
+  deps: Listing<String> = new Listing {}
   /// Fully qualified main class to run
   mainClass: String(!isEmpty)
   /// Arguments to pass to the main class when running the app. Can also be provided at runtime via `deder exec -t runMvnApp <name> -- [args...]`, which will be appended to these defaults.
   args: Listing<String> = new Listing {}
+}
+
+open class ServerTool {
+  /// Maven dependencies, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
+  deps: Listing<String> = new Listing {}
+  /// Fully qualified main class to run
+  mainClass: String(!isEmpty)
+  /// Arguments to pass to the main class when launching the tool.
+  /// Can also be provided at runtime via `deder tool <name> -- [args...]`,
+  /// which will be appended to these defaults.
+  args: Listing<String> = new Listing {}
+  /// Short description shown in `deder tool` listing
+  description: String?
 }
 
 open class JavaModule extends DederModule {
