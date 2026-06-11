@@ -493,6 +493,7 @@ class FanInTask[T: JsonRW: Hashable](
       dependencyResolver: DependencyResolverApi
   ): (res: TaskResult[Seq[T]], changed: Boolean) = {
     serverNotificationsLogger.add(ServerNotification.logDebug(s"Executing ${name}", Some(module.id)))
+    // TODO add a nice error message if the cast fails
     val collected = depResults.map(_.value.asInstanceOf[T])
     val outputHash = Hashable[Seq[T]].hashStr(collected)
     (TaskResult(collected, "", outputHash), true)
