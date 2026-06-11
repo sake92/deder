@@ -340,6 +340,7 @@ object ForkedTestOrchestrator extends StrictLogging {
     os.makeDir.all(forkDir)
     val argsFilePath = forkDir / "fork-args.json"
     val resultsFilePath = forkDir / s"fork-results-${java.util.UUID.randomUUID()}.json"
+    val cancelFilePath = forkDir / "cancel"
     val stdoutLog = forkDir / "stdout.log"
     val stderrLog = forkDir / "stderr.log"
     val suiteOutputs = new java.util.concurrent.ConcurrentHashMap[String, StringBuilder]()
@@ -347,6 +348,8 @@ object ForkedTestOrchestrator extends StrictLogging {
     val completedSuites = java.util.concurrent.ConcurrentHashMap.newKeySet[String]()
     if os.exists(stdoutLog) then os.remove(stdoutLog)
     if os.exists(stderrLog) then os.remove(stderrLog)
+    // Clean up stale cancel file from a previous retry attempt
+    if os.exists(cancelFilePath) then os.remove(cancelFilePath)
 
     val args = ForkedTestArgs(
       forkId = forkId,
@@ -354,7 +357,8 @@ object ForkedTestOrchestrator extends StrictLogging {
       testSelectors = testOptions.testSelectors,
       testParallelism = testParallelism,
       resultsFile = resultsFilePath.toString,
-      flushIntervalMs = flushIntervalMs
+      flushIntervalMs = flushIntervalMs,
+      cancelFile = cancelFilePath.toString
     )
     os.write.over(argsFilePath, args.toJson(spaces = 0, sort = false))
 
