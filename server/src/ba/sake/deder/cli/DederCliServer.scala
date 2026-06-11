@@ -35,7 +35,6 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
     serverChannel = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
     serverChannel.bind(address)
 
-    // TODO better try catch
     try {
       while true do {
         // Accept client connection (blocking)

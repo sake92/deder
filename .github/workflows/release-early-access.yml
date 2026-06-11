@@ -70,6 +70,9 @@ jobs:
       - uses: coursier/cache-action@v7
         with:
           extraFiles: deder.pkl
+      - name: Set Homebrew env
+        shell: bash
+        run: echo "HOMEBREW_NO_SANDBOX_LINUX=1" >> $GITHUB_ENV
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
       - name: Install deder
@@ -120,6 +123,9 @@ jobs:
       - uses: coursier/cache-action@v7
         with:
           extraFiles: deder.pkl
+      - name: Set Homebrew env
+        shell: bash
+        run: echo "HOMEBREW_NO_SANDBOX_LINUX=1" >> $GITHUB_ENV
       - name: Set up Homebrew
         if: runner.os != 'Windows'
         uses: Homebrew/actions/setup-homebrew@main
