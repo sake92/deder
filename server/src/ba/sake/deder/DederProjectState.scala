@@ -753,10 +753,14 @@ class DederProjectState(
 
   def getTabCompletions(commandLine: String, cursorPos: Int): Seq[String] =
     readCurrentOrLastGood match {
-      case Left(_) => Seq.empty
+      case Left(_) =>
+        // State unavailable: use empty dynamic data so static completions (subcommands,
+        // flags, shell types, etc.) still work
+        new TabCompleter(Seq.empty, Seq.empty, Seq.empty).complete(commandLine, cursorPos)
       case Right(state) =>
-        val tabCompleter = TabCompleter(state.tasksResolver)
-        tabCompleter.complete(commandLine, cursorPos)
+        val tools = state.projectConfig.tools
+        val toolNames = if tools != null then tools.keySet().asScala.toSeq else Seq.empty
+        TabCompleter(state.tasksResolver, toolNames).complete(commandLine, cursorPos)
     }
 
   def shutdown(): Unit = {

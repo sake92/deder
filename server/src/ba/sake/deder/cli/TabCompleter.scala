@@ -3,7 +3,7 @@ package ba.sake.deder.cli
 import ba.sake.deder.TasksResolver
 import scala.util.boundary
 
-class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
+class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String], toolNames: Seq[String]) {
 
   private val allSubcommands = Seq(
     "version",
@@ -17,11 +17,12 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
     "import",
     "bsp",
     "complete",
-    "help"
+    "help",
+    "tool"
   )
 
   enum ValueType:
-    case ModuleIds, TaskNames, ShellTypes, ImportFrom, Subcommands, OutputFormats, LogLevels
+    case ModuleIds, TaskNames, ShellTypes, ImportFrom, Subcommands, OutputFormats, LogLevels, ToolNames
 
   case class FlagDef(long: String, short: Option[String], valueType: Option[ValueType])
 
@@ -92,6 +93,11 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
         // 2. Handle "bsp" subcommand specially (it has sub-subcommand)
         if subcommand == "bsp" then return Seq("install").filter(_.startsWith(currentWord))
 
+        // Handle "tool" subcommand specially — complete configured tool names
+        if subcommand == "tool" then
+          if rest.length <= 1 then return toolNames.filter(_.startsWith(currentWord))
+          else return Seq.empty
+
         // 3. Complete flags for this subcommand
         commandFlags
           .get(subcommand)
@@ -128,6 +134,7 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
       case ValueType.Subcommands   => allSubcommands
       case ValueType.OutputFormats => Seq("plain", "json", "densejson", "dot", "mermaid")
       case ValueType.LogLevels => Seq("error", "warning", "info", "debug", "trace")
+      case ValueType.ToolNames => toolNames
     }
     candidates.filter(_.startsWith(prefix))
   }
@@ -135,10 +142,11 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String]) {
 
 object TabCompleter {
 
-  def apply(tasksResolver: TasksResolver): TabCompleter =
+  def apply(tasksResolver: TasksResolver, toolNames: Seq[String]): TabCompleter =
     new TabCompleter(
       moduleIds = tasksResolver.allModules.map(_.id),
-      taskIds = tasksResolver.publicTaskInstancesPerModule.values.flatten.map(_.task.name).toSeq.distinct
+      taskIds = tasksResolver.publicTaskInstancesPerModule.values.flatten.map(_.task.name).toSeq.distinct,
+      toolNames = toolNames
     )
 
   val bashScript: String =
