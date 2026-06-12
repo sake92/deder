@@ -411,7 +411,27 @@ class DederProjectState(
         )
         val duration = Duration.ofNanos(System.nanoTime() - requestStartNanos)
         val cancelled = Option(DederGlobals.cancellationTokens.get(requestId)).exists(_.get())
-        internals.recordRequestCompleted(requestId, taskName, success = !cancelled, duration, callerType)
+
+        // Collect ALL errors from the result set — Failure, Skipped, and
+        // Success-with-unsuccessful-result (e.g., compile with errors):
+        val errors = result.flatMap {
+          case s: TaskExecResult.Success =>
+            if !s.taskInstance.task.isResultSuccessfulUnsafe(s.value) then
+              Some(s"${s.taskInstance.id}: result was unsuccessful")
+            else None
+          case TaskExecResult.Failure(ti, msg) =>
+            Some(s"${ti.id}: $msg")
+          case TaskExecResult.Skipped(ti, because) =>
+            Some(s"${ti.id}: skipped — ${because.taskInstance.id} failed: ${because.error}")
+        }
+        val hasFailures = errors.nonEmpty
+
+        internals.recordRequestCompleted(
+          requestId, taskName,
+          success = !cancelled && !hasFailures,
+          duration, callerType,
+          error = if errors.nonEmpty then Some(errors.mkString(" | ")) else None
+        )
         result
       } finally {
         acquiredLocks.reverse.foreach { taskInstance =>
@@ -422,7 +442,8 @@ class DederProjectState(
     } catch {
       case NonFatal(e) =>
         val duration = Duration.ofNanos(System.nanoTime() - requestStartNanos)
-        internals.recordRequestCompleted(requestId, taskName, success = false, duration, callerType)
+        val errMsg = Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
+        internals.recordRequestCompleted(requestId, taskName, success = false, duration, callerType, error = Some(errMsg))
         // send notification about failure to client
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
         if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))

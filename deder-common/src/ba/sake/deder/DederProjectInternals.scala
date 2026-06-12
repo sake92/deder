@@ -21,7 +21,8 @@ case class CompletedRequest(
     moduleIds: Seq[String],
     startTime: Instant,
     duration: Duration,
-    success: Boolean
+    success: Boolean,
+    error: Option[String]
 )
 
 case class DurationDistribution(
@@ -38,6 +39,7 @@ case class TaskStats(
     executions: Long,
     cacheHits: Long,
     errors: Long,
+    lastError: Option[String],
     duration: DurationDistribution
 )
 
