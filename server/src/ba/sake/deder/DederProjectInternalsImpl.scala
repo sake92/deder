@@ -98,8 +98,10 @@ class DederProjectInternalsImpl private (
       duration: Duration,
       caller: CallerType
   ): Unit =
-    currentReqs.remove(requestId)
-    val completed = CompletedRequest(requestId, caller, taskName, Seq.empty, Instant.now(), duration, success)
+    val liveReq = currentReqs.remove(requestId)
+    val moduleIds = Option(liveReq).map(_.moduleIds).getOrElse(Seq.empty)
+    val startTime = Option(liveReq).map(_.startTime).getOrElse(Instant.now())
+    val completed = CompletedRequest(requestId, caller, taskName, moduleIds, startTime, duration, success)
     history.addFirst(completed)
     while history.size() > maxHistory do history.pollLast()
     totalServed.incrementAndGet()
