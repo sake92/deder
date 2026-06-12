@@ -1,5 +1,6 @@
 package ba.sake.deder.client;
 
+import io.avaje.jsonb.Jsonb;
 import java.io.*;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -50,8 +51,10 @@ public class ArtifactCache {
 	// For atomic check-then-act operations
 	private final Path cacheBasePath;
 	
-	// Session-level early-access checksums cache (avoids downloading twice)
-	private Map<String, String> earlyAccessChecksums = null;
+	// Release info file for GitHub API freshness check
+	private static final String RELEASE_INFO_FILE = ".release-info";
+	// Minimum interval between GitHub API freshness checks (avoids rate limits)
+	private static final Duration API_CHECK_COOLDOWN = Duration.ofMinutes(5);
 
 	private final java.util.function.Consumer<String> logger;
 
@@ -107,9 +110,9 @@ public class ArtifactCache {
 
 			// Verify checksum
 			if (verifyCachedChecksum(version, type)) {
-				// For early-access, also verify against remote checksums
+				// For early-access, check freshness via GitHub API
 				if ("early-access".equals(version)) {
-					if (isEarlyAccessChecksumMatch(type)) {
+					if (!isEarlyAccessReleaseStale(version)) {
 						System.err.println("Using cached early-access " + type.getName() + ".jar");
 						return cachedPath;
 					}
@@ -128,7 +131,21 @@ public class ArtifactCache {
 		}
 
 		// Download and cache
-		return downloadAndCache(version, type);
+		Path result = downloadAndCache(version, type);
+
+		// After successful early-access download, store release metadata for freshness
+		if ("early-access".equals(version)) {
+			try {
+				String remoteUpdatedAt = fetchReleaseUpdatedAt(version);
+				if (remoteUpdatedAt != null) {
+					writeReleaseTimestamp(version, "updated_at", remoteUpdatedAt);
+				}
+			} catch (Exception e) {
+				log("Could not update release metadata: " + e.getMessage());
+			}
+		}
+
+		return result;
 	}
 
 	/**
@@ -443,30 +460,153 @@ public class ArtifactCache {
 	}
 
 	/**
-	 * Checks remote freshness: downloads the 536-byte checksums_sha256.txt from
-	 * the early-access GitHub release and compares it against the locally stored
-	 * .sha256. Local integrity (verifyCachedChecksum) confirms the cache is not
-	 * corrupted; this confirms the cache is still current.
+	 * Checks freshness of the early-access release via the GitHub API.
+	 * Compares the release's updated_at timestamp against a locally stored value.
+	 * Respects a cooldown period to avoid hitting GitHub API rate limits.
+	 *
+	 * @return true if the cached artifact is stale (should re-download), false if fresh
 	 */
-	private boolean isEarlyAccessChecksumMatch(ArtifactType type) {
+	private boolean isEarlyAccessReleaseStale(String version) {
 		try {
-			if (earlyAccessChecksums == null) {
-				earlyAccessChecksums = fetchChecksums("early-access");
+			// Check cooldown: skip API call if recently checked
+			String lastCheck = readReleaseTimestamp(version, "last_check");
+			if (lastCheck != null) {
+				Instant lastCheckTime = Instant.parse(lastCheck);
+				if (Duration.between(lastCheckTime, Instant.now()).compareTo(API_CHECK_COOLDOWN) < 0) {
+					log("Skipping API freshness check (cooldown active, last checked: " + lastCheck + ")");
+					String storedUpdatedAt = readReleaseTimestamp(version, "updated_at");
+					// If we have no stored timestamp, treat as stale to be safe
+					return storedUpdatedAt == null;
+				}
 			}
-			String fileName = ARTIFACT_FILE_NAMES.get(type);
-			String remoteHash = earlyAccessChecksums.get(fileName);
-			if (remoteHash == null) {
-				return false;
+
+			// Fetch current release metadata from GitHub API
+			String remoteUpdatedAt = fetchReleaseUpdatedAt(version);
+			// Record that we checked
+			writeReleaseTimestamp(version, "last_check", Instant.now().toString());
+
+			if (remoteUpdatedAt == null) {
+				// API call failed — treat as stale to trigger re-download (safe fallback)
+				log("GitHub API call failed, treating cache as stale");
+				return true;
 			}
-			Path checksumPath = getChecksumPath("early-access", type);
-			if (!Files.exists(checksumPath)) {
-				return false;
+
+			String storedUpdatedAt = readReleaseTimestamp(version, "updated_at");
+			if (storedUpdatedAt == null) {
+				// No stored timestamp — treat as stale (first run)
+				log("No stored release timestamp, treating cache as stale");
+				return true;
 			}
-			String cachedHash = Files.readString(checksumPath, StandardCharsets.UTF_8).strip();
-			return remoteHash.equals(cachedHash);
+
+			boolean stale = !remoteUpdatedAt.equals(storedUpdatedAt);
+			log("Early-access freshness: remote=" + remoteUpdatedAt + " stored=" + storedUpdatedAt + " stale=" + stale);
+			return stale;
 		} catch (Exception e) {
 			log("Error checking early-access freshness: " + e.getMessage());
-			return false;
+			return true; // Treat as stale on error (safe fallback)
+		}
+	}
+
+	/**
+	 * Fetches the release's updated_at timestamp from the GitHub API.
+	 * Uses the /repos/{owner}/{repo}/releases/tags/{tag} endpoint.
+	 *
+	 * @return the updated_at timestamp string, or null on failure
+	 */
+	private String fetchReleaseUpdatedAt(String version) {
+		try {
+			String apiUrl = GITHUB_API_URL + "tags/" + version;
+			log("Fetching release metadata from: " + apiUrl);
+
+			HttpRequest request = HttpRequest.newBuilder()
+					.uri(URI.create(apiUrl))
+					.header("Accept", "application/vnd.github+json")
+					.GET()
+					.timeout(Duration.ofSeconds(10))
+					.build();
+
+			HttpResponse<String> response = httpClient.send(request,
+					HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+			if (response.statusCode() != 200) {
+				log("GitHub API returned HTTP " + response.statusCode());
+				return null;
+			}
+
+			// Parse JSON response using avaje jsonb
+			GitHubRelease release = Jsonb.builder().failOnUnknown(false).build()
+					.type(GitHubRelease.class).fromJson(response.body());
+			if (release.updated_at != null) {
+				return release.updated_at;
+			}
+			log("Could not parse updated_at from API response");
+			return null;
+		} catch (Exception e) {
+			log("Error fetching release metadata: " + e.getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * Reads a metadata value from the .release-info file for a given version.
+	 * The file stores key=value pairs, one per line.
+	 *
+	 * @param version the version tag
+	 * @param key     the metadata key (e.g., "updated_at", "last_check")
+	 * @return the value, or null if not found
+	 */
+	private String readReleaseTimestamp(String version, String key) {
+		try {
+			Path infoFile = getVersionDir(version).resolve(RELEASE_INFO_FILE);
+			if (!Files.exists(infoFile)) {
+				return null;
+			}
+			String prefix = key + "=";
+			for (String line : Files.readAllLines(infoFile, StandardCharsets.UTF_8)) {
+				if (line.startsWith(prefix)) {
+					return line.substring(prefix.length()).strip();
+				}
+			}
+			return null;
+		} catch (Exception e) {
+			log("Error reading release metadata: " + e.getMessage());
+			return null;
+		}
+	}
+
+	/**
+	 * Writes a metadata key=value pair to the .release-info file.
+	 * Preserves existing entries and updates/adds the given key.
+	 */
+	private void writeReleaseTimestamp(String version, String key, String value) {
+		try {
+			Path infoFile = getVersionDir(version).resolve(RELEASE_INFO_FILE);
+			Map<String, String> entries = new LinkedHashMap<>();
+
+			// Read existing entries
+			if (Files.exists(infoFile)) {
+				for (String line : Files.readAllLines(infoFile, StandardCharsets.UTF_8)) {
+					String lineStrip = line.strip();
+					if (lineStrip.isEmpty()) continue;
+					int eqIdx = lineStrip.indexOf('=');
+					if (eqIdx > 0) {
+						entries.put(lineStrip.substring(0, eqIdx), lineStrip.substring(eqIdx + 1).strip());
+					}
+				}
+			}
+
+			// Update or add the key
+			entries.put(key, value);
+
+			// Write back
+			StringBuilder sb = new StringBuilder();
+			for (var entry : entries.entrySet()) {
+				sb.append(entry.getKey()).append("=").append(entry.getValue()).append("\n");
+			}
+			Files.writeString(infoFile, sb.toString(), StandardCharsets.UTF_8,
+					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+		} catch (Exception e) {
+			log("Error writing release metadata: " + e.getMessage());
 		}
 	}
 
@@ -614,5 +754,10 @@ public class ArtifactCache {
 
 	private void log(String message) {
 		logger.accept(message);
+	}
+
+	/** Lightweight type for deserializing GitHub release API response with avaje jsonb. */
+	static class GitHubRelease {
+		public String updated_at;
 	}
 }
