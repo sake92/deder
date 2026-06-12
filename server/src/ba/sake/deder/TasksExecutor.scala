@@ -112,17 +112,19 @@ class TasksExecutor(
           args, watch, serverNotificationsLogger, dependencyResolver
         )
         val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
-        internals.recordTaskExecution(ti.task.name, taskDuration, !changed)
+        val isUnsuccessful = !ti.task.isResultSuccessfulUnsafe(taskRes.value)
+        val errMsg = if isUnsuccessful then Some("result was unsuccessful") else None
+        internals.recordTaskExecution(ti.task.name, taskDuration, !changed, errorMessage = errMsg)
         ExecutionOutcome(TaskExecResult.Success(ti, taskRes.value, changed), Some(taskRes))
       }
     } catch {
       case NonFatal(e) =>
         val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
-        internals.recordTaskExecution(ti.task.name, taskDuration, cacheHit = false)
+        val errMsg = Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
+        internals.recordTaskExecution(ti.task.name, taskDuration, cacheHit = false, errorMessage = Some(errMsg))
         logger.error(s"Error during execution of task ${ti.id}", e)
         taskSpan.recordException(e)
         taskSpan.setStatus(StatusCode.ERROR)
-        val errMsg = Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
         ExecutionOutcome(TaskExecResult.Failure(ti, errMsg), None)
     } finally {
       taskSpan.end()

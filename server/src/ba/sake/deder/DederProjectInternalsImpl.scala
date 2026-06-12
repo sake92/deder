@@ -3,7 +3,7 @@ package ba.sake.deder
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
-import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
+import java.util.concurrent.atomic.{AtomicInteger, AtomicLong, AtomicReference}
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
 import io.opentelemetry.api.metrics.{LongCounter, LongHistogram, Meter}
@@ -96,12 +96,13 @@ class DederProjectInternalsImpl private (
       taskName: String,
       success: Boolean,
       duration: Duration,
-      caller: CallerType
+      caller: CallerType,
+      error: Option[String] = None
   ): Unit =
     val liveReq = currentReqs.remove(requestId)
     val moduleIds = Option(liveReq).map(_.moduleIds).getOrElse(Seq.empty)
     val startTime = Option(liveReq).map(_.startTime).getOrElse(Instant.now())
-    val completed = CompletedRequest(requestId, caller, taskName, moduleIds, startTime, duration, success)
+    val completed = CompletedRequest(requestId, caller, taskName, moduleIds, startTime, duration, success, error)
     history.addFirst(completed)
     while history.size() > maxHistory do history.pollLast()
     totalServed.incrementAndGet()
@@ -117,12 +118,13 @@ class DederProjectInternalsImpl private (
   private[deder] def recordTaskExecution(
       taskName: String,
       duration: Duration,
-      cacheHit: Boolean
+      cacheHit: Boolean,
+      errorMessage: Option[String] = None
   ): Unit =
     val acc = taskAccumulators.computeIfAbsent(taskName, _ => new TaskStatsAccumulator(1024))
-    acc.record(duration, cacheHit)
+    acc.record(duration, cacheHit, errorMessage)
     // OTEL
-    logger.debug(s"OTEL: task execution: task=${taskName} duration=${duration.toMillis}ms cacheHit=${cacheHit}")
+    logger.debug(s"OTEL: task execution: task=${taskName} duration=${duration.toMillis}ms cacheHit=${cacheHit} error=${errorMessage}")
     val attrs = Attributes.of(AttributeKey.stringKey("task"), taskName)
     taskExecutionsCounter.add(1, attrs)
     if cacheHit then taskCacheHitsCounter.add(1, attrs)
@@ -146,6 +148,7 @@ private class TaskStatsAccumulator(sampleCapacity: Int):
   private val executions = new AtomicLong(0)
   private val cacheHits = new AtomicLong(0)
   private val errors = new AtomicLong(0)
+  private val lastError = new AtomicReference[Option[String]](None)
   private val totalDurationNanos = new AtomicLong(0)
   private val maxDurationNanos = new AtomicLong(0)
   private val minDurationNanos = new AtomicLong(Long.MaxValue)
@@ -153,10 +156,14 @@ private class TaskStatsAccumulator(sampleCapacity: Int):
   private val sampleCursor = new AtomicInteger(0)
   private val sampleCount = new AtomicInteger(0)
 
-  def record(duration: Duration, cacheHit: Boolean): Unit =
+  def record(duration: Duration, cacheHit: Boolean, errorMessage: Option[String]): Unit =
     val nanos = duration.toNanos
     executions.incrementAndGet()
     if cacheHit then cacheHits.incrementAndGet()
+    errorMessage.foreach { msg =>
+      errors.incrementAndGet()
+      lastError.set(Some(msg))
+    }
     totalDurationNanos.addAndGet(nanos)
     maxDurationNanos.updateAndGet(math.max(_, nanos))
     minDurationNanos.updateAndGet(math.min(_, nanos))
@@ -167,7 +174,7 @@ private class TaskStatsAccumulator(sampleCapacity: Int):
   def toStats: TaskStats =
     val execs = executions.get()
     if execs == 0 then
-      TaskStats(0L, 0L, 0L,
+      TaskStats(0L, 0L, 0L, None,
         DurationDistribution(0L, Duration.ZERO, Duration.ZERO, Duration.ZERO, Duration.ZERO, Duration.ZERO, Duration.ZERO))
     else
       val count = math.min(sampleCount.get(), sampleCapacity)
@@ -179,6 +186,7 @@ private class TaskStatsAccumulator(sampleCapacity: Int):
         executions = execs,
         cacheHits = cacheHits.get(),
         errors = errors.get(),
+        lastError = lastError.get(),
         duration = DurationDistribution(
           count = count,
           min = Duration.ofNanos(minDurationNanos.get()),
