@@ -68,7 +68,81 @@ class DederTestRunnerSuite extends munit.FunSuite {
     assertEquals(results.suites.head.testCases.head.classname, results.suites.head.name)
   }
 
+  test("isCancelled=true from start: no tasks execute, returns empty results") {
+    val executed = new java.util.concurrent.atomic.AtomicInteger(0)
+    val framework = new FakeFramework(taskCount = 4, onExecute = () => {
+      executed.incrementAndGet()
+    })
+
+    val runner = buildCancellableRunner(framework, testParallelism = 1, isCancelled = () => true)
+    val results = runner.run(DederTestOptions(testSelectors = Seq.empty))
+
+    assertEquals(executed.get(), 0, "no tasks should execute when cancelled from start")
+    assertEquals(results.total, 0)
+  }
+
+  test("isCancelled after first task: partial results returned") {
+    val executed = new java.util.concurrent.atomic.AtomicInteger(0)
+    var cancelled = false
+    val latch = new CountDownLatch(1)
+    val startedLatch = new CountDownLatch(1)
+
+    val framework = new FakeFramework(taskCount = 4, onExecute = () => {
+      val n = executed.incrementAndGet()
+      if (n == 1) {
+        startedLatch.countDown()
+        latch.await(5, TimeUnit.SECONDS)
+      }
+    })
+
+    val runner = buildCancellableRunner(framework, testParallelism = 1, isCancelled = () => cancelled)
+    val runnerThread = new Thread((() => runner.run(DederTestOptions(testSelectors = Seq.empty))): Runnable)
+    runnerThread.start()
+
+    assert(startedLatch.await(5, TimeUnit.SECONDS), "first task should have started")
+    cancelled = true
+    latch.countDown()
+
+    runnerThread.join(5000)
+    assert(!runnerThread.isAlive(), "runner should have exited after cancellation")
+
+    assertEquals(executed.get(), 1, "only the in-flight task should complete")
+  }
+
   // --- helpers ---
+
+  private def buildCancellableRunner(
+      framework: Framework,
+      testParallelism: Int,
+      isCancelled: () => Boolean
+  ): DederTestRunner = {
+    val notifications = mutable.ArrayBuffer[ServerNotification]()
+    val logger = DederTestLogger(ServerNotificationsLogger(n => notifications += n), "test-module")
+    val discovered = Seq(
+      DiscoveredFrameworkTests(
+        frameworkName = framework.name(),
+        frameworkClassName = framework.getClass.getName,
+        testClasses = framework match {
+          case f: FakeFramework =>
+            (0 until f.taskCount).map(i =>
+              DiscoveredFrameworkTest(
+                className = s"fake.Task$i",
+                fingerprint = JsonableFingerprint.Subclass("java.lang.Object", false, false)
+              )
+            )
+          case _ => Seq.empty
+        }
+      )
+    )
+    new DederTestRunner(
+      testParallelism = testParallelism,
+      discoveredTests = discovered,
+      frameworkOverrides = Map(framework.getClass.getName -> framework),
+      classLoader = getClass.getClassLoader,
+      logger = logger,
+      isCancelled = isCancelled
+    )
+  }
 
   private def buildRunner(framework: Framework, testParallelism: Int): DederTestRunner = {
     val notifications = mutable.ArrayBuffer[ServerNotification]()

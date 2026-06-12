@@ -201,7 +201,14 @@ object ForkedTestOrchestrator extends StrictLogging {
     var crashErrorSuites = Vector.empty[DederTestSuiteReport]
     var retryAttempt = 0
 
-    while (currentSlice.nonEmpty) {
+    val cancelled = () => {
+      val requestId = RequestContext.current.get().requestId
+      requestId != null && {
+        val tok = DederGlobals.cancellationTokens.get(requestId)
+        tok != null && tok.get()
+      }
+    }
+    while (currentSlice.nonEmpty && !cancelled()) {
       // Safety net: don't retry forever if every attempt fails the same way.
       if (retryAttempt > MaxRetries) {
         val tag = if showForkTag then s"[fork-$forkId] " else ""
@@ -222,7 +229,7 @@ object ForkedTestOrchestrator extends StrictLogging {
           if (retryAttempt == 0) runDir / s"fork-$forkId"
           else runDir / s"fork-$forkId-retry-$retryAttempt"
 
-        spawnAndRun(
+        val outcome = spawnAndRun(
           forkId = forkId,
           slice = currentSlice,
           javaBinary = javaBinary,
@@ -236,7 +243,9 @@ object ForkedTestOrchestrator extends StrictLogging {
           notifications = notifications,
           moduleId = moduleId,
           flushIntervalMs = flushIntervalMs
-        ) match {
+        )
+        if cancelled() then return None
+        outcome match {
           case ForkOutcome.Success(payload) =>
             return Some(mergeCrashSuites(payload, crashErrorSuites))
 
@@ -340,6 +349,7 @@ object ForkedTestOrchestrator extends StrictLogging {
     os.makeDir.all(forkDir)
     val argsFilePath = forkDir / "fork-args.json"
     val resultsFilePath = forkDir / s"fork-results-${java.util.UUID.randomUUID()}.json"
+    val cancelFilePath = forkDir / "cancel"
     val stdoutLog = forkDir / "stdout.log"
     val stderrLog = forkDir / "stderr.log"
     val suiteOutputs = new java.util.concurrent.ConcurrentHashMap[String, StringBuilder]()
@@ -347,6 +357,8 @@ object ForkedTestOrchestrator extends StrictLogging {
     val completedSuites = java.util.concurrent.ConcurrentHashMap.newKeySet[String]()
     if os.exists(stdoutLog) then os.remove(stdoutLog)
     if os.exists(stderrLog) then os.remove(stderrLog)
+    // Clean up stale cancel file from a previous retry attempt
+    if os.exists(cancelFilePath) then os.remove(cancelFilePath)
 
     val args = ForkedTestArgs(
       forkId = forkId,
@@ -354,7 +366,8 @@ object ForkedTestOrchestrator extends StrictLogging {
       testSelectors = testOptions.testSelectors,
       testParallelism = testParallelism,
       resultsFile = resultsFilePath.toString,
-      flushIntervalMs = flushIntervalMs
+      flushIntervalMs = flushIntervalMs,
+      cancelFile = cancelFilePath.toString
     )
     os.write.over(argsFilePath, args.toJson(spaces = 0, sort = false))
 
@@ -385,7 +398,11 @@ object ForkedTestOrchestrator extends StrictLogging {
         streamStderr(proc, stderrLog, tag, notifications, moduleId)
       )
 
-      val finished = waitForForkProcess(proc, tag, moduleId, notifications)
+      val finished = try {
+        waitForForkProcess(proc, cancelFilePath, tag, moduleId, notifications)
+      } catch {
+        case _: CancelledException => false
+      }
       stdoutThread.join(300)
       stderrThread.join(300)
 
@@ -549,14 +566,35 @@ object ForkedTestOrchestrator extends StrictLogging {
 
   private def waitForForkProcess(
       proc: os.SubProcess,
+      cancelFilePath: os.Path,
       tag: String,
       moduleId: String,
       notifications: ServerNotificationsLogger
   ): Boolean = {
-    val finished =
-      try proc.waitFor(MaxTestTimeMs)
-      catch case _: InterruptedException => false
-    if !finished then {
+    val cancelled = () => {
+      val requestId = RequestContext.current.get().requestId
+      requestId != null && {
+        val tok = DederGlobals.cancellationTokens.get(requestId)
+        tok != null && tok.get()
+      }
+    }
+
+    val deadline = System.currentTimeMillis() + MaxTestTimeMs
+    var finished = false
+    while (!finished && System.currentTimeMillis() < deadline) {
+      if (cancelled()) {
+        handleCancelledFork(proc, cancelFilePath, tag, moduleId, notifications)
+        throw CancelledException("Forked test run cancelled")
+      }
+      finished =
+        try !proc.wrapped.isAlive()
+        catch { case _: Exception => false }
+      if (!finished) {
+        Thread.sleep(500)
+      }
+    }
+
+    if (!finished) {
       proc.wrapped.destroyForcibly()
       notifications.add(
         ServerNotification.logError(
@@ -566,6 +604,61 @@ object ForkedTestOrchestrator extends StrictLogging {
       )
     }
     finished
+  }
+
+  /** Graceful-to-forceful escalation when a forked test JVM should be stopped due to
+    * cancellation. Creates the cancel file for the forked JVM to notice, then escalates
+    * through SIGTERM and SIGKILL with timeouts.
+    */
+  private def handleCancelledFork(
+      proc: os.SubProcess,
+      cancelFilePath: os.Path,
+      tag: String,
+      moduleId: String,
+      notifications: ServerNotificationsLogger
+  ): Unit = {
+    notifications.add(
+      ServerNotification.logDebug(
+        s"${tag}cancelling forked test process...",
+        Some(moduleId)
+      )
+    )
+
+    // Step 1: Create cancel file — forked JVM polls this
+    try os.write(cancelFilePath, "")
+    catch case _: Exception => () // best effort
+
+    // Step 2: Wait up to 5s for graceful exit
+    val graceDeadline = System.currentTimeMillis() + 5000
+    while (proc.wrapped.isAlive() && System.currentTimeMillis() < graceDeadline) {
+      Thread.sleep(200)
+    }
+
+    // Step 3: SIGTERM
+    if (proc.wrapped.isAlive()) {
+      notifications.add(
+        ServerNotification.logDebug(
+          s"${tag}forked test did not exit after cancel signal, sending SIGTERM...",
+          Some(moduleId)
+        )
+      )
+      proc.wrapped.destroy()
+      val termDeadline = System.currentTimeMillis() + 2000
+      while (proc.wrapped.isAlive() && System.currentTimeMillis() < termDeadline) {
+        Thread.sleep(200)
+      }
+    }
+
+    // Step 4: SIGKILL
+    if (proc.wrapped.isAlive()) {
+      notifications.add(
+        ServerNotification.logDebug(
+          s"${tag}forked test did not exit after SIGTERM, force-killing...",
+          Some(moduleId)
+        )
+      )
+      proc.wrapped.destroyForcibly()
+    }
   }
 
   private def readForkResults(

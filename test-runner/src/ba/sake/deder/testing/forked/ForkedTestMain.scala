@@ -23,13 +23,15 @@ object ForkedTestMain {
     val logger = new ForkedTestLogger
 
     try {
+      val cancelFilePath = os.Path(forkedArgs.cancelFile)
       val testRunner = new DederTestRunner(
         testParallelism = forkedArgs.testParallelism,
         discoveredTests = forkedArgs.discoveredTests,
         frameworkOverrides = Map.empty,
         classLoader = classLoader,
         logger = logger,
-        forkHooks = Some(ForkRunnerHooks(capture, reporter))
+        forkHooks = Some(ForkRunnerHooks(capture, reporter)),
+        isCancelled = () => forkedArgs.cancelFile.nonEmpty && os.exists(cancelFilePath)
       )
       val results = testRunner.run(DederTestOptions(forkedArgs.testSelectors))
       val payload = ForkedTestResultsPayload(results, testRunner.perClassStats)
