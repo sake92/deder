@@ -59,7 +59,7 @@ class CliClientMessageHandler(
           |  version                 Show client and server versions
           |  modules [options]       List modules
           |  tasks [options]         List tasks
-          |  plugins [options]       List loaded plugins
+          |  plugins [options]       List configured plugins
           |  plan [options]          Show execution plan for a task
           |  exec [options]          Execute a task
           |  clean [options]         Clean modules
@@ -302,12 +302,25 @@ class CliClientMessageHandler(
             _.setAttribute("clientId", clientId)
               .setAttribute("request.id", requestId)
           ) { _ =>
-            val plugins = projectState.internals.loadedPlugins
+            val debug = ctx.logLevel.ordinal >= LogLevel.DEBUG.ordinal
             cliOptions.format match
               case OutputFormat.Dot | OutputFormat.Mermaid =>
                 serverMessages.put(CliServerMessage.Log("Format not supported for plugins (try plain, json, or densejson)", LogLevel.ERROR))
               case _ =>
-                val output = OutputFormat.render(PluginsOutput(plugins), cliOptions.format)
+                val output = projectState.readState(useLastGood = true) match {
+                  case Left(_) =>
+                    // Can't read project config, fall back to just loaded plugins
+                    val plugins = projectState.internals.loadedPlugins
+                    OutputFormat.render(PluginsOutput(plugins, debug), cliOptions.format)
+                  case Right(state) =>
+                    // Show ALL configured plugins, cross-referenced with loaded+error info
+                    val configuredIds = state.projectConfig.plugins.asScala.map(_.id).toSeq
+                    val loadedMap = projectState.internals.loadedPlugins.map(p => p.id -> p).toMap
+                    val allPlugins = configuredIds.map { id =>
+                      loadedMap.getOrElse(id, LoadedPluginInfo(id, Seq.empty, Some("Not loaded")))
+                    }
+                    OutputFormat.render(PluginsOutput(allPlugins, debug), cliOptions.format)
+                }
                 serverMessages.put(CliServerMessage.Output(output))
             serverMessages.put(CliServerMessage.Exit(0))
           }
@@ -772,7 +785,7 @@ private object TasksOutput:
         v => v.id, v => v.task.name
       )
 
-private case class PluginsOutput(plugins: Seq[LoadedPluginInfo])
+private case class PluginsOutput(plugins: Seq[LoadedPluginInfo], debug: Boolean = false)
 private object PluginsOutput:
   given JsonRW[PluginsOutput] with
     def write(value: PluginsOutput): JValue =
@@ -783,8 +796,16 @@ private object PluginsOutput:
 
   given PlainTextWritable[PluginsOutput] with
     def write(value: PluginsOutput): String =
-      if value.plugins.isEmpty then "No plugins loaded."
-      else value.plugins.map(p => s"${p.id} (${p.taskNames.mkString(", ")})").mkString("\n")
+      if value.plugins.isEmpty then "No plugins configured."
+      else value.plugins.map { p =>
+        val taskStr = if value.debug && p.taskNames.nonEmpty then s" (${p.taskNames.mkString(", ")})" else ""
+        val errorStr = p.error.fold("") { err =>
+          val lines = err.split('\n')
+          val truncated = if lines.length <= 3 then err else lines.take(3).mkString("\n") + "\n..."
+          s" (error: $truncated)"
+        }
+        s"${p.id}$taskStr$errorStr"
+      }.mkString("\n")
 
 private case class PlanOutput(
     stages: Seq[(Int, Seq[String])],

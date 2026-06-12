@@ -43,11 +43,15 @@ class PluginLoader(
       pklFile: os.Path,
       dederProject: DederProject
   ): PluginsLoadResult = {
+    val errors = scala.collection.mutable.ArrayBuffer.empty[PluginError]
+
     // Step 1: Serialize all new configs and compute hashes
     val serializedMap: Map[String, (String, Seq[String], String)] = pluginConfigs.flatMap { cfg =>
       serializePluginConfig(pklFile, cfg.id) match {
         case Left(err) =>
-          logger.warn(s"Failed to serialize plugin config for '${cfg.id}': $err. Skipping plugin.")
+          val errMsg = s"Failed to serialize plugin config for '${cfg.id}': $err"
+          logger.warn(s"$errMsg. Skipping plugin.")
+          errors += PluginError(cfg.id, errMsg)
           None
         case Right(configText) =>
           val rawDeps = cfg.deps.asScala.toSeq
@@ -83,14 +87,16 @@ class PluginLoader(
         dederProject = dederProject
       ) match {
         case Left(err) =>
-          logger.warn(s"Failed to load plugin '$pluginId': $err. Skipping plugin.")
+          val errMsg = s"Failed to load plugin '$pluginId': $err"
+          logger.warn(s"$errMsg. Skipping plugin.")
+          errors += PluginError(pluginId, errMsg)
           None
         case Right(loadedPlugin) =>
           Some(loadedPlugin)
       }
     }
 
-    PluginsLoadResult(toKeep ++ toLoad)
+    PluginsLoadResult(toKeep ++ toLoad, errors.toSeq)
   }
 
   /** Serialize a single plugin config as JSON via Pkl's evaluator with OutputFormat.JSON. The plugin can re-evaluate
@@ -183,6 +189,8 @@ class PluginLoader(
 
 }
 
+case class PluginError(pluginId: String, error: String)
+
 case class LoadedPlugin(
     plugin: DederPluginApi,
     configText: String,
@@ -196,7 +204,8 @@ case class LoadedPlugin(
 }
 
 case class PluginsLoadResult(
-    loadedPlugins: Seq[LoadedPlugin]
+    loadedPlugins: Seq[LoadedPlugin],
+    errors: Seq[PluginError]
 )
 
 private[deder] def partitionPlugins(

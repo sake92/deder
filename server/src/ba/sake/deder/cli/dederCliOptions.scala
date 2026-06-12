@@ -38,7 +38,7 @@ case class DederCliModulesOptions(
     format: OutputFormat = OutputFormat.PlainText
 )
 
-@main("plugins command", "List loaded plugins and their registered tasks")
+@main("plugins command", "List configured plugins and their tasks (tasks only shown with --log-level debug)")
 case class DederCliPluginsOptions(
     @arg(doc = "Output format: plain, json, densejson", short = 'f') 
     format: OutputFormat = OutputFormat.PlainText
