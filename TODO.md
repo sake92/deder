@@ -1,10 +1,8 @@
 
 # Misc
-- fix failing default summary
-- modules in stats history empty?
-- init() plugin in new thread?
+
 - publish pkl configs as proper Pkl modules, good for offline/caching
-- init like giter8, autoimport from sbt?
+- init like giter8, autoimport from sbt? maybe a separate "tool" CLI APP, noice
 - import from other maven effective POM etc
 - import from other mill
 - import from other gradle
