@@ -14,7 +14,22 @@ case class CompileResult(
 
 // One source file's diagnostics. A list (not a Map) because tupson cannot derive JsonRW
 // for a Map with a non-String key (DederPath). Clean files are present with an empty list.
-case class FileDiagnostics(file: DederPath, diagnostics: List[Diagnostic]) derives JsonRW
+case class FileDiagnostics(file: DederPath, diagnostics: List[CompileDiagnostic]) derives JsonRW
+
+// `Compile*` prefix avoids clashing with bsp4j's Diagnostic/Range/DiagnosticSeverity, so the
+// BSP layer can import both packages without qualification gymnastics.
+case class CompileDiagnostic(
+    range: CompileRange,
+    severity: CompileSeverity,
+    message: String,
+    code: Option[String]
+) derives JsonRW
+
+case class CompileRange(startLine: Int, startChar: Int, endLine: Int, endChar: Int) derives JsonRW
+
+enum CompileSeverity derives JsonRW {
+  case Error, Warning, Info, Hint
+}
 
 object CompileResult {
   // Custom Hashable that includes actual class file content hash, not just the path string.
@@ -27,17 +42,4 @@ object CompileResult {
       val combined = s"${classesHash}-${value.errors}-${value.warnings}-${value.sourceCount}"
       combined.hashStr
   }
-}
-
-case class Diagnostic(
-    range: Range,
-    severity: Severity,
-    message: String,
-    code: Option[String]
-) derives JsonRW
-
-case class Range(startLine: Int, startChar: Int, endLine: Int, endChar: Int) derives JsonRW
-
-enum Severity derives JsonRW {
-  case Error, Warning, Info, Hint
 }
