@@ -131,6 +131,27 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       kind = kind,
       internal = internal
     )
+
+  /** Like [[build]], but attaches a custom summary type `S2` instead of the default
+    * `MultiModuleResults[T]`. Requires nonempty dependencies (caching needs inputs to hash).
+    */
+  def buildSummarized[S2](
+      execute: TaskExecContext[T, Deps] => T,
+      isResultSuccessful: T => Boolean = (_: T) => true
+  )(using Deps <:< NonEmptyTuple, Summarizable[T, S2]): Task[T, Deps, S2] =
+    CachedTask(
+      name,
+      execute,
+      taskDeps,
+      transitive,
+      singleton,
+      supportedModuleTypes,
+      enabled = enabled,
+      category = category,
+      kind = kind,
+      isResultSuccessful = isResultSuccessful,
+      internal = internal
+    )
 }
 
 object CachedTaskBuilder {
