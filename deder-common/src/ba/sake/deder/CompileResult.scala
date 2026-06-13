@@ -6,20 +6,38 @@ case class CompileResult(
     classesDir: DederPath,
     errors: Int,
     warnings: Int,
-    sourceCount: Int
+    sourceCount: Int,
+    diagnostics: List[FileDiagnostics] = Nil
 ) derives JsonRW {
   def success: Boolean = errors == 0
 }
 
+// One source file's diagnostics. A list (not a Map) because tupson cannot derive JsonRW
+// for a Map with a non-String key (DederPath). Clean files are present with an empty list.
+case class FileDiagnostics(file: DederPath, diagnostics: List[Diagnostic]) derives JsonRW
+
 object CompileResult {
   // Custom Hashable that includes actual class file content hash, not just the path string.
-  // Without this, JsonRW-derived Hashable (low-priority fallback) only hashes the JSON
-  // representation — which serializes classesDir as a path string, missing any file content
-  // changes. Downstream CachedTasks (jar, publishArtifacts) would then hit cache with stale results.
+  // `diagnostics` is intentionally EXCLUDED: it is a BSP replay artifact, not a build output.
+  // Hashing it would churn downstream caches (jar, publishArtifacts) when only a warning
+  // message text changes.
   given Hashable[CompileResult] with {
     def hashStr(value: CompileResult): String =
       val classesHash = Hashable[DederPath].hashStr(value.classesDir)
       val combined = s"${classesHash}-${value.errors}-${value.warnings}-${value.sourceCount}"
       combined.hashStr
   }
+}
+
+case class Diagnostic(
+    range: Range,
+    severity: Severity,
+    message: String,
+    code: Option[String]
+) derives JsonRW
+
+case class Range(startLine: Int, startChar: Int, endLine: Int, endChar: Int) derives JsonRW
+
+enum Severity derives JsonRW {
+  case Error, Warning, Info, Hint
 }
