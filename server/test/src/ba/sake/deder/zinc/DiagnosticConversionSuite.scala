@@ -31,7 +31,7 @@ class DiagnosticConversionSuite extends munit.FunSuite {
     }
 
   test("converts a warning problem with 1->0 indexed range") {
-    val root = os.pwd
+    val root = os.temp.dir()
     val srcAbs = root / "src" / "Foo.scala"
     os.makeDir.all(srcAbs / os.up)
     os.write.over(srcAbs, "")
@@ -54,7 +54,7 @@ class DiagnosticConversionSuite extends munit.FunSuite {
   }
 
   test("clean source files appear as keys with empty lists") {
-    val root = os.pwd
+    val root = os.temp.dir()
     val cleanAbs = root / "src" / "Clean.scala"
     os.makeDir.all(cleanAbs / os.up)
     os.write.over(cleanAbs, "")
