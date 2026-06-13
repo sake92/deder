@@ -256,7 +256,7 @@ sealed trait Task[T, Deps <: Tuple, S](using
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
       dependencyResolver: DependencyResolverApi
-  ): (res: TaskResult[T], changed: Boolean)
+  ): (res: TaskResult[T], changed: Boolean, fromCache: Boolean)
 
   /** Type-erased cross-module aggregation returning the summary value. */
   private[deder] def summarizeValueUnsafe(
@@ -299,7 +299,7 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple, S](
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
       dependencyResolver: DependencyResolverApi
-  ): (res: TaskResult[T], changed: Boolean) = {
+  ): (res: TaskResult[T], changed: Boolean, fromCache: Boolean) = {
     serverNotificationsLogger.add(
       ServerNotification.logDebug(s"Executing ${name}", Some(module.id))
     )
@@ -323,7 +323,7 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple, S](
     serverNotificationsLogger.add(
       ServerNotification.logDebug(s"Computed result for ${name}", Some(module.id))
     )
-    (taskResult, true)
+    (taskResult, true, false)
   }
 
   override def toString(): String = s"TaskImpl($name)"
@@ -358,7 +358,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
       dependencyResolver: DependencyResolverApi
-  ): (res: TaskResult[T], changed: Boolean) = {
+  ): (res: TaskResult[T], changed: Boolean, fromCache: Boolean) = {
 
     serverNotificationsLogger.add(ServerNotification.logDebug(s"Executing ${name}", Some(module.id)))
 
@@ -398,21 +398,22 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
       try {
         val cachedTaskResult = os.read(metadataFile).parseJson[TaskResult[T]]
         val hasDeps = allDepResults.nonEmpty
-        val newRes = if hasDeps && inputsHash == cachedTaskResult.inputsHash then
+        if hasDeps && inputsHash == cachedTaskResult.inputsHash then
           serverNotificationsLogger.add(
             ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id))
           )
-          cachedTaskResult
-        else computeTaskResult()
-        val changed = newRes.outputHash != cachedTaskResult.outputHash
-        (newRes, changed)
+          // served from cache: execute() did not run, so no live notifications were emitted
+          (cachedTaskResult, false, true)
+        else
+          val newRes = computeTaskResult()
+          (newRes, newRes.outputHash != cachedTaskResult.outputHash, false)
       } catch {
         case _: TupsonException =>
           // if metadata file is corrupted, just recompute
-          (computeTaskResult(), true)
+          (computeTaskResult(), true, false)
       }
     } else {
-      (computeTaskResult(), true)
+      (computeTaskResult(), true, false)
     }
   }
 
@@ -529,7 +530,7 @@ class FanInTask[T: JsonRW: Hashable](
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
       dependencyResolver: DependencyResolverApi
-  ): (res: TaskResult[Seq[T]], changed: Boolean) = {
+  ): (res: TaskResult[Seq[T]], changed: Boolean, fromCache: Boolean) = {
     serverNotificationsLogger.add(ServerNotification.logDebug(s"Executing ${name}", Some(module.id)))
     val collected =
       try depResults.map(_.value.asInstanceOf[T])
@@ -544,7 +545,7 @@ class FanInTask[T: JsonRW: Hashable](
           throw e
       }
     val outputHash = Hashable[Seq[T]].hashStr(collected)
-    (TaskResult(collected, "", outputHash), true)
+    (TaskResult(collected, "", outputHash), true, false)
   }
 
   override def toString(): String = s"FanInTask($name, kind=$collectKind)"
