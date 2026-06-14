@@ -107,7 +107,7 @@ class TasksExecutor(
     val taskSpan = OTEL.TRACER.spanBuilder(ti.id).startSpan()
     try {
       Using.resource(taskSpan.makeCurrent()) { scope =>
-        val (taskRes, changed) = ti.task.executeUnsafe(
+        val (taskRes, changed, fromCache) = ti.task.executeUnsafe(
           projectConfig, ti.module, depResults, transitiveResults,
           args, watch, serverNotificationsLogger, dependencyResolver
         )
@@ -115,7 +115,7 @@ class TasksExecutor(
         val isUnsuccessful = !ti.task.isResultSuccessfulUnsafe(taskRes.value)
         val errMsg = if isUnsuccessful then Some("result was unsuccessful") else None
         internals.recordTaskExecution(ti.task.name, taskDuration, !changed, errorMessage = errMsg)
-        ExecutionOutcome(TaskExecResult.Success(ti, taskRes.value, changed), Some(taskRes))
+        ExecutionOutcome(TaskExecResult.Success(ti, taskRes.value, changed, fromCache), Some(taskRes))
       }
     } catch {
       case NonFatal(e) =>
@@ -167,6 +167,6 @@ class TasksExecutor(
 }
 
 enum TaskExecResult:
-  case Success(taskInstance: TaskInstance, value: Any, changed: Boolean)
+  case Success(taskInstance: TaskInstance, value: Any, changed: Boolean, fromCache: Boolean)
   case Failure(taskInstance: TaskInstance, error: String)
   case Skipped(taskInstance: TaskInstance, because: Failure)

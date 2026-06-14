@@ -383,12 +383,39 @@ class DederBspServer(
             moduleId = Some(moduleId),
             isCompileTask = true
           )
-          val compileResult = try {
-              executeTask(serverNotificationsLogger, moduleId, coreTasks.compileTask, Seq.empty, params.getOriginId)
+          val targetIdForRender = resolveModule(moduleId).map(buildTargetId).orNull
+          val (compileResult, fromCache) = try {
+              executeCompileTask(serverNotificationsLogger, moduleId, params.getOriginId)
             } catch {
               case _: TaskEvaluationException =>
-                val classesDir= executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask)
-                ba.sake.deder.CompileResult(classesDir, errors = 1, warnings = 0, sourceCount = 0)
+                val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask)
+                (ba.sake.deder.CompileResult(classesDir, errors = 1, warnings = 0, sourceCount = 0), false)
+            }
+            if fromCache then {
+              // Compiler was skipped, so no live notifications fired — replay the full picture.
+              val startP = TaskStartParams(subtaskId)
+              startP.setEventTime(System.currentTimeMillis())
+              startP.setOriginId(params.getOriginId)
+              startP.setMessage(s"Compiling ${moduleId} (cached) ...")
+              startP.setDataKind(TaskStartDataKind.COMPILE_TASK)
+              startP.setData(new CompileTask(targetIdForRender))
+              client.onBuildTaskStart(startP)
+
+              renderCompileResult(compileResult, targetIdForRender)
+
+              val cStatus = if compileResult.errors == 0 then StatusCode.OK else StatusCode.ERROR
+              val finishP = TaskFinishParams(subtaskId, cStatus)
+              finishP.setEventTime(System.currentTimeMillis())
+              finishP.setOriginId(params.getOriginId)
+              finishP.setMessage(s"Finished compiling ${moduleId}")
+              finishP.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
+              finishP.setData(new CompileReport(targetIdForRender, compileResult.errors, compileResult.warnings))
+              client.onBuildTaskFinish(finishP)
+            } else if targetIdForRender != null then {
+              // Live path already streamed start/diagnostics/finish via notifications. Finalize with
+              // the complete map so warnings on files an incremental compile didn't recompile (and
+              // that CompileStarted reset) are restored.
+              renderCompileResult(compileResult, targetIdForRender)
             }
             if compileResult.errors > 0 then allCompileSucceeded = false
         }
@@ -1150,6 +1177,53 @@ class DederBspServer(
       originId: String = null
   ): T =
     projectState.executeTask(moduleId, task, args, serverNotificationsLogger, useLastGood = true, requestId = Option(originId), callerType = CallerType.Bsp).res
+
+  /** Execute the compile task, exposing whether the result was served from cache (in which case
+    * the compiler was skipped and no live diagnostics notifications were emitted). */
+  private def executeCompileTask(
+      serverNotificationsLogger: ServerNotificationsLogger,
+      moduleId: String,
+      originId: String
+  ): (res: ba.sake.deder.CompileResult, fromCache: Boolean) = {
+    val r = projectState.executeTask(
+      moduleId, coreTasks.compileTask, Seq.empty, serverNotificationsLogger,
+      useLastGood = true, requestId = Option(originId), callerType = CallerType.Bsp
+    )
+    (r.res, r.fromCache)
+  }
+
+  private def bspDiagnostic(d: ba.sake.deder.CompileDiagnostic): Diagnostic = {
+    val range = new bsp4j.Range(
+      new bsp4j.Position(d.range.startLine, d.range.startChar),
+      new bsp4j.Position(d.range.endLine, d.range.endChar)
+    )
+    val out = new Diagnostic(range, d.message)
+    out.setSeverity(d.severity match {
+      case ba.sake.deder.CompileSeverity.Error   => DiagnosticSeverity.ERROR
+      case ba.sake.deder.CompileSeverity.Warning => DiagnosticSeverity.WARNING
+      case ba.sake.deder.CompileSeverity.Info    => DiagnosticSeverity.INFORMATION
+      case ba.sake.deder.CompileSeverity.Hint    => DiagnosticSeverity.HINT
+    })
+    d.code.foreach(out.setCode)
+    out.setSource("deder")
+    out
+  }
+
+  /** Render the complete diagnostics picture for a module from a CompileResult: publish each known
+    * source file with reset=true. Clean files (empty list) thereby clear stale IDE markers; files
+    * with diagnostics set them. Used on cache hits and to finalize cache-miss compiles, so both
+    * converge on identical, complete state. */
+  private def renderCompileResult(
+      result: ba.sake.deder.CompileResult,
+      targetId: BuildTargetIdentifier
+  ): Unit =
+    result.diagnostics.foreach { fd =>
+      val uri = fd.file.absPath.toNIO.toUri.toString
+      val diags = fd.diagnostics.map(bspDiagnostic).asJava
+      client.onBuildPublishDiagnostics(
+        PublishDiagnosticsParams(TextDocumentIdentifier(uri), targetId, diags, true)
+      )
+    }
 
   private def toBspLogMessage(n: ServerNotification.Log): LogMessageParams = {
     val level = n.level match {

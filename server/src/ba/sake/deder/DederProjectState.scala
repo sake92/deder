@@ -290,7 +290,7 @@ class DederProjectState(
         }
         if exitOnEnd then {
           val allSuccessful = results.forall {
-            case TaskExecResult.Success(ti, value, _) => ti.task.isResultSuccessfulUnsafe(value)
+            case TaskExecResult.Success(ti, value, _, _) => ti.task.isResultSuccessfulUnsafe(value)
             case _                                    => false // Failure and Skipped are always unsuccessful
           }
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = allSuccessful))
@@ -311,7 +311,7 @@ class DederProjectState(
       useLastGood: Boolean = false,
       requestId: Option[String] = None,
       callerType: CallerType = CallerType.Cli
-  ): (res: T, changed: Boolean) = {
+  ): (res: T, changed: Boolean, fromCache: Boolean) = {
     val span = OTEL.TRACER
       .spanBuilder(s"${moduleId}.${task.name}")
       .setAttribute("moduleId", moduleId)
@@ -341,7 +341,7 @@ class DederProjectState(
         }
 
         res match
-          case TaskExecResult.Success(_, value, changed) => (value.asInstanceOf[T], changed)
+          case TaskExecResult.Success(_, value, changed, fromCache) => (value.asInstanceOf[T], changed, fromCache)
           case TaskExecResult.Failure(ti, error) =>
             throw TaskEvaluationException(s"${ti.id}: $error")
           case TaskExecResult.Skipped(ti, because) =>
@@ -727,7 +727,7 @@ class DederProjectState(
       }
       val taskInstancesToCheck = watchedTaskAffected ++ watchedTask.affectingConfigValueTasks
       val affected = taskInstancesToCheck.exists { taskInstance =>
-        val (_, changed) = taskInstance.task match {
+        val (_, changed, _) = taskInstance.task match {
           case configValueTask: ConfigValueTask[?] =>
             executeTask(
               taskInstance.moduleId,
@@ -736,7 +736,7 @@ class DederProjectState(
               watchedTask.serverNotificationsLogger,
               useLastGood = watchedTask.useLastGood
             )
-          case _ => ((), true) // should not happen
+          case _ => ((), true, false) // should not happen
         }
         changed
       }

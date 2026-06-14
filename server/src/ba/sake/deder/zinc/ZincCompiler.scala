@@ -28,7 +28,8 @@ import xsbti.compile.{
 import scala.util.control.NonFatal
 import com.typesafe.scalalogging.StrictLogging
 import sbt.internal.inc.ScalaInstance
-import ba.sake.deder.{CacheStatsRegistry, DederGlobals, OTEL, RequestContext, ServerNotification, ServerNotificationsLogger}
+import ba.sake.deder.{CacheStatsRegistry, DederGlobals, DederPath, FileDiagnostics, OTEL, RequestContext, ServerNotification, ServerNotificationsLogger}
+import scala.jdk.CollectionConverters.*
 
 object ZincCompiler {
   def apply(
@@ -101,7 +102,8 @@ class ZincCompiler(
   case class ZincCompileResult(
       errors: Int,
       warnings: Int,
-      sourceCount: Int
+      sourceCount: Int,
+      diagnostics: List[FileDiagnostics]
   )
 
   private def compilerSetupKey(
@@ -319,6 +321,9 @@ class ZincCompiler(
          |""".stripMargin
     )
 
+    // Holds the fresh analysis on success; stays None if compile throws (errors) before
+    // producing one, in which case we fall back to the reporter's problems below.
+    var lastAnalysis: Option[CompileAnalysis] = None
     try {
       notifications.add(ServerNotification.CompileStarted(moduleId, sources))
       val compileSpan = OTEL.TRACER.spanBuilder("ZincCompiler.incrementalCompile")
@@ -328,6 +333,7 @@ class ZincCompiler(
       val newResult =
         try incrementalCompiler.compile(inputs, zincLogger)
         finally compileSpan.end()
+      lastAnalysis = Some(newResult.analysis())
       val storeSpan = OTEL.TRACER.spanBuilder("ZincCompiler.analysisStore.set")
         .setAttribute("moduleId", moduleId)
         .startSpan()
@@ -372,7 +378,26 @@ class ZincCompiler(
     val problems = reporter.problems()
     val errorsCount = problems.count(_.severity == xsbti.Severity.Error)
     val warningsCount = problems.count(_.severity == xsbti.Severity.Warn)
-    ZincCompileResult(errorsCount, warningsCount, sources.size)
+
+    val diagnosticsMap: Map[DederPath, List[ba.sake.deder.CompileDiagnostic]] =
+      lastAnalysis match {
+        case Some(analysis: sbt.internal.inc.Analysis) =>
+          // SourceInfos is the complete, Zinc-maintained per-file picture: reported problems for
+          // ALL sources in the analysis, not only files recompiled this run. This is what keeps
+          // warnings on untouched files from being dropped on an incremental compile.
+          val allProblems =
+            analysis.readSourceInfos.getAllSourceInfos.values().asScala
+              .flatMap(_.getReportedProblems.toSeq)
+              .toSeq
+          DiagnosticConversion.groupByFile(allProblems, sources, DederGlobals.projectRootDir)
+        case _ =>
+          // Failure path (compile threw before producing analysis): use this run's reported
+          // problems. Untouched-file warnings are not restored while the build is broken.
+          DiagnosticConversion.groupByFile(problems.toSeq, sources, DederGlobals.projectRootDir)
+      }
+    val diagnostics = diagnosticsMap.map((file, diags) => FileDiagnostics(file, diags)).toList
+
+    ZincCompileResult(errorsCount, warningsCount, sources.size, diagnostics)
   }
 
   private def getSetup(
