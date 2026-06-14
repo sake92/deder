@@ -100,6 +100,8 @@ All build artifacts go under `.deder/out/<moduleId>/<taskName>/`. Cache metadata
 
 ## Testing
 
+**Make a change work in a real/example project FIRST, then write the tests.** When fixing behavior (especially caching/incremental/build-graph changes), build the server and verify the actual behavior against an `examples/` scenario (or another real project) — confirm it does what you intended — *before* writing or tuning integration tests. Don't iterate on a test harness to infer whether the fix works; prove it in a real project, then encode that as a test. (A loose `String.contains` assertion or harness quirk can give false greens — e.g. `"...for compile"` matches `compilerJars`/`compileOnlyDeps`.)
+
 Check @CONTRIBUTING.md for technical details, how to test server, client, test-runner changes locally.  
 
 Use "deder shutdown && sleep 1" to kill the server.
