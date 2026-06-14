@@ -116,8 +116,14 @@ public class ArtifactCache {
 						System.err.println("Using cached early-access " + type.getName() + ".jar");
 						return cachedPath;
 					}
-					log("Early-access " + type.getName() + " updated, re-downloading...");
 					System.err.println("Early-access " + type.getName() + " updated, downloading...");
+					// Remove the stale artifact so downloadAndCache performs a real
+					// re-download. The cached jar passes local checksum verification
+					// (it is intact, just outdated), which would otherwise cause
+					// downloadAndCache's "already downloaded" re-check to short-circuit
+					// and return the stale jar without downloading.
+					Files.deleteIfExists(cachedPath);
+					Files.deleteIfExists(getChecksumPath(version, type));
 				} else {
 					log("Cache hit, checksum verified for " + version);
 					return cachedPath;
