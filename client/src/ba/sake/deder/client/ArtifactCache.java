@@ -117,11 +117,8 @@ public class ArtifactCache {
 						return cachedPath;
 					}
 					System.err.println("Early-access " + type.getName() + " updated, downloading...");
-					// Remove the stale artifact so downloadAndCache performs a real
-					// re-download. The cached jar passes local checksum verification
-					// (it is intact, just outdated), which would otherwise cause
-					// downloadAndCache's "already downloaded" re-check to short-circuit
-					// and return the stale jar without downloading.
+					// Remove the stale-but-intact artifact so downloadAndCache doesn't
+					// short-circuit on its local checksum guard and return the old jar.
 					Files.deleteIfExists(cachedPath);
 					Files.deleteIfExists(getChecksumPath(version, type));
 				} else {
@@ -542,8 +539,8 @@ public class ArtifactCache {
 			// Parse JSON response using avaje jsonb
 			GitHubRelease release = Jsonb.builder().failOnUnknown(false).build()
 					.type(GitHubRelease.class).fromJson(response.body());
-			if (release.updated_at != null) {
-				return release.updated_at;
+			if (release.updated_at() != null) {
+				return release.updated_at();
 			}
 			log("Could not parse updated_at from API response");
 			return null;
@@ -763,7 +760,7 @@ public class ArtifactCache {
 	}
 
 	/** Lightweight type for deserializing GitHub release API response with avaje jsonb. */
-	static class GitHubRelease {
-		public String updated_at;
+	@io.avaje.jsonb.Json
+	record GitHubRelease(String updated_at) {
 	}
 }
