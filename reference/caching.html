@@ -55,6 +55,7 @@
             <li><a href="#two-task-kinds">Two task kinds</a></li>
             <li><a href="#the-hash-chain">The hash chain</a></li>
             <li><a href="#hashablet-derivation">Hashable[T] derivation</a></li>
+            <li><a href="#anti-pattern-never-content-hash-a-tasks-own-outputs">Anti-pattern: never content-hash a task's own outputs</a></li>
             <li><a href="#known-limitations">Known limitations</a></li>
            </ul></li>
          </ul></li>
@@ -67,12 +68,12 @@
     <div></div>
    </div>
    <h1 id="task-caching">Task caching<a href="#task-caching" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
-   <p>Deder caches task outputs on disk so tasks whose inputs haven't changed don't re-run. This is separate from Scala incremental compilation: the <code>compile</code> task itself always re-invokes Zinc, and Zinc does incremental compilation internally.</p>
+   <p>Deder caches task outputs on disk so tasks whose inputs haven't changed don't re-run. This is separate from Scala incremental compilation: when <code>compile</code> does run it invokes Zinc, which does incremental compilation internally.</p>
    <h2 id="how-caching-behaves">How caching behaves<a href="#how-caching-behaves" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <h3 id="cached-vs-always-run-tasks">Cached vs always-run tasks<a href="#cached-vs-always-run-tasks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p>Whether a task is <em>cached</em> or <em>always runs</em> is noted in the <a href="https://sake92.github.io/deder/reference/tasks.html">Task Reference</a> — that page is the authoritative inventory.</p>
    <p>To verify against source, grep <code>server/src</code> for <code>CachedTaskBuilder</code> (cached). Always-run tasks extend <code>TaskImpl</code> — this includes <code>TaskBuilder</code>-constructed tasks as well as <code>ConfigValueTask</code> (config reads) and <code>SourceFileTask</code>/<code>SourceFilesTask</code> (source-file tracking).</p>
-   <p><code>compile</code> is "always runs" from deder's perspective, but Zinc skips unchanged sources internally — so unchanged compilations are still cheap even without deder-level caching.</p>
+   <p><code>compile</code> is a <code>CachedTask</code>, so it <em>should</em> skip when its inputs are unchanged — but see the "never content-hash a task's own outputs" anti-pattern below: it currently has self-referential dependencies that keep it from hitting. Even when it does run, Zinc skips unchanged sources internally.</p>
    <h3 id="where-cached-data-lives">Where cached data lives<a href="#where-cached-data-lives" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p>Every cached task writes a <code>metadata.json</code> (plus any task-specific artifacts) under:</p>
    <pre><code class="language- hljs language-crystal" data-highlighted="yes">.deder/<span class="hljs-keyword">out</span>/&lt;<span class="hljs-class"><span class="hljs-keyword">module</span>-<span class="hljs-title">id</span>&gt;/&lt;<span class="hljs-title">task</span>-<span class="hljs-title">name</span>&gt;/<span class="hljs-title">metadata</span>.<span class="hljs-title">json</span></span>
@@ -109,7 +110,7 @@ deder clean -m mod% -t compile%
 <span class="hljs-variable">compileClasspath</span> (<span class="hljs-variable">CachedTask</span>) ──────► <span class="hljs-variable">inputsHash</span> = <span class="hljs-function"><span class="hljs-title">hash</span>(<span class="hljs-variable">dep</span> <span class="hljs-variable">outputHashes</span>)</span>
          │                             <span class="hljs-variable">outputHash</span> = <span class="hljs-function"><span class="hljs-title">hash</span>(<span class="hljs-variable"><span class="hljs-class">result</span></span>)</span>
          ▼
-<span class="hljs-variable">compile</span> (<span class="hljs-variable">TaskImpl</span>) ─────────────────► <span class="hljs-variable">always</span> <span class="hljs-variable">runs</span>
+<span class="hljs-variable">compile</span> (<span class="hljs-variable">CachedTask</span>) ───────────────► <span class="hljs-variable">skips</span> <span class="hljs-variable"><span class="hljs-keyword">if</span></span> <span class="hljs-variable">its</span> <span class="hljs-variable">inputs</span> <span class="hljs-variable">are</span> <span class="hljs-variable">unchanged</span>
                                        <span class="hljs-variable">outputHash</span> = <span class="hljs-function"><span class="hljs-title">hash</span>(<span class="hljs-variable">classes</span> <span class="hljs-variable">dir</span>)</span>
          │
          ▼
@@ -117,6 +118,23 @@ deder clean -m mod% -t compile%
 </span></code></pre>
    <h3 id="hashablet-derivation"><code>Hashable[T]</code> derivation<a href="#hashablet-derivation" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p>Explicit instances live in <code>server/src/ba/sake/deder/Hashable.scala</code>: <code>Int</code>, <code>String</code>, <code>Boolean</code>, <code>os.Path</code>, <code>Option[T]</code>, <code>Seq[T]</code>, <code>Map[K,V]</code>. A low-priority given derives <code>Hashable[T]</code> from <code>JsonRW[T]</code> by hashing the JSON string, so any config type is automatically hashable. Explicit instances take priority — <code>os.Path</code> hashes file/directory contents (recursively, with leaf names bound to child hashes) rather than the path string.</p>
+   <h3 id="anti-pattern-never-content-hash-a-tasks-own-outputs">Anti-pattern: never content-hash a task's own outputs<a href="#anti-pattern-never-content-hash-a-tasks-own-outputs" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p><code>Hashable[os.Path]</code> / <code>Hashable[DederPath]</code> hash directory <strong>contents</strong> recursively, and a cache key is built from its dependencies' <code>outputHash</code>es. Therefore a task must <strong>never</strong> take a content-hashed dependency (<code>dependsOn</code>) on a directory that the task itself — or any task downstream of it — writes into.</p>
+   <p>This is <strong>not</strong> a task-graph cycle, so cycle detection will not catch it. The DAG stays acyclic (e.g. <code>compile → compileClasspath → allClassesDirs → classes</code>); the coupling is through the <strong>filesystem</strong>: <code>compile</code> writes the class dir that one of its own dependencies content-hashes. The consequences:</p>
+   <ul>
+    <li><strong>The task can never cache-hit.</strong> Each run rewrites its output → its own next input hash changes → it re-runs forever. Compounded by the fact that <code>.class</code> / <code>.semanticdb</code> bytes are <em>not</em> byte-stable across otherwise-identical recompiles.</li>
+    <li><strong>Every build pays a full content re-hash</strong> of a large output tree — e.g. ~14k <code>.class</code> files for a ~1.3k-source module is several seconds, even on a no-op.</li>
+   </ul>
+   <p>Rules:</p>
+   <ol>
+    <li>A task's cache key must be derived only from its true <strong>inputs</strong> (sources, compiler options, <em>upstream</em> module outputs) — never its own outputs.</li>
+    <li>If a task needs an output path at <strong>execute time</strong> (e.g. the module's own classes dir on the compiler classpath, needed for javac annotation processing where generated Java sources feed Scala), <strong>derive the path</strong> in <code>execute</code> (<code>ctx.out / os.up / "classes"</code>) — do not add a content-hashed <code>dependsOn</code>.</li>
+    <li>Represent a produced directory's "version" by its <strong>producer's input hash</strong> (identity), not by re-hashing its bytes. Cheaper, and immune to non-deterministic compiler output.</li>
+    <li>Build outputs live under <code>.deder/out/&lt;module&gt;/&lt;task&gt;/</code>. A content-hashed cache input pointing inside that tree (for the same or a downstream module) is the smell to watch for — consider it a bug.</li>
+   </ol>
+   <blockquote>
+    <p><strong>Tracked offenders (2026-06-14):</strong> <code>compileTask</code> depends on <code>semanticdbDirTask</code>, and (via <code>compileClasspathTask → allClassesDirsTask</code>) on its own <code>classesTask</code> — both directories <code>compile</code> writes. Until they're removed from <code>compile</code>'s cache key (derive the paths at execute time instead), <code>compile</code> re-runs Zinc and re-hashes its class tree on every no-op.</p>
+   </blockquote>
    <h3 id="known-limitations">Known limitations<a href="#known-limitations" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <ul>
     <li><strong>Transitive dep hashing is first-level only.</strong> A change deep in the dep chain doesn't necessarily invalidate downstream cache. Only if the direct task deps results have changed, the cached task will be reevaluated</li>
