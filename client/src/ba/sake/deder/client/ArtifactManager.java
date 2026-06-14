@@ -151,7 +151,7 @@ public class ArtifactManager {
         // Case 1: Local path specified - copy directly (bypass cache)
         if (localPath != null && !localPath.isBlank()) {
             log("Using local " + artifactName + " build from " + localPath);
-            System.err.println("Using local " + artifactName + "...");
+            System.err.println("Using local " + artifactName + " from " + Path.of(localPath).toAbsolutePath() + "...");
             Files.copy(Path.of(localPath), targetPath, StandardCopyOption.REPLACE_EXISTING);
             return;
         }

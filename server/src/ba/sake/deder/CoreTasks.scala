@@ -696,7 +696,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     }
 
   // returns classes dir
-  val compileTask = TaskBuilder
+  val compileTask = CachedTaskBuilder
     .make[CompileResult](
       name = "compile",
       transitive = true,
@@ -856,7 +856,8 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         classesDir = DederPath(classesDir),
         errors = zincResult.errors,
         warnings = zincResult.warnings,
-        sourceCount = zincResult.sourceCount
+        sourceCount = zincResult.sourceCount,
+        diagnostics = zincResult.diagnostics
       )
       },
       isResultSuccessful = _.errors == 0

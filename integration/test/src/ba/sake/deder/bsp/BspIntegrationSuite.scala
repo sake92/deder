@@ -291,6 +291,103 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     assertEquals(targetIds, List("common"), "Common.scala should be included in common module")
   }
 
+  // A cache-hit replay emits a task-start whose message contains "(cached)" — this uniquely
+  // distinguishes the replay path from the live (compiler-ran) path.
+  private def isCachedCompileStart(p: TaskStartParams): Boolean =
+    p.getDataKind == TaskStartDataKind.COMPILE_TASK && Option(p.getMessage).exists(_.contains("cached"))
+
+  private def compileCommon(): CompileResult =
+    buildServer.buildTargetCompile(new CompileParams(List(targetId("common")).asJava)).get(2, TimeUnit.MINUTES)
+
+  test("buildTargetCompile cache hit replays compile notifications") {
+    // First compile populates the cache for 'common' with the current (unchanged) inputs.
+    compileCommon()
+    capturingClient.clear()
+
+    // Second compile with identical inputs must be served from cache and replay notifications,
+    // even though the compiler did not run.
+    val result = compileCommon()
+    assertEquals(result.getStatusCode, StatusCode.OK)
+
+    val cachedStart = capturingClient.awaitTaskStart(predicate = isCachedCompileStart)
+    assert(
+      cachedStart.isDefined,
+      s"expected a cache-hit COMPILE_TASK start, got messages: ${capturingClient.taskStarts.asScala.map(_.getMessage).toList}"
+    )
+
+    val finish = capturingClient.awaitTaskFinish(predicate = _.getDataKind == TaskFinishDataKind.COMPILE_REPORT)
+    assert(finish.isDefined, "expected a COMPILE_REPORT task-finish on cache hit")
+    val report = new com.google.gson.Gson().fromJson(
+      finish.get.getData.asInstanceOf[com.google.gson.JsonObject],
+      classOf[CompileReport]
+    )
+    assertEquals(report.getErrors.intValue(), 0)
+    assertEquals(report.getWarnings.intValue(), 0)
+  }
+
+  test("buildTargetCompile cache hit replays error diagnostics without recompiling") {
+    val badFile = testDir / "common/src/bad.scala"
+    os.write.over(badFile, "package common\nval notValid: Int = \"wrong type\"")
+    try {
+      // First compile: cache miss, fails and publishes an error diagnostic (live path).
+      val r1 = compileCommon()
+      assertEquals(r1.getStatusCode, StatusCode.ERROR)
+      capturingClient.clear()
+
+      // Second compile, bad.scala unchanged: cache hit must REPLAY the error diagnostic.
+      val r2 = compileCommon()
+      assertEquals(r2.getStatusCode, StatusCode.ERROR)
+
+      val cachedStart = capturingClient.awaitTaskStart(predicate = isCachedCompileStart)
+      assert(cachedStart.isDefined, "expected a cache-hit COMPILE_TASK start on the 2nd compile")
+
+      val diag = capturingClient.awaitDiagnostic(predicate =
+        p =>
+          p.getTextDocument.getUri.contains("bad.scala") &&
+            p.getDiagnostics.asScala.exists(_.getSeverity == DiagnosticSeverity.ERROR)
+      )
+      assert(diag.isDefined, "error diagnostic for bad.scala should be replayed on cache hit")
+    } finally {
+      os.remove(badFile)
+      compileCommon() // restore clean state for subsequent tests
+    }
+  }
+
+  test("buildTargetCompile incremental compile keeps and clears diagnostics consistently") {
+    val fileA = testDir / "common/src/badA.scala"
+    val fileB = testDir / "common/src/badB.scala"
+    os.write.over(fileA, "package common\nval badA: Int = \"a\"")
+    os.write.over(fileB, "package common\nval badB: Int = \"b\"")
+    try {
+      val r1 = compileCommon()
+      assertEquals(r1.getStatusCode, StatusCode.ERROR)
+      capturingClient.clear()
+
+      // Fix only A; B is untouched and still broken. This is an incremental recompile.
+      os.write.over(fileA, "package common\nval okA: Int = 1")
+      val r2 = compileCommon()
+      assertEquals(r2.getStatusCode, StatusCode.ERROR)
+
+      // B's diagnostic must still be reported after the recompile (complete picture).
+      val diagB = capturingClient.awaitDiagnostic(predicate =
+        p =>
+          p.getTextDocument.getUri.contains("badB.scala") &&
+            p.getDiagnostics.asScala.exists(_.getSeverity == DiagnosticSeverity.ERROR)
+      )
+      assert(diagB.isDefined, "badB.scala error should still be reported after editing only badA.scala")
+
+      // A's diagnostics must be cleared (empty publish with reset).
+      val diagACleared = capturingClient.awaitDiagnostic(predicate =
+        p => p.getTextDocument.getUri.contains("badA.scala") && p.getDiagnostics.asScala.isEmpty
+      )
+      assert(diagACleared.isDefined, "badA.scala diagnostics should be cleared after fixing it")
+    } finally {
+      os.remove(fileA)
+      os.remove(fileB)
+      compileCommon() // restore clean state for subsequent tests
+    }
+  }
+
   test("buildTargetOutputPaths returns excluded directory paths") {
     val params = new OutputPathsParams(List(targetId("common")).asJava)
     val result = buildServer.buildTargetOutputPaths(params).get(30, TimeUnit.SECONDS)

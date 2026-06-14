@@ -116,7 +116,6 @@ public class ArtifactCache {
 						System.err.println("Using cached early-access " + type.getName() + ".jar");
 						return cachedPath;
 					}
-					log("Early-access " + type.getName() + " updated, re-downloading...");
 					System.err.println("Early-access " + type.getName() + " updated, downloading...");
 					// Remove the stale-but-intact artifact so downloadAndCache doesn't
 					// short-circuit on its local checksum guard and return the old jar.
