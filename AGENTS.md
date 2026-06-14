@@ -62,6 +62,7 @@ The core abstraction is `Task[T, Deps]` (`server/src/ba/sake/deder/Task.scala`).
 - `TaskBuilder.make[T]("name").dependsOn(otherTask).build { ctx => ... }` — fluent task construction
 - Tasks are defined in `CoreTasks.scala` and registered via `TasksRegistry`
 - **CRITICAL**: Any data class that is a task result type (`T` in `Task[T, Deps, S]`) and contains `DederPath` or `os.Path` fields MUST have a custom `Hashable[T]` instance. The low-priority JSON-based `Hashable` fallback serializes paths as strings — missing actual file/directory content changes. Without a custom `Hashable`, downstream `CachedTask`s will hit stale cache entries because their `inputsHash` (computed from upstream `outputHash`es) never changes. See `CompileResult` for an example of a custom `Hashable` that includes content hashing.
+- **CRITICAL (the other direction)**: A task must **never** content-hash its own outputs as cache *inputs*. `Hashable[os.Path]`/`Hashable[DederPath]` hash directory **contents**, so a task must not `dependsOn` any directory it (or a downstream task) writes into. This is a *filesystem* feedback loop, **not** a graph cycle — the DAG stays acyclic, so cycle detection won't catch it — and it makes the task never cache-hit plus re-hash a large output tree (e.g. ~14k `.class` files) on every build, including no-ops. If you need an output path at execute time (e.g. the module's own classes dir on the compiler classpath for javac annotation processing), **derive it** in `execute` (`ctx.out / os.up / "classes"`), do not `dependsOn` it. Build outputs live under `.deder/out/<module>/<task>/`; a content-hashed input pointing inside that tree is the smell. See `docs/content/reference/caching.md` → "Anti-pattern: never content-hash a task's own outputs" (tracks the current `compile` → `semanticdbDir` / `classes` offenders).
 
 ### Task Execution Flow
 1. `TasksResolver` builds a JGraphT `SimpleDirectedGraph[TaskInstance, DefaultEdge]` from modules × tasks
@@ -98,6 +99,8 @@ CLI communication uses newline-delimited JSON over Unix sockets. Message types a
 All build artifacts go under `.deder/out/<moduleId>/<taskName>/`. Cache metadata is in `metadata.json` per task. Server logs go to `.deder/logs/`.
 
 ## Testing
+
+**Make a change work in a real/example project FIRST, then write the tests.** When fixing behavior (especially caching/incremental/build-graph changes), build the server and verify the actual behavior against an `examples/` scenario (or another real project) — confirm it does what you intended — *before* writing or tuning integration tests. Don't iterate on a test harness to infer whether the fix works; prove it in a real project, then encode that as a test. (A loose `String.contains` assertion or harness quirk can give false greens — e.g. `"...for compile"` matches `compilerJars`/`compileOnlyDeps`.)
 
 Check @CONTRIBUTING.md for technical details, how to test server, client, test-runner changes locally.  
 

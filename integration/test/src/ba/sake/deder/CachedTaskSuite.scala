@@ -33,6 +33,32 @@ class CachedTaskSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("cached tasks: compile is reused on second run (no self-referential deps)") {
+    withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
+      // First run computes
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compile")
+      val offsetAfterFirst = serverLogOffset(projectPath)
+      // Second run with nothing changed must hit cache. Regression guard: compile must not
+      // depend on its own outputs (classes dir, semanticdb dir) — those are written by compile,
+      // so content-hashing them as inputs made compile's key change every build (never hit).
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compile")
+      val newLines = readNewServerLogLines(projectPath, offsetAfterFirst)
+      // Exact-match the task name: `contains("...for compile")` would also match
+      // `compilerJars` / `compileOnlyDeps` / `compileClasspath`.
+      def usedCache(l: String) = l.trim.endsWith("Using cached result for compile")
+      def recomputed(l: String) = l.trim.endsWith("Computed result for compile")
+      val compileLines = newLines.filter(l => usedCache(l) || recomputed(l))
+      assert(
+        newLines.exists(usedCache),
+        s"Expected compile to be served from cache on the second identical run, got:\n${compileLines.mkString("\n")}"
+      )
+      assert(
+        !newLines.exists(recomputed),
+        s"compile should not recompute when nothing changed. compile lines:\n${compileLines.mkString("\n")}"
+      )
+    }
+  }
+
   test("cached tasks: should recompute after dependency change") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
       executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")

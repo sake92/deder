@@ -703,7 +703,11 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       category = "Build"
     )
     .dependsOn(sourceFilesTask)
-    .dependsOn(generatedSourcesTask)
+    // NOT generatedSourcesTask: that's THIS module's javac-annotation-processing output dir,
+    // which compile creates and writes — content-hashing it as an input is self-referential
+    // (absent -> empty -> populated flips the hash every build). Path derived at execute time.
+    // (allGeneratedSourceFilesTask stays: those are separate plugin SourceGenerator outputs,
+    // i.e. genuine upstream inputs.)
     .dependsOn(allGeneratedSourceFilesTask)
     .dependsOn(javaHomeTask)
     .dependsOn(javaVersionTask)
@@ -711,9 +715,17 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     .dependsOn(scalacOptionsTask)
     .dependsOn(scalaVersionTask)
     .dependsOn(compilerJarsTask)
-    .dependsOn(compileClasspathTask)
+    // NOT compileClasspathTask: it includes this module's OWN classes dir (via allClassesDirs),
+    // whose content-hash is self-referential — compile writes those classes, so depending on
+    // their content makes compile's cache key change every build (it never hits). Instead we
+    // take the dependency coordinates (stable) and reconstruct the classpath at execute time
+    // from upstream compile outputs + jars + our own (derived) classes dir.
+    // See docs/content/reference/caching.md "never content-hash a task's own outputs".
+    .dependsOn(mandatoryDependenciesTask)
+    .dependsOn(allDependenciesTask)
     .dependsOn(compileOnlyDependenciesTask)
-    .dependsOn(semanticdbDirTask)
+    // NOT semanticdbDirTask either: compile writes the semanticdb dir, so hashing its content
+    // is likewise self-referential. The path is derived at execute time.
     .dependsOn(scalacPluginsTask)
     .dependsOn(javacAnnotationProcessorsTask)
     .dependsOn(javaSemanticdbVersionTask)
@@ -723,7 +735,6 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       execute = { ctx =>
       val (
         sourceFiles,
-        generatedSourcesDir,
         allGeneratedSourceFiles,
         javaHome,
         javaVersion,
@@ -731,25 +742,34 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         scalacOptions,
         scalaVersion,
         compilerJars,
-        compileClasspath,
+        mandatoryDependencies,
+        dependencies,
         compileOnlyDeps,
-        semanticdbDir,
         scalacPlugins,
         javacAnnotationProcessors,
         javaSemanticdbVersion,
         scalaSemanticdbVersion,
         semanticdbEnabled
       ) = ctx.depResults
-      // classesTask is NOT a dep here: its outputHash reflects compiled class contents,
-      // which changes after every compilation — making the cache key self-referential.
-      // The path is stable and derived the same way classesTask would compute it.
+      // classes and semanticdb dirs are this task's OWN outputs — derive their paths instead of
+      // taking content-hashed dependencies on them (which would make the cache key self-referential).
       val classesDir = ctx.out / os.up / "classes"
+      val semanticdbDir = DederPath(ctx.out / os.up / "semanticdb")
+      val generatedSourcesDir = DederPath(ctx.out / os.up / "generatedSources")
 
-      // fetch compileOnly deps and add them to the compile classpath
+      // Upstream module class dirs come from transitive compile outputs (this is a transitive
+      // task). Their change-detection is via the transitive results' outputHashes, not by us
+      // content-hashing the dirs. Own classes dir is added below for javac annotation processing.
+      val upstreamClassesDirs = ctx.transitiveResults.flatten.map(_.classesDir.absPath)
+      val depsJars =
+        ctx.dependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
       val compileOnlyJars =
         if compileOnlyDeps.nonEmpty then ctx.dependencyResolver.fetchFiles(compileOnlyDeps, Some(ctx.notifications))
         else Seq.empty
-      val fullCompileClasspath = (compileClasspath ++ compileOnlyJars).distinct
+      // Own classes dir on the classpath so javac-annotation-processor-generated sources are
+      // visible to scalac within this same compile (the original reason for feeding own classes).
+      val fullCompileClasspath =
+        (Seq(classesDir) ++ upstreamClassesDirs ++ depsJars ++ compileOnlyJars).reverse.distinct.reverse
 
       JdkUtils.checkCompat(JdkUtils.getVersion(scala.util.Properties.javaSpecVersion), scalaVersion)
 
