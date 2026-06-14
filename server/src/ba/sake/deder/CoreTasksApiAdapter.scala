@@ -20,7 +20,6 @@ class CoreTasksApiAdapter(
 ) extends CoreTasksApi {
   def sourcesTask: AbstractTask[Seq[DederPath]] = coreTasks.sourcesTask
   def sourceFilesTask: AbstractTask[Seq[DederPath]] = coreTasks.sourceFilesTask
-  def generatedSourcesTask: AbstractTask[DederPath] = coreTasks.generatedSourcesTask
   def resourcesTask: AbstractTask[Seq[DederPath]] = coreTasks.resourcesTask
   def javaHomeTask: AbstractTask[Option[os.Path]] = coreTasks.javaHomeTask
   def javaVersionTask: AbstractTask[Option[String]] = coreTasks.javaVersionTask
@@ -31,8 +30,6 @@ class CoreTasksApiAdapter(
   def repositoriesTask: AbstractTask[Seq[String]] = coreTasks.repositoriesTask
   def compileOnlyDepsTask: AbstractTask[Seq[String]] = coreTasks.compileOnlyDepsTask
   def depsTreeTask: AbstractTask[DepTree] = coreTasks.depsTreeTask
-  def classesTask: AbstractTask[DederPath] = coreTasks.classesTask
-  def semanticdbDirTask: AbstractTask[DederPath] = coreTasks.semanticdbDirTask
   def compileTask: AbstractTask[CompileResult] = coreTasks.compileTask
   def compileClasspathTask: AbstractTask[Seq[os.Path]] = coreTasks.compileClasspathTask
   def javaSemanticdbVersionTask: AbstractTask[String] = coreTasks.javaSemanticdbVersionTask

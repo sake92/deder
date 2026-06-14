@@ -14,6 +14,16 @@ object DederGlobals {
       )
     os.Path(prop)
 
+  // Conventional output paths for a module. These are compile *outputs*, derived from the
+  // fixed `.deder/out/<module>/<name>` layout — NOT modeled as tasks. Modeling them as tasks
+  // (the old classesTask/semanticdbDirTask) made consumers content-hash dirs that compile
+  // writes, which is self-referential. Derive the path; get change-detection from compileTask.
+  def moduleOutDir(moduleId: String, name: String): os.Path =
+    projectRootDir / ".deder/out" / moduleId / name
+  def classesDir(moduleId: String): os.Path = moduleOutDir(moduleId, "classes")
+  def semanticdbDir(moduleId: String): os.Path = moduleOutDir(moduleId, "semanticdb")
+  def generatedSourcesDir(moduleId: String): os.Path = moduleOutDir(moduleId, "generatedSources")
+
   val cancellationTokens: ConcurrentHashMap[String, AtomicBoolean] = new ConcurrentHashMap()
 
   /** Caps the number of forked test JVMs alive at any one time across the whole server.

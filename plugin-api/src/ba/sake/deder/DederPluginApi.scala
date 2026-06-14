@@ -53,7 +53,6 @@ case class PluginInitParams(
 trait CoreTasksApi {
   def sourcesTask: AbstractTask[Seq[DederPath]]
   def sourceFilesTask: AbstractTask[Seq[DederPath]]
-  def generatedSourcesTask: AbstractTask[DederPath]
   def resourcesTask: AbstractTask[Seq[DederPath]]
   def javaHomeTask: AbstractTask[Option[os.Path]]
   def javaVersionTask: AbstractTask[Option[String]]
@@ -64,8 +63,6 @@ trait CoreTasksApi {
   def repositoriesTask: AbstractTask[Seq[String]]
   def compileOnlyDepsTask: AbstractTask[Seq[String]]
   def depsTreeTask: AbstractTask[DepTree]
-  def classesTask: AbstractTask[DederPath]
-  def semanticdbDirTask: AbstractTask[DederPath]
   def compileTask: AbstractTask[CompileResult]
   def compileClasspathTask: AbstractTask[Seq[os.Path]]
   def javaSemanticdbVersionTask: AbstractTask[String]
