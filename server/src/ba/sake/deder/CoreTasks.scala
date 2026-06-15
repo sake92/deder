@@ -278,7 +278,8 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       result.conflicts.foreach { conflict =>
         ctx.notifications.add(
           ServerNotification.logWarning(
-            s"Dependency `${conflict.coordinate}` has multiple versions: [${conflict.versions.mkString(", ")}]. Keeping last: ${conflict.keptVersion}",
+            s"Dependency `${conflict.coordinate}` has multiple versions: [${conflict.versions
+                .mkString(", ")}]. Keeping last: ${conflict.keptVersion}",
             Some(ctx.module.id)
           )
         )
@@ -709,173 +710,172 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
           val level = diag.severity match {
             case CompileSeverity.Error   => ServerNotification.LogLevel.ERROR
             case CompileSeverity.Warning => ServerNotification.LogLevel.WARNING
-            case _                        => ServerNotification.LogLevel.INFO
+            case _                       => ServerNotification.LogLevel.INFO
           }
-          val location = if diag.range.startLine > 0 then
-            Some(s"${fd.file.path}:${diag.range.startLine}:${diag.range.startChar}")
-          else None
-          val text = location match
-            case Some(loc) => s"$loc: ${diag.message}"
-            case None      => diag.message
+          val location =
+            if diag.range.startLine > 0 then s"${fd.file.path}:${diag.range.startLine}:${diag.range.startChar}"
+            else s"${fd.file.path}"
+          val text = s"$location: ${diag.message}"
           logger.add(ServerNotification.log(level, text, Some(moduleId)))
         }
       }
     }
     .buildSummarized[CompilationSummary](
       execute = { ctx =>
-      val (
-        sourceFiles,
-        allGeneratedSourceFiles,
-        javaHome,
-        javaVersion,
-        javacOptions,
-        scalacOptions,
-        scalaVersion,
-        compilerJars,
-        mandatoryDependencies,
-        dependencies,
-        compileOnlyDeps,
-        scalacPlugins,
-        javacAnnotationProcessors,
-        javaSemanticdbVersion,
-        scalaSemanticdbVersion,
-        semanticdbEnabled
-      ) = ctx.depResults
-      // classes and semanticdb dirs are this task's OWN outputs — derive their paths instead of
-      // taking content-hashed dependencies on them (which would make the cache key self-referential).
-      val classesDir = ctx.out / os.up / "classes"
-      val semanticdbDir = DederPath(ctx.out / os.up / "semanticdb")
-      val generatedSourcesDir = DederPath(ctx.out / os.up / "generatedSources")
+        val (
+          sourceFiles,
+          allGeneratedSourceFiles,
+          javaHome,
+          javaVersion,
+          javacOptions,
+          scalacOptions,
+          scalaVersion,
+          compilerJars,
+          mandatoryDependencies,
+          dependencies,
+          compileOnlyDeps,
+          scalacPlugins,
+          javacAnnotationProcessors,
+          javaSemanticdbVersion,
+          scalaSemanticdbVersion,
+          semanticdbEnabled
+        ) = ctx.depResults
+        // classes and semanticdb dirs are this task's OWN outputs — derive their paths instead of
+        // taking content-hashed dependencies on them (which would make the cache key self-referential).
+        val classesDir = ctx.out / os.up / "classes"
+        val semanticdbDir = DederPath(ctx.out / os.up / "semanticdb")
+        val generatedSourcesDir = DederPath(ctx.out / os.up / "generatedSources")
 
-      // Upstream module class dirs come from transitive compile outputs (this is a transitive
-      // task). Their change-detection is via the transitive results' outputHashes, not by us
-      // content-hashing the dirs. Own classes dir is added below for javac annotation processing.
-      val upstreamClassesDirs = ctx.transitiveResults.flatten.map(_.classesDir.absPath)
-      val depsJars =
-        ctx.dependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
-      val compileOnlyJars =
-        if compileOnlyDeps.nonEmpty then ctx.dependencyResolver.fetchFiles(compileOnlyDeps, Some(ctx.notifications))
-        else Seq.empty
-      // Own classes dir on the classpath so javac-annotation-processor-generated sources are
-      // visible to scalac within this same compile (the original reason for feeding own classes).
-      // Classpath.++ dedups keeping the last occurrence (shadowing order); upstream dirs from
-      // transitiveResults may repeat across depth levels — keep-last resolves them correctly.
-      val fullCompileClasspath =
-        (Classpath(Seq(classesDir)) ++ Classpath(upstreamClassesDirs) ++ Classpath(depsJars) ++ Classpath(
-          compileOnlyJars
-        )).entries
+        // Upstream module class dirs come from transitive compile outputs (this is a transitive
+        // task). Their change-detection is via the transitive results' outputHashes, not by us
+        // content-hashing the dirs. Own classes dir is added below for javac annotation processing.
+        val upstreamClassesDirs = ctx.transitiveResults.flatten.map(_.classesDir.absPath)
+        val depsJars =
+          ctx.dependencyResolver.fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
+        val compileOnlyJars =
+          if compileOnlyDeps.nonEmpty then ctx.dependencyResolver.fetchFiles(compileOnlyDeps, Some(ctx.notifications))
+          else Seq.empty
+        // Own classes dir on the classpath so javac-annotation-processor-generated sources are
+        // visible to scalac within this same compile (the original reason for feeding own classes).
+        // Classpath.++ dedups keeping the last occurrence (shadowing order); upstream dirs from
+        // transitiveResults may repeat across depth levels — keep-last resolves them correctly.
+        val fullCompileClasspath =
+          (Classpath(Seq(classesDir)) ++ Classpath(upstreamClassesDirs) ++ Classpath(depsJars) ++ Classpath(
+            compileOnlyJars
+          )).entries
 
-      JdkUtils.checkCompat(JdkUtils.getVersion(scala.util.Properties.javaSpecVersion), scalaVersion)
+        JdkUtils.checkCompat(JdkUtils.getVersion(scala.util.Properties.javaSpecVersion), scalaVersion)
 
-      // annotation processors need generated sources dir to exist
-      os.makeDir.all(generatedSourcesDir.absPath)
+        // annotation processors need generated sources dir to exist
+        os.makeDir.all(generatedSourcesDir.absPath)
 
-      val zincCacheFile = ctx.out / "inc_compile.zip"
-      val zincLogger = new DederZincLogger(ctx.notifications, ctx.module.id)
+        val zincCacheFile = ctx.out / "inc_compile.zip"
+        val zincLogger = new DederZincLogger(ctx.notifications, ctx.module.id)
 
-      // semanticdb javac annotation processor (when enabled)
-      val semanticdbJavacJar =
-        if semanticdbEnabled then
-          ctx.dependencyResolver.fetchFiles(
-            Seq(Dependency.make(s"com.sourcegraph:semanticdb-javac:${javaSemanticdbVersion}", scalaVersion))
-          )
-        else Seq.empty
-      val allJavacAnnotationProcessors = javacAnnotationProcessors ++ semanticdbJavacJar
-
-      val finalJavacOptions = javacOptions ++
-        Option
-          .when(allJavacAnnotationProcessors.nonEmpty)(
-            Seq(
-              "-s",
-              generatedSourcesDir.absPath.toString,
-              "-processorpath",
-              allJavacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator)
+        // semanticdb javac annotation processor (when enabled)
+        val semanticdbJavacJar =
+          if semanticdbEnabled then
+            ctx.dependencyResolver.fetchFiles(
+              Seq(Dependency.make(s"com.sourcegraph:semanticdb-javac:${javaSemanticdbVersion}", scalaVersion))
             )
-          )
-          .toSeq
-          .flatten ++
-        javaVersion.map(v => Seq("--release", v)).getOrElse(Seq.empty) ++
-        // https://github.com/sourcegraph/scip-java/issues/390
-        Option.when(semanticdbEnabled)(
-          s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${semanticdbDir.absPath} -build-tool:sbt"
-        )
+          else Seq.empty
+        val allJavacAnnotationProcessors = javacAnnotationProcessors ++ semanticdbJavacJar
 
-      // For Scala 2: add semanticdb-scalac plugin (when enabled)
-      val semanticdbScalacJar =
-        if semanticdbEnabled && !scalaVersion.startsWith("3.") then
-          ctx.dependencyResolver.fetchFiles(
-            Seq(Dependency.make(s"org.scalameta:::semanticdb-scalac:${scalaSemanticdbVersion}", scalaVersion))
+        val finalJavacOptions = javacOptions ++
+          Option
+            .when(allJavacAnnotationProcessors.nonEmpty)(
+              Seq(
+                "-s",
+                generatedSourcesDir.absPath.toString,
+                "-processorpath",
+                allJavacAnnotationProcessors.map(_.toString).mkString(File.pathSeparator)
+              )
+            )
+            .toSeq
+            .flatten ++
+          javaVersion.map(v => Seq("--release", v)).getOrElse(Seq.empty) ++
+          // https://github.com/sourcegraph/scip-java/issues/390
+          Option.when(semanticdbEnabled)(
+            s"-Xplugin:semanticdb -sourceroot:${DederGlobals.projectRootDir} -targetroot:${semanticdbDir.absPath} -build-tool:sbt"
           )
-        else Seq.empty
-      val allScalacPlugins = scalacPlugins ++ semanticdbScalacJar
 
-      val semanticDbScalacOpts =
-        if !semanticdbEnabled then Seq.empty
-        else if scalaVersion.startsWith("3.") then
-          Seq(
-            "-Xsemanticdb",
-            "-sourceroot",
-            DederGlobals.projectRootDir.toString,
-            "-semanticdb-target",
-            semanticdbDir.absPath.toString
-          )
-        else
-          Seq(
-            "-Yrangepos",
-            s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}",
-            s"-P:semanticdb:targetroot:${semanticdbDir.absPath}"
-          )
-      val platformSpecificScalacOptions = ctx.module match {
-        case module: ScalaJsModule => if scalaVersion.startsWith("3.") then Seq("-scalajs") else Seq.empty
-        case _                     => Seq.empty
-      }
-      val finalScalacOptions =
-        scalacOptions ++ allScalacPlugins
-          .map(p => s"-Xplugin:${p.toString}") ++ platformSpecificScalacOptions ++ semanticDbScalacOpts
+        // For Scala 2: add semanticdb-scalac plugin (when enabled)
+        val semanticdbScalacJar =
+          if semanticdbEnabled && !scalaVersion.startsWith("3.") then
+            ctx.dependencyResolver.fetchFiles(
+              Seq(Dependency.make(s"org.scalameta:::semanticdb-scalac:${scalaSemanticdbVersion}", scalaVersion))
+            )
+          else Seq.empty
+        val allScalacPlugins = scalacPlugins ++ semanticdbScalacJar
 
-      val compileOrder = (ctx.module: @unchecked) match {
-        case m: JavaModule =>
-          m.compileOrder match {
-            case ConfigCompileOrder.JAVA_THEN_SCALA => CompileOrder.JavaThenScala
-            case ConfigCompileOrder.SCALA_THEN_JAVA => CompileOrder.ScalaThenJava
-            case ConfigCompileOrder.MIXED           => CompileOrder.Mixed
+        val semanticDbScalacOpts =
+          if !semanticdbEnabled then Seq.empty
+          else if scalaVersion.startsWith("3.") then
+            Seq(
+              "-Xsemanticdb",
+              "-sourceroot",
+              DederGlobals.projectRootDir.toString,
+              "-semanticdb-target",
+              semanticdbDir.absPath.toString
+            )
+          else
+            Seq(
+              "-Yrangepos",
+              s"-P:semanticdb:sourceroot:${DederGlobals.projectRootDir}",
+              s"-P:semanticdb:targetroot:${semanticdbDir.absPath}"
+            )
+        val platformSpecificScalacOptions = ctx.module match {
+          case module: ScalaJsModule => if scalaVersion.startsWith("3.") then Seq("-scalajs") else Seq.empty
+          case _                     => Seq.empty
+        }
+        val finalScalacOptions =
+          scalacOptions ++ allScalacPlugins
+            .map(p => s"-Xplugin:${p.toString}") ++ platformSpecificScalacOptions ++ semanticDbScalacOpts
+
+        val compileOrder = (ctx.module: @unchecked) match {
+          case m: JavaModule =>
+            m.compileOrder match {
+              case ConfigCompileOrder.JAVA_THEN_SCALA => CompileOrder.JavaThenScala
+              case ConfigCompileOrder.SCALA_THEN_JAVA => CompileOrder.ScalaThenJava
+              case ConfigCompileOrder.MIXED           => CompileOrder.Mixed
+            }
+        }
+
+        val sem = DederGlobals.compileSemaphore
+        sem.acquire()
+        val zincResult =
+          try {
+            zincCompilersCache
+              .get(scalaVersion, ctx.dependencyResolver)
+              .compile(
+                javaHome = javaHome.map(_.toNIO),
+                scalaVersion = scalaVersion,
+                compilerJars = compilerJars,
+                compileClasspath = fullCompileClasspath,
+                zincCacheFile = zincCacheFile,
+                sources = (sourceFiles ++ allGeneratedSourceFiles).distinct.map(_.absPath),
+                classesDir = classesDir,
+                scalacOptions = finalScalacOptions,
+                javacOptions = finalJavacOptions,
+                compileOrder = compileOrder,
+                zincLogger = zincLogger,
+                moduleId = ctx.module.id,
+                notifications = ctx.notifications
+              )
+          } finally {
+            sem.release()
           }
-      }
 
-      val sem = DederGlobals.compileSemaphore
-      sem.acquire()
-      val zincResult = try {
-        zincCompilersCache
-          .get(scalaVersion, ctx.dependencyResolver)
-          .compile(
-            javaHome = javaHome.map(_.toNIO),
-            scalaVersion = scalaVersion,
-            compilerJars = compilerJars,
-            compileClasspath = fullCompileClasspath,
-            zincCacheFile = zincCacheFile,
-            sources = (sourceFiles ++ allGeneratedSourceFiles).distinct.map(_.absPath),
-            classesDir = classesDir,
-            scalacOptions = finalScalacOptions,
-            javacOptions = finalJavacOptions,
-            compileOrder = compileOrder,
-            zincLogger = zincLogger,
-            moduleId = ctx.module.id,
-            notifications = ctx.notifications
-          )
-      } finally {
-        sem.release()
-      }
-
-      CompileResult(
-        classesDir = DederPath(classesDir),
-        errors = zincResult.errors,
-        warnings = zincResult.warnings,
-        sourceCount = zincResult.sourceCount,
-        diagnostics = zincResult.diagnostics,
-        // Output token: carry our own inputsHash so downstream/jar/publish key on input identity
-        // instead of re-hashing the (huge) classes dir. See Hashable[CompileResult].
-        inputsHash = ctx.inputsHash
-      )
+        CompileResult(
+          classesDir = DederPath(classesDir),
+          errors = zincResult.errors,
+          warnings = zincResult.warnings,
+          sourceCount = zincResult.sourceCount,
+          diagnostics = zincResult.diagnostics,
+          // Output token: carry our own inputsHash so downstream/jar/publish key on input identity
+          // instead of re-hashing the (huge) classes dir. See Hashable[CompileResult].
+          inputsHash = ctx.inputsHash
+        )
       },
       isResultSuccessful = _.errors == 0
     )
@@ -945,8 +945,6 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
           Option.when(discoveredMainClasses.length == 1)(discoveredMainClasses.head)
         }
     }
-
-  
 
   val fixTask = TaskBuilder
     .make[Seq[String]](
@@ -1158,10 +1156,8 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       isResultSuccessful = _.success
     )
 
-  
-
-  /** Source JARs for all transitive dependencies (used by BSP). Fetches source JARs in parallel with per-dep timeout
-    * so a single slow or missing-sources artifact never stalls the whole import.
+  /** Source JARs for all transitive dependencies (used by BSP). Fetches source JARs in parallel with per-dep timeout so
+    * a single slow or missing-sources artifact never stalls the whole import.
     */
   val depSourcesTask = CachedTaskBuilder
     .make[Seq[os.Path]](
