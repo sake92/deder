@@ -84,8 +84,6 @@ class TasksResolverSuite extends munit.FunSuite {
       "dependencies",
       "allDependencies",
       "mandatoryDependencies",
-      "classes",
-      "allClassesDirs",
       "compileOnlyDeps",
       "compileOnlyDependencies",
       "compileClasspath",
@@ -201,7 +199,6 @@ class TasksResolverSuite extends munit.FunSuite {
   private def baseScalaModuleTaskEdges(moduleId: String): Set[(String, String)] =
     Set(
       (s"${moduleId}.allDependencies", s"${moduleId}.dependencies"),
-      (s"${moduleId}.allClassesDirs", s"${moduleId}.classes"),
       (s"${moduleId}.allJars", s"${moduleId}.jar"),
       (s"${moduleId}.assemblyDeps", s"${moduleId}.scalaVersion"),
       (s"${moduleId}.assemblyDeps", s"${moduleId}.mandatoryDependencies"),
@@ -212,7 +209,6 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.compileClasspath", s"${moduleId}.scalaVersion"),
       (s"${moduleId}.compileClasspath", s"${moduleId}.mandatoryDependencies"),
       (s"${moduleId}.compileClasspath", s"${moduleId}.allDependencies"),
-      (s"${moduleId}.compileClasspath", s"${moduleId}.allClassesDirs"),
       (s"${moduleId}.compileOnlyDependencies", s"${moduleId}.compileOnlyDeps"),
       (s"${moduleId}.compileOnlyDependencies", s"${moduleId}.scalaVersion"),
       (s"${moduleId}.compilerDeps", s"${moduleId}.scalaVersion"),
@@ -292,8 +288,6 @@ class TasksResolverSuite extends munit.FunSuite {
   private def transitiveScalaModuleTaskEdges(moduleId: String, dependencyModuleId: String): Set[(String, String)] =
     Set(
       (s"${moduleId}.allDependencies", s"${dependencyModuleId}.allDependencies"),
-      (s"${moduleId}.allClassesDirs", s"${dependencyModuleId}.allClassesDirs"),
-      (s"${moduleId}.compileClasspath", s"${dependencyModuleId}.compileClasspath"),
       (s"${moduleId}.compile", s"${dependencyModuleId}.compile"),
       (s"${moduleId}.runClasspath", s"${dependencyModuleId}.runClasspath"),
       (s"${moduleId}.allJars", s"${dependencyModuleId}.allJars"),

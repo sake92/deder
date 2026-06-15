@@ -24,6 +24,17 @@ object DederGlobals {
   def semanticdbDir(moduleId: String): os.Path = moduleOutDir(moduleId, "semanticdb")
   def generatedSourcesDir(moduleId: String): os.Path = moduleOutDir(moduleId, "generatedSources")
 
+  /** Classes dirs for a module and all its (transitive) dependency modules, this module first,
+    * then dependents in the order given by `dependentModuleIds` (flattened from
+    * `ctx.dependentModulesTree`, which is longest-path layered so shared foundational deps come
+    * last). Replaces the old `classesTask`/`allClassesDirsTask` quasi-tasks: a pure mapping, no
+    * I/O and no content-hashing — change-detection comes from each consumer's `compileTask` dep.
+    *
+    * Deliberately does NOT dedup: deduplication/shadowing is owned by [[Classpath]] (its `++`
+    * keeps the last occurrence). Wrap the result in a `Classpath` to dedup. */
+  def allClassesDirs(moduleId: String, dependentModuleIds: Seq[String]): Seq[os.Path] =
+    (moduleId +: dependentModuleIds).map(classesDir)
+
   val cancellationTokens: ConcurrentHashMap[String, AtomicBoolean] = new ConcurrentHashMap()
 
   /** Caps the number of forked test JVMs alive at any one time across the whole server.

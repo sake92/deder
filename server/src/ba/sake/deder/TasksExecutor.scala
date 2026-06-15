@@ -102,13 +102,14 @@ class TasksExecutor(
       Option.when(d.module == ti.module)(depRes)
     }
     val transitiveResults = getTransitiveResults(ti, taskResults, allTaskDeps)
+    val dependentModulesTree = dependentModulesTreeFor(ti.module)
 
     val taskStartNanos = System.nanoTime()
     val taskSpan = OTEL.TRACER.spanBuilder(ti.id).startSpan()
     try {
       Using.resource(taskSpan.makeCurrent()) { scope =>
         val (taskRes, changed, fromCache) = ti.task.executeUnsafe(
-          projectConfig, ti.module, depResults, transitiveResults,
+          projectConfig, ti.module, depResults, transitiveResults, dependentModulesTree,
           args, watch, serverNotificationsLogger, dependencyResolver
         )
         val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
@@ -163,6 +164,36 @@ class TasksExecutor(
     }
     val transitiveResults = for i <- 0 to maxDepth yield transitiveResultsMap.getOrElse(i, Seq.empty)
     transitiveResults.map(_.sortBy(_._1).map(_._2))
+  }
+
+  /** The current module's transitive dependency modules, grouped into topological levels using
+    * **longest-path ("max depth")** layering: a module sits one level below the deepest dependent
+    * that reaches it. Consequently, flattening the levels yields an order in which every module
+    * comes strictly after all modules that depend on it — i.e. shared foundational dependencies
+    * come LAST, which is the correct classpath-shadowing order. Each module appears once; sorted
+    * by id within a level for determinism. Derived from `modulesGraph` (the DederModule DAG),
+    * independent of the task graph — so it is available to every task regardless of `transitive`. */
+  private def dependentModulesTreeFor(module: DederModule): Seq[Seq[DederModule]] = {
+    val depthOf = scala.collection.mutable.Map.empty[String, Int]
+    val byId = scala.collection.mutable.Map.empty[String, DederModule]
+    def go(m: DederModule, depth: Int): Unit = {
+      val deeper = depthOf.get(m.id).forall(depth > _)
+      if deeper then {
+        depthOf(m.id) = depth
+        byId(m.id) = m
+        // re-descend whenever we found a longer path, so descendants are pushed deeper too
+        // (DAG is acyclic — checked in TasksResolver — so this terminates)
+        modulesGraph.outgoingEdgesOf(m).asScala.foreach(e => go(modulesGraph.getEdgeTarget(e), depth + 1))
+      }
+    }
+    modulesGraph.outgoingEdgesOf(module).asScala.foreach(e => go(modulesGraph.getEdgeTarget(e), 0))
+    if depthOf.isEmpty then Seq.empty
+    else {
+      val grouped = depthOf.toSeq.groupBy(_._2)
+      (0 to depthOf.values.max)
+        .map(d => grouped.getOrElse(d, Seq.empty).map(_._1).sorted.flatMap(byId.get))
+        .filter(_.nonEmpty)
+    }
   }
 }
 

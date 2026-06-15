@@ -94,7 +94,6 @@ class CoreTasksApiAdapter(
   def dependenciesTask: AbstractTask[Seq[Dependency]] = coreTasks.dependenciesTask
   def allDependenciesTask: AbstractTask[Seq[Dependency]] = coreTasks.allDependenciesTask
   def mandatoryDependenciesTask: AbstractTask[Seq[Dependency]] = coreTasks.mandatoryDependenciesTask
-  def allClassesDirsTask: AbstractTask[Seq[DederPath]] = coreTasks.allClassesDirsTask
   def compilerJarsTask: AbstractTask[Seq[os.Path]] = coreTasks.compilerJarsTask
 }
 

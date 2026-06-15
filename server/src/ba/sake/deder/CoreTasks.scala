@@ -462,48 +462,28 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       scalaLibDeps
     }
 
-  // Internal per-module "classes dir" node. Kept (unlike semanticdb/generatedSources) because
-  // allClassesDirsTask aggregates it transitively into the compile/run classpath and needs a
-  // node with change-detection that is declared *before* compileTask (val init order) — a
-  // forward dep on compileTask would be null at init. Not exposed in the plugin API; the only
-  // consumer is allClassesDirsTask. Other consumers derive the path via DederGlobals.classesDir.
-  private val classesTask = TaskBuilder
-    .make[DederPath](
-      name = "classes",
-      category = "Build",
-      internal = true
-    )
-    .build { ctx => DederPath(ctx.out) }
-
-  val allClassesDirsTask = CachedTaskBuilder
-    .make[Seq[DederPath]](
-      name = "allClassesDirs",
-      transitive = true,
-      category = "Build",
-      internal = true
-    )
-    .dependsOn(classesTask)
-    .build { ctx =>
-      Seq(ctx.depResults._1) ++ ctx.transitiveResults.flatten.flatten.reverse.distinct.reverse
-    }
-
   val compileClasspathTask = CachedTaskBuilder
     .make[Seq[os.Path]](
       name = "compileClasspath",
-      transitive = true,
       category = "Dependencies"
     )
     .dependsOn(scalaVersionTask)
     .dependsOn(mandatoryDependenciesTask)
     .dependsOn(allDependenciesTask)
-    .dependsOn(allClassesDirsTask)
     .build { ctx =>
-      // we feed even this module's classes dir because of javac annotation processing,
-      // it can generate java sources.. and then scala sources can depend on them
-      val (scalaVersion, mandatoryDependencies, dependencies, allClassesDirs) = ctx.depResults
+      // Class dirs (this module's + all transitive dependency modules', this module first) are
+      // derived purely from the module graph via `dependentModulesTree` — no `classesTask`/
+      // `allClassesDirsTask` quasi-tasks, no content-hashing. This module's own classes dir is
+      // included for javac annotation processing (it can generate java sources that scala
+      // sources then depend on). Change-detection for class *contents* comes from each consumer's
+      // own `compileTask` dependency, NOT from here — which is why this task must stay free of a
+      // compileTask dep (so BSP can query the classpath without triggering a compile).
+      val (scalaVersion, mandatoryDependencies, dependencies) = ctx.depResults
+      val classDirs =
+        DederGlobals.allClassesDirs(ctx.module.id, ctx.dependentModulesTree.flatten.map(_.id))
       val depsJars = ctx.dependencyResolver
         .fetchFiles(mandatoryDependencies ++ dependencies, Some(ctx.notifications))
-      (allClassesDirs.map(_.absPath) ++ depsJars).reverse.distinct.reverse
+      (Classpath(classDirs) ++ Classpath(depsJars)).entries
     }
 
   val javaSemanticdbVersionTask = ConfigValueTask[String](
@@ -760,8 +740,12 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         else Seq.empty
       // Own classes dir on the classpath so javac-annotation-processor-generated sources are
       // visible to scalac within this same compile (the original reason for feeding own classes).
+      // Classpath.++ dedups keeping the last occurrence (shadowing order); upstream dirs from
+      // transitiveResults may repeat across depth levels — keep-last resolves them correctly.
       val fullCompileClasspath =
-        (Seq(classesDir) ++ upstreamClassesDirs ++ depsJars ++ compileOnlyJars).reverse.distinct.reverse
+        (Classpath(Seq(classesDir)) ++ Classpath(upstreamClassesDirs) ++ Classpath(depsJars) ++ Classpath(
+          compileOnlyJars
+        )).entries
 
       JdkUtils.checkCompat(JdkUtils.getVersion(scala.util.Properties.javaSpecVersion), scalaVersion)
 
@@ -869,7 +853,10 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         errors = zincResult.errors,
         warnings = zincResult.warnings,
         sourceCount = zincResult.sourceCount,
-        diagnostics = zincResult.diagnostics
+        diagnostics = zincResult.diagnostics,
+        // Output token: carry our own inputsHash so downstream/jar/publish key on input identity
+        // instead of re-hashing the (huge) classes dir. See Hashable[CompileResult].
+        inputsHash = ctx.inputsHash
       )
       },
       isResultSuccessful = _.errors == 0
@@ -1207,8 +1194,6 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     allDependenciesTask,
     depsTreeTask,
     depSourcesTask,
-    classesTask,
-    allClassesDirsTask,
     compilerDepsTask,
     compilerJarsTask,
     compileClasspathTask,

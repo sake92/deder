@@ -197,11 +197,16 @@ case class TaskExecContext[T, Deps <: Tuple](
     module: DederModule,
     depResults: TaskDepResults[Deps],
     transitiveResults: Seq[Seq[T]], // results from dependent modules
+    dependentModulesTree: Seq[Seq[DederModule]], // transitive module deps, topological levels, nearest-first
     args: Seq[String], // external args, like run args
     watch: Boolean,
     notifications: ServerNotificationsLogger,
     out: os.Path,
-    dependencyResolver: DependencyResolverApi
+    dependencyResolver: DependencyResolverApi,
+    // This task's own cache inputsHash (hash of all dependency outputHashes + args). Set for
+    // CachedTask; empty for always-run tasks. Lets a producer embed it in its result as a stable,
+    // cheap "output token" (see CompileResult.inputsHash) instead of content-hashing big outputs.
+    inputsHash: String = ""
 )(using ev: TaskDeps[Deps] =:= true)
 
 /** Public-facing base trait for a task, without exposing the `Deps` type parameter. Use this type in plugin APIs so
@@ -252,6 +257,7 @@ sealed trait Task[T, Deps <: Tuple, S](using
       module: DederModule,
       depResults: Seq[TaskResult[?]],
       transitiveResults: Seq[Seq[TaskResult[?]]],
+      dependentModulesTree: Seq[Seq[DederModule]],
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
@@ -295,6 +301,7 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple, S](
       module: DederModule,
       depResults: Seq[TaskResult[?]],
       transitiveResults: Seq[Seq[TaskResult[?]]],
+      dependentModulesTree: Seq[Seq[DederModule]],
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
@@ -312,6 +319,7 @@ class TaskImpl[T: JsonRW: Hashable, Deps <: Tuple, S](
         module,
         depResultsUnsafe,
         transitiveResultsUnsafe.map(_.map(_.value)),
+        dependentModulesTree,
         args,
         watch,
         serverNotificationsLogger,
@@ -354,6 +362,7 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
       module: DederModule,
       depResults: Seq[TaskResult[?]],
       transitiveResults: Seq[Seq[TaskResult[?]]],
+      dependentModulesTree: Seq[Seq[DederModule]],
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
@@ -378,11 +387,13 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
           module,
           depResultsUnsafe,
           transitiveResultsUnsafe.map(_.map(_.value)),
+          dependentModulesTree,
           args,
           watch,
           serverNotificationsLogger,
           outDir,
-          dependencyResolver
+          dependencyResolver,
+          inputsHash
         )
       )
       val outputHash = Hashable[T].hashStr(res)
@@ -526,6 +537,7 @@ class FanInTask[T: JsonRW: Hashable](
       module: DederModule,
       depResults: Seq[TaskResult[?]],
       transitiveResults: Seq[Seq[TaskResult[?]]],
+      dependentModulesTree: Seq[Seq[DederModule]],
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,

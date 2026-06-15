@@ -127,7 +127,6 @@ trait CoreTasksApi {
   def dependenciesTask: AbstractTask[Seq[Dependency]]
   def allDependenciesTask: AbstractTask[Seq[Dependency]]
   def mandatoryDependenciesTask: AbstractTask[Seq[Dependency]]
-  def allClassesDirsTask: AbstractTask[Seq[DederPath]]
   def compilerJarsTask: AbstractTask[Seq[os.Path]]
 }
 

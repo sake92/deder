@@ -7,7 +7,11 @@ case class CompileResult(
     errors: Int,
     warnings: Int,
     sourceCount: Int,
-    diagnostics: List[FileDiagnostics] = Nil
+    diagnostics: List[FileDiagnostics] = Nil,
+    // The producing compile task's own inputsHash. Used as the cache "output token" so downstream
+    // tasks key on "compiled with inputs X" instead of re-hashing the (huge, non-deterministic)
+    // class-file tree. Empty when unknown (e.g. BSP-synthesized failure results).
+    inputsHash: String = ""
 ) derives JsonRW {
   def success: Boolean = errors == 0
 }
@@ -32,14 +36,15 @@ enum CompileSeverity derives JsonRW {
 }
 
 object CompileResult {
-  // Custom Hashable that includes actual class file content hash, not just the path string.
-  // `diagnostics` is intentionally EXCLUDED: it is a BSP replay artifact, not a build output.
-  // Hashing it would churn downstream caches (jar, publishArtifacts) when only a warning
-  // message text changes.
+  // Output token: hash the PRODUCER'S inputsHash, not the class-file tree. The inputsHash already
+  // captures every input to compile (sources, options, scalaVersion, compiler/dependency jars, and
+  // — transitively — upstream modules' compile outputs), so for deterministic compilation it
+  // uniquely identifies the output. This avoids content-hashing the (potentially huge, e.g. 14k
+  // files) and non-deterministic classes dir on every cache-miss — the edit→compile hot path.
+  // `classesDir` is deliberately NOT hashed; `diagnostics` is EXCLUDED (a BSP replay artifact, not
+  // a build output — hashing it would churn jar/publish caches on a warning text change).
   given Hashable[CompileResult] with {
     def hashStr(value: CompileResult): String =
-      val classesHash = Hashable[DederPath].hashStr(value.classesDir)
-      val combined = s"${classesHash}-${value.errors}-${value.warnings}-${value.sourceCount}"
-      combined.hashStr
+      s"${value.inputsHash}-${value.errors}-${value.warnings}-${value.sourceCount}".hashStr
   }
 }
