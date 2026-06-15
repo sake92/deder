@@ -263,9 +263,9 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     .dependsOn(coreTasks.compilerDepsTask)
     .dependsOn(coreTasks.compileClasspathTask)
     .dependsOn(coreTasks.compileTask)
-    .dependsOn(coreTasks.classesTask)
     .build { ctx =>
-      val (scalaVersion, pomSettingsOpt, sources, compilerDeps, compileClasspath, _, classesDir) = ctx.depResults
+      val (scalaVersion, pomSettingsOpt, sources, compilerDeps, compileClasspath, _) = ctx.depResults
+      val classesDir = DederPath(DederGlobals.classesDir(ctx.module.id))
       pomSettingsOpt.map { pomSettings =>
         os.remove.all(ctx.out)
         os.makeDir.all(ctx.out)

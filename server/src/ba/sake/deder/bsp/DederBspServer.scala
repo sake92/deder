@@ -388,7 +388,7 @@ class DederBspServer(
               executeCompileTask(serverNotificationsLogger, moduleId, params.getOriginId)
             } catch {
               case _: TaskEvaluationException =>
-                val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask)
+                val classesDir = DederPath(DederGlobals.classesDir(moduleId))
                 (ba.sake.deder.CompileResult(classesDir, errors = 1, warnings = 0, sourceCount = 0), false)
             }
             if fromCache then {
@@ -624,8 +624,8 @@ class DederBspServer(
         val serverNotificationsLogger = makeServerNotificationsLogger()
         resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).flatMap { case (targetId, module) =>
           val moduleId = module.id
-          val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).absPath.toNIO.toUri.toString
-          val semanticdbDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask).absPath
+          val classesDir = DederGlobals.classesDir(moduleId).toNIO.toUri.toString
+          val semanticdbDir = DederGlobals.semanticdbDir(moduleId)
           val javacOptions = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.javacOptionsTask)(Seq.empty)
           val javacAnnotationProcessors =
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.javacAnnotationProcessorsTask)(Seq.empty)
@@ -717,7 +717,7 @@ class DederBspServer(
           val scalaVersion = executeTask(serverNotificationsLogger, moduleId, coreTasks.scalaVersionTask)
           val scalacOptions =
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.scalacOptionsTask)(Seq.empty)
-          val semanticdbDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.semanticdbDirTask).absPath
+          val semanticdbDir = DederGlobals.semanticdbDir(moduleId)
           val scalacPlugins =
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.scalacPluginsTask)(Seq.empty)
           val semanticdbOptions =
@@ -748,7 +748,7 @@ class DederBspServer(
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.compileClasspathTask)(Seq.empty)
               .map(_.toNIO.toUri.toString)
               .toList
-          val classesDir = executeTask(serverNotificationsLogger, moduleId, coreTasks.classesTask).absPath.toNIO.toUri.toString
+          val classesDir = DederGlobals.classesDir(moduleId).toNIO.toUri.toString
           val scalacOptionsItem =
             ScalacOptionsItem(targetId, finalScalacOptions.asJava, compileClasspath.asJava, classesDir)
           List(scalacOptionsItem)

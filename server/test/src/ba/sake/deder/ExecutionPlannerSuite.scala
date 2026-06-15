@@ -42,12 +42,10 @@ class ExecutionPlannerSuite extends munit.FunSuite {
         stageTaskIds,
         Seq(
           Set(
-            "common.classes",
             "common.compileOnlyDeps",
             "common.deps",
             "common.javaHome",
             "common.javaVersion",
-            "common.generatedSources",
             "common.javacAnnotationProcessorDeps",
             "common.javacOptions",
             "common.scalaVersion",
@@ -56,11 +54,9 @@ class ExecutionPlannerSuite extends munit.FunSuite {
             "common.sources",
             "common.javaSemanticdbVersion",
             "common.semanticdbEnabled",
-            "common.semanticdb",
             "common.allGeneratedSources"
           ),
           Set(
-            "common.allClassesDirs",
             "common.mandatoryDependencies",
             "common.compilerDeps",
             "common.dependencies",
@@ -72,7 +68,6 @@ class ExecutionPlannerSuite extends munit.FunSuite {
             "common.allGeneratedSourceFiles"
           ),
           Set("common.allDependencies", "common.compilerJars"),
-          Set("common.compileClasspath"),
           Set("common.compile")
         ),
         "common compile stages mismatch"
