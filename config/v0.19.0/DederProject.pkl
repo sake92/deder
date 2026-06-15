@@ -1,0 +1,1109 @@
+module ba.sake.deder.config.DederProject
+
+// temporarily until we have proper Pkl packages
+import "https://sake92.github.io/deder/config-api/DederPlugins.pkl" as P
+
+import "DederInternals.pkl" as I
+
+/// list of modules in the project. Each module corresponds to a subproject with its own source directories, dependencies, and tasks.
+modules: Listing<DederModule>(modulesValidation)
+
+hidden modulesValidation = (value: Listing<DederModule>) ->
+  if (!(value.toList().map((m) -> m.id).distinct.length == value.length))
+    throw("Module ids must be unique.")
+  else
+    true
+
+/// Find modules in a listing whose `id` matches exactly.
+const function moduleById(listing: List<DederModule>, id: String): DederModule =
+  listing.find((m) -> m.id == id)
+
+/// Build tool plugins applied to this project.
+plugins: Listing<P.DederPlugin>(pluginsValidation) = new Listing {}
+
+hidden pluginsValidation = (value: Listing<P.DederPlugin>) ->
+  let (ids = value.toList().map((p) -> p.id))
+  let (dups = ids.filter((id) -> ids.count((it) -> it == id) > 1).distinct)
+    if (!dups.isEmpty)
+      throw("Duplicate plugin ids in project: \(dups.join(", ")). Plugin ids must be unique.")
+    else
+      true
+
+/// Additional Maven repositories for dependency resolution.
+/// Tried in declared order, before default repositories.
+repositories: Listing<MavenRepository> = new Listing {}
+
+/// Include Maven Central, the local Maven repository (~/.m2/repository), and the Ivy2 local cache. Set to false for
+/// air-gapped / internal-only resolution (e.g. via a corporate Nexus).
+/// If false, `repositories` must be non-empty.
+includeDefaultRepos: Boolean = true
+
+/// Custom watch-ignore patterns in gitignore syntax.
+/// Matched paths will NOT trigger rebuilds in watch mode.
+/// Supports: `*`, `**`, `?`, trailing `/` for directories, `!` negation.
+/// Merged with `.gitignore` patterns — last match wins across both lists.
+/// Patterns are relative to the project root.
+watchIgnore: Listing<String> = new {}
+/// Enable BSP (Build Server Protocol). Disabled in CI by default.
+bspEnabled: Boolean = read?("env:CI") == null
+
+/// Maximum number of concurrent Zinc compilations server-wide.
+/// 0 = detect automatically (number of available CPU cores).
+maxActiveCompilers: Int(isBetween(0, 256)) = 0
+
+/// Maximum number of forked test JVMs alive server-wide at any one time.
+/// 0 = detect automatically (number of available CPU cores).
+/// Per-module `maxTestForks` is capped by this value.
+maxConcurrentTestForks: Int(isBetween(0, 64)) = 0
+
+/// Server-wide tools that can be launched via `deder tool <name> [args...]`.
+/// Tools run as long-lived subprocesses, independent of any module.
+/// Deder predefines a `tui` tool (terminal dashboard) when the `deder-http` plugin is loaded.
+tools: Mapping<String, ServerTool> = new {
+  ["tui"] = new {
+    deps {
+      "ba.sake::deder-tui-dashboard:0.4.0"
+    }
+    mainClass = "ba.sake.deder.tuidashboard.app.TuiDashboardMain"
+  }
+}
+
+/// Base class for publish repository configuration.
+/// Credentials for the repository are looked up by `id` in `~/.deder/credentials.pkl`.
+abstract class PublishRepo {
+  /// Unique identifier for this repository. Must match a key in `~/.deder/credentials.pkl`.
+  id: String(!isEmpty)
+}
+
+/// Publish to Sonatype Central (https://central.sonatype.com). Use for release versions.
+/// Requires `SonatypeCentralCredentials` (username, password, pgpSecret, pgpPassphrase) in `~/.deder/credentials.pkl`.
+class SonatypeCentralRepo extends PublishRepo {}
+
+/// Publish to Sonatype Central Snapshots (https://central.sonatype.com/repository/maven-snapshots).
+/// Use for SNAPSHOT versions. Requires `SonatypeSnapshotCredentials` (username, password) in `~/.deder/credentials.pkl`.
+class SonatypeSnapshotRepo extends PublishRepo {}
+
+/// Publish to any Maven-compatible repository (e.g. Nexus, Artifactory).
+/// Requires `BasicAuthCredentials` (username, password) in `~/.deder/credentials.pkl`.
+class MavenRepo extends PublishRepo {
+  /// Base URL of the repository, e.g. "https://nexus.example.com/repository/releases".
+  url: String(!isEmpty)
+}
+
+class MavenRepository {
+  /// Repository URL. Supports http(s):// and file:// schemes.
+  /// Credentials (if required) come from Coursier's native config:
+  /// ~/.config/coursier/credentials.properties or COURSIER_CREDENTIALS.
+  url: String(!isEmpty)
+}
+
+abstract class DederModule {
+  /// Module id, used in CLI and referring from other modules
+  id: String(idValidation)
+
+  /// Module root directory, relative to project root
+  root: String(rootValidation) = id
+
+  /// Source directories, relative to module root. Defaults to `src`.
+  sources: Listing<String> = new Listing { "src" }
+
+  /// Module dependencies
+  moduleDeps: Listing<DederModule>
+
+  /// Whether this module should be exposed as a BSP build target.
+  /// When unset, Deder uses IDE-friendly defaults for generated cross/versioned families.
+  bspVisible: Boolean?
+
+  type: ModuleType
+
+  hidden idValidation = (value: String) ->
+    if (!value.matches(Regex("^[.a-zA-Z0-9_-]+$")))
+      throw("Id must be alphanumeric and can contain '_' and '-' but got: " + value)
+    else
+      true
+
+  hidden rootValidation = (value: String) ->
+    if (!value.matches(Regex("^[.a-zA-Z0-9/_-]+$")))
+      throw("Root must be alphanumeric and can contain '_', '-', and '/' but got: " + value)
+    else
+      true
+}
+
+typealias ModuleType =
+  "java"
+    | "java-test"
+    | "scala"
+    | "scala-test"
+    | "scala-js"
+    | "scala-js-test"
+    | "scala-native"
+    | "scala-native-test"
+
+/// Zinc compile order: controls the order in which Java and Scala sources are compiled.
+/// `java-then-scala` (default): compile all Java first, then Scala. Standard for most projects.
+/// `scala-then-java`: compile Scala first, then Java. Use when Java sources depend on Scala.
+/// `mixed`: compile Java and Scala together in a single pass. Required when there are circular
+///   dependencies between Java and Scala sources in the same module.
+typealias CompileOrder = "java-then-scala" | "scala-then-java" | "mixed"
+
+/// Controls source/resource directory layout convention.
+/// `default` — Deder's own convention: sources and resources at module root level.
+/// `maven` — Maven/SBT/Gradle convention: sources under `src/main/<lang>/` and `src/test/<lang>/`.
+typealias DirLayout =
+  "default" | "maven" | "sbt" | "sbt-cross-full" | "sbt-cross-pure" | "sbt-cross-dummy"
+
+/// Validates that a scalaVersion is in `major.minor.patch` format, e.g. "3.7.4" or "2.13.18+3".
+const function validScalaVersion(value: String): Boolean =
+  if (value.matches(Regex("^\\d+\\.\\d+\\.\\d+.*$")))
+    true
+  else
+    throw(
+      "scalaVersion must be in `major.minor.patch` format, e.g. \"3.7.4\" or \"2.13.18+3\", but got: \(value)"
+    )
+
+class PomLicense {
+  /// SPDX identifier or full license name, e.g. "MIT" or "MIT License"
+  name: String(!isEmpty)
+  /// URL to the license text
+  url: String(!isEmpty)
+}
+class PomDeveloper {
+  id: String(!isEmpty)
+  name: String(!isEmpty)
+  email: String(!isEmpty)
+}
+class PomScm {
+  /// URL of the SCM repository, e.g. GitHub URL
+  url: String?
+  /// SCM connection string, e.g. "scm:git:github.com:user/repo.git"
+  connection: String?
+  developerConnection: String?
+  /// Optional tag/branch to point to, e.g. "v1.0.0" or "main". Not commonly used but can be helpful for linking to the exact code corresponding to a release.
+  tag: String?
+}
+class PomSettings {
+  /// Group ID for publishing, e.g. "com.example". Required for publishing to Maven Central. Not strictly required for local publishing but recommended to avoid conflicts.
+  groupId: String(!isEmpty)
+  /// Artifact ID for publishing, e.g. "my-library". Required for publishing to Maven Central. Not strictly required for local publishing but recommended to avoid conflicts.
+  artifactId: String(!isEmpty)
+  /// Version for publishing, e.g. "1.0.0". Required for publishing to Maven Central. Not strictly required for local publishing but recommended to avoid conflicts.
+  /// If not provided, Deder will use a default semver versioning scheme based on git tags and commits (e.g. "0.1.0-SNAPSHOT" for a non-tagged commit, "1.0.0" for a commit tagged with "v1.0.0").
+  version: String?
+  name: String(!isEmpty) = artifactId
+  description: String?
+  url: String?
+  licenses: Listing<PomLicense> = new Listing {}
+  developers: Listing<PomDeveloper> = new Listing {}
+  scm: PomScm?
+}
+
+class ManifestSettings {
+  /// Main JAR manifest attributes, e.g. "Implementation-Version" -> "1.0.0"
+  mainAttributes: Mapping<String, String> = new Mapping {}
+  /// Named manifest entry groups (rarely needed)
+  groups: Mapping<String, Mapping<String, String>> = new Mapping {}
+}
+
+class GraalVmSettings {
+  /// Path to GraalVM home directory (must contain bin/native-image).
+  /// If null, falls back to the GRAALVM_HOME environment variable.
+  graalvmHome: String?
+  /// Extra flags passed to the native-image tool, e.g. "--no-fallback"
+  nativeImageOptions: Listing<String> = new Listing {}
+}
+
+class JUnitXmlReportSettings {
+  /// When true, Deder writes one JUnit XML file per executed test suite/class.
+  enabled: Boolean = false
+  /// Optional report output directory. Relative paths resolve from the module root.
+  /// If null, Deder writes to `.deder/out/<module>/<task>/reports/junit/`.
+  outputDir: String?
+}
+
+open class MvnApp {
+  /// Maven dependencies, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
+  deps: Listing<String> = new Listing {}
+  /// Fully qualified main class to run
+  mainClass: String(!isEmpty)
+  /// Arguments to pass to the main class when running the app. Can also be provided at runtime via `deder exec -t runMvnApp <name> -- [args...]`, which will be appended to these defaults.
+  args: Listing<String> = new Listing {}
+}
+
+open class ServerTool {
+  /// Maven dependencies, e.g. "org.scalameta:scalafmt-cli_2.13:3.8.6"
+  deps: Listing<String> = new Listing {}
+  /// Fully qualified main class to run
+  mainClass: String(!isEmpty)
+  /// Arguments to pass to the main class when launching the tool.
+  /// Can also be provided at runtime via `deder tool <name> -- [args...]`,
+  /// which will be appended to these defaults.
+  args: Listing<String> = new Listing {}
+  /// Short description shown in `deder tool` listing
+  description: String?
+}
+
+open class JavaModule extends DederModule {
+  type = "java"
+  /// Resource directories, relative to module root. Defaults to `resources/`.
+  resources: Listing<String> = new Listing { "resources" }
+  /// Java path to use for compilation and running. Can be a JDK path or a JDK version if using toolchains. If not provided, Deder will use the Java version running Deder server itself.
+  javaHome: String?
+  /// JVM options to use for running and testing, e.g. "-DXmx2g". These are not used for compilation, which uses `javacOptions` instead.
+  jvmOptions: Listing<String> = new Listing {}
+  /// Java version to use for compilation, e.g. "1.8", "11", "17". This is used for setting the `--release` flag during compilation and for selecting the appropriate Java runtime when running the app.
+  javaVersion: String?
+  /// Zinc compile order: controls how Java and Scala sources are ordered during compilation.
+  /// `java-then-scala` (default): compile all Java first, then Scala. Standard for most projects.
+  /// `scala-then-java`: compile Scala first, then Java. Use when Java sources depend on Scala types.
+  /// `mixed`: compile Java and Scala together. Required when there are circular dependencies.
+  compileOrder: CompileOrder = "java-then-scala"
+  javacOptions: Listing<String> = new Listing {}
+  /// Environment variables to set when running/testing the app, e.g. "ENV_VAR" -> "value".
+  forkEnv: Mapping<String, String> = new Mapping {}
+  /// Main class to run
+  mainClass: String?
+  /// Dependencies to include when compiling/running the app
+  deps: Listing<String> = new Listing {}
+  /// Dependencies used only during compilation, excluded from the runtime classpath.
+  /// Follows the same format as `deps` (Coursier dependency strings).
+  compileOnlyDeps: Listing<String> = new Listing {}
+  javacAnnotationProcessorDeps: Listing<String> = new Listing {}
+  javaSemanticdbVersion: String = "0.11.1"
+  /// Whether to generate SemanticDB during compilation (used by BSP/IDE features and scalafix).
+  /// Defaults to true in local development, false in CI environments.
+  semanticdbEnabled: Boolean = read?("env:CI") == null
+  /// JAR manifest entries. Overrides defaults set by Deder.
+  manifest: ManifestSettings = new ManifestSettings {}
+  /// Optional JarJar shading rules file for assembly shading configuration.
+  /// Relative paths resolve from the module root; absolute paths are used as-is.
+  shadeRulesFile: String?
+  /// Whether this module should be published to the configured `publishTo` repository when running the `publish` task. Defaults to false.
+  publish: Boolean = false
+  pomSettings: PomSettings?
+  /// The repository to publish artifacts to.
+  /// Default is Sonatype Central (stable releases).
+  /// You can use env vars or `~/.deder/credentials.pkl` to avoid hardcoding sensitive credentials in this config file.
+  /// The env vars have format of DEDER_<PUBLISH_REPO_ID>_<CREDENTIAL_KEY>, e.g. DEDER_SONATYPE_USERNAME for a SonatypeCentralRepo with id "sonatype".
+  /// The `id` can have a matching key in `~/.deder/credentials.pkl`.
+  /// Use `SonatypeCentralRepo` for Sonatype Central (releases), `SonatypeSnapshotRepo` for snapshots,
+  /// or `MavenRepo` for any other repository.
+  publishTo: PublishRepo? = new SonatypeCentralRepo { id = "sonatype" }
+  /// Custom local Maven repository folder for the `publishLocal` task.
+  /// When set, artifacts are published to this folder instead of the default `~/.m2/repository`.
+  /// Accepts a relative path (resolved against the project root) or an absolute path.
+  /// Example (relative): `publishLocalTo = "out/local-repo"`
+  /// Example (absolute): `publishLocalTo = "/home/user/.custom-repo"`
+  publishLocalTo: String?
+  /// GraalVM native image settings. When non-null, the nativeImage task is available for this module.
+  graalvm: GraalVmSettings?
+  /// Named maven apps that can be run via `deder exec -t runMvnApp <name> [args...]`.
+  /// Server auto-provides `fmt`, `fmtCheck` (scalafmt) etc for scala modules.
+  mvnApps: Mapping<String, MvnApp> = new Mapping {}
+  function asTest(): JavaTestModule = (this.toDynamic().toTyped(JavaTestModule)) {
+    type = "java-test"
+    deps = new Listing {}
+    moduleDeps = new Listing {}
+    mainClass = null
+    publish = false
+    pomSettings = null
+  }
+}
+
+class JavaTestModule extends JavaModule {
+  type = "java-test"
+  publish = false
+  /// Number of test classes to run in parallel within a single test JVM.
+  /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
+  /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
+  testParallelism: Int(isBetween(0, 256)) = 0
+  /// Maximum number of forked JVMs to spawn for running this module's tests.
+  /// Effective fork count is min(maxTestForks, number of discovered test classes).
+  /// 0 (default) = use all available CPU cores. Each fork pays JVM startup cost and holds its own heap.
+  /// Capped server-wide by the maxConcurrentTestForks server property.
+  maxTestForks: Int(isBetween(0, 64)) = 0
+  junitXmlReport: JUnitXmlReportSettings?
+  testFrameworks: Listing<String> = new Listing {
+    "com.novocode.junit.JUnitFramework"
+    "com.github.sbt.junit.jupiter.api.JupiterFramework"
+  }
+}
+
+typealias ScalaBinaryVersion = "2.12" | "2.13" | "3"
+
+open class ScalaModule extends JavaModule {
+  type = "scala"
+  scalaVersion: String(scalaVersionValidation)
+
+  hidden scalaVersionValidation = (value: String) -> validScalaVersion(value)
+  scalacOptions: Listing<String> = new Listing {}
+  scalacPluginDeps: Listing<String> = new Listing {}
+  scalaSemanticdbVersion: String?
+  function asTest(): ScalaTestModule = (this.toDynamic().toTyped(ScalaTestModule)) {
+    type = "scala-test"
+    deps = new Listing {}
+    moduleDeps = new Listing {}
+    mainClass = null
+    publish = false
+    pomSettings = null
+  }
+  function asJs(): ScalaJsModule = (this.toDynamic().toTyped(ScalaJsModule)) {
+    type = "scala-js"
+  }
+  function asNative(): ScalaNativeModule = (this.toDynamic().toTyped(ScalaNativeModule)) {
+    type = "scala-native"
+  }
+}
+
+class ScalaTestModule extends ScalaModule {
+  type = "scala-test"
+  publish = false
+  /// Number of test classes to run in parallel within a single test JVM.
+  /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
+  /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
+  testParallelism: Int(isBetween(0, 256)) = 0
+  /// Maximum number of forked JVMs to spawn for running this module's tests.
+  /// Effective fork count is min(maxTestForks, number of discovered test classes).
+  /// 0 (default) = use all available CPU cores. Each fork pays JVM startup cost and holds its own heap.
+  /// Capped server-wide by the maxConcurrentTestForks server property.
+  maxTestForks: Int(isBetween(0, 64)) = 0
+  junitXmlReport: JUnitXmlReportSettings?
+  testFrameworks: Listing<String> = new Listing {
+    "com.novocode.junit.JUnitFramework"
+    "com.github.sbt.junit.jupiter.api.JupiterFramework"
+    "org.scalatest.tools.Framework"
+    "org.specs2.runner.Specs2Framework"
+    "munit.Framework"
+    "utest.runner.Framework"
+    "zio.test.sbt.ZTestFramework"
+    "weaver.framework.CatsEffect"
+    "org.scalacheck.ScalaCheckFramework"
+  }
+}
+
+typealias ScalaJsModuleKind = "no-module" | "es-module" | "commonjs-module"
+
+typealias ScalaJsModuleSplitStyle = "fewest-modules" | "smallest-modules" | "small-modules-for"
+
+typealias ScalaJsESVersion =
+  "es2015" | "es2016" | "es2017" | "es2018" | "es2019" | "es2020" | "es2021"
+
+class ScalaJsLinkerConfig {
+  /// How to split output into multiple JS modules.
+  /// `fewest-modules` (default): bundles aggressively, fewer larger files.
+  /// `smallest-modules`: splits ~1 class per file, better for caching/incremental downstream tooling.
+  /// `small-modules-for`: splits only listed packages (see `smallModulesFor`).
+  moduleSplitStyle: ScalaJsModuleSplitStyle = "fewest-modules"
+
+  /// Packages to split when `moduleSplitStyle = "small-modules-for"`. Must be non-empty.
+  smallModulesFor: Listing<String> = new Listing {}
+
+  /// ECMAScript version assumed available at runtime. Enables polyfill dead-code-elimination.
+  /// Use `es2018`+ for modern Node.js/browsers.
+  esVersion: ScalaJsESVersion = "es2015"
+
+  /// Emit source maps for debugging generated JS. Turn off to reduce file count.
+  sourceMap: Boolean = true
+
+  /// Enable Scala.js optimizer (dead-code elimination, method inlining). Disable for faster dev linking.
+  optimizer: Boolean = true
+
+  /// Apply Scala.js minification (identifier shortening). Does NOT affect runtime performance.
+  minify: Boolean = false
+
+  /// Production mode semantics: removes debug assertions, enables aggressive optimizations.
+  productionMode: Boolean = false
+
+  /// JS comment prepended to every generated `.js` file. Must end with `\n`.
+  jsHeader: String = ""
+
+  /// Pretty-print generated JavaScript. Useful for debugging linker output.
+  prettyPrint: Boolean = false
+
+  /// Java Formatter pattern for JS output filenames, e.g. "%s.mjs" for Node.js ES modules.
+  jsOutputPattern: String = "%s.js"
+
+  /// Avoid JS `class` syntax in favor of `function`/`prototype` when semantics are identical.
+  avoidClasses: Boolean = true
+
+  /// Avoid `let`/`const` in favor of `var` when semantics are identical.
+  avoidLetsAndConsts: Boolean = true
+
+  /// Perform expensive IR validity checks during linking. For debugging linker/compiler bugs.
+  checkIR: Boolean = false
+
+  /// Base URI to relativize source map paths against. Useful for deployable source maps.
+  relativizeSourceMapBase: String?
+
+  /// Discard intermediate linker state for one-shot builds (CI). Default false for watch mode.
+  batchMode: Boolean = false
+
+  /// Maximum concurrent file writes during linking. Tune lower for slow/network filesystems.
+  maxConcurrentWrites: Int(isBetween(1, 256)) = 50
+
+  /// EXPERIMENTAL: Compile `scala.Long` as JavaScript `bigint` instead of runtime-emulated 64-bit integers.
+  allowBigIntsForLongs: Boolean = false
+
+  /// EXPERIMENTAL: Use the WebAssembly backend instead of JavaScript. Requires `moduleKind = "es-module"` and `esVersion >= es2015`.
+  experimentalUseWebAssembly: Boolean = false
+}
+
+open class ScalaJsModule extends ScalaModule {
+  type = "scala-js"
+  scalaJsVersion: String(!isEmpty)
+  moduleKind: ScalaJsModuleKind = "no-module"
+  /// Scala.js linker configuration. Fine-grained control over linking behavior.
+  linkerConfig: ScalaJsLinkerConfig = new ScalaJsLinkerConfig {}
+  function asTest(): ScalaJsTestModule = (this.toDynamic().toTyped(ScalaJsTestModule)) {
+    type = "scala-js-test"
+    deps = new Listing {}
+    moduleDeps = new Listing {}
+    mainClass = null
+    publish = false
+    pomSettings = null
+  }
+}
+
+class ScalaJsTestModule extends ScalaJsModule {
+  type = "scala-js-test"
+  publish = false
+  /// Number of test classes to run in parallel within a single test JVM.
+  /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
+  /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
+  testParallelism: Int(isBetween(0, 256)) = 0
+  junitXmlReport: JUnitXmlReportSettings?
+  testFrameworks: Listing<String> = new Listing {
+    "com.novocode.junit.JUnitFramework"
+    "com.github.sbt.junit.jupiter.api.JupiterFramework"
+    "org.scalatest.tools.Framework"
+    "org.specs2.runner.Specs2Framework"
+    "munit.Framework"
+    "utest.runner.Framework"
+    "zio.test.sbt.ZTestFramework"
+    "weaver.framework.CatsEffect"
+    "org.scalacheck.ScalaCheckFramework"
+  }
+}
+
+typealias ScalaNativeGC = "none" | "boehm" | "immix" | "commix"
+typealias ScalaNativeMode = "debug" | "release-fast" | "release-full" | "release-size"
+typealias ScalaNativeLTO = "none" | "thin" | "full"
+
+open class ScalaNativeModule extends ScalaModule {
+  type = "scala-native"
+  scalaNativeVersion: String(!isEmpty)
+  /// Garbage collector algorithm. `immix` is the default and recommended for most use cases.
+  gc: ScalaNativeGC = "immix"
+  /// Build mode / optimization level. Use `debug` for development and `release-fast` or `release-full` for production.
+  mode: ScalaNativeMode = "debug"
+  /// Enable multithreading support. Requires a multithreading-capable GC (`immix` or `commix`).
+  multithreading: Boolean = false
+  /// Link-Time Optimization level. `thin` is a good balance for release builds.
+  lto: ScalaNativeLTO = "none"
+  /// Embed classpath resources into the native binary.
+  embedResources: Boolean = false
+  /// Should unresolved stubs be linked into the binary (required for linking without a main class).
+  linkStubs: Boolean = true
+  /// Shall the NIR linker check well-formedness after every phase.
+  check: Boolean = false
+  /// Shall NIR check warnings be treated as errors.
+  checkFatalWarnings: Boolean = false
+  /// Shall the NIR optimizer run on the linked program.
+  optimize: Boolean = true
+  /// Optional LLVM target triple (e.g. "x86_64-pc-linux-gnu"). Leave null to auto-detect.
+  targetTriple: String? = null
+  /// Extra linker flags, appended to auto-discovered options.
+  nativeLinkingOptions: Listing<String> = new Listing {}
+  /// Extra clang compile flags (applied to all sources), appended to auto-discovered options.
+  nativeCompileOptions: Listing<String> = new Listing {}
+  /// Extra clang flags applied only to C source files.
+  nativeCOptions: Listing<String> = new Listing {}
+  /// Extra clang flags applied only to C++ source files.
+  nativeCppOptions: Listing<String> = new Listing {}
+  /// Glob patterns selecting which resource files are embedded into the binary (requires embedResources = true).
+  resourceIncludePatterns: Listing<String> = new Listing { "**" }
+  /// Glob patterns excluding resource files from embedding (requires embedResources = true).
+  resourceExcludePatterns: Listing<String> = new Listing {}
+  function asTest(): ScalaNativeTestModule = (this.toDynamic().toTyped(ScalaNativeTestModule)) {
+    type = "scala-native-test"
+    deps = new Listing {}
+    moduleDeps = new Listing {}
+    mainClass = null
+    publish = false
+    pomSettings = null
+  }
+}
+
+class ScalaNativeTestModule extends ScalaNativeModule {
+  type = "scala-native-test"
+  publish = false
+  /// Number of test classes to run in parallel within a single test JVM.
+  /// 0 (default) = use all available CPU cores. Set to 1 for serial execution.
+  /// Only safe to increase if tests have no shared static state, System.setProperty calls, or shared temp files.
+  testParallelism: Int(isBetween(0, 256)) = 0
+  junitXmlReport: JUnitXmlReportSettings?
+  testFrameworks: Listing<String> = new Listing {
+    "com.novocode.junit.JUnitFramework"
+    "com.github.sbt.junit.jupiter.api.JupiterFramework"
+    "org.scalatest.tools.Framework"
+    "org.specs2.runner.Specs2Framework"
+    "munit.Framework"
+    "utest.runner.Framework"
+    "zio.test.sbt.ZTestFramework"
+    "weaver.framework.CatsEffect"
+    "org.scalacheck.ScalaCheckFramework"
+  }
+}
+
+// helpers
+// https://pkl-lang.org/blog/class-as-a-function.html
+
+const function resolveLayout(layout: DirLayout, lang: String): I.LayoutConfig =
+  let (style = if (layout.startsWith("sbt")) "sbt" else "deder")
+  let (
+    ct =
+      if (layout == "sbt-cross-full")
+        "full"
+      else if (layout == "sbt-cross-pure")
+        "pure"
+      else if (layout == "sbt-cross-dummy")
+        "dummy"
+      else
+        null
+  )
+    if (layout == "maven" || layout.startsWith("sbt"))
+      if (lang == "scala")
+        new I.LayoutConfig {
+          mainScalaSrcBase = "src/main/scala"
+          testScalaSrcBase = "src/test/scala"
+          mainExtraSrc { "src/main/java" }
+          testExtraSrc { "src/test/java" }
+          mainResources { "src/main/resources" }
+          testResources { "src/test/resources" }
+          testRootSuffix = ""
+          versionStyle = style
+          crossType = ct
+        }
+      else // "java"
+        new I.LayoutConfig {
+          mainScalaSrcBase = "src/main/java"
+          testScalaSrcBase = "src/test/java"
+          mainExtraSrc {}
+          testExtraSrc {}
+          mainResources { "src/main/resources" }
+          testResources { "src/test/resources" }
+          testRootSuffix = ""
+          versionStyle = style
+          crossType = ct
+        }
+    else // "default"
+      new I.LayoutConfig {
+        mainScalaSrcBase = "src"
+        testScalaSrcBase = "src"
+        mainExtraSrc {}
+        testExtraSrc {}
+        mainResources { "resources" }
+        testResources { "resources" }
+        testRootSuffix = "/test"
+        versionStyle = style
+        crossType = ct
+      }
+
+class JavaModules {
+  main: JavaModule
+  test: JavaTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateJavaModules {
+  root: String
+  id: String?
+  template: JavaModule
+  testTemplate: JavaTestModule = template.asTest()
+  layout: DirLayout = "default"
+  fixed get: JavaModules = javaModules(template, testTemplate, root, layout, id)
+}
+
+const function javaModules(
+  _template: JavaModule,
+  _testTemplate: JavaTestModule,
+  _root: String,
+  _layout: DirLayout,
+  _id: String?,
+): JavaModules =
+  let (cfg = resolveLayout(_layout, "java"))
+  let (baseId = if (_id != null) _id else _root.replaceAll("/", "-"))
+    new {
+      main = (_template) {
+        id = baseId
+        root = _root
+        sources = new Listing {
+          cfg.mainScalaSrcBase
+          ...(cfg.mainExtraSrc)
+        }
+        resources = cfg.mainResources
+      }
+      test = (_testTemplate) {
+        id = "\(baseId)-test"
+        root = "\(_root)\(cfg.testRootSuffix)"
+        sources = new Listing {
+          cfg.testScalaSrcBase
+          ...(cfg.testExtraSrc)
+        }
+        resources = cfg.testResources
+        moduleDeps {
+          main
+        }
+      }
+    }
+
+class ScalaModules {
+  main: ScalaModule
+  test: ScalaTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateScalaModules {
+  root: String
+  id: String?
+  /// Optional explicit test module id override.
+  /// Used by imported cross-version JVM modules that need `-jvm-test-<version>`
+  /// while keeping normal `CreateScalaModules` callers on the default `"<id>-test"`.
+  testId: String?
+  template: ScalaModule
+  testTemplate: ScalaTestModule = template.asTest()
+  layout: DirLayout = "default"
+  fixed get: ScalaModules = scalaModulesWithTestId(template, testTemplate, root, layout, id, testId)
+}
+
+const function scalaModules(
+  _template: ScalaModule,
+  _testTemplate: ScalaTestModule,
+  _root: String,
+  _layout: DirLayout,
+  _id: String?,
+): ScalaModules = scalaModulesWithTestId(_template, _testTemplate, _root, _layout, _id, null)
+
+/// Internal-by-convention helper for importer-rendered JVM cross-version ids.
+/// Prefer `scalaModules(...)` unless you explicitly need a custom test module id.
+const function scalaModulesWithTestId(
+  _template: ScalaModule,
+  _testTemplate: ScalaTestModule,
+  _root: String,
+  _layout: DirLayout,
+  _id: String?,
+  _testId: String?,
+): ScalaModules =
+  let (cfg = resolveLayout(_layout, "scala"))
+  let (mainId = if (_id != null) _id else _root.replaceAll("/", "-"))
+  let (resolvedTestId = if (_testId != null) _testId else "\(mainId)-test")
+    new {
+      main = (_template) {
+        id = mainId
+        root = _root
+        sources = new Listing {
+          cfg.mainScalaSrcBase
+          ...(cfg.mainExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.mainScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.mainScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
+        resources = cfg.mainResources
+      }
+      test = (_testTemplate) {
+        id = resolvedTestId
+        root = "\(_root)\(cfg.testRootSuffix)"
+        sources = new Listing {
+          cfg.testScalaSrcBase
+          ...(cfg.testExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.testScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.testScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
+        resources = cfg.testResources
+        moduleDeps {
+          main
+        }
+      }
+    }
+
+class ScalaJsModules {
+  main: ScalaJsModule
+  test: ScalaJsTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateScalaJsModules {
+  root: String
+  id: String?
+  template: ScalaJsModule
+  testTemplate: ScalaJsTestModule = template.asTest()
+  layout: DirLayout = "default"
+  fixed get: ScalaJsModules = scalaJsModules(template, testTemplate, root, layout, id)
+}
+
+const function scalaJsModules(
+  _template: ScalaJsModule,
+  _testTemplate: ScalaJsTestModule,
+  _root: String,
+  _layout: DirLayout,
+  _id: String?,
+): ScalaJsModules =
+  let (cfg = resolveLayout(_layout, "scala"))
+  let (baseId = if (_id != null) _id else _root.replaceAll("/", "-"))
+    new {
+      main = (_template) {
+        id = baseId
+        root = _root
+        sources = new Listing {
+          cfg.mainScalaSrcBase
+          ...(cfg.mainExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.mainScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.mainScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
+        resources = cfg.mainResources
+      }
+      test = (_testTemplate) {
+        id = "\(baseId)-test"
+        root = "\(_root)\(cfg.testRootSuffix)"
+        sources = new Listing {
+          cfg.testScalaSrcBase
+          ...(cfg.testExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.testScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.testScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
+        resources = cfg.testResources
+        moduleDeps {
+          main
+        }
+      }
+    }
+
+class ScalaNativeModules {
+  main: ScalaNativeModule
+  test: ScalaNativeTestModule
+  all: Listing<DederModule> = new { main; test }
+}
+class CreateScalaNativeModules {
+  root: String
+  id: String?
+  template: ScalaNativeModule
+  testTemplate: ScalaNativeTestModule = template.asTest()
+  layout: DirLayout = "default"
+  fixed get: ScalaNativeModules = scalaNativeModules(template, testTemplate, root, layout, id)
+}
+
+const function scalaNativeModules(
+  _template: ScalaNativeModule,
+  _testTemplate: ScalaNativeTestModule,
+  _root: String,
+  _layout: DirLayout,
+  _id: String?,
+): ScalaNativeModules =
+  let (cfg = resolveLayout(_layout, "scala"))
+  let (baseId = if (_id != null) _id else _root.replaceAll("/", "-"))
+    new {
+      main = (_template) {
+        id = baseId
+        root = _root
+        sources = new Listing {
+          cfg.mainScalaSrcBase
+          ...(cfg.mainExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.mainScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.mainScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
+        resources = cfg.mainResources
+      }
+      test = (_testTemplate) {
+        id = "\(baseId)-test"
+        root = "\(_root)\(cfg.testRootSuffix)"
+        sources = new Listing {
+          cfg.testScalaSrcBase
+          ...(cfg.testExtraSrc)
+          when (cfg.versionStyle == "sbt") {
+            ...I.sbtVersionSourceDirs(_template.scalaVersion, cfg.testScalaSrcBase)
+          }
+          when (cfg.versionStyle != "sbt") {
+            for (prefix in I.versionPrefixes(_template.scalaVersion)) {
+              "\(cfg.testScalaSrcBase)-\(prefix)"
+            }
+          }
+        }
+        resources = cfg.testResources
+        moduleDeps {
+          main
+        }
+      }
+    }
+
+class CrossModules {
+  jvm: ScalaModule
+  jvm_test: ScalaTestModule
+  js: ScalaJsModule
+  js_test: ScalaJsTestModule
+  native: ScalaNativeModule
+  native_test: ScalaNativeTestModule
+  all: Listing<DederModule> = new { jvm; jvm_test; js; js_test; native; native_test }
+}
+
+class CreateCrossModules {
+  template: ScalaModule
+  testTemplate: ScalaTestModule = template.asTest()
+  jsTemplate: ScalaJsModule = template.asJs()
+  jsTestTemplate: ScalaJsTestModule = jsTemplate.asTest()
+  nativeTemplate: ScalaNativeModule = template.asNative()
+  nativeTestTemplate: ScalaNativeTestModule = nativeTemplate.asTest()
+  root: String
+  id: String?
+  layout: DirLayout = "default"
+  fixed get: CrossModules =
+    crossModules(
+      template,
+      testTemplate,
+      jsTemplate,
+      jsTestTemplate,
+      nativeTemplate,
+      nativeTestTemplate,
+      root,
+      layout,
+      id,
+    )
+}
+
+const function crossModules(
+  _template: ScalaModule,
+  _testTemplate: ScalaTestModule,
+  _jsTemplate: ScalaJsModule,
+  _jsTestTemplate: ScalaJsTestModule,
+  _nativeTemplate: ScalaNativeModule,
+  _nativeTestTemplate: ScalaNativeTestModule,
+  _root: String,
+  _layout: DirLayout,
+  _id: String?,
+): CrossModules =
+  let (cfg = resolveLayout(_layout, "scala"))
+  let (baseId = if (_id != null) _id else _root.replaceAll("/", "-"))
+  let (sv = _template.scalaVersion)
+
+  // Determine platform base directories and shared source configuration
+  let (
+    jvmMainBase =
+      if (cfg.crossType == "full")
+        "jvm/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".jvm/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "jvm/\(cfg.mainScalaSrcBase)"
+      else
+        "\(cfg.mainScalaSrcBase)-jvm"
+  )
+  let (
+    jsMainBase =
+      if (cfg.crossType == "full")
+        "js/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".js/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "js/\(cfg.mainScalaSrcBase)"
+      else
+        "\(cfg.mainScalaSrcBase)-js"
+  )
+  let (
+    nativeMainBase =
+      if (cfg.crossType == "full")
+        "native/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".native/\(cfg.mainScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "native/\(cfg.mainScalaSrcBase)"
+      else
+        "\(cfg.mainScalaSrcBase)-native"
+  )
+  let (
+    jvmTestBase =
+      if (cfg.crossType == "full")
+        "jvm/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".jvm/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "jvm/\(cfg.testScalaSrcBase)"
+      else
+        "\(cfg.testScalaSrcBase)-jvm"
+  )
+  let (
+    jsTestBase =
+      if (cfg.crossType == "full")
+        "js/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".js/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "js/\(cfg.testScalaSrcBase)"
+      else
+        "\(cfg.testScalaSrcBase)-js"
+  )
+  let (
+    nativeTestBase =
+      if (cfg.crossType == "full")
+        "native/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "pure")
+        ".native/\(cfg.testScalaSrcBase)"
+      else if (cfg.crossType == "dummy")
+        "native/\(cfg.testScalaSrcBase)"
+      else
+        "\(cfg.testScalaSrcBase)-native"
+  )
+  let (hasSharedSource = cfg.crossType != "dummy")
+  let (sharedPrefix = if (cfg.crossType == "full") "shared/" else null)
+
+  // Compute shared base with optional prefix
+  let (
+    sharedMainBase =
+      if (sharedPrefix != null) "\(sharedPrefix)\(cfg.mainScalaSrcBase)" else cfg.mainScalaSrcBase
+  )
+  let (
+    sharedTestBase =
+      if (sharedPrefix != null) "\(sharedPrefix)\(cfg.testScalaSrcBase)" else cfg.testScalaSrcBase
+  )
+    new {
+      jvm = (_template) {
+        id = "\(baseId)-jvm-\(sv)"
+        root = _root
+        sources =
+          I.crossPlatformSources(
+            sharedMainBase,
+            jvmMainBase,
+            cfg.mainExtraSrc,
+            hasSharedSource,
+            cfg.versionStyle,
+            sv,
+          )
+        resources =
+          if (sharedPrefix != null)
+            new Listing { ...cfg.mainResources; for (r in cfg.mainResources) { "shared/\(r)" } }
+          else
+            cfg.mainResources
+      }
+      jvm_test = (_testTemplate) {
+        id = "\(baseId)-jvm-test-\(sv)"
+        root = "\(_root)\(cfg.testRootSuffix)"
+        sources =
+          I.crossPlatformSources(
+            sharedTestBase,
+            jvmTestBase,
+            cfg.testExtraSrc,
+            hasSharedSource,
+            cfg.versionStyle,
+            sv,
+          )
+        resources =
+          if (sharedPrefix != null)
+            new Listing { ...cfg.testResources; for (r in cfg.testResources) { "shared/\(r)" } }
+          else
+            cfg.testResources
+        moduleDeps {
+          jvm
+        }
+      }
+      js = (_jsTemplate) {
+        id = "\(baseId)-js-\(sv)"
+        root = _root
+        sources =
+          I.crossPlatformSources(
+            sharedMainBase,
+            jsMainBase,
+            cfg.mainExtraSrc,
+            hasSharedSource,
+            cfg.versionStyle,
+            sv,
+          )
+        resources =
+          if (sharedPrefix != null)
+            new Listing { ...cfg.mainResources; for (r in cfg.mainResources) { "shared/\(r)" } }
+          else
+            cfg.mainResources
+      }
+      js_test = (_jsTestTemplate) {
+        id = "\(baseId)-js-test-\(sv)"
+        root = "\(_root)\(cfg.testRootSuffix)"
+        sources =
+          I.crossPlatformSources(
+            sharedTestBase,
+            jsTestBase,
+            cfg.testExtraSrc,
+            hasSharedSource,
+            cfg.versionStyle,
+            sv,
+          )
+        resources =
+          if (sharedPrefix != null)
+            new Listing { ...cfg.testResources; for (r in cfg.testResources) { "shared/\(r)" } }
+          else
+            cfg.testResources
+        moduleDeps {
+          js
+        }
+      }
+      native = (_nativeTemplate) {
+        id = "\(baseId)-native-\(sv)"
+        root = _root
+        sources =
+          I.crossPlatformSources(
+            sharedMainBase,
+            nativeMainBase,
+            cfg.mainExtraSrc,
+            hasSharedSource,
+            cfg.versionStyle,
+            sv,
+          )
+        resources =
+          if (sharedPrefix != null)
+            new Listing { ...cfg.mainResources; for (r in cfg.mainResources) { "shared/\(r)" } }
+          else
+            cfg.mainResources
+      }
+      native_test = (_nativeTestTemplate) {
+        id = "\(baseId)-native-test-\(sv)"
+        root = "\(_root)\(cfg.testRootSuffix)"
+        sources =
+          I.crossPlatformSources(
+            sharedTestBase,
+            nativeTestBase,
+            cfg.testExtraSrc,
+            hasSharedSource,
+            cfg.versionStyle,
+            sv,
+          )
+        resources =
+          if (sharedPrefix != null)
+            new Listing { ...cfg.testResources; for (r in cfg.testResources) { "shared/\(r)" } }
+          else
+            cfg.testResources
+        moduleDeps {
+          native
+        }
+      }
+    }
