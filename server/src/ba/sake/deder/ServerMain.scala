@@ -261,8 +261,7 @@ object ServerMain extends StrictLogging {
                   )
                 else if paths.exists(isProjectConfigFile) then
                   logger.debug(s"Configuration file changed: ${paths}, reloading project...")
-                  projectState.reloadProject()
-                  projectState.notifyBspClientsOfConfigChange()
+                  projectState.reloadProject() // notification moved inside reloadProject()
                 else if paths.exists(p => p == projectRoot / ".gitignore") then
                   logger.debug(s".gitignore changed, reloading...")
                   loadGitignore()

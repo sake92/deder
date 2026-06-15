@@ -42,6 +42,7 @@ class DederProjectState(
   private val taskLockTimeoutEnabled = taskLockTimeoutSeconds > 0
 
   @volatile private var shutdownStarted = false
+  @volatile private var prevConfigModules: Seq[DederProject.DederModule] = Seq.empty
 
   private val configParser = ConfigParser(writeJson = true)
   private val baseTasks = tasksRegistry.all
@@ -149,6 +150,15 @@ class DederProjectState(
             val executionPlanner =
               ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)
 
+            // Capture old modules BEFORE overwriting state (for config-change diff)
+            prevConfigModules = readState(useLastGood = true) match {
+              case Right(state) =>
+                val modules = state.projectConfig.modules.asScala.toSeq
+                val visibleIds = bsp.BspVisibleTargets.visibleModuleIds(modules)
+                modules.filter(m => visibleIds.contains(m.id))
+              case Left(_) => Seq.empty
+            }
+
             val goodProjectStateData =
               DederProjectStateData(newConfig, effectiveRegistry, tasksResolver, executionPlanner, dependencyResolver)
             lastGood = Right(goodProjectStateData)
@@ -160,7 +170,8 @@ class DederProjectState(
             DederGlobals.setCompileSemaphore(activeCompilers)
             DederGlobals.setTestForkSemaphore(concurrentForks)
             triggerConfigWatchedTasks()
-        }
+            notifyBspClientsOfConfigChange()
+          }
       } catch {
         case NonFatal(e) =>
           val errorMessage = s"Error during project load: ${e.getMessage}"
@@ -822,34 +833,76 @@ class DederProjectState(
   }
 
   /** Notify all connected BSP clients that the project config (`deder.pkl`) has changed.
-    * Sends `buildTarget/didChange` for all bsp-visible modules. No per-module throttling. */
+    * Diffs previous vs. current BSP-visible modules and sends targeted
+    * CREATED/CHANGED/DELETED events. Falls back to broadcasting CHANGED for all modules
+    * when no previous config is available. */
   def notifyBspClientsOfConfigChange(): Unit = {
     val serversSnapshot = bspServers.iterator().asScala.toSeq
     if serversSnapshot.isEmpty then return
 
-    val targetIds = readState(useLastGood = true) match {
-      case Right(state) =>
-        val modules = state.projectConfig.modules.asScala.toSeq
-        val visibleModuleIds = bsp.BspVisibleTargets.visibleModuleIds(modules)
-        modules
-          .filter { m => visibleModuleIds.contains(m.id) }
-          .map { module =>
-            val targetId = new BuildTargetIdentifier(
-              DederGlobals.projectRootDir.toURI.toString + "#" + module.id
-            )
-            val event = new BuildTargetEvent(targetId)
-            event.setKind(BuildTargetEventKind.CHANGED)
-            event
-          }
-      case Left(_) => Seq.empty
+    val newModules: Seq[DederProject.DederModule] =
+      readState(useLastGood = true) match {
+        case Right(state) =>
+          val modules = state.projectConfig.modules.asScala.toSeq
+          val visibleIds = bsp.BspVisibleTargets.visibleModuleIds(modules)
+          modules.filter(m => visibleIds.contains(m.id))
+        case Left(_) => Seq.empty
+      }
+
+    val oldModules = prevConfigModules
+
+    // If no prior config, fall back to all-CHANGED
+    if oldModules.isEmpty then {
+      val rootUri = DederGlobals.projectRootDir.toURI.toString
+      val events = newModules.map { m =>
+        val event = new BuildTargetEvent(new BuildTargetIdentifier(rootUri + "#" + m.id))
+        event.setKind(BuildTargetEventKind.CHANGED)
+        event
+      }
+      if events.nonEmpty then {
+        val params = new DidChangeBuildTarget(events.asJava)
+        serversSnapshot.foreach { server =>
+          try server.client.onBuildTargetDidChange(params)
+          catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP client: ${e.getMessage}") }
+        }
+      }
+      return
     }
 
-    if targetIds.nonEmpty then {
-      val params = new DidChangeBuildTarget(targetIds.asJava)
-      serversSnapshot.foreach { server =>
-        try server.client.onBuildTargetDidChange(params)
-        catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP client about config change: ${e.getMessage}") }
-      }
+    // Diff old vs new by module id
+    val oldById: Map[String, DederProject.DederModule] = oldModules.map(m => m.id -> m).toMap
+    val newById: Map[String, DederProject.DederModule] = newModules.map(m => m.id -> m).toMap
+
+    val oldIds = oldById.keySet
+    val newIds = newById.keySet
+
+    val addedIds = newIds -- oldIds
+    val removedIds = oldIds -- newIds
+    val commonIds = oldIds.intersect(newIds)
+
+    val changedIds = commonIds.filter { id =>
+      !oldById(id).equals(newById(id))
+    }
+
+    if addedIds.isEmpty && removedIds.isEmpty && changedIds.isEmpty then return
+
+    val rootUri = DederGlobals.projectRootDir.toURI.toString
+    val events = scala.collection.mutable.ArrayBuffer.empty[BuildTargetEvent]
+
+    def makeEvent(id: String, kind: BuildTargetEventKind): BuildTargetEvent = {
+      val event = new BuildTargetEvent(new BuildTargetIdentifier(rootUri + "#" + id))
+      event.setKind(kind)
+      event
+    }
+
+    addedIds.foreach(id => events += makeEvent(id, BuildTargetEventKind.CREATED))
+    removedIds.foreach(id => events += makeEvent(id, BuildTargetEventKind.DELETED))
+    changedIds.foreach(id => events += makeEvent(id, BuildTargetEventKind.CHANGED))
+
+    val params = new DidChangeBuildTarget(events.asJava)
+    serversSnapshot.foreach { server =>
+      try server.client.onBuildTargetDidChange(params)
+      catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP client about config change: ${e.getMessage}") }
     }
   }
 
