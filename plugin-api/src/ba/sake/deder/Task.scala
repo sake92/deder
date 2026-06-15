@@ -351,7 +351,8 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
     val category: String = "",
     val kind: TaskKind = TaskKind.Standard,
     override val isResultSuccessful: T => Boolean = (_: T) => true,
-    override val internal: Boolean = false
+    override val internal: Boolean = false,
+    val cliReplayFn: Option[(T, String, ServerNotificationsLogger) => Unit] = None
 )(using
     summarizable: Summarizable[T, S],
     ev: TaskDeps[Deps] =:= true
@@ -413,7 +414,9 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
           serverNotificationsLogger.add(
             ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id))
           )
-          // served from cache: execute() did not run, so no live notifications were emitted
+          // served from cache: execute() did not run, so no live notifications were emitted.
+          // Replay cached diagnostics to CLI (e.g. compile errors) if a replay hook is set.
+          cliReplayFn.foreach(_(cachedTaskResult.value, module.id, serverNotificationsLogger))
           (cachedTaskResult, false, true)
         else
           val newRes = computeTaskResult()
