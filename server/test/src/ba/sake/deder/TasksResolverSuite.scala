@@ -63,7 +63,6 @@ class TasksResolverSuite extends munit.FunSuite {
       "javaVersion",
       "jvmOptions",
       "sources",
-      "generatedSources",
       "allGeneratedSources",
       "allGeneratedSourceFiles",
       "allGeneratedResources",
@@ -72,7 +71,6 @@ class TasksResolverSuite extends munit.FunSuite {
       "repositories",
       "javacOptions",
       "scalacOptions",
-      "semanticdb", // directory..
       "javaSemanticdbVersion",
       "scalaSemanticdbVersion",
       "semanticdbEnabled",
@@ -181,8 +179,7 @@ class TasksResolverSuite extends munit.FunSuite {
     baseScalaModuleTaskEdges(moduleId) ++ Set(
       (s"${moduleId}.finalMainClass", s"${moduleId}.mainClasses"),
       (s"${moduleId}.finalMainClass", s"${moduleId}.mainClass"),
-      (s"${moduleId}.mainClasses", s"${moduleId}.compile"),
-      (s"${moduleId}.mainClasses", s"${moduleId}.classes")
+      (s"${moduleId}.mainClasses", s"${moduleId}.compile")
     )
 
   private def scalaTestModuleTaskEdges(moduleId: String): Set[(String, String)] =
@@ -196,7 +193,7 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.test", s"${moduleId}.testClasses"),
       (s"${moduleId}.testInMemory", s"${moduleId}.runClasspath"),
       (s"${moduleId}.testInMemory", s"${moduleId}.testClasses"),
-      (s"${moduleId}.testClasses", s"${moduleId}.classes"),
+      (s"${moduleId}.testClasses", s"${moduleId}.compile"),
       (s"${moduleId}.testClasses", s"${moduleId}.runClasspath")
     )
 
@@ -223,7 +220,6 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.sourceFiles", s"${moduleId}.sources"),
       (s"${moduleId}.allGeneratedSourceFiles", s"${moduleId}.allGeneratedSources"),
       (s"${moduleId}.compile", s"${moduleId}.sourceFiles"),
-      (s"${moduleId}.compile", s"${moduleId}.generatedSources"),
       (s"${moduleId}.compile", s"${moduleId}.allGeneratedSourceFiles"),
       (s"${moduleId}.compile", s"${moduleId}.javaHome"),
       (s"${moduleId}.compile", s"${moduleId}.javaVersion"),
@@ -231,11 +227,11 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.compile", s"${moduleId}.scalacOptions"),
       (s"${moduleId}.compile", s"${moduleId}.scalaVersion"),
       (s"${moduleId}.compile", s"${moduleId}.compilerJars"),
-      (s"${moduleId}.compile", s"${moduleId}.compileClasspath"),
+      (s"${moduleId}.compile", s"${moduleId}.mandatoryDependencies"),
+      (s"${moduleId}.compile", s"${moduleId}.allDependencies"),
       (s"${moduleId}.compile", s"${moduleId}.compileOnlyDependencies"),
       (s"${moduleId}.compile", s"${moduleId}.scalacPlugins"),
       (s"${moduleId}.compile", s"${moduleId}.javacAnnotationProcessors"),
-      (s"${moduleId}.compile", s"${moduleId}.semanticdb"),
       (s"${moduleId}.compile", s"${moduleId}.javaSemanticdbVersion"),
       (s"${moduleId}.compile", s"${moduleId}.scalaSemanticdbVersion"),
       (s"${moduleId}.compile", s"${moduleId}.semanticdbEnabled"),
@@ -249,7 +245,6 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.jar", s"${moduleId}.resources"),
       (s"${moduleId}.jar", s"${moduleId}.finalManifest"),
       (s"${moduleId}.javadocJar", s"${moduleId}.scalaVersion"),
-      (s"${moduleId}.javadocJar", s"${moduleId}.classes"),
       (s"${moduleId}.javadocJar", s"${moduleId}.compilerDeps"),
       (s"${moduleId}.javadocJar", s"${moduleId}.compileClasspath"),
       (s"${moduleId}.javadocJar", s"${moduleId}.sources"),
@@ -284,14 +279,12 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.fix", s"${moduleId}.jvmOptions"),
       (s"${moduleId}.fix", s"${moduleId}.compile"),
       (s"${moduleId}.fix", s"${moduleId}.compileClasspath"),
-      (s"${moduleId}.fix", s"${moduleId}.semanticdb"),
       (s"${moduleId}.fixCheck", s"${moduleId}.sources"),
       (s"${moduleId}.fixCheck", s"${moduleId}.scalaVersion"),
       (s"${moduleId}.fixCheck", s"${moduleId}.scalacOptions"),
       (s"${moduleId}.fixCheck", s"${moduleId}.jvmOptions"),
       (s"${moduleId}.fixCheck", s"${moduleId}.compile"),
       (s"${moduleId}.fixCheck", s"${moduleId}.compileClasspath"),
-      (s"${moduleId}.fixCheck", s"${moduleId}.semanticdb"),
       (s"${moduleId}.depsTree", s"${moduleId}.allDependencies"),
       (s"${moduleId}.depSources", s"${moduleId}.dependencies")
     )
