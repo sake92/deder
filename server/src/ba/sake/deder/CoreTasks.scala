@@ -1103,7 +1103,6 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         }
       },
       isResultSuccessful = _.success
-      // summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
     )
 
   val testInMemoryTask = TaskBuilder
