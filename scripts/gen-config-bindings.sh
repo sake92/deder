@@ -19,7 +19,9 @@ chmod +x pkl-codegen-java
 rsync -rc --delete --no-t "$TMP_GEN/java/ba" config/src/
 
 # normalize .properties files: strip timestamp comment for deterministic output and caching
-find "$TMP_GEN/resources" -name "*.properties" -exec sed -i '/^#/d' {} \;
+#find "$TMP_GEN/resources" -name "*.properties" -exec sed -i '/^#/d' {} \;
+find "$TMP_GEN/resources" -name "*.properties" -exec sed -i.bak '/^#/d' {} \; \
+  -exec rm -f {}.bak \;
 rsync -rc --delete --no-t "$TMP_GEN/resources/" config/resources/
 
 rm -rf "$TMP_GEN"
