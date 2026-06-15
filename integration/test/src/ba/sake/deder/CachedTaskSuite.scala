@@ -121,6 +121,33 @@ class CachedTaskSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("cached tasks: compile cache hit replays diagnostics to CLI") {
+    withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "INFO")) { projectPath =>
+      // Overwrite Common.scala with a deliberate type mismatch error
+      val commonSrc = projectPath / "common/src/Common.scala"
+      val original = os.read(commonSrc)
+      val broken = "package common\nobject Common { val x: String = 42 }"
+      os.write.over(commonSrc, broken)
+
+      // First compile — fails with live diagnostics
+      val firstRun = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compile")
+      val firstErr = firstRun.err.text()
+      assert(firstRun.exitCode != 0, s"First compile should fail, got exit code ${firstRun.exitCode}")
+      assert(firstErr.contains("Common.scala"), s"Expected diagnostic referencing Common.scala, got: $firstErr")
+      assert(firstErr.contains("Found:") || firstErr.contains("error"), s"Expected error message, got: $firstErr")
+
+      // Second compile — cache hit, must replay the same diagnostics
+      val secondRun = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compile")
+      val secondErr = secondRun.err.text()
+      assert(secondRun.exitCode != 0, s"Second compile should fail, got exit code ${secondRun.exitCode}")
+      assert(secondErr.contains("Common.scala"), s"Expected replay to mention Common.scala, got: $secondErr")
+      assert(secondErr.contains("Found:") || secondErr.contains("error"), s"Expected replayed error message, got: $secondErr")
+
+      // Restore original source
+      os.write.over(commonSrc, original)
+    }
+  }
+
   private def serverLogOffset(projectPath: os.Path): Long = {
     val logFile = projectPath / ".deder/logs/server.log"
     if os.exists(logFile) then os.stat(logFile).size else 0L
