@@ -99,6 +99,7 @@ class CliExecHeartbeatSuite extends munit.FunSuite {
         val emitted = new ConcurrentLinkedQueue[CliServerMessage]()
         val heartbeat = new CliExecHeartbeat(
           quietPeriod = Duration.ofSeconds(60),
+          startTime = clock.now(),
           emit = msg => emitted.add(msg),
           now = clock.now,
           sleep = clock.sleep

@@ -1,6 +1,8 @@
 package ba.sake.deder.cli
 
 import java.time.{Duration, Instant}
+import java.time.format.DateTimeFormatter
+import java.time.ZoneId
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import ba.sake.deder.ServerNotification
@@ -8,6 +10,7 @@ import ba.sake.deder.RequestContext
 
 final class CliExecHeartbeat(
     quietPeriod: Duration = Duration.ofSeconds(60),
+    startTime: Instant = Instant.now(),
     emit: CliServerMessage => Unit,
     now: () => Instant = () => Instant.now(),
     sleep: Duration => Unit = duration => Thread.sleep(duration.toMillis)
@@ -40,10 +43,21 @@ final class CliExecHeartbeat(
           val heartbeatAt = now()
           if !closed.get() && lastVisibleActivityAt.compareAndSet(activityAt, heartbeatAt) then
             RequestContext.current.supervisedWhere(requestContext) {
-              emit(CliServerMessage.info("Still working..."))
+              val ts = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault()).format(heartbeatAt)
+              val elapsed = formatDuration(Duration.between(startTime, heartbeatAt))
+              emit(CliServerMessage.info(s"[$ts] Still working... ($elapsed)"))
             }
         else
           sleep(remaining)
     catch
       case _: InterruptedException if closed.get() =>
+
+  private def formatDuration(d: Duration): String =
+    val totalSeconds = d.toSeconds
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    if hours > 0 then f"${hours}h ${minutes}m ${seconds}s"
+    else if minutes > 0 then f"${minutes}m ${seconds}s"
+    else f"${seconds}s"
 }

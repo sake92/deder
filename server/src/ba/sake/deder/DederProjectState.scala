@@ -2,6 +2,8 @@ package ba.sake.deder
 
 import java.net.URLClassLoader
 import java.time.{Duration, Instant}
+import java.time.format.DateTimeFormatter
+import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.concurrent.TimeUnit
@@ -298,6 +300,11 @@ class DederProjectState(
             case TaskExecResult.Success(ti, value, _, _) => ti.task.isResultSuccessfulUnsafe(value)
             case _                                    => false // Failure and Skipped are always unsuccessful
           }
+          val ts = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault()).format(Instant.now())
+          val statusStr = if allSuccessful then "Finished" else "Failed"
+          serverNotificationsLogger.add(
+            ServerNotification.logInfo(s"[$ts] $statusStr in ${totalDuration.toPrettyString}")
+          )
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = allSuccessful))
         }
     }
