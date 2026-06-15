@@ -33,7 +33,6 @@ class DederProjectState(
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
     taskLockTimeoutSeconds: Int,
-    bspFileChangeNotifyCooldownSeconds: Int,
     onShutdown: () => Unit,
     configFile: os.Path,
     val internals: DederProjectInternalsImpl
@@ -61,9 +60,6 @@ class DederProjectState(
 
   // Track active BSP servers for graceful teardown on CLI shutdown
   private val bspServers = new java.util.concurrent.ConcurrentLinkedQueue[ba.sake.deder.bsp.DederBspServer]()
-
-  // Per-module throttle: last time we sent a buildTarget/didChange for this moduleId
-  private val lastBspFileChangeNotify = new java.util.concurrent.ConcurrentHashMap[String, java.time.Instant]()
 
   // Callback to release the server lock early (before executor shutdown)
   private var releaseServerLockCallback: () => Unit = () => ()
@@ -821,60 +817,6 @@ class DederProjectState(
       snapshot.foreach { bspServer =>
         try bspServer.initiateShutdown()
         catch { case NonFatal(e) => logger.warn(s"Error notifying BSP client: ${e.getMessage}") }
-      }
-    }
-  }
-
-  /** Notify all connected BSP clients about source file changes detected by the file watcher.
-    * Matches changed paths against modules' source directories and sends `buildTarget/didChange`
-    * with per-module throttling (cooldown from `bspFileChangeNotifyCooldownSeconds`). */
-  def notifyBspClientsOfFileChanges(changedPaths: Set[os.Path]): Unit = {
-    val serversSnapshot = bspServers.iterator().asScala.toSeq
-    if serversSnapshot.isEmpty then return
-
-    val affectedModules = readState(useLastGood = true) match {
-      case Right(state) =>
-        val modules = state.projectConfig.modules.asScala.toSeq
-        val visibleModuleIds = bsp.BspVisibleTargets.visibleModuleIds(modules)
-        val projectRoot = DederGlobals.projectRootDir
-        modules.filter { module =>
-          if !visibleModuleIds.contains(module.id) then false
-          else if module.sources.isEmpty then false
-          else {
-            val sourceBaseDirs = module.sources.asScala.map { src =>
-              projectRoot / os.SubPath(s"${module.root}/${src}")
-            }
-            changedPaths.exists { changedPath =>
-              sourceBaseDirs.exists(baseDir => changedPath.startsWith(baseDir))
-            }
-          }
-        }
-      case Left(_) => Seq.empty
-    }
-
-    if affectedModules.isEmpty then return
-
-    val now = Instant.now()
-    val cooldownSecs = bspFileChangeNotifyCooldownSeconds.toLong
-
-    affectedModules.foreach { module =>
-      val lastNotified = lastBspFileChangeNotify.get(module.id)
-      val shouldNotify = lastNotified == null ||
-        Duration.between(lastNotified, now).toSeconds >= cooldownSecs
-
-      if shouldNotify then {
-        lastBspFileChangeNotify.put(module.id, now)
-        val targetId = new BuildTargetIdentifier(
-          DederGlobals.projectRootDir.toURI.toString + "#" + module.id
-        )
-        val event = new BuildTargetEvent(targetId)
-        event.setKind(BuildTargetEventKind.CHANGED)
-        val params = new DidChangeBuildTarget(java.util.List.of(event))
-
-        serversSnapshot.foreach { server =>
-          try server.client.onBuildTargetDidChange(params)
-          catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP client about file change: ${e.getMessage}") }
-        }
       }
     }
   }
