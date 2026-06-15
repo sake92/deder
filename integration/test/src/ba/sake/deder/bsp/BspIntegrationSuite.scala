@@ -109,8 +109,8 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     val classpath = item.getClasspath.asScala
     assert(classpath.nonEmpty, "classpath should not be empty")
     assert(
-      item.getClassDirectory.contains("/classes"),
-      s"classDirectory should point to classes, got: ${item.getClassDirectory}"
+      item.getClassDirectory.contains("/compile/classes"),
+      s"classDirectory should point to compile/classes, got: ${item.getClassDirectory}"
     )
   }
 
@@ -126,8 +126,8 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     val options = item.getOptions.asScala
     assert(options.contains("-Xsemanticdb"), s"missing -Xsemanticdb in options: $options")
     assert(
-      item.getClassDirectory.contains("/classes"),
-      s"classDirectory should point to classes, got: ${item.getClassDirectory}"
+      item.getClassDirectory.contains("/compile/classes"),
+      s"classDirectory should point to compile/classes, got: ${item.getClassDirectory}"
     )
   }
 
@@ -262,8 +262,8 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
       .buildTargetCompile(new CompileParams(List(targetId("common")).asJava))
       .get(2, TimeUnit.MINUTES)
     assertEquals(result.getStatusCode, StatusCode.OK)
-    val semanticdbFiles = os.walk(testDir / ".deder/out/common/semanticdb").filter(_.ext == "semanticdb")
-    assert(semanticdbFiles.nonEmpty, s"expected .semanticdb files to be generated under .deder/out/common/semanticdb/")
+    val semanticdbFiles = os.walk(testDir / ".deder/out/common/compile/semanticdb").filter(_.ext == "semanticdb")
+    assert(semanticdbFiles.nonEmpty, s"expected .semanticdb files to be generated under .deder/out/common/compile/semanticdb/")
   }
 
   test("buildTargetCompile after cleanCache regenerates semanticdb files") {
@@ -277,10 +277,10 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
       .buildTargetCompile(new CompileParams(List(targetId("common")).asJava))
       .get(2, TimeUnit.MINUTES)
     assertEquals(result.getStatusCode, StatusCode.OK)
-    val semanticdbFiles = os.walk(testDir / ".deder/out/common/semanticdb").filter(_.ext == "semanticdb")
+    val semanticdbFiles = os.walk(testDir / ".deder/out/common/compile/semanticdb").filter(_.ext == "semanticdb")
     assert(
       semanticdbFiles.nonEmpty,
-      s"expected .semanticdb files after clean+recompile under .deder/out/common/semanticdb/"
+      s"expected .semanticdb files after clean+recompile under .deder/out/common/compile/semanticdb/"
     )
   }
 
