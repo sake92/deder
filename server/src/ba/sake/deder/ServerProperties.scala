@@ -7,8 +7,7 @@ final case class ServerProperties(
     maxInactiveSeconds: Int,
     taskLockTimeoutSeconds: Int,
     forkTestFlushIntervalMs: Long,
-    watchDebounceMillis: Int,
-    bspFileChangeNotifyCooldownSeconds: Int
+    watchDebounceMillis: Int
 ) {
   require(taskLockTimeoutSeconds > 0, "taskLockTimeoutSeconds must be > 0")
 }
@@ -20,15 +19,12 @@ object ServerProperties {
     val taskLockTimeoutSeconds = props.getProperty("taskLockTimeoutSeconds", "600").toInt
     val forkTestFlushIntervalMs = props.getProperty("forkTestFlushIntervalMs", "1000").toLong
     val watchDebounceMillis = props.getProperty("watchDebounceMillis", "300").toInt
-    val bspFileChangeNotifyCooldownSeconds = props.getProperty("bspFileChangeNotifyCooldownSeconds", "5").toInt
-
     ServerProperties(
       logLevel,
       maxInactiveSeconds,
       taskLockTimeoutSeconds,
       forkTestFlushIntervalMs,
-      watchDebounceMillis,
-      bspFileChangeNotifyCooldownSeconds
+      watchDebounceMillis
     )
   }
 }
