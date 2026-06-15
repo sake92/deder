@@ -2,7 +2,6 @@
 # Misc
 
 
-
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - init like giter8, autoimport from sbt? maybe a separate "tool" CLI APP, noice
 - import from other maven effective POM etc
