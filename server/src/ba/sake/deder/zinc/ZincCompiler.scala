@@ -248,12 +248,14 @@ class ZincCompiler(
     // When compiling module B that depends on A, Zinc needs A's CompileAnalysis
     // to track cross-module dependencies and avoid unnecessary recompilation.
     // A's classesDir is on B's compileClasspath; A's zinc cache is at
-    // classesDir.parent/compile/inc_compile.zip (Deder's output layout).
+    // classesDir.parent/zinc/inc_compile.zip (Deder's compile output layout:
+    // .deder/out/<module>/compile/{classes,zinc,semanticdb,generatedSources}).
     val classpathAnalysisMap: Map[Path, CompileAnalysis] =
       compileClasspath.flatMap { entryPath =>
         val entryNio = entryPath.toNIO
+        // entryNio is <module>/compile/classes, parent is <module>/compile
         val inferredZincCacheNio =
-          entryNio.getParent.resolve("compile").resolve("inc_compile.zip")
+          entryNio.getParent.resolve("zinc").resolve("inc_compile.zip")
         val inferredZincCache = os.Path(inferredZincCacheNio)
         val contentsOpt = analysisCache.getIfPresent(inferredZincCache).orElse {
           if os.exists(inferredZincCache) then
