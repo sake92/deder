@@ -168,7 +168,6 @@ object ServerMain extends StrictLogging {
       tasksRegistry,
       cfg.maxInactiveSeconds,
       cfg.taskLockTimeoutSeconds,
-      cfg.bspFileChangeNotifyCooldownSeconds,
       onShutdown,
       configFile = DederGlobals.projectRootDir / "deder.pkl",
       internals = internals
@@ -209,7 +208,6 @@ object ServerMain extends StrictLogging {
               s"Debounce fired, triggering tasks for ${snapshot.size} changed paths: ${snapshot.take(3).mkString(", ")}..."
             )
             projectState.triggerFileWatchedTasks(snapshot)
-            projectState.notifyBspClientsOfFileChanges(snapshot)
           }
         }
       }
@@ -263,8 +261,7 @@ object ServerMain extends StrictLogging {
                   )
                 else if paths.exists(isProjectConfigFile) then
                   logger.debug(s"Configuration file changed: ${paths}, reloading project...")
-                  projectState.reloadProject()
-                  projectState.notifyBspClientsOfConfigChange()
+                  projectState.reloadProject() // notification moved inside reloadProject()
                 else if paths.exists(p => p == projectRoot / ".gitignore") then
                   logger.debug(s".gitignore changed, reloading...")
                   loadGitignore()

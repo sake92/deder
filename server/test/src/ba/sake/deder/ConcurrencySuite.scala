@@ -54,7 +54,6 @@ class ConcurrencySuite extends munit.FunSuite {
       tasksRegistry,
       Int.MaxValue,
       0,
-      5,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals
@@ -107,7 +106,6 @@ class ConcurrencySuite extends munit.FunSuite {
       tasksRegistry,
       Int.MaxValue,
       0,
-      5,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals
@@ -153,7 +151,6 @@ class ConcurrencySuite extends munit.FunSuite {
       tasksRegistry,
       Int.MaxValue,
       2,
-      5,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals
@@ -205,7 +202,6 @@ class ConcurrencySuite extends munit.FunSuite {
       tasksRegistry,
       Int.MaxValue,
       0,
-      5,
       () => (),
       configFile = testProjectDir / "deder.pkl",
       internals = noopInternals

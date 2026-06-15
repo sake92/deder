@@ -135,7 +135,6 @@ class SourceGeneratorsSuite extends munit.FunSuite {
           tasksRegistry,
           Int.MaxValue,
           0,
-          5,
           () => (),
           configFile = testProjectDir / "deder.pkl",
           internals = noopInternals
