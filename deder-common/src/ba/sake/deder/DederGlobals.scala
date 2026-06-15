@@ -14,15 +14,19 @@ object DederGlobals {
       )
     os.Path(prop)
 
-  // Conventional output paths for a module. These are compile *outputs*, derived from the
-  // fixed `.deder/out/<module>/<name>` layout — NOT modeled as tasks. Modeling them as tasks
-  // (the old classesTask/semanticdbDirTask) made consumers content-hash dirs that compile
-  // writes, which is self-referential. Derive the path; get change-detection from compileTask.
+  // Conventional output paths for a module. These are compile *outputs*, derived from
+  // the `.deder/out/<module>/compile/<name>` layout — NOT modeled as tasks. Modeling them
+  // as tasks (the old classesTask/semanticdbDirTask) made consumers content-hash dirs that
+  // compile writes, which is self-referential. Derive the path; get change-detection from
+  // compileTask. All compiler outputs (classes, semanticdb, zinc, generatedSources) are
+  // now grouped under `.deder/out/<module>/compile/`.
   def moduleOutDir(moduleId: String, name: String): os.Path =
     projectRootDir / ".deder/out" / moduleId / name
-  def classesDir(moduleId: String): os.Path = moduleOutDir(moduleId, "classes")
-  def semanticdbDir(moduleId: String): os.Path = moduleOutDir(moduleId, "semanticdb")
-  def generatedSourcesDir(moduleId: String): os.Path = moduleOutDir(moduleId, "generatedSources")
+  /** Compile task's output dir — all compiler-produced artifacts live under here. */
+  private def compileOutDir(moduleId: String): os.Path = moduleOutDir(moduleId, "compile")
+  def classesDir(moduleId: String): os.Path = compileOutDir(moduleId) / "classes"
+  def semanticdbDir(moduleId: String): os.Path = compileOutDir(moduleId) / "semanticdb"
+  def generatedSourcesDir(moduleId: String): os.Path = compileOutDir(moduleId) / "generatedSources"
 
   /** Classes dirs for a module and all its (transitive) dependency modules, this module first,
     * then dependents in the order given by `dependentModuleIds` (flattened from
