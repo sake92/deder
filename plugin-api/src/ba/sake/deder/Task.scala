@@ -100,7 +100,8 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
     enabled: PartialFunction[DederModule, Boolean],
     category: String,
     kind: TaskKind,
-    internal: Boolean
+    internal: Boolean,
+    cliReplayFn: Option[(T, String, ServerNotificationsLogger) => Unit] = None
 )(using ev: TaskDeps[Deps] =:= true, summarizable: Summarizable[T, S]) {
   def dependsOn[T2](t: AbstractTask[T2]): CachedTaskBuilder[T, Deps :* AbstractTask[T2], S] =
     CachedTaskBuilder(
@@ -112,7 +113,14 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       enabled,
       category,
       kind,
-      internal
+      internal,
+      cliReplayFn
+    )
+
+  def withCliReplay(f: (T, String, ServerNotificationsLogger) => Unit): CachedTaskBuilder[T, Deps, S] =
+    CachedTaskBuilder(
+      name, taskDeps, transitive, singleton, supportedModuleTypes,
+      enabled, category, kind, internal, cliReplayFn = Some(f)
     )
 
   /** Requires nonempty dependencies because caching only makes sense if there are inputs to hash. If there are no
@@ -129,7 +137,8 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       enabled = enabled,
       category = category,
       kind = kind,
-      internal = internal
+      internal = internal,
+      cliReplayFn = cliReplayFn
     )
 
   /** Like [[build]], but attaches a custom summary type `S2` instead of the default
@@ -150,7 +159,8 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       category = category,
       kind = kind,
       isResultSuccessful = isResultSuccessful,
-      internal = internal
+      internal = internal,
+      cliReplayFn = cliReplayFn
     )
 }
 
@@ -351,7 +361,8 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
     val category: String = "",
     val kind: TaskKind = TaskKind.Standard,
     override val isResultSuccessful: T => Boolean = (_: T) => true,
-    override val internal: Boolean = false
+    override val internal: Boolean = false,
+    val cliReplayFn: Option[(T, String, ServerNotificationsLogger) => Unit] = None
 )(using
     summarizable: Summarizable[T, S],
     ev: TaskDeps[Deps] =:= true
@@ -413,7 +424,9 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
           serverNotificationsLogger.add(
             ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id))
           )
-          // served from cache: execute() did not run, so no live notifications were emitted
+          // served from cache: execute() did not run, so no live notifications were emitted.
+          // Replay cached diagnostics to CLI (e.g. compile errors) if a replay hook is set.
+          cliReplayFn.foreach(_(cachedTaskResult.value, module.id, serverNotificationsLogger))
           (cachedTaskResult, false, true)
         else
           val newRes = computeTaskResult()

@@ -703,6 +703,24 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     .dependsOn(javaSemanticdbVersionTask)
     .dependsOn(scalaSemanticdbVersionTask)
     .dependsOn(semanticdbEnabledTask)
+    .withCliReplay { (result, moduleId, logger) =>
+      result.diagnostics.foreach { fd =>
+        fd.diagnostics.foreach { diag =>
+          val level = diag.severity match {
+            case CompileSeverity.Error   => ServerNotification.LogLevel.ERROR
+            case CompileSeverity.Warning => ServerNotification.LogLevel.WARNING
+            case _                        => ServerNotification.LogLevel.INFO
+          }
+          val location = if diag.range.startLine > 0 then
+            Some(s"${fd.file.path}:${diag.range.startLine}:${diag.range.startChar}")
+          else None
+          val text = location match
+            case Some(loc) => s"$loc: ${diag.message}"
+            case None      => diag.message
+          logger.add(ServerNotification.log(level, text, Some(moduleId)))
+        }
+      }
+    }
     .buildSummarized[CompilationSummary](
       execute = { ctx =>
       val (
@@ -1103,7 +1121,6 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         }
       },
       isResultSuccessful = _.success
-      // summarize = (results, notifs) => TestResultsSummary.summarize(results.map((m, r) => m.id -> r), notifs)
     )
 
   val testInMemoryTask = TaskBuilder

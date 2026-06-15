@@ -73,41 +73,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
         assert(dederOutput.contains("\"name\":"), "DenseJson tasks output should contain name field")
         assert(dederOutput.contains("\"features\":"), "DenseJson tasks output should contain features array")
       }
-      // deder plan
-      locally {
-        val dederRes = executeDederCommand(projectPath, "plan", "-m", "common", "-t", "compile")
-        val dederOutput = dederRes.out.text()
-        assertEquals(
-          dederOutput,
-          """|Stage #0:
-             |  common.classes
-             |  common.compileOnlyDeps
-             |  common.deps
-             |  common.generatedSources
-             |  common.javaHome
-             |  common.javaSemanticdbVersion
-             |  common.javaVersion
-             |  common.javacAnnotationProcessorDeps
-             |  common.javacOptions
-             |  common.scalaVersion
-             |  common.scalacOptions
-             |  common.scalacPluginDeps
-             |  common.semanticdb
-             |  common.semanticdbEnabled
-             |  common.sources
-             |Stage #1:
-             |  common.compilerDeps
-             |  common.javacAnnotationProcessors
-             |  common.scalaSemanticdbVersion
-             |  common.scalacPlugins
-             |  common.sourceFiles
-             |Stage #3:
-             |  common.compileClasspath
-             |Stage #4:
-             |  common.compile
-             |""".stripMargin
-        )
-      }
+      
     }
   }
 

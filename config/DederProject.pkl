@@ -62,7 +62,7 @@ maxConcurrentTestForks: Int(isBetween(0, 64)) = 0
 tools: Mapping<String, ServerTool> = new {
   ["tui"] = new {
     deps {
-      "ba.sake::deder-tui-dashboard:0.3.0"
+      "ba.sake::deder-tui-dashboard:0.4.0"
     }
     mainClass = "ba.sake.deder.tuidashboard.app.TuiDashboardMain"
   }
