@@ -17,6 +17,7 @@ import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
 import ba.sake.deder.plugin.{LoadedPlugin, PluginLoader, PluginLoaderApi}
 import ba.sake.deder.toPrettyString
 import ba.sake.tupson.JsonRW
+import ch.epfl.scala.bsp4j.{BuildTargetEvent, BuildTargetEventKind, BuildTargetIdentifier, DidChangeBuildTarget}
 import ba.sake.deder.scalajs.ScalaJsTasks
 import ba.sake.deder.scalanative.ScalaNativeTasks
 import ba.sake.deder.graalvm.GraalVmNativeImageTasks
@@ -32,6 +33,7 @@ class DederProjectState(
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
     taskLockTimeoutSeconds: Int,
+    bspFileChangeNotifyCooldownSeconds: Int,
     onShutdown: () => Unit,
     configFile: os.Path,
     val internals: DederProjectInternalsImpl
@@ -59,6 +61,9 @@ class DederProjectState(
 
   // Track active BSP servers for graceful teardown on CLI shutdown
   private val bspServers = new java.util.concurrent.ConcurrentLinkedQueue[ba.sake.deder.bsp.DederBspServer]()
+
+  // Per-module throttle: last time we sent a buildTarget/didChange for this moduleId
+  private val lastBspFileChangeNotify = new java.util.concurrent.ConcurrentHashMap[String, java.time.Instant]()
 
   // Callback to release the server lock early (before executor shutdown)
   private var releaseServerLockCallback: () => Unit = () => ()
@@ -816,6 +821,89 @@ class DederProjectState(
       snapshot.foreach { bspServer =>
         try bspServer.initiateShutdown()
         catch { case NonFatal(e) => logger.warn(s"Error notifying BSP client: ${e.getMessage}") }
+      }
+    }
+  }
+
+  /** Notify all connected BSP clients about source file changes detected by the file watcher.
+    * Matches changed paths against modules' source directories and sends `buildTarget/didChange`
+    * with per-module throttling (cooldown from `bspFileChangeNotifyCooldownSeconds`). */
+  def notifyBspClientsOfFileChanges(changedPaths: Set[os.Path]): Unit = {
+    val serversSnapshot = bspServers.iterator().asScala.toSeq
+    if serversSnapshot.isEmpty then return
+
+    val affectedModules = readState(useLastGood = true) match {
+      case Right(state) =>
+        val modules = state.projectConfig.modules.asScala.toSeq
+        val projectRoot = DederGlobals.projectRootDir
+        modules.filter { module =>
+          if !module.bspVisible then false
+          else if module.sources.isEmpty then false
+          else {
+            val sourceBaseDirs = module.sources.asScala.map { src =>
+              projectRoot / os.SubPath(s"${module.root}/${src}")
+            }
+            changedPaths.exists { changedPath =>
+              sourceBaseDirs.exists(baseDir => changedPath.startsWith(baseDir))
+            }
+          }
+        }
+      case Left(_) => Seq.empty
+    }
+
+    if affectedModules.isEmpty then return
+
+    val now = Instant.now()
+    val cooldownSecs = bspFileChangeNotifyCooldownSeconds.toLong
+
+    affectedModules.foreach { module =>
+      val lastNotified = lastBspFileChangeNotify.get(module.id)
+      val shouldNotify = lastNotified == null ||
+        Duration.between(lastNotified, now).toSeconds >= cooldownSecs
+
+      if shouldNotify then {
+        lastBspFileChangeNotify.put(module.id, now)
+        val targetId = new BuildTargetIdentifier(
+          DederGlobals.projectRootDir.toURI.toString + "#" + module.id
+        )
+        val event = new BuildTargetEvent(targetId)
+        event.setKind(BuildTargetEventKind.CHANGED)
+        val params = new DidChangeBuildTarget(java.util.List.of(event))
+
+        serversSnapshot.foreach { server =>
+          try server.client.onBuildTargetDidChange(params)
+          catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP client about file change: ${e.getMessage}") }
+        }
+      }
+    }
+  }
+
+  /** Notify all connected BSP clients that the project config (`deder.pkl`) has changed.
+    * Sends `buildTarget/didChange` for all bsp-visible modules. No per-module throttling. */
+  def notifyBspClientsOfConfigChange(): Unit = {
+    val serversSnapshot = bspServers.iterator().asScala.toSeq
+    if serversSnapshot.isEmpty then return
+
+    val targetIds = readState(useLastGood = true) match {
+      case Right(state) =>
+        state.projectConfig.modules.asScala.toSeq
+          .filter(_.bspVisible)
+          .map { module =>
+            val targetId = new BuildTargetIdentifier(
+              DederGlobals.projectRootDir.toURI.toString + "#" + module.id
+            )
+            val event = new BuildTargetEvent(targetId)
+            event.setKind(BuildTargetEventKind.CHANGED)
+            event
+          }
+      case Left(_) => Seq.empty
+    }
+
+    if targetIds.nonEmpty then {
+      val params = new DidChangeBuildTarget(targetIds.asJava)
+      serversSnapshot.foreach { server =>
+        try server.client.onBuildTargetDidChange(params)
+        catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP client about config change: ${e.getMessage}") }
       }
     }
   }
