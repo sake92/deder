@@ -3,7 +3,7 @@ package ba.sake.deder.bsp
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 
-private[bsp] object BspVisibleTargets {
+private[deder] object BspVisibleTargets {
 
   /** Determines which modules should be visible to BSP clients. If a module has `bspVisible` explicitly set, that value
     * is used. Otherwise, if a root has multiple modules with different platforms or Scala versions, only the module
