@@ -400,23 +400,31 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
   }
 
   test("notifies BSP client about external source file change") {
-    // Write a new source file inside the "common" module's source tree (simulates external edit)
+    // Drain any pending notifications from prior test debounce
+    capturingClient.didChangeNotifications.clear()
+
     val commonSrcDir = testDir / "common" / "src"
-    os.write(commonSrcDir / "ExternallyEdited.scala", "object ExternallyEdited { val x = 1 }")
+    os.makeDir.all(commonSrcDir)
+    val editedFile = commonSrcDir / "ExternallyEdited.scala"
+    try {
+      os.write(editedFile, "object ExternallyEdited { val x = 1 }")
 
-    // Wait for file watcher debounce (300ms) + OS propagation + processing time
-    val notification = capturingClient.awaitTargetDidChange(
-      30.seconds,
-      predicate = { n =>
-        n.getChanges.asScala.exists { event =>
-          event.getTarget.getUri.endsWith("#common")
+      // Wait for file watcher debounce (300ms) + OS propagation + processing time
+      val notification = capturingClient.awaitTargetDidChange(
+        30.seconds,
+        predicate = { n =>
+          n.getChanges.asScala.exists { event =>
+            event.getTarget.getUri.endsWith("#common")
+          }
         }
-      }
-    )
+      )
 
-    assert(notification.isDefined,
-      s"No didChange notification received for module 'common' after writing a source file. " +
-      s"Total notifications received: ${capturingClient.didChangeNotifications.size()}")
+      assert(notification.isDefined,
+        s"No didChange notification received for module 'common' after writing a source file. " +
+        s"Total notifications received: ${capturingClient.didChangeNotifications.size()}")
+    } finally {
+      if os.exists(editedFile) then os.remove(editedFile)
+    }
   }
 
 }
