@@ -30,7 +30,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     stageTestProject(os.RelPath("sample-projects/multi"), testDir)
     os.write.over(
       testDir / ".deder/server.properties",
-      s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\nmaxConnectSeconds=300\n",
+      s"localPath=$dederServerPath\ntestRunnerLocalPath=$dederTestRunnerPath\nmaxConnectSeconds=300\nbspFileChangeNotifyCooldownSeconds=0\n",
       createFolders = true
     )
     executeDederCommand(testDir, "bsp", "install")
@@ -397,6 +397,26 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     val paths = item.getOutputPaths.asScala
     assert(paths.exists(_.getUri.contains(".deder")), "should include .deder in excluded paths")
     assert(paths.exists(_.getUri.contains(".metals")), "should include .metals in excluded paths")
+  }
+
+  test("notifies BSP client about external source file change") {
+    // Write a new source file inside the "common" module's source tree (simulates external edit)
+    val commonSrcDir = testDir / "common" / "src"
+    os.write(commonSrcDir / "ExternallyEdited.scala", "object ExternallyEdited { val x = 1 }")
+
+    // Wait for file watcher debounce (300ms) + OS propagation + processing time
+    val notification = capturingClient.awaitTargetDidChange(
+      30.seconds,
+      predicate = { n =>
+        n.getChanges.asScala.exists { event =>
+          event.getTarget.getUri.endsWith("#common")
+        }
+      }
+    )
+
+    assert(notification.isDefined,
+      s"No didChange notification received for module 'common' after writing a source file. " +
+      s"Total notifications received: ${capturingClient.didChangeNotifications.size()}")
   }
 
 }

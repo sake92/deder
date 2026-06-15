@@ -835,10 +835,10 @@ class DederProjectState(
     val affectedModules = readState(useLastGood = true) match {
       case Right(state) =>
         val modules = state.projectConfig.modules.asScala.toSeq
+        val visibleModuleIds = bsp.BspVisibleTargets.visibleModuleIds(modules)
         val projectRoot = DederGlobals.projectRootDir
         modules.filter { module =>
-          val isVisible = Option(module.bspVisible).map(_.booleanValue()).getOrElse(false)
-          if !isVisible then false
+          if !visibleModuleIds.contains(module.id) then false
           else if module.sources.isEmpty then false
           else {
             val sourceBaseDirs = module.sources.asScala.map { src =>
@@ -887,8 +887,10 @@ class DederProjectState(
 
     val targetIds = readState(useLastGood = true) match {
       case Right(state) =>
-        state.projectConfig.modules.asScala.toSeq
-          .filter { m => Option(m.bspVisible).map(_.booleanValue()).getOrElse(false) }
+        val modules = state.projectConfig.modules.asScala.toSeq
+        val visibleModuleIds = bsp.BspVisibleTargets.visibleModuleIds(modules)
+        modules
+          .filter { m => visibleModuleIds.contains(m.id) }
           .map { module =>
             val targetId = new BuildTargetIdentifier(
               DederGlobals.projectRootDir.toURI.toString + "#" + module.id
