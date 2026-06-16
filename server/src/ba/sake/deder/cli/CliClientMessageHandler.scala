@@ -684,13 +684,15 @@ class CliClientMessageHandler(
                     val depStrs = tool.deps.asScala.toSeq
                     val dependencies = depStrs.map(Dependency.make(_, "3.7.4"))
                     val jars = state.dependencyResolver.fetchFiles(dependencies)
-                    val cp = jars.map(_.toString).mkString(java.io.File.pathSeparator)
                     val toolArgsCfg = tool.args.asScala.toSeq
                     // strip "--" separator if present
                     val extraArgs =
                       if toolArgs.headOption == Some("--") then toolArgs.tail
                       else toolArgs
-                    val cmd = Seq("java", "-cp", cp, tool.mainClass) ++ toolArgsCfg ++ extraArgs
+                    val argfileDir = DederGlobals.projectRootDir / ".deder" / "out" / ".tool" / name
+                    val argfile = Argfile.write(argfileDir, name, Seq.empty, Classpath(jars),
+                      mainClass = tool.mainClass, args = toolArgsCfg)
+                    val cmd = Seq("java", s"@${argfile}") ++ extraArgs
                     serverMessages.put(CliServerMessage.RunSubprocess(cmd, Map.empty, watch = false))
                     serverMessages.put(CliServerMessage.Exit(0))
                 }

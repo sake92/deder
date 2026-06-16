@@ -36,8 +36,8 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       val (runClasspath, discoveredMainClasses, finalMainClass, jvmOptions) = ctx.depResults
       finalMainClass match {
         case Some(mc) =>
-          val cp = runClasspath.map(_.toString)
-          val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp.mkString(File.pathSeparator), mc) ++ ctx.args
+          val argfile = Argfile.write(ctx.out, "run", jvmOptions, Classpath(runClasspath), mainClass = mc)
+          val cmd = Seq("java", s"@${argfile}") ++ ctx.args
           logger.debug(s"Client should run command: ${cmd}")
           val forkEnv = ctx.module match {
             case m: JavaModule => m.forkEnv.asScala.to(Map)
@@ -75,8 +75,8 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       val finalMainClass = discoveredMainClasses.find(_ == selectedMainClass)
       finalMainClass match {
         case Some(mc) =>
-          val cp = runClasspath.map(_.toString)
-          val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp.mkString(File.pathSeparator), mc) ++ ctx.args.tail
+          val argfile = Argfile.write(ctx.out, "run", jvmOptions, Classpath(runClasspath), mainClass = mc)
+          val cmd = Seq("java", s"@${argfile}") ++ ctx.args.tail
           logger.debug(s"Client should run command: ${cmd}")
           val forkEnv = ctx.module match {
             case m: JavaModule => m.forkEnv.asScala.to(Map)
@@ -135,9 +135,8 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
           )
           val jars = ctx.dependencyResolver.fetchFiles(dependencies, Some(ctx.notifications))
           logger.info(s"Resolved jars for maven app '${mvnAppName}': ${jars.map(_.toString).mkString(", ")}")
-          val cp = jars.map(_.toString).mkString(File.pathSeparator)
-          val commandArgs = args ++ ctx.args.tail
-          val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, mainClass) ++ commandArgs
+          val argfile = Argfile.write(ctx.out, mvnAppName, jvmOptions, Classpath(jars), mainClass = mainClass, args = args)
+          val cmd = Seq("java", s"@${argfile}") ++ ctx.args.tail
           logger.info(s"Running maven app '${mvnAppName}': ${cmd}")
           val forkEnv = ctx.module match {
             case m: JavaModule => m.forkEnv.asScala.to(Map)
@@ -214,12 +213,13 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       }
       val cmd = ctx.module match {
         case _: ScalaModule =>
-          val replCp = replJars.map(_.toString).mkString(File.pathSeparator)
           val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)
           val mainClass =
             if scalaVersion.startsWith("3.") then "dotty.tools.repl.Main"
             else "scala.tools.nsc.MainGenericRunner"
-          Seq("java") ++ jvmOptions ++ Seq("-cp", replCp, mainClass, "-classpath", userClasspath) ++ ctx.args
+          val argfile = Argfile.write(ctx.out, "repl", jvmOptions, Classpath(replJars),
+            mainClass = mainClass, args = Seq("-classpath", userClasspath))
+          Seq("java", s"@${argfile}") ++ ctx.args
         case _ =>
           val jshellBin = javaHome.map(h => (h / "bin" / "jshell").toString).getOrElse("jshell")
           val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)

@@ -970,7 +970,6 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       val semanticdbDir = DederPath(DederGlobals.semanticdbDir(ctx.module.id))
       val dependency = Dependency.make(ScalafixUtils.scalafixDep(scalaVersion), scalaVersion)
       val jars = ctx.dependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
-      val cp = jars.map(_.toString).mkString(File.pathSeparator)
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val scalafixArgs =
         ScalafixUtils.buildArgs(
@@ -981,7 +980,9 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
           sourcePaths,
           ctx.args
         )
-      val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, "scalafix.cli.Cli") ++ scalafixArgs
+      val argfile = Argfile.write(ctx.out, "scalafix", jvmOptions, Classpath(jars),
+        mainClass = "scalafix.cli.Cli", args = scalafixArgs)
+      val cmd = Seq("java", s"@${argfile}")
       logger.info(s"Running scalafix fix: ${cmd}")
       val forkEnv = ctx.module match {
         case m: JavaModule => m.forkEnv.asScala.to(Map)
@@ -1015,7 +1016,6 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       val semanticdbDir = DederPath(DederGlobals.semanticdbDir(ctx.module.id))
       val dependency = Dependency.make(ScalafixUtils.scalafixDep(scalaVersion), scalaVersion)
       val jars = ctx.dependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
-      val cp = jars.map(_.toString).mkString(File.pathSeparator)
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
       val scalafixArgs = ScalafixUtils.buildArgs(
         scalaVersion,
@@ -1025,7 +1025,9 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         sourcePaths,
         Seq("--test") ++ ctx.args
       )
-      val cmd = Seq("java") ++ jvmOptions ++ Seq("-cp", cp, "scalafix.cli.Cli") ++ scalafixArgs
+      val argfile = Argfile.write(ctx.out, "scalafix", jvmOptions, Classpath(jars),
+        mainClass = "scalafix.cli.Cli", args = scalafixArgs)
+      val cmd = Seq("java", s"@${argfile}")
       logger.info(s"Running scalafix fixCheck: ${cmd}")
       val forkEnv = ctx.module match {
         case m: JavaModule => m.forkEnv.asScala.to(Map)
