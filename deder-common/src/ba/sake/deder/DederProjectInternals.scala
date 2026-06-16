@@ -49,6 +49,40 @@ case class LoadedPluginInfo(
     error: Option[String] = None
 ) derives JsonRW
 
+enum RequestState:
+  case QUEUED           // request received, not yet acquiring locks
+  case ACQUIRING_LOCKS  // in the lock acquisition loop
+  case EXECUTING        // locks acquired, tasks running
+  case COMPLETED        // done (then moves to recentHistory)
+
+case class LockProgress(
+    acquired: Int,                 // locks acquired so far (0..total)
+    total: Int,                    // total locks needed
+    blockingOn: Option[String],    // TaskInstance id we're currently waiting on (e.g. "foo.compile")
+    heldBy: Option[String]         // requestId that holds the blocking lock (if any)
+)
+
+case class TaskStageProgress(
+    currentStage: Int,
+    totalStages: Int,
+    completed: Seq[String],   // TaskInstance ids
+    failed: Seq[String],
+    skipped: Seq[String],
+    running: Seq[String],     // currently executing
+    pending: Seq[String]      // not yet started in current stage
+)
+
+case class RequestStatus(
+    requestId: String,
+    caller: CallerType,
+    taskName: String,
+    moduleIds: Seq[String],
+    startTime: java.time.Instant,
+    state: RequestState,
+    lockProgress: Option[LockProgress],    // set during ACQUIRING_LOCKS
+    taskProgress: Option[TaskStageProgress] // set during EXECUTING
+)
+
 trait DederProjectInternals:
   /** Currently executing top-level requests (CLI or BSP). */
   def currentRequests: Seq[LiveRequest]
@@ -75,3 +109,14 @@ trait DederProjectInternals:
 
   /** Server metadata. */
   def serverUptime: Duration
+
+  /** Cancel an in-flight request by its requestId.
+    * Returns true if the request was found and cancellation was triggered.
+    * Returns false if the requestId is unknown or already completed. */
+  def cancelRequest(requestId: String): Boolean
+
+  /** Rich status snapshot for a single in-flight request, or None if not found. */
+  def requestStatus(requestId: String): Option[RequestStatus]
+
+  /** Rich status snapshots for all in-flight requests. */
+  def allRequestStatuses: Seq[RequestStatus]
