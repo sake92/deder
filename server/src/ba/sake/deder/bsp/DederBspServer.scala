@@ -109,12 +109,8 @@ class DederBspServer(
             taskStartParams.setDataKind(TaskStartDataKind.COMPILE_TASK)
             taskStartParams.setData(new CompileTask(targetId.orNull))
             client.onBuildTaskStart(taskStartParams)
-            // reset diagnostics for these files
-            cs.files.foreach { file =>
-              val fileUri = TextDocumentIdentifier(file.toURI.toString)
-              val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List.empty.asJava, true)
-              client.onBuildPublishDiagnostics(params)
-            }
+            // Diagnostics are published in bulk by renderCompileResult() at compilation end.
+            // No per-file reset needed here — renderCompileResult sends reset=true per file.
           }
         case tp: ServerNotification.TaskProgress =>
           val targetId = resolveModule(tp.moduleId).map(buildTargetId)
@@ -132,38 +128,12 @@ class DederBspServer(
             client.onBuildTaskProgress(params)
           }
         case cd: ServerNotification.CompileDiagnostic =>
-          val targetId = resolveModule(cd.moduleId).map(buildTargetId)
           val isRelevantCompileNotification = isCompileTask && moduleId.contains(cd.moduleId)
           if isRelevantCompileNotification then {
             if cd.problem.position.sourceFile.isPresent then {
-              val file = cd.problem.position.sourceFile.get
-              val problem = cd.problem
-              val fileUri = TextDocumentIdentifier(file.toURI.toString)
-              val range = {
-                val pos = problem.position
-                logger.info(s"Diagnostic position for ${problem.message()} : ${pos.startLine()}:${pos
-                    .startColumn()} - ${pos.endLine()}:${pos.endColumn()}")
-                // Zinc's range starts at 1 whereas BSP at 0
-                val startLine = pos.startLine().orElse(1) - 1
-                val startColumn = pos.startColumn().orElse(1)
-                val endLine = pos.endLine().orElse(pos.startLine().orElse(1)) - 1
-                val endColumn = pos.endColumn().orElse(pos.startColumn().orElse(0)) // - 1
-                new bsp4j.Range(
-                  new bsp4j.Position(startLine, startColumn),
-                  new bsp4j.Position(endLine, endColumn)
-                )
-              }
-              val severity = problem.severity() match {
-                case xsbti.Severity.Error => DiagnosticSeverity.ERROR
-                case xsbti.Severity.Warn  => DiagnosticSeverity.WARNING
-                case xsbti.Severity.Info  => DiagnosticSeverity.INFORMATION
-              }
-              val diagnostic = new Diagnostic(range, problem.message())
-              diagnostic.setSeverity(severity)
-              diagnostic.setCode(problem.category())
-              diagnostic.setSource("deder")
-              val params = PublishDiagnosticsParams(fileUri, targetId.orNull, List(diagnostic).asJava, false)
-              client.onBuildPublishDiagnostics(params)
+              // Diagnostics with a source position are published in bulk by renderCompileResult()
+              // at compilation end. Publishing them one-by-one here overwhelms the BSP client.
+              // No action needed — the diagnostic is accumulated in the CompileResult.
             } else {
               val msgType = cd.problem.severity() match {
                 case xsbti.Severity.Error => MessageType.ERROR
