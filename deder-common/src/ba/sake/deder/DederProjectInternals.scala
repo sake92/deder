@@ -77,7 +77,7 @@ case class RequestStatus(
     caller: CallerType,
     taskName: String,
     moduleIds: Seq[String],
-    startTime: java.time.Instant,
+    startTime: Instant,
     state: RequestState,
     lockProgress: Option[LockProgress],    // set during ACQUIRING_LOCKS
     taskProgress: Option[TaskStageProgress] // set during EXECUTING
