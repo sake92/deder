@@ -53,7 +53,7 @@ class DederProjectInternalsImpl private (
   private val lockHolders: ConcurrentHashMap[String, String] = new ConcurrentHashMap()
 
   // Delegated cancel function — wired after construction by ServerMain
-  private[deder] var cancelFn: String => Unit = _ => ()
+  @volatile private[deder] var cancelFn: String => Unit = _ => ()
 
   override def currentRequests: Seq[LiveRequest] =
     currentReqs.values().asScala.toSeq
@@ -163,8 +163,9 @@ class DederProjectInternalsImpl private (
 
   private[deder] def updateLockBlocking(requestId: String, taskInstanceId: String): Unit =
     Option(requestStatuses.get(requestId)).foreach { rs =>
-      val currentTotal = rs.lockProgress.map(_.total).getOrElse(0)
-      val currentAcquired = rs.lockProgress.map(_.acquired).getOrElse(0)
+      val lp = rs.lockProgress
+      val currentTotal = lp.map(_.total).getOrElse(0)
+      val currentAcquired = lp.map(_.acquired).getOrElse(0)
       val holder = Option(lockHolders.get(taskInstanceId))
       rs.lockProgress = Some(LockProgress(currentAcquired, currentTotal, Some(taskInstanceId), holder))
     }
