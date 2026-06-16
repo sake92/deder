@@ -291,10 +291,10 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     assertEquals(targetIds, List("common"), "Common.scala should be included in common module")
   }
 
-  // A cache-hit replay emits a task-start whose message contains "(cached)" — this uniquely
-  // distinguishes the replay path from the live (compiler-ran) path.
-  private def isCachedCompileStart(p: TaskStartParams): Boolean =
-    p.getDataKind == TaskStartDataKind.COMPILE_TASK && Option(p.getMessage).exists(_.contains("cached"))
+  // After compile notification unification, cache-hit and live compiles use the same
+  // task-start message — no "(cached)" suffix. Just verify a COMPILE_TASK start fires.
+  private def isCompileTaskStart(p: TaskStartParams): Boolean =
+    p.getDataKind == TaskStartDataKind.COMPILE_TASK
 
   private def compileCommon(): CompileResult =
     buildServer.buildTargetCompile(new CompileParams(List(targetId("common")).asJava)).get(2, TimeUnit.MINUTES)
@@ -309,10 +309,10 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     val result = compileCommon()
     assertEquals(result.getStatusCode, StatusCode.OK)
 
-    val cachedStart = capturingClient.awaitTaskStart(predicate = isCachedCompileStart)
+    val cachedStart = capturingClient.awaitTaskStart(predicate = isCompileTaskStart)
     assert(
       cachedStart.isDefined,
-      s"expected a cache-hit COMPILE_TASK start, got messages: ${capturingClient.taskStarts.asScala.map(_.getMessage).toList}"
+      s"expected a COMPILE_TASK start on cache hit, got messages: ${capturingClient.taskStarts.asScala.map(_.getMessage).toList}"
     )
 
     val finish = capturingClient.awaitTaskFinish(predicate = _.getDataKind == TaskFinishDataKind.COMPILE_REPORT)
@@ -338,8 +338,8 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
       val r2 = compileCommon()
       assertEquals(r2.getStatusCode, StatusCode.ERROR)
 
-      val cachedStart = capturingClient.awaitTaskStart(predicate = isCachedCompileStart)
-      assert(cachedStart.isDefined, "expected a cache-hit COMPILE_TASK start on the 2nd compile")
+      val cachedStart = capturingClient.awaitTaskStart(predicate = isCompileTaskStart)
+      assert(cachedStart.isDefined, "expected a COMPILE_TASK start on the 2nd compile")
 
       val diag = capturingClient.awaitDiagnostic(predicate =
         p =>
