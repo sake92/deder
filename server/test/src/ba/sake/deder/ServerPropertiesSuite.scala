@@ -28,12 +28,11 @@ class ServerPropertiesSuite extends munit.FunSuite {
     assertEquals(cfg.watchDebounceMillis, 100)
   }
 
-  test("silently ignores removed keys (bspEnabled, maxActiveCompilers, maxConcurrentTestForks, bspFileChangeNotifyCooldownSeconds)") {
+  test("silently ignores removed keys (bspEnabled, maxActiveCompilers, maxConcurrentTestForks)") {
     val props = mkProps(
       "bspEnabled" -> "false",
       "maxActiveCompilers" -> "4",
-      "maxConcurrentTestForks" -> "2",
-      "bspFileChangeNotifyCooldownSeconds" -> "10"
+      "maxConcurrentTestForks" -> "2"
     )
     val cfg = ServerProperties.from(props)
     // Defaults are used — removed keys have no effect

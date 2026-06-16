@@ -21,10 +21,6 @@
 - harden the abstraction
 - polish the docs
 
-
-## Misc
-- temp override of settings, say scalacOptions when running BSP request??? hmmm
-
 ## BSP
 - java main classes cant be run..??
 
