@@ -2,7 +2,7 @@ package ba.sake.deder
 
 import java.net.URLClassLoader
 import java.time.{Duration, Instant}
-import java.time.format.DateTimeFormatter
+import java.time.format.{DateTimeFormatter, FormatStyle}
 import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
@@ -274,10 +274,7 @@ class DederProjectState(
             given MermaidWritable[Any] = task.summarizable.mermaidW.asInstanceOf[MermaidWritable[Any]]
             given DotWritable[Any] = task.summarizable.dotW.asInstanceOf[DotWritable[Any]]
             val rendered = OutputFormat.render[Any](summary, ctx.outputFormat)
-            val output = ctx.outputFormat match
-              case OutputFormat.PlainText => rendered + s"\nTotal time: ${totalDuration.toPrettyString}"
-              case _                      => rendered
-            serverNotificationsLogger.add(ServerNotification.Output(output))
+            serverNotificationsLogger.add(ServerNotification.Output(rendered))
           }
         }
         if startWatch then {
@@ -307,10 +304,10 @@ class DederProjectState(
             case TaskExecResult.Success(ti, value, _, _) => ti.task.isResultSuccessfulUnsafe(value)
             case _                                    => false // Failure and Skipped are always unsuccessful
           }
-          val ts = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault()).format(Instant.now())
+          val ts = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withZone(ZoneId.systemDefault()).format(Instant.now())
           val statusStr = if allSuccessful then "Finished" else "Failed"
           serverNotificationsLogger.add(
-            ServerNotification.logInfo(s"[$ts] $statusStr in ${totalDuration.toPrettyString}")
+            ServerNotification.logInfo(s"$statusStr in ${totalDuration.toPrettyString} at $ts")
           )
           serverNotificationsLogger.add(ServerNotification.RequestFinished(success = allSuccessful))
         }
