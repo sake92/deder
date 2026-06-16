@@ -27,6 +27,8 @@ object Argfile {
     * @param jvmOptions JVM options that go before `-cp` (`-Dfoo=bar`, `-Xmx2g`, etc.). May be empty.
     * @param classpath  Ordered classpath entries.
     * @param jvmOptions2 JVM options that go after `-cp` (`--add-opens`, `--add-exports`, etc.). Default empty.
+    * @param mainClass  The Java main class. Default empty (omitted from file if empty).
+    * @param args       Program arguments (after the main class). Default empty.
     * @return           Absolute path of the created file, ready for use as `@path` in a command.
     */
   def write(
@@ -34,13 +36,17 @@ object Argfile {
       key: String,
       jvmOptions: Seq[String],
       classpath: Classpath,
-      jvmOptions2: Seq[String] = Seq.empty
+      jvmOptions2: Seq[String] = Seq.empty,
+      mainClass: String = "",
+      args: Seq[String] = Seq.empty
   ): os.Path = {
     require(key.nonEmpty && key.matches("[a-zA-Z0-9._-]+"), s"Invalid argfile key: '$key'")
     os.makeDir.all(dir)
     val file = dir / s"$key-jvm-opts.txt"
     val cpString = classpath.entries.map(_.toString).mkString(java.io.File.pathSeparator)
-    val lines = (jvmOptions ++ Seq("-cp", cpString) ++ jvmOptions2).map(escapeArg)
+    val lines =
+      (jvmOptions ++ Seq("-cp", cpString) ++ jvmOptions2 ++ Option.when(mainClass.nonEmpty)(mainClass).toSeq ++ args)
+        .map(escapeArg)
     os.write.over(file, lines.mkString("\n"))
     file
   }

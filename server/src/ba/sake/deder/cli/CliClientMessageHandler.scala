@@ -690,8 +690,9 @@ class CliClientMessageHandler(
                       if toolArgs.headOption == Some("--") then toolArgs.tail
                       else toolArgs
                     val argfileDir = DederGlobals.projectRootDir / ".deder" / "out" / ".tool" / name
-                    val argfile = Argfile.write(argfileDir, name, Seq.empty, Classpath(jars))
-                    val cmd = Seq("java", s"@${argfile}", tool.mainClass) ++ toolArgsCfg ++ extraArgs
+                    val argfile = Argfile.write(argfileDir, name, Seq.empty, Classpath(jars),
+                      mainClass = tool.mainClass, args = toolArgsCfg)
+                    val cmd = Seq("java", s"@${argfile}") ++ extraArgs
                     serverMessages.put(CliServerMessage.RunSubprocess(cmd, Map.empty, watch = false))
                     serverMessages.put(CliServerMessage.Exit(0))
                 }

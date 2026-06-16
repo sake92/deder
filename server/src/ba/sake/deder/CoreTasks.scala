@@ -980,8 +980,9 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
           sourcePaths,
           ctx.args
         )
-      val argfile = Argfile.write(ctx.out, "scalafix", jvmOptions, Classpath(jars))
-      val cmd = Seq("java", s"@${argfile}", "scalafix.cli.Cli") ++ scalafixArgs
+      val argfile = Argfile.write(ctx.out, "scalafix", jvmOptions, Classpath(jars),
+        mainClass = "scalafix.cli.Cli", args = scalafixArgs)
+      val cmd = Seq("java", s"@${argfile}")
       logger.info(s"Running scalafix fix: ${cmd}")
       val forkEnv = ctx.module match {
         case m: JavaModule => m.forkEnv.asScala.to(Map)
@@ -1024,8 +1025,9 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         sourcePaths,
         Seq("--test") ++ ctx.args
       )
-      val argfile = Argfile.write(ctx.out, "scalafix", jvmOptions, Classpath(jars))
-      val cmd = Seq("java", s"@${argfile}", "scalafix.cli.Cli") ++ scalafixArgs
+      val argfile = Argfile.write(ctx.out, "scalafix", jvmOptions, Classpath(jars),
+        mainClass = "scalafix.cli.Cli", args = scalafixArgs)
+      val cmd = Seq("java", s"@${argfile}")
       logger.info(s"Running scalafix fixCheck: ${cmd}")
       val forkEnv = ctx.module match {
         case m: JavaModule => m.forkEnv.asScala.to(Map)
