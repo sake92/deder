@@ -11,6 +11,9 @@ Example:
 localPath=myprojects/deder/.deder/out/server/assembly/out.jar
 testRunnerLocalPath=myprojects/deder/.deder/out/test-runner/assembly/out.jar
 logLevel=debug
+logRolloverPattern=%d{yyyy-MM-dd}
+logMaxHistory=14
+logTotalSizeCap=500MB
 JAVA_OPTS=-javaagent:otel.jar -Dotel.service.name=my-project -Dotel.exporter.otlp.protocol=grpc -Dotel.exporter.otlp.endpoint=http://localhost:4317
 ```
 
@@ -30,3 +33,6 @@ Available properties:
 - `testRunnerLocalPath` - fixed local path to test-runner JAR, useful for developing Deder and debugging. **Note:** When using testRunnerLocalPath, the global cache is bypassed - the artifact is copied directly without caching.
 - `forkTestFlushIntervalMs` - interval in milliseconds for flushing partial test output from forked test JVMs. Setting to `0` disables periodic flushing (output only appears when each test suite completes). Defaults to `1000` (1 second).
 - `taskLockTimeoutSeconds` - maximum number of seconds to wait when acquiring a task lock before giving up. If another request is holding the lock (e.g., a long-running compilation), the waiting request will fail with a timeout error instead of blocking indefinitely. Set to `0` to disable (unlimited wait). Defaults to `600` (10 minutes).
+- `logRolloverPattern` - Logback date pattern for rolled log file naming (see [Logback docs](https://logback.qos.ch/manual/appenders.html#TimeBasedRollingPolicy)). Controls rollover frequency: `%d{yyyy-MM-dd-HH}` = hourly (default), `%d{yyyy-MM-dd}` = daily, `%d{yyyy-MM-dd_HH-mm}` = per-minute, etc. Defaults to `%d{yyyy-MM-dd-HH}`.
+- `logMaxHistory` - maximum number of days to retain rolled log files. Defaults to `7`.
+- `logTotalSizeCap` - maximum total size of all archived log files. Supports `KB`, `MB`, `GB` suffixes. Defaults to `1GB`.
