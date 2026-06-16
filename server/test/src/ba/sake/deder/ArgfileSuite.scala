@@ -2,9 +2,12 @@ package ba.sake.deder
 
 class ArgfileSuite extends munit.FunSuite {
 
+  private def p(s: String) = os.Path(s)
+
   test("write creates file with expected content when jvmOptions are non-empty") {
     val dir = os.temp.dir()
-    val file = Argfile.write(dir, "run", Seq("-Dfoo=bar", "-Xmx2g"), "/a.jar:/b.jar")
+    val cp = Classpath(Seq(p("/a.jar"), p("/b.jar")))
+    val file = Argfile.write(dir, "run", Seq("-Dfoo=bar", "-Xmx2g"), cp)
 
     assert(file.ext == "txt")
     assert(file.last.contains("run-jvm-opts"), s"filename should contain 'run-jvm-opts'")
@@ -20,7 +23,8 @@ class ArgfileSuite extends munit.FunSuite {
 
   test("write creates file with expected content when jvmOptions are empty") {
     val dir = os.temp.dir()
-    val file = Argfile.write(dir, "scalafix", Seq.empty, "/x.jar:/y.jar")
+    val cp = Classpath(Seq(p("/x.jar"), p("/y.jar")))
+    val file = Argfile.write(dir, "scalafix", Seq.empty, cp)
 
     val content = os.read(file)
     val expected =
@@ -31,18 +35,20 @@ class ArgfileSuite extends munit.FunSuite {
 
   test("write rejects invalid keys") {
     val dir = os.temp.dir()
+    val cp = Classpath(Seq(p("/cp.jar")))
     intercept[IllegalArgumentException] {
-      Argfile.write(dir, "my key", Seq.empty, "/cp")
+      Argfile.write(dir, "my key", Seq.empty, cp)
     }
     intercept[IllegalArgumentException] {
-      Argfile.write(dir, "", Seq.empty, "/cp")
+      Argfile.write(dir, "", Seq.empty, cp)
     }
   }
 
   test("write creates parent directories if needed") {
     val parent = os.temp.dir()
     val dir = parent / "nested" / "dir"
-    val file = Argfile.write(dir, "run", Seq.empty, "/cp")
+    val cp = Classpath(Seq(p("/cp.jar")))
+    val file = Argfile.write(dir, "run", Seq.empty, cp)
 
     assert(os.exists(file))
   }

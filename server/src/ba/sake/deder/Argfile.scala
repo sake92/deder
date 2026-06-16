@@ -21,19 +21,32 @@ object Argfile {
 
   /** Write an argument file and return its absolute path.
     *
-    * @param dir       Directory to create the file in (typically the task's `ctx.out`).
-    * @param key       Stable identifier for the file, used in the filename (`key-jvm-opts.txt`).
-    *                  Must consist of alphanumeric characters, dots, hyphens, and underscores.
-    * @param jvmOptions JVM options (`-Dfoo=bar`, `-Xmx2g`, etc.). May be empty.
-    * @param classpath  Classpath string (already joined with the OS path separator).
-    * @return          Absolute path of the created file, ready for use as `@path` in a command.
+    * @param dir        Directory to create the file in (typically the task's `ctx.out`).
+    * @param key        Stable identifier for the file, used in the filename (`key-jvm-opts.txt`).
+    *                   Must consist of alphanumeric characters, dots, hyphens, and underscores.
+    * @param jvmOptions JVM options that go before `-cp` (`-Dfoo=bar`, `-Xmx2g`, etc.). May be empty.
+    * @param classpath  Ordered classpath entries.
+    * @param jvmOptions2 JVM options that go after `-cp` (`--add-opens`, `--add-exports`, etc.). Default empty.
+    * @return           Absolute path of the created file, ready for use as `@path` in a command.
     */
-  def write(dir: os.Path, key: String, jvmOptions: Seq[String], classpath: String): os.Path = {
+  def write(
+      dir: os.Path,
+      key: String,
+      jvmOptions: Seq[String],
+      classpath: Classpath,
+      jvmOptions2: Seq[String] = Seq.empty
+  ): os.Path = {
     require(key.nonEmpty && key.matches("[a-zA-Z0-9._-]+"), s"Invalid argfile key: '$key'")
     os.makeDir.all(dir)
     val file = dir / s"$key-jvm-opts.txt"
-    val lines = jvmOptions ++ Seq("-cp", classpath)
+    val cpString = classpath.entries.map(_.toString).mkString(java.io.File.pathSeparator)
+    val lines = (jvmOptions ++ Seq("-cp", cpString) ++ jvmOptions2).map(escapeArg)
     os.write.over(file, lines.mkString("\n"))
     file
   }
+
+  /** Quote arguments that contain whitespace, as required by Java's @-file parser. */
+  private def escapeArg(arg: String): String =
+    if arg.exists(_.isWhitespace) then s""""$arg""""
+    else arg
 }
