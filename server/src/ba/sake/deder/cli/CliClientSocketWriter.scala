@@ -15,7 +15,20 @@ class CliClientSocketWriter(
     serverMessages: BlockingQueue[CliServerMessage]
 ) extends Runnable, StrictLogging {
 
-  private val MaxOutputChunkSize = 30_000
+  private val MaxMessageChunkSize = 30_000
+
+  /** Write a large-text message split into chunks to keep each JSON line under avaje-jsonb's
+    * hardcoded 50 K string-buffer limit.
+    */
+  private def writeChunks(
+      text: String,
+      makeMsg: String => CliServerMessage,
+      outputStream: java.io.OutputStream
+  ): Unit =
+    text.grouped(MaxMessageChunkSize).foreach { chunk =>
+      val json = makeMsg(chunk).toJson(spaces = 0, sort = false)
+      outputStream.write((json + '\n').getBytes(StandardCharsets.UTF_8))
+    }
 
   override def run(): Unit = {
     try {
@@ -25,13 +38,10 @@ class CliClientSocketWriter(
         // newline delimited JSON messages
         val message = serverMessages.take()
         message match
-          case CliServerMessage.Output(text) if text.length > MaxOutputChunkSize =>
-            // split large output to avoid exceeding client's JSON parser string limit (avaje-jsonb 50K)
-            text.grouped(MaxOutputChunkSize).foreach { chunk =>
-              val chunkMsg = CliServerMessage.Output(chunk)
-              val json = chunkMsg.toJson(spaces = 0, sort = false)
-              outputStream.write((json + '\n').getBytes(StandardCharsets.UTF_8))
-            }
+          case CliServerMessage.Output(text) if text.length > MaxMessageChunkSize =>
+            writeChunks(text, CliServerMessage.Output(_), outputStream)
+          case CliServerMessage.Log(text, level) if text.length > MaxMessageChunkSize =>
+            writeChunks(text, CliServerMessage.Log(_, level), outputStream)
           case _ =>
             // very important to have ZERO SPACES/NEWLINES!!!
             val jsonMessage = message.toJson(spaces = 0, sort = false)
