@@ -172,6 +172,7 @@ object ServerMain extends StrictLogging {
       configFile = DederGlobals.projectRootDir / "deder.pkl",
       internals = internals
     )
+    internals.cancelFn = projectState.cancelRequest
 
     debounceThread = Thread.ofVirtual().name("watch-debounce").start(() => {
       var running = true
