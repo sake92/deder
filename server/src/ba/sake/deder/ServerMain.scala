@@ -14,9 +14,7 @@ import scala.util.Properties
 import scala.util.Using
 import com.typesafe.scalalogging.StrictLogging
 import mainargs.*
-import org.slf4j.LoggerFactory
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger
+
 import io.opentelemetry.context.Context
 import io.opentelemetry.api.GlobalOpenTelemetry
 import ba.sake.deder.TeePrintStream
@@ -78,8 +76,7 @@ object ServerMain extends StrictLogging {
 
     val cfg = ServerProperties.from(props)
     DederGlobals.setForkTestFlushIntervalMs(cfg.forkTestFlushIntervalMs)
-    val rootLogger = LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME).asInstanceOf[Logger]
-    rootLogger.setLevel(Level.toLevel(cfg.logLevel))
+    LoggingUtils.configureLogging(cfg)
 
     val watchDebounceMs = cfg.watchDebounceMillis
 

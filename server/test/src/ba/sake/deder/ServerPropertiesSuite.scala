@@ -10,6 +10,9 @@ class ServerPropertiesSuite extends munit.FunSuite {
     assertEquals(cfg.taskLockTimeoutSeconds, 600)
     assertEquals(cfg.forkTestFlushIntervalMs, 1000L)
     assertEquals(cfg.watchDebounceMillis, 300)
+    assertEquals(cfg.logRolloverPattern, "%d{yyyy-MM-dd-HH}")
+    assertEquals(cfg.logMaxHistory, 7)
+    assertEquals(cfg.logTotalSizeCap, "1GB")
   }
 
   test("parses property overrides") {
@@ -18,7 +21,10 @@ class ServerPropertiesSuite extends munit.FunSuite {
       "maxInactiveSeconds" -> "300",
       "taskLockTimeoutSeconds" -> "1200",
       "forkTestFlushIntervalMs" -> "500",
-      "watchDebounceMillis" -> "100"
+      "watchDebounceMillis" -> "100",
+      "logRolloverPattern" -> "%d{yyyy-MM-dd}",
+      "logMaxHistory" -> "14",
+      "logTotalSizeCap" -> "500MB"
     )
     val cfg = ServerProperties.from(props)
     assertEquals(cfg.logLevel, "DEBUG")
@@ -26,6 +32,9 @@ class ServerPropertiesSuite extends munit.FunSuite {
     assertEquals(cfg.taskLockTimeoutSeconds, 1200)
     assertEquals(cfg.forkTestFlushIntervalMs, 500L)
     assertEquals(cfg.watchDebounceMillis, 100)
+    assertEquals(cfg.logRolloverPattern, "%d{yyyy-MM-dd}")
+    assertEquals(cfg.logMaxHistory, 14)
+    assertEquals(cfg.logTotalSizeCap, "500MB")
   }
 
   test("silently ignores removed keys (bspEnabled, maxActiveCompilers, maxConcurrentTestForks)") {
