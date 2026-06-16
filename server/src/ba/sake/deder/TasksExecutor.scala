@@ -27,6 +27,7 @@ class TasksExecutor(
     ti.task.name == taskName && moduleIds.contains(ti.moduleId)
 
   def execute(
+      requestId: String,
       stages: Seq[Seq[TaskInstance]],
       moduleIds: Seq[String],
       taskName: String,
@@ -38,6 +39,10 @@ class TasksExecutor(
     val moduleFailures = scala.collection.mutable.Map.empty[String, TaskExecResult.Failure]
     val targetResults = Seq.newBuilder[TaskExecResult]
 
+    val allCompleted = scala.collection.mutable.ArrayBuffer.empty[String]
+    val allFailed = scala.collection.mutable.ArrayBuffer.empty[String]
+    val allSkipped = scala.collection.mutable.ArrayBuffer.empty[String]
+
     for (taskInstances, stageIndex) <- stages.zipWithIndex do {
       val stageSpan = OTEL.TRACER.spanBuilder(s"Stage $stageIndex").startSpan()
       try {
@@ -48,6 +53,17 @@ class TasksExecutor(
             if isTargetTask(ti, taskName, moduleIds) then
               targetResults += TaskExecResult.Skipped(ti, moduleFailures(ti.moduleId))
           }
+
+          // Report stage start
+          internals.updateStageProgress(requestId, TaskStageProgress(
+            currentStage = stageIndex + 1,
+            totalStages = stages.size,
+            completed = allCompleted.toSeq,
+            failed = allFailed.toSeq,
+            skipped = allSkipped.toSeq,
+            running = executable.map(_.id),
+            pending = if stageIndex + 1 < stages.size then stages(stageIndex + 1).map(_.id) else Seq.empty
+          ))
 
           val outcomes: Seq[ExecutionOutcome] = supervised {
             val taskResultsSnapshot = taskResults.toMap
@@ -75,6 +91,27 @@ class TasksExecutor(
               case _: TaskExecResult.Skipped =>
             }
           }
+
+          // Update progress accumulators
+          outcomes.foreach { oc =>
+            oc.result match
+              case s: TaskExecResult.Success => allCompleted += s.taskInstance.id
+              case f: TaskExecResult.Failure => allFailed += f.taskInstance.id
+              case _ =>
+          }
+          allSkipped ++= skipped.map(_.id)
+          
+          // Report stage-end progress
+          val nextStagePending = if stageIndex + 1 < stages.size then stages(stageIndex + 1).map(_.id) else Seq.empty
+          internals.updateStageProgress(requestId, TaskStageProgress(
+            currentStage = stageIndex + 1,
+            totalStages = stages.size,
+            completed = allCompleted.toSeq,
+            failed = allFailed.toSeq,
+            skipped = allSkipped.toSeq,
+            running = Seq.empty,
+            pending = nextStagePending
+          ))
         }
       } catch {
         case NonFatal(e) =>
