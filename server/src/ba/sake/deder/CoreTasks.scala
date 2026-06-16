@@ -742,9 +742,9 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         ) = ctx.depResults
         // classes and semanticdb dirs are this task's OWN outputs — derive their paths instead of
         // taking content-hashed dependencies on them (which would make the cache key self-referential).
-        val classesDir = ctx.out / os.up / "classes"
-        val semanticdbDir = DederPath(ctx.out / os.up / "semanticdb")
-        val generatedSourcesDir = DederPath(ctx.out / os.up / "generatedSources")
+        val classesDir = ctx.out / "classes"
+        val semanticdbDir = DederPath(ctx.out / "semanticdb")
+        val generatedSourcesDir = DederPath(ctx.out / "generatedSources")
 
         // Upstream module class dirs come from transitive compile outputs (this is a transitive
         // task). Their change-detection is via the transitive results' outputHashes, not by us
@@ -769,7 +769,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         // annotation processors need generated sources dir to exist
         os.makeDir.all(generatedSourcesDir.absPath)
 
-        val zincCacheFile = ctx.out / "inc_compile.zip"
+        val zincCacheFile = ctx.out / "zinc" / "inc_compile.zip"
         val zincLogger = new DederZincLogger(ctx.notifications, ctx.module.id)
 
         // semanticdb javac annotation processor (when enabled)

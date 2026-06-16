@@ -85,10 +85,10 @@ class IntegrationSuite extends BaseIntegrationSuite {
         val dederOutputJson = executeDederCommand(projectPath, "exec", "-m", "uber", "-t", "compileClasspath", "--format", "json").out.text()
         val dederOutput = dederOutputJson.parseJson[MultiModuleResults[Seq[String]]]
         val uberCompileClasspath = dederOutput.results("uber")
-        assert(uberCompileClasspath(0).endsWith("/.deder/out/uber/classes"))
-        assert(uberCompileClasspath(1).endsWith("/.deder/out/backend/classes"))
-        assert(uberCompileClasspath(2).endsWith("/.deder/out/frontend/classes"))
-        assert(uberCompileClasspath(3).endsWith("/.deder/out/common/classes"))
+        assert(uberCompileClasspath(0).endsWith("/.deder/out/uber/compile/classes"))
+        assert(uberCompileClasspath(1).endsWith("/.deder/out/backend/compile/classes"))
+        assert(uberCompileClasspath(2).endsWith("/.deder/out/frontend/compile/classes"))
+        assert(uberCompileClasspath(3).endsWith("/.deder/out/common/compile/classes"))
         assert(uberCompileClasspath.exists(_.contains("scala3-library_3-3.7.1.jar")))
         assert(uberCompileClasspath.exists(_.contains("scala-library-2.13.16.jar")))
       }
