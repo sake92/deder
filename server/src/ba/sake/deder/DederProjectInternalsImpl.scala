@@ -47,7 +47,13 @@ class DederProjectInternalsImpl private (
     .ofLongs()
     .build()
 
+  // -- Request progress tracking --
+  private val requestStatuses: ConcurrentHashMap[String, MutableRequestStatus] = new ConcurrentHashMap()
+  // Maps TaskInstance.id -> requestId that currently holds the lock
+  private val lockHolders: ConcurrentHashMap[String, String] = new ConcurrentHashMap()
 
+  // Delegated cancel function — wired after construction by ServerMain
+  private[deder] var cancelFn: String => Unit = _ => ()
 
   override def currentRequests: Seq[LiveRequest] =
     currentReqs.values().asScala.toSeq
@@ -77,6 +83,18 @@ class DederProjectInternalsImpl private (
   override def inMemoryCachesStats: Map[String, InMemCacheStats] =
     cacheStatsRegistry.getAllStats
 
+  override def cancelRequest(requestId: String): Boolean =
+    if requestStatuses.containsKey(requestId) then
+      cancelFn(requestId)
+      true
+    else false
+
+  override def requestStatus(requestId: String): Option[RequestStatus] =
+    Option(requestStatuses.get(requestId)).map(_.toRequestStatus)
+
+  override def allRequestStatuses: Seq[RequestStatus] =
+    requestStatuses.values().asScala.toSeq.map(_.toRequestStatus).sortBy(_.startTime)
+
   // -- Write methods --
 
   private[deder] def setLoadedPlugins(plugins: Seq[LoadedPluginInfo]): Unit =
@@ -90,7 +108,8 @@ class DederProjectInternalsImpl private (
       startTime: Instant
   ): Unit =
     currentReqs.put(requestId, LiveRequest(requestId, caller, taskName, moduleIds, startTime))
-
+    requestStatuses.put(requestId, MutableRequestStatus(requestId, caller, taskName, moduleIds, startTime))
+    
   private[deder] def recordRequestCompleted(
       requestId: String,
       taskName: String,
@@ -114,6 +133,10 @@ class DederProjectInternalsImpl private (
       AttributeKey.stringKey("task"), taskName,
       AttributeKey.booleanKey("success"), success
     ))
+    // Remove progress tracking
+    requestStatuses.remove(requestId)
+    // Clean up any lock holders held by this request
+    lockHolders.values().removeIf(_ == requestId)
 
   private[deder] def recordTaskExecution(
       taskName: String,
@@ -129,6 +152,57 @@ class DederProjectInternalsImpl private (
     taskExecutionsCounter.add(1, attrs)
     if cacheHit then taskCacheHitsCounter.add(1, attrs)
     taskDurationHistogram.record(duration.toMillis, attrs)
+
+  // -- Package-private progress methods, called by DederProjectState and TasksExecutor --
+
+  private[deder] def transitionToAcquiringLocks(requestId: String, totalLocks: Int): Unit =
+    Option(requestStatuses.get(requestId)).foreach { rs =>
+      rs.state = RequestState.ACQUIRING_LOCKS
+      rs.lockProgress = Some(LockProgress(0, totalLocks, None, None))
+    }
+
+  private[deder] def updateLockBlocking(requestId: String, taskInstanceId: String): Unit =
+    Option(requestStatuses.get(requestId)).foreach { rs =>
+      val currentTotal = rs.lockProgress.map(_.total).getOrElse(0)
+      val currentAcquired = rs.lockProgress.map(_.acquired).getOrElse(0)
+      val holder = Option(lockHolders.get(taskInstanceId))
+      rs.lockProgress = Some(LockProgress(currentAcquired, currentTotal, Some(taskInstanceId), holder))
+    }
+
+  private[deder] def updateLockAcquired(requestId: String, taskInstanceId: String): Unit =
+    lockHolders.put(taskInstanceId, requestId)
+    Option(requestStatuses.get(requestId)).foreach { rs =>
+      val total = rs.lockProgress.map(_.total).getOrElse(0)
+      val acquired = rs.lockProgress.map(_.acquired).getOrElse(0) + 1
+      rs.lockProgress = Some(LockProgress(acquired, total, None, None))
+    }
+
+  private[deder] def transitionToExecuting(requestId: String, totalStages: Int, allTaskIds: Seq[String]): Unit =
+    Option(requestStatuses.get(requestId)).foreach { rs =>
+      rs.state = RequestState.EXECUTING
+      rs.taskProgress = Some(TaskStageProgress(
+        currentStage = 0,
+        totalStages = totalStages,
+        completed = Seq.empty,
+        failed = Seq.empty,
+        skipped = Seq.empty,
+        running = Seq.empty,
+        pending = allTaskIds
+      ))
+    }
+
+  private[deder] def updateStageProgress(requestId: String, progress: TaskStageProgress): Unit =
+    Option(requestStatuses.get(requestId)).foreach { rs =>
+      rs.taskProgress = Some(progress)
+    }
+
+  private[deder] def transitionToCompleted(requestId: String): Unit =
+    Option(requestStatuses.get(requestId)).foreach { rs =>
+      rs.state = RequestState.COMPLETED
+    }
+
+  private[deder] def releaseLockHolder(requestId: String, taskInstanceId: String): Unit =
+    lockHolders.remove(taskInstanceId, requestId)
 
 object DederProjectInternalsImpl:
   def apply(meter: Meter, cacheStatsRegistry: CacheStatsRegistry): DederProjectInternalsImpl =
@@ -197,3 +271,17 @@ private class TaskStatsAccumulator(sampleCapacity: Int):
           p99 = pct(0.99)
         )
       )
+
+private class MutableRequestStatus(
+    val requestId: String,
+    val caller: CallerType,
+    val taskName: String,
+    val moduleIds: Seq[String],
+    val startTime: java.time.Instant
+):
+  @volatile var state: RequestState = RequestState.QUEUED
+  @volatile var lockProgress: Option[LockProgress] = None
+  @volatile var taskProgress: Option[TaskStageProgress] = None
+
+  def toRequestStatus: RequestStatus =
+    RequestStatus(requestId, caller, taskName, moduleIds, startTime, state, lockProgress, taskProgress)
