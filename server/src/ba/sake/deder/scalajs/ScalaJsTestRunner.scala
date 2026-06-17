@@ -45,7 +45,8 @@ class ScalaJsTestRunner(
         notifications.add(
           ServerNotification.logWarning(
             s"No test frameworks found for Scala.js module '$moduleId'. Tried: ${testFrameworkNames.mkString(", ")}",
-            Some(moduleId)
+            Some(moduleId),
+            source = Some("scalajs")
           )
         )
         return DederTestResults.empty
@@ -112,10 +113,10 @@ class ScalaJsTestRunner(
   private def withForwardedOutput(runConfig: RunConfig): RunConfig =
     runConfig.withOnOutputStream { (stdout, stderr) =>
       stdout.foreach(stream =>
-        startForwarding(stream, message => notifications.add(ServerNotification.logInfo(message, Some(moduleId))))
+        startForwarding(stream, message => notifications.add(ServerNotification.logInfo(message, Some(moduleId), source = Some("scalajs"))))
       )
       stderr.foreach(stream =>
-        startForwarding(stream, message => notifications.add(ServerNotification.logError(message, Some(moduleId))))
+        startForwarding(stream, message => notifications.add(ServerNotification.logError(message, Some(moduleId), source = Some("scalajs"))))
       )
     }
 

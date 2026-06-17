@@ -93,10 +93,15 @@ class DederBspServer(
     ServerNotificationsLogger { sn =>
       sn match {
         case n: ServerNotification.Log =>
-          // for compile tasks, errors are sent as CompileDiagnostic
-          // we want to avoid owerwhelming the client with thousands of error messages, i.e if nothing compiles..
-          if !isCompileTask && n.level == ServerNotification.LogLevel.ERROR then
-            client.onBuildShowMessage(new ShowMessageParams(MessageType.ERROR, n.message))
+          // Forward non-zinc errors and warnings to BSP client.
+          // Zinc compile log spam is suppressed — compile diagnostics are sent separately.
+          if n.source != Some("zinc") then
+            n.level match
+              case ServerNotification.LogLevel.ERROR =>
+                client.onBuildShowMessage(new ShowMessageParams(MessageType.ERROR, n.message))
+              case ServerNotification.LogLevel.WARNING =>
+                client.onBuildShowMessage(new ShowMessageParams(MessageType.WARNING, n.message))
+              case _ => // info/debug/trace not forwarded
         case cs: ServerNotification.CompileStarted =>
           // dont send notification if compile was triggered transitively by another task
           // e.g. mainClasses -> compile

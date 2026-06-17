@@ -352,7 +352,8 @@ class ZincCompiler(
             notifications.add(
               ServerNotification.logError(
                 "Compilation failed but no diagnostic messages were reported by the compiler.",
-                Some(moduleId)
+                Some(moduleId),
+                source = Some("zinc")
               )
             )
             reporter.printSummaryCalled = true

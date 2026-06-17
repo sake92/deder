@@ -35,7 +35,7 @@ class TeePrintStreamSuite extends munit.FunSuite {
     }
     assert(originalBaos.toString.contains("captured line"))
     val logMessages = notifications.collect {
-      case ServerNotification.Log(_, _, msg, _) => msg
+      case ServerNotification.Log(_, _, msg, _, _) => msg
     }
     assert(logMessages.exists(_.contains("captured line")))
   }
@@ -45,13 +45,13 @@ class TeePrintStreamSuite extends munit.FunSuite {
     OutputCaptureContext.withCapture(slogger, "mod1") {
       tee.print("part1")
       val logsSoFar = notifications.collect {
-        case ServerNotification.Log(_, _, msg, _) => msg
+        case ServerNotification.Log(_, _, msg, _, _) => msg
       }
       assert(logsSoFar.isEmpty, s"Expected no logs yet, got: $logsSoFar")
       tee.println(" part2")
     }
     val logMessages = notifications.collect {
-      case ServerNotification.Log(_, _, msg, _) => msg
+      case ServerNotification.Log(_, _, msg, _, _) => msg
     }
     assert(logMessages.exists(_.contains("part1 part2")))
   }
@@ -63,7 +63,7 @@ class TeePrintStreamSuite extends munit.FunSuite {
       tee.flush()
     }
     val logMessages = notifications.collect {
-      case ServerNotification.Log(_, _, msg, _) => msg
+      case ServerNotification.Log(_, _, msg, _, _) => msg
     }
     assert(logMessages.exists(_.contains("partial")))
   }
@@ -79,7 +79,7 @@ class TeePrintStreamSuite extends munit.FunSuite {
       tee.println("from capture thread")
     }
     val logMessages = notifications.collect {
-      case ServerNotification.Log(_, _, msg, _) => msg
+      case ServerNotification.Log(_, _, msg, _, _) => msg
     }
     assert(logMessages.exists(_.contains("from capture thread")))
     assert(!logMessages.exists(_.contains("from other thread")))
@@ -92,7 +92,7 @@ class TeePrintStreamSuite extends munit.FunSuite {
     }
     assert(originalBaos.toString.contains("Hello 世界 🎉"))
     val logMessages = notifications.collect {
-      case ServerNotification.Log(_, _, msg, _) => msg
+      case ServerNotification.Log(_, _, msg, _, _) => msg
     }
     assert(logMessages.exists(_.contains("Hello 世界 🎉")), s"Expected UTF-8 output, got: $logMessages")
   }

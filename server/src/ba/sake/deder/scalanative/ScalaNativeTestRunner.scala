@@ -32,7 +32,8 @@ class ScalaNativeTestRunner(
       if loadedFrameworks.isEmpty then
         notifications.add(ServerNotification.logWarning(
           s"No test frameworks found for Scala Native module '$moduleId'. Tried: ${nativeFwNames.mkString(", ")}",
-          Some(moduleId)
+          Some(moduleId),
+          source = Some("scalanative")
         ))
         return DederTestResults.empty
 

@@ -313,17 +313,17 @@ object DependencyResolver {
 class DederCoursierLogger(notifications: ServerNotificationsLogger) extends coursierapi.SimpleLogger {
   private val downloadLengthMap = ConcurrentHashMap[String, Long]()
   override def starting(url: String): Unit =
-    notifications.add(ServerNotification.logInfo(s"Download started: $url"))
+    notifications.add(ServerNotification.logInfo(s"Download started: $url", source = Some("coursier")))
   override def length(url: String, total: Long, alreadyDownloaded: Long, watching: Boolean): Unit = {
     downloadLengthMap.putIfAbsent(url, total)
   }
   override def progress(url: String, downloaded: Long): Unit = {
     val length = downloadLengthMap.getOrDefault(url, 0L)
     val percentage = if length > 0 then (downloaded * 100 / length) else 0
-    notifications.add(ServerNotification.logInfo(s"Downloading $url ... (${percentage}%)"))
+    notifications.add(ServerNotification.logInfo(s"Downloading $url ... (${percentage}%)", source = Some("coursier")))
   }
   override def done(url: String, success: Boolean): Unit = {
     val status = if success then "completed" else "failed"
-    notifications.add(ServerNotification.logInfo(s"Download $status: $url"))
+    notifications.add(ServerNotification.logInfo(s"Download $status: $url", source = Some("coursier")))
   }
 }

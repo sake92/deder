@@ -10,15 +10,15 @@ class DederScalaJsLogger(
 ) extends Logger {
   def log(level: Level, message: => String): Unit = level match {
     case Level.Error =>
-      notifications.add(ServerNotification.logError(message, Some(moduleId)))
+      notifications.add(ServerNotification.logError(message, Some(moduleId), source = Some("scalajs")))
     case Level.Warn =>
-      notifications.add(ServerNotification.logWarning(message, Some(moduleId)))
+      notifications.add(ServerNotification.logWarning(message, Some(moduleId), source = Some("scalajs")))
     case Level.Info =>
-      notifications.add(ServerNotification.logInfo(message, Some(moduleId)))
+      notifications.add(ServerNotification.logInfo(message, Some(moduleId), source = Some("scalajs")))
     case Level.Debug =>
-      notifications.add(ServerNotification.logDebug(message, Some(moduleId)))
+      notifications.add(ServerNotification.logDebug(message, Some(moduleId), source = Some("scalajs")))
   }
 
   def trace(t: => Throwable): Unit =
-    notifications.add(ServerNotification.logTrace(t.getMessage, Some(moduleId)))
+    notifications.add(ServerNotification.logTrace(t.getMessage, Some(moduleId), source = Some("scalajs")))
 }

@@ -23,7 +23,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
       jsModuleKind: ScalaJsModuleKind,
       linkerConfig: ScalaJsLinkerConfig
   ): Report = {
-    notifications.add(ServerNotification.logInfo("Linking scalajs module...", Some(moduleId)))
+    notifications.add(ServerNotification.logInfo("Linking scalajs module...", Some(moduleId), source = Some("scalajs")))
     val config = buildLinkerConfig(jsModuleKind, linkerConfig)
     linkImpl(irContainers, outputDir, moduleInitializers, config, "Linking")
   }
@@ -36,7 +36,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
       jsModuleKind: ScalaJsModuleKind,
       linkerConfig: ScalaJsLinkerConfig
   ): Report = {
-    notifications.add(ServerNotification.logInfo("Fast-linking scalajs module...", Some(moduleId)))
+    notifications.add(ServerNotification.logInfo("Fast-linking scalajs module...", Some(moduleId), source = Some("scalajs")))
     val config = buildLinkerConfig(jsModuleKind, linkerConfig)
       .withSourceMap(true)
       .withOptimizer(false)
@@ -55,7 +55,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
       jsModuleKind: ScalaJsModuleKind,
       linkerConfig: ScalaJsLinkerConfig
   ): Report = {
-    notifications.add(ServerNotification.logInfo("Full-linking scalajs module...", Some(moduleId)))
+    notifications.add(ServerNotification.logInfo("Full-linking scalajs module...", Some(moduleId), source = Some("scalajs")))
     val config = buildLinkerConfig(jsModuleKind, linkerConfig)
       .withSourceMap(false)
       .withOptimizer(true)
@@ -93,7 +93,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
     val report = Await.result(res, Duration.Inf)
     val publicModulePaths = report.publicModules.map(_.jsFileName).map(outputDir / _)
     notifications.add(
-      ServerNotification.logInfo(s"$label succeeded: " + publicModulePaths.mkString(", "), Some(moduleId))
+      ServerNotification.logInfo(s"$label succeeded: " + publicModulePaths.mkString(", "), Some(moduleId), source = Some("scalajs"))
     )
     report
   }

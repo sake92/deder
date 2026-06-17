@@ -8,17 +8,17 @@ class DederScalaNativeLogger(
     moduleId: String
 ) extends Logger {
   def trace(t: Throwable): Unit =
-    notifications.add(ServerNotification.logTrace(t.getMessage, Some(moduleId)))
+    notifications.add(ServerNotification.logTrace(t.getMessage, Some(moduleId), source = Some("scalanative")))
 
   def debug(msg: String): Unit =
-    notifications.add(ServerNotification.logDebug(msg, Some(moduleId)))
+    notifications.add(ServerNotification.logDebug(msg, Some(moduleId), source = Some("scalanative")))
 
   def info(msg: String): Unit =
-    notifications.add(ServerNotification.logInfo(msg, Some(moduleId)))
+    notifications.add(ServerNotification.logInfo(msg, Some(moduleId), source = Some("scalanative")))
 
   def warn(msg: String): Unit =
-    notifications.add(ServerNotification.logWarning(msg, Some(moduleId)))
+    notifications.add(ServerNotification.logWarning(msg, Some(moduleId), source = Some("scalanative")))
 
   def error(msg: String): Unit =
-    notifications.add(ServerNotification.logError(msg, Some(moduleId)))
+    notifications.add(ServerNotification.logError(msg, Some(moduleId), source = Some("scalanative")))
 }
