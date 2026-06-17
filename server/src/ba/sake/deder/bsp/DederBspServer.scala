@@ -93,7 +93,9 @@ class DederBspServer(
     ServerNotificationsLogger { sn =>
       sn match {
         case n: ServerNotification.Log =>
-          if n.level == ServerNotification.LogLevel.ERROR then
+          // for compile tasks, errors are sent as CompileDiagnostic
+          // we want to avoid owerwhelming the client with thousands of error messages, i.e if nothing compiles..
+          if !isCompileTask && n.level == ServerNotification.LogLevel.ERROR then
             client.onBuildShowMessage(new ShowMessageParams(MessageType.ERROR, n.message))
         case cs: ServerNotification.CompileStarted =>
           // dont send notification if compile was triggered transitively by another task
@@ -236,7 +238,8 @@ class DederBspServer(
           )
           List.empty
         case Right(projectStateData) =>
-          val visibleModuleIds = BspVisibleTargets.visibleModuleIds(projectStateData.projectConfig.modules.asScala.toSeq)
+          val visibleModuleIds =
+            BspVisibleTargets.visibleModuleIds(projectStateData.projectConfig.modules.asScala.toSeq)
           projectStateData.projectConfig.modules.asScala
             .filter(module => visibleModuleIds.contains(module.id))
             .sortBy(m => (if m.id.contains("-jvm") then 0 else 1, m.id))
@@ -330,7 +333,10 @@ class DederBspServer(
       result
     }
 
-  private def createCompileFuture(params: CompileParams, requestedModules: Set[String]): CompletableFuture[CompileResult] =
+  private def createCompileFuture(
+      params: CompileParams,
+      requestedModules: Set[String]
+  ): CompletableFuture[CompileResult] =
     javaFuture("buildTargetCompile", Option(params.getOriginId)) {
       logger.debug(s"buildTargetCompile for params: ${params}")
       ensureRunning()
@@ -354,40 +360,41 @@ class DederBspServer(
             isCompileTask = true
           )
           val targetIdForRender = resolveModule(moduleId).map(buildTargetId).orNull
-          val (compileResult, fromCache) = try {
+          val (compileResult, fromCache) =
+            try {
               executeCompileTask(serverNotificationsLogger, moduleId, params.getOriginId)
             } catch {
               case _: TaskEvaluationException =>
                 val classesDir = DederPath(DederGlobals.classesDir(moduleId))
                 (ba.sake.deder.CompileResult(classesDir, errors = 1, warnings = 0, sourceCount = 0), false)
             }
-            if fromCache then {
-              // Compiler was skipped, so no live notifications fired — replay the full picture.
-              val startP = TaskStartParams(subtaskId)
-              startP.setEventTime(System.currentTimeMillis())
-              startP.setOriginId(params.getOriginId)
-              startP.setMessage(s"Compiling ${moduleId} (cached) ...")
-              startP.setDataKind(TaskStartDataKind.COMPILE_TASK)
-              startP.setData(new CompileTask(targetIdForRender))
-              client.onBuildTaskStart(startP)
+          if fromCache then {
+            // Compiler was skipped, so no live notifications fired — replay the full picture.
+            val startP = TaskStartParams(subtaskId)
+            startP.setEventTime(System.currentTimeMillis())
+            startP.setOriginId(params.getOriginId)
+            startP.setMessage(s"Compiling ${moduleId} (cached) ...")
+            startP.setDataKind(TaskStartDataKind.COMPILE_TASK)
+            startP.setData(new CompileTask(targetIdForRender))
+            client.onBuildTaskStart(startP)
 
-              renderCompileResult(compileResult, targetIdForRender)
+            renderCompileResult(compileResult, targetIdForRender)
 
-              val cStatus = if compileResult.errors == 0 then StatusCode.OK else StatusCode.ERROR
-              val finishP = TaskFinishParams(subtaskId, cStatus)
-              finishP.setEventTime(System.currentTimeMillis())
-              finishP.setOriginId(params.getOriginId)
-              finishP.setMessage(s"Finished compiling ${moduleId}")
-              finishP.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
-              finishP.setData(new CompileReport(targetIdForRender, compileResult.errors, compileResult.warnings))
-              client.onBuildTaskFinish(finishP)
-            } else if targetIdForRender != null then {
-              // Live path already streamed start/diagnostics/finish via notifications. Finalize with
-              // the complete map so warnings on files an incremental compile didn't recompile (and
-              // that CompileStarted reset) are restored.
-              renderCompileResult(compileResult, targetIdForRender)
-            }
-            if compileResult.errors > 0 then allCompileSucceeded = false
+            val cStatus = if compileResult.errors == 0 then StatusCode.OK else StatusCode.ERROR
+            val finishP = TaskFinishParams(subtaskId, cStatus)
+            finishP.setEventTime(System.currentTimeMillis())
+            finishP.setOriginId(params.getOriginId)
+            finishP.setMessage(s"Finished compiling ${moduleId}")
+            finishP.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
+            finishP.setData(new CompileReport(targetIdForRender, compileResult.errors, compileResult.warnings))
+            client.onBuildTaskFinish(finishP)
+          } else if targetIdForRender != null then {
+            // Live path already streamed start/diagnostics/finish via notifications. Finalize with
+            // the complete map so warnings on files an incremental compile didn't recompile (and
+            // that CompileStarted reset) are restored.
+            renderCompileResult(compileResult, targetIdForRender)
+          }
+          if compileResult.errors > 0 then allCompileSucceeded = false
         }
       }
       val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
@@ -492,9 +499,10 @@ class DederBspServer(
       logger.debug(s"buildTargetCleanCache for params: ${params}")
       ensureRunning()
       withLastGoodState(_ => CleanCacheResult(false)) { projectStateData =>
-        val cleaned = resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).forall { case (_, module) =>
-          val moduleId = module.id
-          projectState.cleanModules(Seq(moduleId), _ => ())
+        val cleaned = resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).forall {
+          case (_, module) =>
+            val moduleId = module.id
+            projectState.cleanModules(Seq(moduleId), _ => ())
         }
         val result = CleanCacheResult(cleaned)
         logger.debug(s"buildTargetCleanCache for params ${params} return: ${result}")
@@ -849,7 +857,12 @@ class DederBspServer(
           moduleId = Some(moduleId),
           isCompileTask = true
         )
-        executeTask(serverNotificationsLogger, moduleId, coreTasks.finalMainClassTask, originId = params.getOriginId) match {
+        executeTask(
+          serverNotificationsLogger,
+          moduleId,
+          coreTasks.finalMainClassTask,
+          originId = params.getOriginId
+        ) match {
           case Some(mainClass) =>
             val args = Option(params.getArguments).map(_.asScala.toSeq).getOrElse(Seq.empty)
             val runCmd =
@@ -971,13 +984,17 @@ class DederBspServer(
     logger.info("Initiating BSP server shutdown (CLI shutdown requested)...")
     running.set(false)
     cancelInFlightCompilationsOnShutdown()
-    Thread.ofVirtual().name("bsp-shutdown-close").start(() => {
-      try Thread.sleep(200) // give JSON-RPC layer a brief window to flush cancelled responses
-      catch {
-        case _: InterruptedException =>
-      }
-      try { onExit() } catch { case _: Exception => }
-    })
+    Thread
+      .ofVirtual()
+      .name("bsp-shutdown-close")
+      .start(() => {
+        try Thread.sleep(200) // give JSON-RPC layer a brief window to flush cancelled responses
+        catch {
+          case _: InterruptedException =>
+        }
+        try { onExit() }
+        catch { case _: Exception => }
+      })
   }
 
   private def cancelInFlightCompilationsOnShutdown(): Unit = {
@@ -1146,18 +1163,34 @@ class DederBspServer(
       args: Seq[String] = Seq.empty,
       originId: String = null
   ): T =
-    projectState.executeTask(moduleId, task, args, serverNotificationsLogger, useLastGood = true, requestId = Option(originId), callerType = CallerType.Bsp).res
+    projectState
+      .executeTask(
+        moduleId,
+        task,
+        args,
+        serverNotificationsLogger,
+        useLastGood = true,
+        requestId = Option(originId),
+        callerType = CallerType.Bsp
+      )
+      .res
 
-  /** Execute the compile task, exposing whether the result was served from cache (in which case
-    * the compiler was skipped and no live diagnostics notifications were emitted). */
+  /** Execute the compile task, exposing whether the result was served from cache (in which case the compiler was
+    * skipped and no live diagnostics notifications were emitted).
+    */
   private def executeCompileTask(
       serverNotificationsLogger: ServerNotificationsLogger,
       moduleId: String,
       originId: String
   ): (res: ba.sake.deder.CompileResult, fromCache: Boolean) = {
     val r = projectState.executeTask(
-      moduleId, coreTasks.compileTask, Seq.empty, serverNotificationsLogger,
-      useLastGood = true, requestId = Option(originId), callerType = CallerType.Bsp
+      moduleId,
+      coreTasks.compileTask,
+      Seq.empty,
+      serverNotificationsLogger,
+      useLastGood = true,
+      requestId = Option(originId),
+      callerType = CallerType.Bsp
     )
     (r.res, r.fromCache)
   }
@@ -1179,10 +1212,10 @@ class DederBspServer(
     out
   }
 
-  /** Render the complete diagnostics picture for a module from a CompileResult: publish each known
-    * source file with reset=true. Clean files (empty list) thereby clear stale IDE markers; files
-    * with diagnostics set them. Used on cache hits and to finalize cache-miss compiles, so both
-    * converge on identical, complete state. */
+  /** Render the complete diagnostics picture for a module from a CompileResult: publish each known source file with
+    * reset=true. Clean files (empty list) thereby clear stale IDE markers; files with diagnostics set them. Used on
+    * cache hits and to finalize cache-miss compiles, so both converge on identical, complete state.
+    */
   private def renderCompileResult(
       result: ba.sake.deder.CompileResult,
       targetId: BuildTargetIdentifier
