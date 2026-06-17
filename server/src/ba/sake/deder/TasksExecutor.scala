@@ -43,6 +43,24 @@ class TasksExecutor(
     val allFailed = scala.collection.mutable.ArrayBuffer.empty[String]
     val allSkipped = scala.collection.mutable.ArrayBuffer.empty[String]
 
+    def propagateModuleFailure(failedModuleId: String, cause: TaskExecResult.Failure): Unit = {
+      val visited = scala.collection.mutable.Set.empty[String]
+      val depMsg = cause.taskInstance.moduleId
+      def dfs(moduleId: String): Unit = {
+        if visited.contains(moduleId) then return
+        visited += moduleId
+        modulesGraph.vertexSet().asScala.find(_.id == moduleId).foreach { mod =>
+          modulesGraph.incomingEdgesOf(mod).asScala.foreach { edge =>
+            val dependent = modulesGraph.getEdgeSource(edge)
+            moduleFailures.getOrElseUpdate(dependent.id,
+              TaskExecResult.Failure(cause.taskInstance, depMsg))
+            dfs(dependent.id)
+          }
+        }
+      }
+      dfs(failedModuleId)
+    }
+
     for (taskInstances, stageIndex) <- stages.zipWithIndex do {
       val stageSpan = OTEL.TRACER.spanBuilder(s"Stage $stageIndex").startSpan()
       try {
@@ -84,9 +102,11 @@ class TasksExecutor(
                   // the Success in targetResults so the task's own summary still works.
                   val f: TaskExecResult.Failure = TaskExecResult.Failure(s.taskInstance, "result was unsuccessful")
                   moduleFailures.getOrElseUpdate(s.taskInstance.moduleId, f)
+                  propagateModuleFailure(s.taskInstance.moduleId, f)
                 if isTargetTask(s.taskInstance, taskName, moduleIds) then targetResults += s
               case f: TaskExecResult.Failure =>
                 moduleFailures.getOrElseUpdate(f.taskInstance.moduleId, f)
+                propagateModuleFailure(f.taskInstance.moduleId, f)
                 if isTargetTask(f.taskInstance, taskName, moduleIds) then targetResults += f
               case _: TaskExecResult.Skipped =>
             }
