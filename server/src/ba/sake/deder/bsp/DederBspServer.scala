@@ -196,8 +196,9 @@ class DederBspServer(
   override def onBuildInitialized(): Unit = traced("onBuildInitialized") {
     logger.debug(s"onBuildInitialized")
     ensureRunning()
-    // we dont trigger compile immediately
-    // coz there is no progress seen in metals.. just "importing"
+    // Trigger silent background compilation so compile errors appear as diagnostics
+    // in the IDE without showing compile progress in the Metals status bar.
+    CompletableFuture.runAsync { () => compileAllModulesOnInit() }
   }
 
   override def workspaceReload(): CompletableFuture[Object] = javaFuture("workspaceReload") {
@@ -1214,6 +1215,34 @@ class DederBspServer(
         PublishDiagnosticsParams(TextDocumentIdentifier(uri), targetId, diags, true)
       )
     }
+
+  /** Silent background compilation of all visible modules on BSP init. Suppresses task progress
+    * notifications (no onBuildTaskStart/Progress/Finish) — only diagnostics are published.
+    * Called asynchronously from [[onBuildInitialized]] so the IDE sees errors immediately.
+    */
+  private def compileAllModulesOnInit(): Unit = {
+    projectState.readState(useLastGood = true) match {
+      case Left(errorMessage) =>
+        logger.info(s"Skipping silent compile-on-init: project state unavailable ($errorMessage)")
+      case Right(projectStateData) =>
+        val visibleIds = BspVisibleTargets.visibleModuleIds(projectStateData.projectConfig.modules.asScala.toSeq)
+        visibleIds.foreach { moduleId =>
+          try {
+            // Silent logger: isCompileTask = false suppresses BSP task progress notifications.
+            val silentLogger = makeServerNotificationsLogger(moduleId = Some(moduleId))
+            val (compileResult, _) = executeCompileTask(silentLogger, moduleId, originId = null)
+            resolveModule(moduleId).map(buildTargetId).foreach { targetId =>
+              renderCompileResult(compileResult, targetId)
+            }
+          } catch {
+            case _: TaskEvaluationException =>
+              logger.debug(s"Silent compile-on-init failed for module $moduleId (module may have compile errors)")
+            case NonFatal(e) =>
+              logger.warn(s"Silent compile-on-init failed for module $moduleId: ${e.getMessage}")
+          }
+        }
+    }
+  }
 
   private def toBspLogMessage(n: ServerNotification.Log): LogMessageParams = {
     val level = n.level match {
