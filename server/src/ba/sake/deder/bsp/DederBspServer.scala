@@ -130,21 +130,8 @@ class DederBspServer(
             client.onBuildTaskProgress(params)
           }
         case cd: ServerNotification.CompileDiagnostic =>
-          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cd.moduleId)
-          if isRelevantCompileNotification then {
-            if cd.problem.position.sourceFile.isPresent then {
-              // Diagnostics with a source position are published in bulk by renderCompileResult()
-              // at compilation end. Publishing them one-by-one here overwhelms the BSP client.
-              // No action needed — the diagnostic is accumulated in the CompileResult.
-            } else {
-              val msgType = cd.problem.severity() match {
-                case xsbti.Severity.Error => MessageType.ERROR
-                case xsbti.Severity.Warn  => MessageType.WARNING
-                case xsbti.Severity.Info  => MessageType.INFO
-              }
-              client.onBuildShowMessage(new ShowMessageParams(msgType, cd.problem.message()))
-            }
-          }
+          // no need to spam client with diagnostics popups
+          // issues are rendered in bulk by renderCompileResult() at compilation end anyway
         case cf: ServerNotification.CompileFinished =>
           val targetId = resolveModule(cf.moduleId).map(buildTargetId)
           val isRelevantCompileNotification = isCompileTask && moduleId.contains(cf.moduleId)
@@ -369,7 +356,7 @@ class DederBspServer(
                 (ba.sake.deder.CompileResult(classesDir, errors = 1, warnings = 0, sourceCount = 0), false)
             }
           if fromCache then {
-            // Compiler was skipped, so no live notifications fired — replay the full picture.
+            // compiler was skipped -> no live notifications fired -> replay the full picture.
             val startP = TaskStartParams(subtaskId)
             startP.setEventTime(System.currentTimeMillis())
             startP.setOriginId(params.getOriginId)
