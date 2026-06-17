@@ -6,17 +6,21 @@ class ServerNotificationsLogger(callback: ServerNotification => Unit) extends St
   def add(serverNotification: ServerNotification): Unit = {
     serverNotification match {
       case ServerNotification.Output(text) =>
-      case ServerNotification.Log(level, timestamp, message, moduleId) =>
-        val msgWithModule = moduleId match {
-          case Some(id) => s"[$id] $message"
+      case ServerNotification.Log(level, timestamp, message, moduleId, source) =>
+        val prefix = source match {
+          case Some(s) => Some(s)
+          case None    => moduleId
+        }
+        val msgWithPrefix = prefix match {
+          case Some(p) => s"[$p] $message"
           case None     => message
         }
         level match {
-          case ServerNotification.LogLevel.DEBUG   => logger.debug(msgWithModule)
-          case ServerNotification.LogLevel.INFO    => logger.info(msgWithModule)
-          case ServerNotification.LogLevel.WARNING => logger.warn(msgWithModule)
-          case ServerNotification.LogLevel.ERROR   => logger.error(msgWithModule)
-          case ServerNotification.LogLevel.TRACE   => logger.trace(msgWithModule)
+          case ServerNotification.LogLevel.DEBUG   => logger.debug(msgWithPrefix)
+          case ServerNotification.LogLevel.INFO    => logger.info(msgWithPrefix)
+          case ServerNotification.LogLevel.WARNING => logger.warn(msgWithPrefix)
+          case ServerNotification.LogLevel.ERROR   => logger.error(msgWithPrefix)
+          case ServerNotification.LogLevel.TRACE   => logger.trace(msgWithPrefix)
         }
       case _: ServerNotification.TaskProgress      =>
       case _: ServerNotification.CompileStarted    =>

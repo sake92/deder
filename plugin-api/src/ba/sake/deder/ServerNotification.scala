@@ -9,7 +9,8 @@ enum ServerNotification {
       level: ServerNotification.LogLevel,
       timestamp: Instant,
       message: String,
-      moduleId: Option[String]
+      moduleId: Option[String],
+      source: Option[String] = None
   )
 
   case CompileStarted(moduleId: String, files: Seq[os.Path])
@@ -35,26 +36,51 @@ enum ServerNotification {
 }
 
 object ServerNotification {
-  def log(level: ServerNotification.LogLevel, message: String, moduleId: Option[String] = None): ServerNotification =
-    ServerNotification.Log(level, Instant.now(), message, moduleId)
+  def log(
+      level: ServerNotification.LogLevel,
+      message: String,
+      moduleId: Option[String] = None,
+      source: Option[String] = None
+  ): ServerNotification =
+    ServerNotification.Log(level, Instant.now(), message, moduleId, source)
 
-  def logError(message: String, moduleId: Option[String] = None): ServerNotification =
-    log(ServerNotification.LogLevel.ERROR, message, moduleId)
+  def logError(
+      message: String,
+      moduleId: Option[String] = None,
+      source: Option[String] = None
+  ): ServerNotification =
+    log(ServerNotification.LogLevel.ERROR, message, moduleId, source)
 
-  def logWarning(message: String, moduleId: Option[String] = None): ServerNotification =
-    log(ServerNotification.LogLevel.WARNING, message, moduleId)
+  def logWarning(
+      message: String,
+      moduleId: Option[String] = None,
+      source: Option[String] = None
+  ): ServerNotification =
+    log(ServerNotification.LogLevel.WARNING, message, moduleId, source)
 
-  def logInfo(message: String, moduleId: Option[String] = None): ServerNotification =
-    log(ServerNotification.LogLevel.INFO, message, moduleId)
+  def logInfo(
+      message: String,
+      moduleId: Option[String] = None,
+      source: Option[String] = None
+  ): ServerNotification =
+    log(ServerNotification.LogLevel.INFO, message, moduleId, source)
 
   def logInfo(message: String, moduleId: String): ServerNotification =
-      log(ServerNotification.LogLevel.INFO, message, Some(moduleId))
+    log(ServerNotification.LogLevel.INFO, message, Some(moduleId))
 
-  def logDebug(message: String, moduleId: Option[String] = None): ServerNotification =
-    log(ServerNotification.LogLevel.DEBUG, message, moduleId)
+  def logDebug(
+      message: String,
+      moduleId: Option[String] = None,
+      source: Option[String] = None
+  ): ServerNotification =
+    log(ServerNotification.LogLevel.DEBUG, message, moduleId, source)
 
-  def logTrace(message: String, moduleId: Option[String] = None): ServerNotification =
-    log(ServerNotification.LogLevel.TRACE, message, moduleId)
+  def logTrace(
+      message: String,
+      moduleId: Option[String] = None,
+      source: Option[String] = None
+  ): ServerNotification =
+    log(ServerNotification.LogLevel.TRACE, message, moduleId, source)
 
   enum LogLevel:
     case ERROR, WARNING, INFO, DEBUG, TRACE
