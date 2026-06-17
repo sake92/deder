@@ -244,4 +244,38 @@ class IntegrationSuite extends BaseIntegrationSuite {
       }
     }
   }
+
+  test("deder should skip downstream modules when upstream compile fails") {
+    withTestProject("sample-projects/multi") { projectPath =>
+      val commonFile = projectPath / "common/src/Common.scala"
+      val original = os.read(commonFile)
+      val broken = original.replace(
+        """  val value = "komon1"""",
+        """  val value = "komon1"
+            |  val x: String = 42 // intentional compile error""".stripMargin
+      )
+      try {
+        os.write.over(commonFile, broken)
+        val dederRes = executeDederCommand(projectPath, "exec")
+        val stdout = dederRes.out.text()
+
+        // The CompilationSummary (with FAIL/SKIPPED/COMPILED) is an Output message → stdout
+        assert(stdout.contains("FAIL common"), s"Expected 'FAIL common' in stdout, got:\n$stdout")
+        assert(!stdout.contains("SKIPPED common"),
+          s"Expected common to FAIL (not be SKIPPED) — it is the module with the compile error.\nstdout:\n$stdout")
+
+        val downstreamModules = Seq("backend", "frontend", "uber", "uber-test")
+        downstreamModules.foreach { mod =>
+          assert(!stdout.contains(s"COMPILED $mod"),
+            s"Expected '$mod' to be SKIPPED, not COMPILED, because upstream common failed.\nstdout:\n$stdout")
+          assert(stdout.contains(s"SKIPPED $mod"),
+            s"Expected '$mod' to appear as SKIPPED in stdout.\nstdout:\n$stdout")
+        }
+
+        assert(dederRes.exitCode != 0, s"Expected non-zero exit code when compile fails, got ${dederRes.exitCode}")
+      } finally {
+        os.write.over(commonFile, original)
+      }
+    }
+  }
 }
