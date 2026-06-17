@@ -403,9 +403,11 @@ class DederProjectState(
           internals
         )
       val allTaskInstances = tasksExecStages.flatten.sortBy(_.id) // essential!!
+      internals.transitionToAcquiringLocks(requestId, allTaskInstances.size)
       val acquiredLocks = ArrayBuffer.empty[TaskInstance]
       try {
         allTaskInstances.foreach { taskInstance =>
+          internals.updateLockBlocking(requestId, taskInstance.id)
           if taskLockTimeoutEnabled then
             val acquired = taskInstance.lock.tryLock(taskLockTimeoutSeconds.toLong, TimeUnit.SECONDS)
             if !acquired then
@@ -415,9 +417,13 @@ class DederProjectState(
               )
           else taskInstance.lock.lock()
           acquiredLocks += taskInstance
+          internals.updateLockAcquired(requestId, taskInstance.id)
         }
         DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
+        val allTaskIds = tasksExecStages.flatten.map(_.id)
+        internals.transitionToExecuting(requestId, tasksExecStages.size, allTaskIds)
         val result = tasksExecutor.execute(
+          requestId,
           tasksExecStages,
           moduleIds,
           taskName,
@@ -450,8 +456,10 @@ class DederProjectState(
         )
         result
       } finally {
+        internals.transitionToCompleted(requestId)
         acquiredLocks.reverse.foreach { taskInstance =>
           taskInstance.lock.unlock()
+          internals.releaseLockHolder(requestId, taskInstance.id)
         }
         DederGlobals.cancellationTokens.remove(requestId)
       }
