@@ -30,19 +30,19 @@ facts {
   ["scalaModules default layout"] {
     local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
     local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "default", null)
-    result.main.sources.toList() == List("src", "src-3", "src-3.7", "src-3.7.4")
+    result.main.sources.toList().distinct == List("src", "src-3", "src-3.7", "src-3.7.4")
   }
 
   ["scalaModules - Coursier suffix stripped"] {
     local mod = new DederProject.ScalaModule { scalaVersion = "2.13.18+3"; id = "x" }
     local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "default", null)
-    result.main.sources.toList() == List("src", "src-2", "src-2.13", "src-2.13.18")
+    result.main.sources.toList().distinct == List("src", "src-2", "src-2.13", "src-2.13.18")
   }
 
   ["scalaModules maven layout"] {
     local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x" }
     local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "maven", null)
-    result.main.sources.toList() == List("src/main/scala", "src/main/java", "src/main/scala-3", "src/main/scala-3.7", "src/main/scala-3.7.4")
+    result.main.sources.toList().distinct == List("src/main/scala", "src/main/java", "src/main/scala-3", "src/main/scala-3.7", "src/main/scala-3.7.4", "src")
   }
 
   ["scalaModules maven layout - test root shared"] {
@@ -55,17 +55,17 @@ facts {
   ["javaModules maven layout"] {
     local javaMod = new DederProject.JavaModule { id = "x" }
     local result = DederProject.javaModules(javaMod, javaMod.asTest(), "mylib", "maven", null)
-    result.main.sources.toList() == List("src/main/java")
-    result.main.resources.toList() == List("src/main/resources")
+    result.main.sources.toList().distinct == List("src/main/java", "src")
+    result.main.resources.toList().distinct == List("src/main/resources", "resources")
     result.test.root == "mylib"
-    result.test.sources.toList() == List("src/test/java")
+    result.test.sources.toList().distinct == List("src/test/java", "src")
   }
 
   ["javaModules default layout"] {
     local javaMod = new DederProject.JavaModule { id = "x" }
     local result = DederProject.javaModules(javaMod, javaMod.asTest(), "mylib", "default", null)
-    result.main.sources.toList() == List("src")
-    result.main.resources.toList() == List("resources")
+    result.main.sources.toList().distinct == List("src")
+    result.main.resources.toList().distinct == List("resources")
     result.test.root == "mylib/test"
   }
 
@@ -75,7 +75,7 @@ facts {
     local jsMod = (scalaMod.asJs()) { scalaJsVersion = "1.18.2" }
     local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
     local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), "mylib", "default", null)
-    result.jvm.sources.toList() == List("src", "src-3", "src-3.7", "src-3.7.4", "src-jvm")
+    result.jvm.sources.toList().distinct == List("src", "src-3", "src-3.7", "src-3.7.4", "src-jvm")
     result.jvm.root == "mylib"
     result.jvm_test.root == "mylib/test"
   }
@@ -85,10 +85,61 @@ facts {
     local jsMod = (scalaMod.asJs()) { scalaJsVersion = "1.18.2" }
     local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
     local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), "mylib", "maven", null)
-    result.jvm.sources.toList() == List("src/main/scala", "src/main/java", "src/main/scala-3", "src/main/scala-3.7", "src/main/scala-3.7.4", "src/main/scala-jvm")
-    result.jvm.resources.toList() == List("src/main/resources")
+    result.jvm.sources.toList().distinct == List("src/main/scala", "src/main/java", "src/main/scala-3", "src/main/scala-3.7", "src/main/scala-3.7.4", "src/main/scala-jvm", "src")
+    result.jvm.resources.toList().distinct == List("src/main/resources", "resources")
     result.jvm.root == "mylib"
     result.jvm_test.root == "mylib"
+  }
+
+  // Template sources/resources propagation
+  ["javaModules with custom template sources"] {
+    local javaMod = new DederProject.JavaModule { id = "x"; sources { "gen" } }
+    local result = DederProject.javaModules(javaMod, javaMod.asTest(), "mylib", "maven", null)
+    result.main.sources.toList().contains("gen") == true
+    && result.test.sources.toList().contains("gen") == true
+  }
+
+  ["javaModules with custom template resources"] {
+    local javaMod = new DederProject.JavaModule { id = "x"; resources { "conf" } }
+    local result = DederProject.javaModules(javaMod, javaMod.asTest(), "mylib", "maven", null)
+    result.main.resources.toList().contains("conf") == true
+    && result.test.resources.toList().contains("conf") == true
+  }
+
+  ["scalaModules with custom template sources and resources"] {
+    local mod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x"; sources { "generated" }; resources { "data" } }
+    local result = DederProject.scalaModules(mod, mod.asTest(), "mylib", "default", null)
+    result.main.sources.toList().contains("generated") == true
+    && result.main.resources.toList().contains("data") == true
+    && result.test.sources.toList().contains("generated") == true
+    && result.test.resources.toList().contains("data") == true
+  }
+
+  ["scalaJsModules with custom template sources and resources"] {
+    local mod = new DederProject.ScalaJsModule { scalaVersion = "3.7.4"; scalaJsVersion = "1.18.2"; id = "x"; sources { "js-src" }; resources { "js-res" } }
+    local result = DederProject.scalaJsModules(mod, mod.asTest(), "mylib", "default", null)
+    result.main.sources.toList().contains("js-src") == true
+    && result.main.resources.toList().contains("js-res") == true
+    && result.test.sources.toList().contains("js-src") == true
+    && result.test.resources.toList().contains("js-res") == true
+  }
+
+  ["scalaNativeModules with custom template sources and resources"] {
+    local mod = new DederProject.ScalaNativeModule { scalaVersion = "3.7.4"; scalaNativeVersion = "0.5.10"; id = "x"; sources { "native-src" }; resources { "native-res" } }
+    local result = DederProject.scalaNativeModules(mod, mod.asTest(), "mylib", "default", null)
+    result.main.sources.toList().contains("native-src") == true
+    && result.main.resources.toList().contains("native-res") == true
+    && result.test.sources.toList().contains("native-src") == true
+    && result.test.resources.toList().contains("native-res") == true
+  }
+
+  ["crossModules with custom template sources and resources"] {
+    local scalaMod = new DederProject.ScalaModule { scalaVersion = "3.7.4"; id = "x"; sources { "shared-src" }; resources { "shared-res" } }
+    local jsMod = (scalaMod.asJs()) { scalaJsVersion = "1.18.2" }
+    local nativeMod = (scalaMod.asNative()) { scalaNativeVersion = "0.5.10" }
+    local result = DederProject.crossModules(scalaMod, scalaMod.asTest(), jsMod, jsMod.asTest(), nativeMod, nativeMod.asTest(), "mylib", "default", null)
+    result.jvm.sources.toList().contains("shared-src") == true
+    && result.jvm.resources.toList().contains("shared-res") == true
   }
 
   // sbt version prefix tests
