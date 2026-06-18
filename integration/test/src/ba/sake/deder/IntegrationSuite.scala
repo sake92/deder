@@ -259,10 +259,10 @@ class IntegrationSuite extends BaseIntegrationSuite {
         val dederRes = executeDederCommand(projectPath, "exec")
         val stdout = dederRes.out.text()
 
-        // The CompilationSummary (with FAIL/SKIPPED/COMPILED) is an Output message → stdout
-        assert(stdout.contains("FAIL common"), s"Expected 'FAIL common' in stdout, got:\n$stdout")
+        // The CompilationSummary (with FAILED/SKIPPED/COMPILED) is an Output message → stdout
+        assert(stdout.contains("FAILED common"), s"Expected 'FAILED common' in stdout, got:\n$stdout")
         assert(!stdout.contains("SKIPPED common"),
-          s"Expected common to FAIL (not be SKIPPED) — it is the module with the compile error.\nstdout:\n$stdout")
+          s"Expected common to FAILED (not be SKIPPED) — it is the module with the compile error.\nstdout:\n$stdout")
 
         val downstreamModules = Seq("backend", "frontend", "uber", "uber-test")
         downstreamModules.foreach { mod =>
