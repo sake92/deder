@@ -110,7 +110,7 @@ class TasksExecutor(
                 propagateModuleFailure(f.taskInstance.moduleId, f)
                 if isTargetTask(f.taskInstance, taskName, moduleIds) then targetResults += f
               case c: TaskExecResult.Cancelled =>
-                val f = TaskExecResult.Failure(c.taskInstance, c.message)
+                val f: TaskExecResult.Failure = TaskExecResult.Failure(c.taskInstance, c.message)
                 moduleFailures.getOrElseUpdate(c.taskInstance.moduleId, f)
                 propagateModuleFailure(c.taskInstance.moduleId, f)
                 if isTargetTask(c.taskInstance, taskName, moduleIds) then targetResults += c
