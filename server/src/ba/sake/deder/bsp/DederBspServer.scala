@@ -35,9 +35,10 @@ class DederBspServer(
       CancelExtension,
       StrictLogging {
 
-  var client: BuildClient = compiletime.uninitialized // set by DederBspProxyServer
+  // set by DederBspProxyServer
+  var client: BuildClient = compiletime.uninitialized
 
-  var clientParams: Option[InitializeBuildParams] = None
+  private var clientParams: Option[InitializeBuildParams] = None
 
   private val running = AtomicBoolean(true)
 
@@ -87,8 +88,6 @@ class DederBspServer(
       originId: Option[String] = None,
       taskId: Option[TaskId] = None,
       moduleId: Option[String] = None,
-      // true if it calls compile in any of the tasks, even transitively!
-      isCompileTask: Boolean = false,
       onCompileResult: (Int, Int) => Unit = (_, _) => ()
   ) = {
     ServerNotificationsLogger { sn =>
@@ -109,7 +108,7 @@ class DederBspServer(
           // e.g. mainClasses -> compile
           // or for dependent modules, we only care about the module being compiled directly!
           val targetId = resolveModule(cs.moduleId).map(buildTargetId)
-          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cs.moduleId)
+          val isRelevantCompileNotification = moduleId.contains(cs.moduleId)
           if isRelevantCompileNotification then {
             val taskStartParams = TaskStartParams(taskId.orNull)
             taskStartParams.setEventTime(System.currentTimeMillis())
@@ -123,7 +122,7 @@ class DederBspServer(
           }
         case tp: ServerNotification.TaskProgress =>
           val targetId = resolveModule(tp.moduleId).map(buildTargetId)
-          val isRelevantCompileNotification = isCompileTask && moduleId.contains(tp.moduleId)
+          val isRelevantCompileNotification = moduleId.contains(tp.moduleId)
           if isRelevantCompileNotification then {
             val params = TaskProgressParams(taskId.orNull)
             params.setOriginId(originId.orNull)
@@ -137,11 +136,11 @@ class DederBspServer(
             client.onBuildTaskProgress(params)
           }
         case cd: ServerNotification.CompileDiagnostic =>
-          // no need to spam client with diagnostics popups
-          // issues are rendered in bulk by renderCompileResult() at compilation end anyway
+        // no need to spam client with diagnostics popups
+        // issues are rendered in bulk by renderCompileResult() at compilation end anyway
         case cf: ServerNotification.CompileFinished =>
           val targetId = resolveModule(cf.moduleId).map(buildTargetId)
-          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cf.moduleId)
+          val isRelevantCompileNotification = moduleId.contains(cf.moduleId)
           if isRelevantCompileNotification then {
             onCompileResult(cf.errors, cf.warnings)
             val status = if cf.errors == 0 then StatusCode.OK else StatusCode.ERROR
@@ -155,7 +154,7 @@ class DederBspServer(
           }
         case cf: ServerNotification.CompileFailed =>
           val targetId = resolveModule(cf.moduleId).map(buildTargetId)
-          val isRelevantCompileNotification = isCompileTask && moduleId.contains(cf.moduleId)
+          val isRelevantCompileNotification = moduleId.contains(cf.moduleId)
           if isRelevantCompileNotification then {
             onCompileResult(cf.errors, cf.warnings)
             val taskFinishParams = TaskFinishParams(taskId.orNull, StatusCode.ERROR)
@@ -351,8 +350,7 @@ class DederBspServer(
           val serverNotificationsLogger = makeServerNotificationsLogger(
             originId = Option(params.getOriginId),
             taskId = Some(subtaskId),
-            moduleId = Some(moduleId),
-            isCompileTask = true
+            moduleId = Some(moduleId)
           )
           val targetIdForRender = resolveModule(moduleId).map(buildTargetId).orNull
           val (compileResult, fromCache) =
@@ -849,8 +847,7 @@ class DederBspServer(
         val serverNotificationsLogger = makeServerNotificationsLogger(
           originId = Option(params.getOriginId),
           taskId = Some(taskId),
-          moduleId = Some(moduleId),
-          isCompileTask = true
+          moduleId = Some(moduleId)
         )
         executeTask(
           serverNotificationsLogger,
@@ -928,8 +925,7 @@ class DederBspServer(
               makeServerNotificationsLogger(
                 originId = Option(params.getOriginId),
                 taskId = Some(subtaskId),
-                moduleId = Some(moduleId),
-                isCompileTask = true
+                moduleId = Some(moduleId)
               )
             val testRes = executeTask(serverNotificationsLogger, moduleId, testTask, originId = params.getOriginId)
             if !testRes.success then allTestsSucceeded = false
@@ -1027,10 +1023,7 @@ class DederBspServer(
     val id = buildTargetId(module)
     val isTestModule0 = isTestModule(module)
 
-    val serverNotificationsLogger = makeServerNotificationsLogger(
-      moduleId = Some(module.id),
-      isCompileTask = true
-    )
+    val serverNotificationsLogger = makeServerNotificationsLogger(moduleId = Some(module.id))
     val isAppModule = tryExecuteTask(serverNotificationsLogger, module.id, coreTasks.finalMainClassTask)(None).isDefined
     val tags = List(
       List(BuildTargetTag.APPLICATION).filter(_ => isAppModule),
@@ -1223,9 +1216,9 @@ class DederBspServer(
       )
     }
 
-  /** Silent background compilation of all visible modules on BSP init. Suppresses task progress
-    * notifications (no onBuildTaskStart/Progress/Finish) — only diagnostics are published.
-    * Called asynchronously from [[onBuildInitialized]] so the IDE sees errors immediately.
+  /** Silent background compilation of all visible modules on BSP init. Suppresses task progress notifications (no
+    * onBuildTaskStart/Progress/Finish) — only diagnostics are published. Called asynchronously from
+    * [[onBuildInitialized]] so the IDE sees errors immediately.
     */
   private def compileAllModulesOnInit(): Unit = {
     projectState.readState(useLastGood = true) match {
@@ -1235,7 +1228,6 @@ class DederBspServer(
         val visibleIds = BspVisibleTargets.visibleModuleIds(projectStateData.projectConfig.modules.asScala.toSeq)
         visibleIds.foreach { moduleId =>
           try {
-            // Silent logger: isCompileTask = false suppresses BSP task progress notifications.
             val silentLogger = makeServerNotificationsLogger(moduleId = Some(moduleId))
             val (compileResult, _) = executeCompileTask(silentLogger, moduleId, originId = null)
             resolveModule(moduleId).map(buildTargetId).foreach { targetId =>
@@ -1249,17 +1241,6 @@ class DederBspServer(
           }
         }
     }
-  }
-
-  private def toBspLogMessage(n: ServerNotification.Log): LogMessageParams = {
-    val level = n.level match {
-      case ServerNotification.LogLevel.ERROR   => MessageType.ERROR
-      case ServerNotification.LogLevel.WARNING => MessageType.WARNING
-      case ServerNotification.LogLevel.INFO    => MessageType.INFO
-      case ServerNotification.LogLevel.DEBUG   => MessageType.LOG
-      case ServerNotification.LogLevel.TRACE   => MessageType.LOG
-    }
-    new LogMessageParams(level, n.message)
   }
 
   private def javaFuture[T](spanName: String, originId: Option[String] = None)(thunk: => T): CompletableFuture[T] = {

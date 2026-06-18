@@ -86,9 +86,9 @@ class DederProjectState(
   private def readCurrentOrLastGood: Either[String, DederProjectStateData] =
     stateLock.synchronized { current.orElse(lastGood) }
 
-  /** Returns watch-ignore patterns from the Pkl project config.
-    * Uses lastGood state as a fallback (consistent with BSP behavior).
-    * Returns an empty Seq if no valid project config is loaded. */
+  /** Returns watch-ignore patterns from the Pkl project config. Uses lastGood state as a fallback (consistent with BSP
+    * behavior). Returns an empty Seq if no valid project config is loaded.
+    */
   def getWatchIgnorePatterns(): Seq[String] =
     readCurrentOrLastGood match {
       case Right(data) =>
@@ -136,13 +136,15 @@ class DederProjectState(
 
             // Build info for ALL configured plugins, including failed ones with errors.
             val configuredIds = newConfig.plugins.asScala.map(_.id).toSeq
-            val loadedMap = loadedPlugins.map(lp => lp.plugin.id ->
-              LoadedPluginInfo(lp.plugin.id, lp.tasks.map(_.name))).toMap
+            val loadedMap = loadedPlugins
+              .map(lp =>
+                lp.plugin.id ->
+                  LoadedPluginInfo(lp.plugin.id, lp.tasks.map(_.name))
+              )
+              .toMap
             val errorMap = loadResult.errors.map(e => e.pluginId -> e.error).toMap
             val allPluginInfo = configuredIds.map { id =>
-              loadedMap.getOrElse(id,
-                LoadedPluginInfo(id, Seq.empty, Some(errorMap.getOrElse(id, "Not loaded")))
-              )
+              loadedMap.getOrElse(id, LoadedPluginInfo(id, Seq.empty, Some(errorMap.getOrElse(id, "Not loaded"))))
             }
             internals.setLoadedPlugins(allPluginInfo)
             // TODO prepend plugin id to task name to avoid conflicts? e.g myplugin:compile ?
@@ -168,12 +170,13 @@ class DederProjectState(
             // Update global semaphores from project config
             val cpus = Runtime.getRuntime.availableProcessors()
             val activeCompilers = if newConfig.maxActiveCompilers <= 0 then cpus else newConfig.maxActiveCompilers.toInt
-            val concurrentForks = if newConfig.maxConcurrentTestForks <= 0 then cpus else newConfig.maxConcurrentTestForks.toInt
+            val concurrentForks =
+              if newConfig.maxConcurrentTestForks <= 0 then cpus else newConfig.maxConcurrentTestForks.toInt
             DederGlobals.setCompileSemaphore(activeCompilers)
             DederGlobals.setTestForkSemaphore(concurrentForks)
             triggerConfigWatchedTasks()
             notifyBspClientsOfConfigChange()
-          }
+        }
       } catch {
         case NonFatal(e) =>
           val errorMessage = s"Error during project load: ${e.getMessage}"
@@ -258,7 +261,8 @@ class DederProjectState(
             case s: TaskExecResult.Skipped =>
               serverNotificationsLogger.add(
                 ServerNotification.logError(
-                  s"${s.taskInstance.moduleId} skipped — ${s.because.taskInstance.moduleId} failed", source = Some("server-cli")
+                  s"${s.taskInstance.moduleId} skipped — ${s.because.taskInstance.moduleId} failed",
+                  source = Some("server-cli")
                 )
               )
               ModuleFailure(s.taskInstance.moduleId, s.because.error, Some(s.because.taskInstance.moduleId))
@@ -302,9 +306,12 @@ class DederProjectState(
         if exitOnEnd then {
           val allSuccessful = results.forall {
             case TaskExecResult.Success(ti, value, _, _) => ti.task.isResultSuccessfulUnsafe(value)
-            case _                                    => false // Failure and Skipped are always unsuccessful
+            case _                                       => false // Failure and Skipped are always unsuccessful
           }
-          val ts = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT).withZone(ZoneId.systemDefault()).format(Instant.now())
+          val ts = DateTimeFormatter
+            .ofLocalizedDateTime(FormatStyle.SHORT)
+            .withZone(ZoneId.systemDefault())
+            .format(Instant.now())
           val statusStr = if allSuccessful then "Finished" else "Failed"
           serverNotificationsLogger.add(
             ServerNotification.logInfo(s"$statusStr in ${totalDuration.toPrettyString} at $ts")
@@ -422,7 +429,7 @@ class DederProjectState(
         DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(false))
         val allTaskIds = tasksExecStages.flatten.map(_.id)
         internals.transitionToExecuting(requestId, tasksExecStages.size, allTaskIds)
-        val result = tasksExecutor.execute(
+        val results = tasksExecutor.execute(
           requestId,
           tasksExecStages,
           moduleIds,
@@ -431,12 +438,25 @@ class DederProjectState(
           watch,
           serverNotificationsLogger
         )
+        // replay cached diagnostics to CLI if a replay hook is set (e.g. compile errors)
+        if callerType == CallerType.Cli then {
+          results.foreach {
+            case TaskExecResult.Success(ti, cachedTaskResult, _, /* fromCache = */ true) =>
+              ti.task match {
+                case ct: CachedTask[?, ?, ?] =>
+                  val typedRes = ct.castRes(cachedTaskResult)
+                  ct.cliReplayFn.foreach(fn => fn(typedRes, ti.moduleId, serverNotificationsLogger))
+                case _ =>
+              }
+            case _ =>
+          }
+        }
         val duration = Duration.ofNanos(System.nanoTime() - requestStartNanos)
         val cancelled = Option(DederGlobals.cancellationTokens.get(requestId)).exists(_.get())
 
         // Collect ALL errors from the result set — Failure, Skipped, and
         // Success-with-unsuccessful-result (e.g., compile with errors):
-        val errors = result.flatMap {
+        val errors = results.flatMap {
           case s: TaskExecResult.Success =>
             if !s.taskInstance.task.isResultSuccessfulUnsafe(s.value) then
               Some(s"${s.taskInstance.id}: result was unsuccessful")
@@ -449,12 +469,14 @@ class DederProjectState(
         val hasFailures = errors.nonEmpty
 
         internals.recordRequestCompleted(
-          requestId, taskName,
+          requestId,
+          taskName,
           success = !cancelled && !hasFailures,
-          duration, callerType,
+          duration,
+          callerType,
           error = if errors.nonEmpty then Some(errors.mkString(" | ")) else None
         )
-        result
+        results
       } finally {
         internals.transitionToCompleted(requestId)
         acquiredLocks.reverse.foreach { taskInstance =>
@@ -467,7 +489,14 @@ class DederProjectState(
       case NonFatal(e) =>
         val duration = Duration.ofNanos(System.nanoTime() - requestStartNanos)
         val errMsg = Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
-        internals.recordRequestCompleted(requestId, taskName, success = false, duration, callerType, error = Some(errMsg))
+        internals.recordRequestCompleted(
+          requestId,
+          taskName,
+          success = false,
+          duration,
+          callerType,
+          error = Some(errMsg)
+        )
         // send notification about failure to client
         serverNotificationsLogger.add(ServerNotification.logError(e.getMessage, source = Some("server")))
         if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
@@ -844,10 +873,10 @@ class DederProjectState(
     }
   }
 
-  /** Notify all connected BSP clients that the project config (`deder.pkl`) has changed.
-    * Diffs previous vs. current BSP-visible modules and sends targeted
-    * CREATED/CHANGED/DELETED events. Falls back to broadcasting CHANGED for all modules
-    * when no previous config is available. */
+  /** Notify all connected BSP clients that the project config (`deder.pkl`) has changed. Diffs previous vs. current
+    * BSP-visible modules and sends targeted CREATED/CHANGED/DELETED events. Falls back to broadcasting CHANGED for all
+    * modules when no previous config is available.
+    */
   def notifyBspClientsOfConfigChange(): Unit = {
     val serversSnapshot = bspServers.iterator().asScala.toSeq
     if serversSnapshot.isEmpty then return
@@ -864,6 +893,7 @@ class DederProjectState(
     val oldModules = prevConfigModules
 
     // If no prior config, fall back to all-CHANGED
+    // TODO move to BspServer
     if oldModules.isEmpty then {
       val rootUri = DederGlobals.projectRootDir.toURI.toString
       val events = newModules.map { m =>

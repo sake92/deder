@@ -10,7 +10,6 @@ import ba.sake.tupson.{*, given}
 import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.{DederModule, ModuleType}
 import ba.sake.deder.deps.DependencyResolverApi
-import ba.sake.deder.RequestContext
 
 enum TaskKind {
   case Standard, SourceGenerator, ResourceGenerator
@@ -119,8 +118,16 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
 
   def withCliReplay(f: (T, String, ServerNotificationsLogger) => Unit): CachedTaskBuilder[T, Deps, S] =
     CachedTaskBuilder(
-      name, taskDeps, transitive, singleton, supportedModuleTypes,
-      enabled, category, kind, internal, cliReplayFn = Some(f)
+      name,
+      taskDeps,
+      transitive,
+      singleton,
+      supportedModuleTypes,
+      enabled,
+      category,
+      kind,
+      internal,
+      cliReplayFn = Some(f)
     )
 
   /** Requires nonempty dependencies because caching only makes sense if there are inputs to hash. If there are no
@@ -141,8 +148,9 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       cliReplayFn = cliReplayFn
     )
 
-  /** Like [[build]], but attaches a custom summary type `S2` instead of the default
-    * `MultiModuleResults[T]`. Requires nonempty dependencies (caching needs inputs to hash).
+  // TODO can we do this in build function?
+  /** Like [[build]], but attaches a custom summary type `S2` instead of the default `MultiModuleResults[T]`. Requires
+    * nonempty dependencies (caching needs inputs to hash).
     */
   def buildSummarized[S2](
       execute: TaskExecContext[T, Deps] => T,
@@ -253,6 +261,8 @@ sealed trait Task[T, Deps <: Tuple, S](using
     ev: TaskDeps[Deps] =:= true
 ) extends AbstractTask[T] {
   type Res = T
+  def castRes(res: Any): T = res.asInstanceOf[T]
+
   def taskDeps: Deps
 
   /** Tasks whose results should be appended to depResults at execution time, computed from the registry rather than
@@ -368,6 +378,8 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
     ev: TaskDeps[Deps] =:= true
 ) extends Task[T, Deps, S](using summon[JsonRW[T]], summarizable, ev) {
 
+  override def castRes(res: Any): T = res.asInstanceOf[T]
+
   private[deder] override def executeUnsafe(
       project: DederProject,
       module: DederModule,
@@ -424,10 +436,6 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
           serverNotificationsLogger.add(
             ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id))
           )
-          // served from cache: execute() did not run, so no live notifications were emitted.
-          // Replay cached diagnostics to CLI (e.g. compile errors) if a replay hook is set.
-          if RequestContext.current then
-            cliReplayFn.foreach(_(cachedTaskResult.value, module.id, serverNotificationsLogger))
           (cachedTaskResult, false, true)
         else
           val newRes = computeTaskResult()
