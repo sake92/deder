@@ -55,6 +55,9 @@ class DederProjectInternalsImpl private (
   // Delegated cancel function — wired after construction by ServerMain
   @volatile private[deder] var cancelFn: String => Unit = _ => ()
 
+  // Delegated purge function — wired after construction by ServerMain
+  @volatile private[deder] var purgeCachesFn: () => PurgeCachesResult = () => PurgeCachesResult(0, 0, 0, false)
+
   override def currentRequests: Seq[LiveRequest] =
     currentReqs.values().asScala.toSeq
 
@@ -94,6 +97,15 @@ class DederProjectInternalsImpl private (
 
   override def allRequestStatuses: Seq[RequestStatus] =
     requestStatuses.values().asScala.toSeq.map(_.toRequestStatus).sortBy(_.startTime)
+
+  override def purgeInMemoryCaches(): PurgeCachesResult =
+    purgeCachesFn()
+
+  private[deder] def clearHistory(): Int = {
+    val size = history.size()
+    history.clear()
+    size
+  }
 
   // -- Write methods --
 

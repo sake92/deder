@@ -170,6 +170,7 @@ object ServerMain extends StrictLogging {
       internals = internals
     )
     internals.cancelFn = projectState.cancelRequest
+    internals.purgeCachesFn = () => projectState.purgeInMemoryCachesImpl()
 
     debounceThread = Thread.ofVirtual().name("watch-debounce").start(() => {
       var running = true

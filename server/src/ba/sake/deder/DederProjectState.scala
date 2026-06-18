@@ -854,6 +854,22 @@ class DederProjectState(
     onShutdown()
   }
 
+  private[deder] def purgeInMemoryCachesImpl(): PurgeCachesResult = {
+    // Wait for in-flight requests to drain (10s timeout, 100ms polling)
+    val deadline = System.currentTimeMillis() + 10_000
+    while inFlightRequests.get() > 0 && System.currentTimeMillis() < deadline do
+      Thread.sleep(100)
+
+    if inFlightRequests.get() > 0 then
+      PurgeCachesResult(0, 0, 0, false)
+    else
+      val cachesCleared = internals.registry.invalidateAll()
+      val bspEntriesRemoved = bspServers.asScala.map(_.cleanupCompletedInFlight()).sum
+      val historyEntriesRemoved = internals.clearHistory()
+      System.gc()
+      PurgeCachesResult(cachesCleared, bspEntriesRemoved, historyEntriesRemoved, gcSuggested = true)
+  }
+
   def registerBspServer(server: ba.sake.deder.bsp.DederBspServer): Unit =
     bspServers.add(server)
 

@@ -2,19 +2,23 @@ package ba.sake.deder
 
 import java.util.concurrent.ConcurrentHashMap
 import scala.jdk.CollectionConverters.*
+import com.github.blemale.scaffeine.Cache as SCache
 
 class CacheStatsRegistry:
-    private val suppliers = new ConcurrentHashMap[String, () => InMemCacheStats]()
+    private val caches = new ConcurrentHashMap[String, SCache[?, ?]]()
 
-    def register(name: String, supplier: () => InMemCacheStats): Unit =
-        suppliers.put(name, supplier)
+    def register(name: String, cache: SCache[?, ?]): Unit =
+        caches.put(name, cache)
 
     def getAllStats: Map[String, InMemCacheStats] =
-        suppliers.asScala.view.mapValues(_()).toMap
+        caches.asScala.view.mapValues(CacheStatsRegistry.statsOf).toMap
+
+    def invalidateAll(): Int =
+        val count = caches.size()
+        caches.values().asScala.foreach(_.invalidateAll())
+        count
 
 object CacheStatsRegistry:
-    import com.github.blemale.scaffeine.Cache as SCache
-
     /** Reads Caffeine stats and converts to plugin-api InMemCacheStats. */
     def statsOf(cache: SCache[?, ?]): InMemCacheStats =
         val s = cache.stats()

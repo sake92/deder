@@ -120,3 +120,15 @@ trait DederProjectInternals:
 
   /** Rich status snapshots for all in-flight requests. */
   def allRequestStatuses: Seq[RequestStatus]
+
+  /** Purges all registered in-memory caches (Scaffeine caches, internals history, completed
+    * BSP in-flight compilation entries) and suggests a GC to the JVM.
+    * Waits up to 10s for in-flight requests to drain; returns a zeroed result if busy. */
+  def purgeInMemoryCaches(): PurgeCachesResult
+
+case class PurgeCachesResult(
+    cachesCleared: Int,
+    bspEntriesRemoved: Int,
+    historyEntriesRemoved: Int,
+    gcSuggested: Boolean
+)
