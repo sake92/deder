@@ -2,12 +2,12 @@ package ba.sake.deder.jvm
 
 import java.io.BufferedOutputStream
 import java.io._
+import java.nio.charset.StandardCharsets
 import java.util.jar._
 import scala.collection.mutable
 import java.nio.file.{Files, Path}
 import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
-import scala.collection.mutable
 import com.eed3si9n.jarjarabrams.{ShadeRule, Shader, ShadeTarget}
 import com.typesafe.scalalogging.StrictLogging
 import scala.io.Source
@@ -110,8 +110,7 @@ object JarUtils extends StrictLogging{
           if skipEntry(name) then {
             ()
           } else if (name.startsWith("META-INF/services/")) {
-            // STRATEGY: CONCATENATE
-            // TODO need to deduplicate entries INSIDE the files as well, e.g. for service providers
+            // STRATEGY: CONCATENATE (deduplicated by line)
             val baos = concatBuffers.getOrElseUpdate(name, new ByteArrayOutputStream())
             jin.transferTo(baos)
             baos.write("\n".getBytes) // Ensure a newline between merges
@@ -127,10 +126,11 @@ object JarUtils extends StrictLogging{
         jin.close()
       }
 
-      // write out all the concatenated files
+      // write out all the concatenated files (deduplicated)
       for ((name, baos) <- concatBuffers) {
+        val deduped = deduplicateServiceLines(new String(baos.toByteArray, StandardCharsets.UTF_8))
         out.putNextEntry(new JarEntry(name))
-        out.write(baos.toByteArray)
+        out.write(deduped.getBytes(StandardCharsets.UTF_8))
         out.closeEntry()
       }
 
@@ -193,6 +193,16 @@ object JarUtils extends StrictLogging{
           Seq()
         }
     }
+  }
+
+  /** Deduplicate lines in a META-INF/services/ file.
+    * Keeps comments (#) and non-empty unique service provider entries.
+    */
+  private def deduplicateServiceLines(raw: String): String = {
+    val lines = raw.linesIterator.toSeq
+    val (comments, entries) = lines.partition(_.startsWith("#"))
+    val uniqueEntries = entries.filter(_.nonEmpty).distinct
+    (comments ++ uniqueEntries).mkString("\n")
   }
 
 }

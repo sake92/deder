@@ -1,6 +1,5 @@
 package ba.sake.deder
 
-import java.net.URLClassLoader
 import java.time.{Duration, Instant}
 import java.time.format.{DateTimeFormatter, FormatStyle}
 import java.time.ZoneId
@@ -147,7 +146,6 @@ class DederProjectState(
               loadedMap.getOrElse(id, LoadedPluginInfo(id, Seq.empty, Some(errorMap.getOrElse(id, "Not loaded"))))
             }
             internals.setLoadedPlugins(allPluginInfo)
-            // TODO prepend plugin id to task name to avoid conflicts? e.g myplugin:compile ?
             val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?, ?]])
             val effectiveRegistry = TasksRegistry(baseTasks ++ pluginTasks)
             val tasksResolver = TasksResolver(newConfig, effectiveRegistry)
@@ -948,19 +946,6 @@ class DederProjectState(
     }
   }
 
-  private def closeStaleClassLoaders(previous: Seq[URLClassLoader], current: Seq[URLClassLoader]): Unit =
-    previous.distinct.foreach { old =>
-      // Compare by reference: if the same classloader instance is still active, keep it open.
-      val shouldClose = current.forall(_ ne old)
-      if shouldClose then closeClassLoader(old)
-    }
-
-  private def closeClassLoader(classLoader: URLClassLoader): Unit =
-    try classLoader.close()
-    catch {
-      case NonFatal(e) =>
-        logger.warn(s"Failed to close old plugin classloader: ${e.getMessage}")
-    }
 }
 
 case class DederProjectStateData(
