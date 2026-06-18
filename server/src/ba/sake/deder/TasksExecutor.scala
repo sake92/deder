@@ -171,16 +171,19 @@ class TasksExecutor(
 
     val taskStartNanos = System.nanoTime()
     val taskSpan = OTEL.TRACER.spanBuilder(ti.id).startSpan()
-    // Make the cancellation token available to CachedTask via ThreadLocal
-    DederGlobals.currentCancellationToken.set(
-      DederGlobals.cancellationTokens.get(requestId)
-    )
     try {
       Using.resource(taskSpan.makeCurrent()) { scope =>
         val (taskRes, changed, fromCache) = ti.task.executeUnsafe(
           projectConfig, ti.module, depResults, transitiveResults, dependentModulesTree,
           args, watch, serverNotificationsLogger, dependencyResolver
         )
+        // If the request was cancelled, clean up and throw so the task is
+        // recorded as Cancelled rather than Success or Failure.
+        val token = DederGlobals.cancellationTokens.get(requestId)
+        if token != null && token.get() then {
+          ti.task.cleanupAfterCancellation(ti.module)
+          throw TaskCancelledException(s"Task '${ti.task.name}' on module '${ti.moduleId}' was cancelled")
+        }
         val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
         val isUnsuccessful = !ti.task.isResultSuccessfulUnsafe(taskRes.value)
         val errMsg = if isUnsuccessful then Some("result was unsuccessful") else None
@@ -203,7 +206,6 @@ class TasksExecutor(
         taskSpan.setStatus(StatusCode.ERROR)
         ExecutionOutcome(TaskExecResult.Failure(ti, errMsg), None)
     } finally {
-      DederGlobals.currentCancellationToken.remove()
       taskSpan.end()
     }
   }
