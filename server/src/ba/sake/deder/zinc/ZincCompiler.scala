@@ -48,16 +48,6 @@ class ZincCompiler(
 
   private val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
 
-  // In-memory cache for Zinc analysis, avoids re-reading inc_compile.zip from disk
-  private val analysisCache: Cache[os.Path, AnalysisContents] =
-    Scaffeine()
-      .recordStats()
-      .expireAfterAccess(5.minute)
-      .maximumSize(50)
-      .build()
-
-  cacheRegistry.register(s"zinc-analysis:$scalaVersion", () => CacheStatsRegistry.statsOf(analysisCache))
-
   // Cached compiler setup: classloaders, ScalaInstance, and Compilers
   // are expensive to create (JAR scanning, reflection) and can be reused
   // across compilations when the same compiler/library JARs are used.
@@ -96,7 +86,6 @@ class ZincCompiler(
 
   def close(): Unit = {
     setupCache.invalidateAll()
-    analysisCache.invalidateAll()
   }
 
   case class ZincCompileResult(
@@ -257,7 +246,7 @@ class ZincCompiler(
         val inferredZincCacheNio =
           entryNio.getParent.resolve("zinc").resolve("inc_compile.zip")
         val inferredZincCache = os.Path(inferredZincCacheNio)
-        val contentsOpt = analysisCache.getIfPresent(inferredZincCache).orElse {
+        val contentsOpt =
           if os.exists(inferredZincCache) then
             val store = ConsistentFileAnalysisStore.binary(
               file = inferredZincCache.toIO,
@@ -265,11 +254,8 @@ class ZincCompiler(
               reproducible = true,
               parallelism = math.min(Runtime.getRuntime.availableProcessors(), 8)
             )
-            val loaded = Option(store.get().orElse(null))
-            loaded.foreach(c => analysisCache.put(inferredZincCache, c))
-            loaded
+            Option(store.get().orElse(null))
           else None
-        }
         contentsOpt.map(ac => entryNio -> ac.getAnalysis)
       }.toMap
 
@@ -296,11 +282,7 @@ class ZincCompiler(
         .setAttribute("moduleId", moduleId)
         .startSpan()
       try {
-        val cached = analysisCache.getIfPresent(zincCacheFile)
-        val previous = cached match {
-          case Some(contents) => Optional.of(contents)
-          case None           => analysisStore.get()
-        }
+        val previous = analysisStore.get()
         PreviousResult.of(
           previous.map(_.getAnalysis),
           previous.map(_.getMiniSetup)
@@ -342,7 +324,6 @@ class ZincCompiler(
       try {
         val contents = AnalysisContents.create(newResult.analysis(), newResult.setup())
         analysisStore.set(contents)
-        analysisCache.put(zincCacheFile, contents)
       } finally storeSpan.end()
     } catch {
       case NonFatal(e) =>
