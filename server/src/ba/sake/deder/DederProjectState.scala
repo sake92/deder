@@ -264,6 +264,11 @@ class DederProjectState(
                 )
               )
               ModuleFailure(s.taskInstance.moduleId, s.because.error, Some(s.because.taskInstance.moduleId))
+            case c: TaskExecResult.Cancelled =>
+              serverNotificationsLogger.add(
+                ServerNotification.logError(s"${c.taskInstance.moduleId}: ${c.message}", source = Some("server-cli"))
+              )
+              ModuleFailure(c.taskInstance.moduleId, c.message, None)
           }
           // generate cross-module summary from successful results
           if successes.nonEmpty then {
@@ -367,6 +372,8 @@ class DederProjectState(
             throw TaskEvaluationException(s"${ti.id}: $error")
           case TaskExecResult.Skipped(ti, because) =>
             throw TaskEvaluationException(s"${ti.id} skipped — ${because.taskInstance.id} failed")
+          case TaskExecResult.Cancelled(ti, message) =>
+            throw TaskEvaluationException(s"${ti.id}: $message")
       }
     } catch {
       case e: Throwable =>
@@ -463,6 +470,8 @@ class DederProjectState(
             Some(s"${ti.id}: $msg")
           case TaskExecResult.Skipped(ti, because) =>
             Some(s"${ti.id}: skipped — ${because.taskInstance.id} failed: ${because.error}")
+          case TaskExecResult.Cancelled(ti, msg) =>
+            Some(s"${ti.id}: cancelled — $msg")
         }
         val hasFailures = errors.nonEmpty
 

@@ -419,6 +419,13 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
           inputsHash
         )
       )
+      // If the request was cancelled, the task result may be incomplete/stale.
+      // Delete the cache metadata so the next build always re-executes.
+      val token = DederGlobals.currentCancellationToken.get()
+      if token != null && token.get() then {
+        if os.exists(metadataFile) then os.remove(metadataFile)
+        throw TaskCancelledException(s"Task '${name}' on module '${module.id}' was cancelled")
+      }
       val outputHash = Hashable[T].hashStr(res)
       val taskResult = TaskResult(res, inputsHash, outputHash)
       os.write.over(metadataFile, taskResult.toJson(spaces = 2, sort = true), createFolders = true)

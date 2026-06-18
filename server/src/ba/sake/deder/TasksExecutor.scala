@@ -12,6 +12,7 @@ import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.DependencyResolver
 import io.opentelemetry.api.trace.StatusCode
+import ba.sake.deder.TaskCancelledException
 
 class TasksExecutor(
     projectConfig: DederProject,
@@ -87,7 +88,7 @@ class TasksExecutor(
             val taskResultsSnapshot = taskResults.toMap
             executable.map { ti =>
               forkUser {
-                executeSingleTask(ti, projectConfig, taskResultsSnapshot, args, watch, serverNotificationsLogger, dependencyResolver)
+                executeSingleTask(ti, projectConfig, taskResultsSnapshot, args, watch, serverNotificationsLogger, dependencyResolver, requestId)
               }
             }.map(_.join())
           }
@@ -108,6 +109,11 @@ class TasksExecutor(
                 moduleFailures.getOrElseUpdate(f.taskInstance.moduleId, f)
                 propagateModuleFailure(f.taskInstance.moduleId, f)
                 if isTargetTask(f.taskInstance, taskName, moduleIds) then targetResults += f
+              case c: TaskExecResult.Cancelled =>
+                val f = TaskExecResult.Failure(c.taskInstance, c.message)
+                moduleFailures.getOrElseUpdate(c.taskInstance.moduleId, f)
+                propagateModuleFailure(c.taskInstance.moduleId, f)
+                if isTargetTask(c.taskInstance, taskName, moduleIds) then targetResults += c
               case _: TaskExecResult.Skipped =>
             }
           }
@@ -117,6 +123,7 @@ class TasksExecutor(
             oc.result match
               case s: TaskExecResult.Success => allCompleted += s.taskInstance.id
               case f: TaskExecResult.Failure => allFailed += f.taskInstance.id
+              case c: TaskExecResult.Cancelled => allFailed += c.taskInstance.id
               case _ =>
           }
           allSkipped ++= skipped.map(_.id)
@@ -150,7 +157,8 @@ class TasksExecutor(
       args: Seq[String],
       watch: Boolean,
       serverNotificationsLogger: ServerNotificationsLogger,
-      dependencyResolver: DependencyResolver
+      dependencyResolver: DependencyResolver,
+      requestId: String
   ): ExecutionOutcome = {
     val allTaskDeps = tasksGraph.outgoingEdgesOf(ti).asScala.toSeq
     val depResults = allTaskDeps.flatMap { depEdge =>
@@ -163,6 +171,10 @@ class TasksExecutor(
 
     val taskStartNanos = System.nanoTime()
     val taskSpan = OTEL.TRACER.spanBuilder(ti.id).startSpan()
+    // Make the cancellation token available to CachedTask via ThreadLocal
+    DederGlobals.currentCancellationToken.set(
+      DederGlobals.cancellationTokens.get(requestId)
+    )
     try {
       Using.resource(taskSpan.makeCurrent()) { scope =>
         val (taskRes, changed, fromCache) = ti.task.executeUnsafe(
@@ -176,6 +188,12 @@ class TasksExecutor(
         ExecutionOutcome(TaskExecResult.Success(ti, taskRes.value, changed, fromCache), Some(taskRes))
       }
     } catch {
+      case e: TaskCancelledException =>
+        val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
+        logger.info(e.getMessage)
+        internals.recordTaskExecution(ti.task.name, taskDuration, cacheHit = false, errorMessage = Some(e.getMessage))
+        taskSpan.setStatus(StatusCode.ERROR)
+        ExecutionOutcome(TaskExecResult.Cancelled(ti, e.getMessage), None)
       case NonFatal(e) =>
         val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
         val errMsg = Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
@@ -185,6 +203,7 @@ class TasksExecutor(
         taskSpan.setStatus(StatusCode.ERROR)
         ExecutionOutcome(TaskExecResult.Failure(ti, errMsg), None)
     } finally {
+      DederGlobals.currentCancellationToken.remove()
       taskSpan.end()
     }
   }
@@ -258,3 +277,4 @@ enum TaskExecResult:
   case Success(taskInstance: TaskInstance, value: Any, changed: Boolean, fromCache: Boolean)
   case Failure(taskInstance: TaskInstance, error: String)
   case Skipped(taskInstance: TaskInstance, because: Failure)
+  case Cancelled(taskInstance: TaskInstance, message: String)

@@ -390,7 +390,14 @@ class DederBspServer(
           if compileResult.errors > 0 then allCompileSucceeded = false
         }
       }
-      val status = if allCompileSucceeded then StatusCode.OK else StatusCode.ERROR
+      // Check if the request was cancelled while we were compiling
+      val wasCancelled = Option(params.getOriginId)
+        .flatMap(oid => Option(DederGlobals.cancellationTokens.get(oid)))
+        .exists(_.get())
+      val status =
+        if wasCancelled then StatusCode.CANCELLED
+        else if allCompileSucceeded then StatusCode.OK
+        else StatusCode.ERROR
       val taskFinishParams = TaskFinishParams(taskId, status)
       taskFinishParams.setEventTime(System.currentTimeMillis())
       taskFinishParams.setOriginId(params.getOriginId)
