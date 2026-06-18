@@ -638,8 +638,12 @@ const function javaModules(
         sources = new Listing {
           cfg.mainScalaSrcBase
           ...(cfg.mainExtraSrc)
+          for (s in _template.sources) { when (s != "src") { s } }
         }
-        resources = cfg.mainResources
+        resources = new Listing {
+          ...cfg.mainResources
+          for (r in _template.resources) { when (r != "resources") { r } }
+        }
       }
       test = (_testTemplate) {
         id = "\(baseId)-test"
@@ -647,8 +651,12 @@ const function javaModules(
         sources = new Listing {
           cfg.testScalaSrcBase
           ...(cfg.testExtraSrc)
+          for (s in _testTemplate.sources) { when (s != "src") { s } }
         }
-        resources = cfg.testResources
+        resources = new Listing {
+          ...cfg.testResources
+          for (r in _testTemplate.resources) { when (r != "resources") { r } }
+        }
         moduleDeps {
           main
         }
@@ -709,8 +717,12 @@ const function scalaModulesWithTestId(
               "\(cfg.mainScalaSrcBase)-\(prefix)"
             }
           }
+          for (s in _template.sources) { when (s != "src") { s } }
         }
-        resources = cfg.mainResources
+        resources = new Listing {
+          ...cfg.mainResources
+          for (r in _template.resources) { when (r != "resources") { r } }
+        }
       }
       test = (_testTemplate) {
         id = resolvedTestId
@@ -726,8 +738,12 @@ const function scalaModulesWithTestId(
               "\(cfg.testScalaSrcBase)-\(prefix)"
             }
           }
+          for (s in _testTemplate.sources) { when (s != "src") { s } }
         }
-        resources = cfg.testResources
+        resources = new Listing {
+          ...cfg.testResources
+          for (r in _testTemplate.resources) { when (r != "resources") { r } }
+        }
         moduleDeps {
           main
         }
@@ -772,8 +788,12 @@ const function scalaJsModules(
               "\(cfg.mainScalaSrcBase)-\(prefix)"
             }
           }
+          for (s in _template.sources) { when (s != "src") { s } }
         }
-        resources = cfg.mainResources
+        resources = new Listing {
+          ...cfg.mainResources
+          for (r in _template.resources) { when (r != "resources") { r } }
+        }
       }
       test = (_testTemplate) {
         id = "\(baseId)-test"
@@ -789,8 +809,12 @@ const function scalaJsModules(
               "\(cfg.testScalaSrcBase)-\(prefix)"
             }
           }
+          for (s in _testTemplate.sources) { when (s != "src") { s } }
         }
-        resources = cfg.testResources
+        resources = new Listing {
+          ...cfg.testResources
+          for (r in _testTemplate.resources) { when (r != "resources") { r } }
+        }
         moduleDeps {
           main
         }
@@ -835,8 +859,12 @@ const function scalaNativeModules(
               "\(cfg.mainScalaSrcBase)-\(prefix)"
             }
           }
+          for (s in _template.sources) { when (s != "src") { s } }
         }
-        resources = cfg.mainResources
+        resources = new Listing {
+          ...cfg.mainResources
+          for (r in _template.resources) { when (r != "resources") { r } }
+        }
       }
       test = (_testTemplate) {
         id = "\(baseId)-test"
@@ -852,8 +880,12 @@ const function scalaNativeModules(
               "\(cfg.testScalaSrcBase)-\(prefix)"
             }
           }
+          for (s in _testTemplate.sources) { when (s != "src") { s } }
         }
-        resources = cfg.testResources
+        resources = new Listing {
+          ...cfg.testResources
+          for (r in _testTemplate.resources) { when (r != "resources") { r } }
+        }
         moduleDeps {
           main
         }
@@ -992,8 +1024,8 @@ const function crossModules(
       jvm = (_template) {
         id = "\(baseId)-jvm-\(sv)"
         root = _root
-        sources =
-          I.crossPlatformSources(
+        sources = new Listing {
+          ...I.crossPlatformSources(
             sharedMainBase,
             jvmMainBase,
             cfg.mainExtraSrc,
@@ -1001,17 +1033,21 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-        resources =
-          if (sharedPrefix != null)
-            new Listing { ...cfg.mainResources; for (r in cfg.mainResources) { "shared/\(r)" } }
-          else
-            cfg.mainResources
+          for (s in _template.sources) { when (s != "src") { s } }
+        }
+        resources = new Listing {
+          ...cfg.mainResources
+          when (sharedPrefix != null) {
+            for (r in cfg.mainResources) { "shared/\(r)" }
+          }
+          for (r in _template.resources) { when (r != "resources") { r } }
+        }
       }
       jvm_test = (_testTemplate) {
         id = "\(baseId)-jvm-test-\(sv)"
         root = "\(_root)\(cfg.testRootSuffix)"
-        sources =
-          I.crossPlatformSources(
+        sources = new Listing {
+          ...I.crossPlatformSources(
             sharedTestBase,
             jvmTestBase,
             cfg.testExtraSrc,
@@ -1019,11 +1055,15 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-        resources =
-          if (sharedPrefix != null)
-            new Listing { ...cfg.testResources; for (r in cfg.testResources) { "shared/\(r)" } }
-          else
-            cfg.testResources
+          for (s in _testTemplate.sources) { when (s != "src") { s } }
+        }
+        resources = new Listing {
+          ...cfg.testResources
+          when (sharedPrefix != null) {
+            for (r in cfg.testResources) { "shared/\(r)" }
+          }
+          for (r in _testTemplate.resources) { when (r != "resources") { r } }
+        }
         moduleDeps {
           jvm
         }
@@ -1031,8 +1071,8 @@ const function crossModules(
       js = (_jsTemplate) {
         id = "\(baseId)-js-\(sv)"
         root = _root
-        sources =
-          I.crossPlatformSources(
+        sources = new Listing {
+          ...I.crossPlatformSources(
             sharedMainBase,
             jsMainBase,
             cfg.mainExtraSrc,
@@ -1040,17 +1080,21 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-        resources =
-          if (sharedPrefix != null)
-            new Listing { ...cfg.mainResources; for (r in cfg.mainResources) { "shared/\(r)" } }
-          else
-            cfg.mainResources
+          for (s in _jsTemplate.sources) { when (s != "src") { s } }
+        }
+        resources = new Listing {
+          ...cfg.mainResources
+          when (sharedPrefix != null) {
+            for (r in cfg.mainResources) { "shared/\(r)" }
+          }
+          for (r in _jsTemplate.resources) { when (r != "resources") { r } }
+        }
       }
       js_test = (_jsTestTemplate) {
         id = "\(baseId)-js-test-\(sv)"
         root = "\(_root)\(cfg.testRootSuffix)"
-        sources =
-          I.crossPlatformSources(
+        sources = new Listing {
+          ...I.crossPlatformSources(
             sharedTestBase,
             jsTestBase,
             cfg.testExtraSrc,
@@ -1058,11 +1102,15 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-        resources =
-          if (sharedPrefix != null)
-            new Listing { ...cfg.testResources; for (r in cfg.testResources) { "shared/\(r)" } }
-          else
-            cfg.testResources
+          for (s in _jsTestTemplate.sources) { when (s != "src") { s } }
+        }
+        resources = new Listing {
+          ...cfg.testResources
+          when (sharedPrefix != null) {
+            for (r in cfg.testResources) { "shared/\(r)" }
+          }
+          for (r in _jsTestTemplate.resources) { when (r != "resources") { r } }
+        }
         moduleDeps {
           js
         }
@@ -1070,8 +1118,8 @@ const function crossModules(
       native = (_nativeTemplate) {
         id = "\(baseId)-native-\(sv)"
         root = _root
-        sources =
-          I.crossPlatformSources(
+        sources = new Listing {
+          ...I.crossPlatformSources(
             sharedMainBase,
             nativeMainBase,
             cfg.mainExtraSrc,
@@ -1079,17 +1127,21 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-        resources =
-          if (sharedPrefix != null)
-            new Listing { ...cfg.mainResources; for (r in cfg.mainResources) { "shared/\(r)" } }
-          else
-            cfg.mainResources
+          for (s in _nativeTemplate.sources) { when (s != "src") { s } }
+        }
+        resources = new Listing {
+          ...cfg.mainResources
+          when (sharedPrefix != null) {
+            for (r in cfg.mainResources) { "shared/\(r)" }
+          }
+          for (r in _nativeTemplate.resources) { when (r != "resources") { r } }
+        }
       }
       native_test = (_nativeTestTemplate) {
         id = "\(baseId)-native-test-\(sv)"
         root = "\(_root)\(cfg.testRootSuffix)"
-        sources =
-          I.crossPlatformSources(
+        sources = new Listing {
+          ...I.crossPlatformSources(
             sharedTestBase,
             nativeTestBase,
             cfg.testExtraSrc,
@@ -1097,11 +1149,15 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-        resources =
-          if (sharedPrefix != null)
-            new Listing { ...cfg.testResources; for (r in cfg.testResources) { "shared/\(r)" } }
-          else
-            cfg.testResources
+          for (s in _nativeTestTemplate.sources) { when (s != "src") { s } }
+        }
+        resources = new Listing {
+          ...cfg.testResources
+          when (sharedPrefix != null) {
+            for (r in cfg.testResources) { "shared/\(r)" }
+          }
+          for (r in _nativeTestTemplate.resources) { when (r != "resources") { r } }
+        }
         moduleDeps {
           native
         }
