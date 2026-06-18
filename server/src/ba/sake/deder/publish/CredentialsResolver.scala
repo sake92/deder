@@ -100,10 +100,4 @@ object CredentialsResolver {
       case _                           => None
     }
   }
-
-  private def expectedCredentialType(publishTo: PublishRepo): String = publishTo match {
-    case _: SonatypeCentralRepo  => "SonatypeCentralCredentials"
-    case _: SonatypeSnapshotRepo => "SonatypeSnapshotCredentials"
-    case _: MavenRepo            => "BasicAuthCredentials"
-  }
 }

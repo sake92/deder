@@ -1,7 +1,6 @@
 package ba.sake.deder.plugin
 
 import java.net.URLClassLoader
-import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
 import scala.util.{Using, Try}
 import scala.util.control.NonFatal

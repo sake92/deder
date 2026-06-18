@@ -203,52 +203,6 @@ object TabCompleter {
        |complete -c deder -f -a "(__deder_complete)"
        |""".stripMargin
 
-  def shellSplit(commandLine: String, cursorPos: Int): (Seq[String], Int) = {
-    val tokens = scala.collection.mutable.ListBuffer.empty[String]
-    val current = new StringBuilder()
-    var inDoubleQuote = false
-    var inSingleQuote = false
-    var escaped = false
-    var wordIndex = -1
-    var currentWordIndex = -1
-    var isCurrentWord = false
-
-    for ((char, i) <- commandLine.zipWithIndex) {
-      if i == cursorPos then {
-        isCurrentWord = true
-      }
-      if (escaped) {
-        current.append(char)
-        escaped = false
-      } else if (char == '\\' && !inSingleQuote) {
-        escaped = true
-      } else if (char == '\"' && !inSingleQuote) {
-        inDoubleQuote = !inDoubleQuote
-      } else if (char == '\'' && !inDoubleQuote) {
-        inSingleQuote = !inSingleQuote
-      } else if (char.isWhitespace && !inDoubleQuote && !inSingleQuote) {
-        if (current.nonEmpty) {
-          wordIndex += 1
-          if isCurrentWord then {
-            currentWordIndex = wordIndex
-            isCurrentWord = false
-          }
-          tokens += current.toString()
-          current.clear()
-        }
-      } else {
-        current.append(char)
-      }
-    }
-    if (current.nonEmpty) tokens += current.toString()
-    if currentWordIndex == -1 && cursorPos == commandLine.length then {
-      // cursor is at the end but we didnt find the current word
-      commandLine.lastOption match {
-        case Some(' ') => tokens += "" // add dummy token
-        case _         =>
-      }
-      currentWordIndex = tokens.length - 1
-    }
-    tokens.result() -> currentWordIndex
-  }
+  def shellSplit(commandLine: String, cursorPos: Int): (Seq[String], Int) =
+    ShellUtils.shellSplit(commandLine, cursorPos)
 }

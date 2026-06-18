@@ -12,7 +12,7 @@ import ba.sake.tupson.JsonRW
 import org.typelevel.jawn.ast.JValue
 import ba.sake.deder.*
 import ba.sake.deder.importing.Importer
-import io.opentelemetry.api.trace.StatusCode
+import io.opentelemetry.api.trace.{Span, SpanBuilder, StatusCode}
 import ba.sake.deder.OTEL
 import ba.sake.deder.config.DederProject.DederModule
 import ba.sake.deder.deps.Dependency
@@ -45,13 +45,8 @@ class CliClientMessageHandler(
     }
   }
 
-  private def handleHelp(m: CliClientMessage.Help): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    OTEL.withSpan("cli.help")(
-      _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-    ) { span =>
+  private def handleHelp(m: CliClientMessage.Help): Unit =
+    withCliSpan("help") { span =>
       val defaultHelpText =
         """Deder Build Tool Help:
           |
@@ -125,46 +120,27 @@ class CliClientMessageHandler(
       }
       serverMessages.put(CliServerMessage.Exit(0))
     }
-  }
 
-  private def handleVersion(): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    OTEL.withSpan("cli.version")(
-      _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-    ) { _ =>
+  private def handleVersion(): Unit =
+    withCliSpan("version") { _ =>
       serverMessages.put(CliServerMessage.Output(s"Server version: ${DederGlobals.version}"))
       serverMessages.put(CliServerMessage.Exit(0))
     }
-  }
 
-  private def handleModules(m: CliClientMessage.Modules): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    if m.args == Seq("--help") || m.args == Seq("-h") then
-      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliModulesOptions].helpText()))
-      serverMessages.put(CliServerMessage.Exit(0))
-    else
+  private def handleModules(m: CliClientMessage.Modules): Unit =
+    if !ifHelpThenShow(m.args, mainargs.Parser[DederCliModulesOptions].helpText()) then
       mainargs.Parser[DederCliModulesOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
         case Left(error) =>
-          OTEL.withSpan("cli.modules")(
-            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-          ) { span =>
+          withCliSpan("modules") { span =>
             span.setStatus(StatusCode.ERROR)
             span.setAttribute("error", error)
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          OTEL.withSpan("cli.modules")(
-            _.setAttribute("clientId", clientId)
-              .setAttribute("request.id", requestId)
-              .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
+          withCliSpan("modules", _.setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
               .setAttribute("cli.depthDown", cliOptions.depthDown)
-              .setAttribute("cli.depthUp", cliOptions.depthUp)
-          ) { span =>
+              .setAttribute("cli.depthUp", cliOptions.depthUp)) { span =>
             projectState.readState(useLastGood = false) match {
               case Left(error) =>
                 span.setStatus(StatusCode.ERROR)
@@ -226,32 +202,19 @@ class CliClientMessageHandler(
             }
           }
       }
-  }
 
-  private def handleTasks(m: CliClientMessage.Tasks): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    if m.args == Seq("--help") || m.args == Seq("-h") then
-      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliTasksOptions].helpText()))
-      serverMessages.put(CliServerMessage.Exit(0))
-    else
+  private def handleTasks(m: CliClientMessage.Tasks): Unit =
+    if !ifHelpThenShow(m.args, mainargs.Parser[DederCliTasksOptions].helpText()) then
       mainargs.Parser[DederCliTasksOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
         case Left(error) =>
-          OTEL.withSpan("cli.tasks")(
-            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-          ) { span =>
+          withCliSpan("tasks") { span =>
             span.setStatus(StatusCode.ERROR)
             span.setAttribute("error", error)
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          OTEL.withSpan("cli.tasks")(
-            _.setAttribute("clientId", clientId)
-              .setAttribute("request.id", requestId)
-              .pipe(b => cliOptions.module.fold(b)(m => b.setAttribute("cli.module", m)))
-          ) { span =>
+          withCliSpan("tasks", _.pipe(b => cliOptions.module.fold(b)(m => b.setAttribute("cli.module", m)))) { span =>
             projectState.readState(useLastGood = true) match {
               case Left(error) =>
                 span.setStatus(StatusCode.ERROR)
@@ -277,32 +240,20 @@ class CliClientMessageHandler(
             }
           }
       }
-  }
 
-  private def handlePlugins(m: CliClientMessage.Plugins): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    if m.args == Seq("--help") || m.args == Seq("-h") then
-      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliPluginsOptions].helpText()))
-      serverMessages.put(CliServerMessage.Exit(0))
-    else
+  private def handlePlugins(m: CliClientMessage.Plugins): Unit =
+    if !ifHelpThenShow(m.args, mainargs.Parser[DederCliPluginsOptions].helpText()) then
       mainargs.Parser[DederCliPluginsOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
         case Left(error) =>
-          OTEL.withSpan("cli.plugins")(
-            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-          ) { span =>
+          withCliSpan("plugins") { span =>
             span.setStatus(StatusCode.ERROR)
             span.setAttribute("error", error)
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          OTEL.withSpan("cli.plugins")(
-            _.setAttribute("clientId", clientId)
-              .setAttribute("request.id", requestId)
-          ) { _ =>
-            val debug = ctx.logLevel.ordinal >= LogLevel.DEBUG.ordinal
+          withCliSpan("plugins") { _ =>
+            val debug = RequestContext.current.get().logLevel.ordinal >= LogLevel.DEBUG.ordinal
             cliOptions.format match
               case OutputFormat.Dot | OutputFormat.Mermaid =>
                 serverMessages.put(CliServerMessage.Log("Format not supported for plugins (try plain, json, or densejson)", LogLevel.ERROR))
@@ -325,33 +276,20 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(0))
           }
       }
-  }
 
   private def handlePlan(m: CliClientMessage.Plan): Unit = boundary {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    if m.args == Seq("--help") || m.args == Seq("-h") then
-      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliPlanOptions].helpText()))
-      serverMessages.put(CliServerMessage.Exit(0))
-    else
+    if !ifHelpThenShow(m.args, mainargs.Parser[DederCliPlanOptions].helpText()) then
       mainargs.Parser[DederCliPlanOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
         case Left(error) =>
-          OTEL.withSpan("cli.plan")(
-            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-          ) { span =>
+          withCliSpan("plan") { span =>
             span.setStatus(StatusCode.ERROR)
             span.setAttribute("error", error)
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          OTEL.withSpan("cli.plan")(
-            _.setAttribute("clientId", clientId)
-              .setAttribute("request.id", requestId)
-              .setAttribute("cli.task", cliOptions.task)
-              .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
-          ) { span =>
+          withCliSpan("plan", _.setAttribute("cli.task", cliOptions.task)
+              .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))) { span =>
             projectState.readState(useLastGood = true) match {
               case Left(error) =>
                 span.setStatus(StatusCode.ERROR)
@@ -410,34 +348,22 @@ class CliClientMessageHandler(
       }
   }
 
-  private def handleExec(m: CliClientMessage.Exec): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    if m.args == Seq("--help") || m.args == Seq("-h") then
-      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliExecOptions].helpText()))
-      serverMessages.put(CliServerMessage.Exit(0))
-    else
+  private def handleExec(m: CliClientMessage.Exec): Unit =
+    if !ifHelpThenShow(m.args, mainargs.Parser[DederCliExecOptions].helpText()) then
       mainargs.Parser[DederCliExecOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
         case Left(error) =>
-          OTEL.withSpan("cli.exec")(
-            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-          ) { span =>
+          withCliSpan("exec") { span =>
             span.setStatus(StatusCode.ERROR)
             span.setAttribute("error", error)
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          
-          OTEL.withSpan(s"cli.exec.${cliOptions.task}")(
-            _.setAttribute("clientId", clientId)
-              .setAttribute("request.id", requestId)
-              .setAttribute("cli.task", cliOptions.task)
+          val ctx = RequestContext.current.get()
+          withCliSpan(s"exec.${cliOptions.task}", _.setAttribute("cli.task", cliOptions.task)
               .setAttribute("cli.moduleIds", cliOptions.modules.mkString(","))
               .setAttribute("cli.watch", cliOptions.watch.value)
-              .setAttribute("cli.format", ctx.outputFormat.toString)
-          ) { _ =>
+              .setAttribute("cli.format", ctx.outputFormat.toString)) { _ =>
             val heartbeat = new CliExecHeartbeat(emit = serverMessages.put)
             try
               val notificationCallback: ServerNotification => Unit = {
@@ -464,47 +390,26 @@ class CliClientMessageHandler(
               heartbeat.close()
           }
       }
-  }
 
-  private def handleCancel(m: CliClientMessage.Cancel): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    OTEL.withSpan("cli.cancel")(
-      _.setAttribute("clientId", clientId)
-        .setAttribute("request.id", requestId)
-        .setAttribute("cli.targetRequestId", m.requestId)
-    ) { _ =>
+  private def handleCancel(m: CliClientMessage.Cancel): Unit =
+    withCliSpan("cancel", _.setAttribute("cli.targetRequestId", m.requestId)) { _ =>
       projectState.cancelRequest(m.requestId)
       serverMessages.put(CliServerMessage.Exit(130))
     }
-  }
 
-  private def handleClean(m: CliClientMessage.Clean): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    if m.args == Seq("--help") || m.args == Seq("-h") then
-      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliCleanOptions].helpText()))
-      serverMessages.put(CliServerMessage.Exit(0))
-    else
+  private def handleClean(m: CliClientMessage.Clean): Unit =
+    if !ifHelpThenShow(m.args, mainargs.Parser[DederCliCleanOptions].helpText()) then
       mainargs.Parser[DederCliCleanOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
         case Left(error) =>
-          OTEL.withSpan("cli.clean")(
-            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-          ) { span =>
+          withCliSpan("clean") { span =>
             span.setStatus(StatusCode.ERROR)
             span.setAttribute("error", error)
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          OTEL.withSpan("cli.clean")(
-            _.setAttribute("clientId", clientId)
-              .setAttribute("request.id", requestId)
-              .setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
-              .pipe(b => cliOptions.task.fold(b)(t => b.setAttribute("cli.task", t)))
-          ) { span =>
+          withCliSpan("clean", _.setAttribute("cli.moduleFilters", cliOptions.modules.mkString(","))
+              .pipe(b => cliOptions.task.fold(b)(t => b.setAttribute("cli.task", t)))) { span =>
             val onOutput: String => Unit = msg => serverMessages.put(CliServerMessage.Output(msg))
             val success = cliOptions.task match {
               case Some(taskName) =>
@@ -518,32 +423,19 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(if success then 0 else 1))
           }
       }
-  }
 
-  private def handleImport(m: CliClientMessage.Import): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    if m.args == Seq("--help") || m.args == Seq("-h") then
-      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliImportOptions].helpText()))
-      serverMessages.put(CliServerMessage.Exit(0))
-    else
+  private def handleImport(m: CliClientMessage.Import): Unit =
+    if !ifHelpThenShow(m.args, mainargs.Parser[DederCliImportOptions].helpText()) then
       mainargs.Parser[DederCliImportOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
         case Left(error) =>
-          OTEL.withSpan("cli.import")(
-            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-          ) { span =>
+          withCliSpan("import") { span =>
             span.setStatus(StatusCode.ERROR)
             span.setAttribute("error", error)
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          OTEL.withSpan("cli.import")(
-            _.setAttribute("clientId", clientId)
-              .setAttribute("request.id", requestId)
-              .setAttribute("cli.from", cliOptions.from.toString)
-          ) { span =>
+          withCliSpan("import", _.setAttribute("cli.from", cliOptions.from.toString)) { span =>
             val notificationCallback: ServerNotification => Unit = { sn =>
               CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
             }
@@ -562,33 +454,20 @@ class CliClientMessageHandler(
             }
           }
       }
-  }
 
-  private def handleComplete(m: CliClientMessage.Complete): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    if m.args == Seq("--help") || m.args == Seq("-h") then
-      serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliCompleteOptions].helpText()))
-      serverMessages.put(CliServerMessage.Exit(0))
-    else
+  private def handleComplete(m: CliClientMessage.Complete): Unit =
+    if !ifHelpThenShow(m.args, mainargs.Parser[DederCliCompleteOptions].helpText()) then
       mainargs.Parser[DederCliCompleteOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
         case Left(error) =>
-          OTEL.withSpan("cli.complete")(
-            _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-          ) { span =>
+          withCliSpan("complete") { span =>
             span.setStatus(StatusCode.ERROR)
             span.setAttribute("error", error)
             serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          OTEL.withSpan("cli.complete")(
-            _.setAttribute("clientId", clientId)
-              .setAttribute("request.id", requestId)
-              .setAttribute("cli.shell", cliOptions.shell.toString)
-              .pipe(b => cliOptions.commandLine.fold(b)(c => b.setAttribute("cli.commandLine", c)))
-          ) { _ =>
+          withCliSpan("complete", _.setAttribute("cli.shell", cliOptions.shell.toString)
+              .pipe(b => cliOptions.commandLine.fold(b)(c => b.setAttribute("cli.commandLine", c)))) { _ =>
             val res = if cliOptions.output.value then {
               cliOptions.shell match {
                 case ShellType.bash       => TabCompleter.bashScript
@@ -608,14 +487,11 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(0))
           }
       }
-  }
 
-  private def handleShutdown(m: CliClientMessage.Shutdown): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    OTEL.withSpan("cli.shutdown")(
-      _.setAttribute("clientId", clientId)
-    ) { _ =>
+  private def handleShutdown(m: CliClientMessage.Shutdown): Unit =
+    withCliSpan("shutdown") { _ =>
+      val ctx = RequestContext.current.get()
+      val clientId = ctx.clientId
       logger.info(s"Client $clientId requested server shutdown.")
       serverMessages.put(CliServerMessage.Log("Deder server is shutting down...", LogLevel.INFO))
       serverMessages.put(CliServerMessage.Exit(0, serverShuttingDown = true))
@@ -634,15 +510,9 @@ class CliClientMessageHandler(
       Thread.sleep(500) // flush window for BSP clients to process disconnect
       projectState.shutdown()
     }
-  }
 
-  private def handleTool(m: CliClientMessage.Tool): Unit = {
-    val ctx = RequestContext.current.get()
-    val clientId = ctx.clientId
-    val requestId = ctx.requestId
-    OTEL.withSpan("cli.tool")(
-      _.setAttribute("clientId", clientId).setAttribute("request.id", requestId)
-    ) { span =>
+  private def handleTool(m: CliClientMessage.Tool): Unit =
+    withCliSpan("tool") { span =>
       if m.args == Seq("--help") || m.args == Seq("-h") then
         serverMessages.put(CliServerMessage.Output(mainargs.Parser[DederCliToolOptions].helpText()))
         serverMessages.put(CliServerMessage.Exit(0))
@@ -699,7 +569,24 @@ class CliClientMessageHandler(
             }
         }
     }
+
+  // --- OTEL span helpers ---
+
+  private def withCliSpan(spanName: String, extraAttrs: SpanBuilder => SpanBuilder = identity)(body: Span => Unit): Unit = {
+    val ctx = RequestContext.current.get()
+    OTEL.withSpan(s"cli.$spanName")(
+      _.setAttribute("clientId", ctx.clientId)
+        .setAttribute("request.id", ctx.requestId)
+        .pipe(extraAttrs)
+    )(body)
   }
+
+  private def ifHelpThenShow(args: Seq[String], helpText: => String): Boolean =
+    if args == Seq("--help") || args == Seq("-h") then {
+      serverMessages.put(CliServerMessage.Output(helpText))
+      serverMessages.put(CliServerMessage.Exit(0))
+      true
+    } else false
 }
 
 object CliClientMessageHandler {

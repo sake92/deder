@@ -946,96 +946,46 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         }
     }
 
-  val fixTask = TaskBuilder
-    .make[Seq[String]](
-      name = "fix",
-      supportedModuleTypes = Set(
-        ModuleType.SCALA,
-        ModuleType.SCALA_TEST,
-        ModuleType.SCALA_JS,
-        ModuleType.SCALA_JS_TEST,
-        ModuleType.SCALA_NATIVE,
-        ModuleType.SCALA_NATIVE_TEST
-      ),
-      category = "Verification"
-    )
-    .dependsOn(sourcesTask)
-    .dependsOn(scalaVersionTask)
-    .dependsOn(scalacOptionsTask)
-    .dependsOn(jvmOptionsTask)
-    .dependsOn(compileTask)
-    .dependsOn(compileClasspathTask)
-    .build { ctx =>
-      val (sources, scalaVersion, scalacOptions, jvmOptions, _, compileClasspath) = ctx.depResults
-      val semanticdbDir = DederPath(DederGlobals.semanticdbDir(ctx.module.id))
-      val dependency = Dependency.make(ScalafixUtils.scalafixDep(scalaVersion), scalaVersion)
-      val jars = ctx.dependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
-      val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
-      val scalafixArgs =
-        ScalafixUtils.buildArgs(
-          scalaVersion,
-          scalacOptions,
-          compileClasspath,
-          semanticdbDir.absPath,
-          sourcePaths,
-          ctx.args
-        )
-      val argfile = Argfile.write(ctx.out, "scalafix", jvmOptions, Classpath(jars),
-        mainClass = "scalafix.cli.Cli", args = scalafixArgs)
-      val cmd = Seq("java", s"@${argfile}")
-      logger.info(s"Running scalafix fix: ${cmd}")
-      val forkEnv = ctx.module match {
-        case m: JavaModule => m.forkEnv.asScala.to(Map)
-        case _             => Map.empty
-      }
-      ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, ctx.watch))
-      cmd
-    }
+  val fixTask = scalafixTask("fix", extraArgs = Seq.empty, watch = true)
 
-  val fixCheckTask = TaskBuilder
-    .make[Seq[String]](
-      name = "fixCheck",
-      supportedModuleTypes = Set(
-        ModuleType.SCALA,
-        ModuleType.SCALA_TEST,
-        ModuleType.SCALA_JS,
-        ModuleType.SCALA_JS_TEST,
-        ModuleType.SCALA_NATIVE,
-        ModuleType.SCALA_NATIVE_TEST
-      ),
-      category = "Verification"
+  val fixCheckTask = scalafixTask("fixCheck", extraArgs = Seq("--test"), watch = false)
+
+  private def scalafixTask(name: String, extraArgs: Seq[String], watch: Boolean) = {
+    val supportedModuleTypes = Set(
+      ModuleType.SCALA, ModuleType.SCALA_TEST,
+      ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST,
+      ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST
     )
-    .dependsOn(sourcesTask)
-    .dependsOn(scalaVersionTask)
-    .dependsOn(scalacOptionsTask)
-    .dependsOn(jvmOptionsTask)
-    .dependsOn(compileTask)
-    .dependsOn(compileClasspathTask)
-    .build { ctx =>
-      val (sources, scalaVersion, scalacOptions, jvmOptions, _, compileClasspath) = ctx.depResults
-      val semanticdbDir = DederPath(DederGlobals.semanticdbDir(ctx.module.id))
-      val dependency = Dependency.make(ScalafixUtils.scalafixDep(scalaVersion), scalaVersion)
-      val jars = ctx.dependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
-      val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
-      val scalafixArgs = ScalafixUtils.buildArgs(
-        scalaVersion,
-        scalacOptions,
-        compileClasspath,
-        semanticdbDir.absPath,
-        sourcePaths,
-        Seq("--test") ++ ctx.args
-      )
-      val argfile = Argfile.write(ctx.out, "scalafix", jvmOptions, Classpath(jars),
-        mainClass = "scalafix.cli.Cli", args = scalafixArgs)
-      val cmd = Seq("java", s"@${argfile}")
-      logger.info(s"Running scalafix fixCheck: ${cmd}")
-      val forkEnv = ctx.module match {
-        case m: JavaModule => m.forkEnv.asScala.to(Map)
-        case _             => Map.empty
+    TaskBuilder
+      .make[Seq[String]](name = name, supportedModuleTypes = supportedModuleTypes, category = "Verification")
+      .dependsOn(sourcesTask)
+      .dependsOn(scalaVersionTask)
+      .dependsOn(scalacOptionsTask)
+      .dependsOn(jvmOptionsTask)
+      .dependsOn(compileTask)
+      .dependsOn(compileClasspathTask)
+      .build { ctx =>
+        val (sources, scalaVersion, scalacOptions, jvmOptions, _, compileClasspath) = ctx.depResults
+        val semanticdbDir = DederPath(DederGlobals.semanticdbDir(ctx.module.id))
+        val dependency = Dependency.make(ScalafixUtils.scalafixDep(scalaVersion), scalaVersion)
+        val jars = ctx.dependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
+        val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
+        val scalafixArgs = ScalafixUtils.buildArgs(
+          scalaVersion, scalacOptions, compileClasspath, semanticdbDir.absPath, sourcePaths,
+          extraArgs ++ ctx.args
+        )
+        val argfile = Argfile.write(ctx.out, "scalafix", jvmOptions, Classpath(jars),
+          mainClass = "scalafix.cli.Cli", args = scalafixArgs)
+        val cmd = Seq("java", s"@${argfile}")
+        logger.info(s"Running scalafix $name: ${cmd}")
+        val forkEnv = ctx.module match {
+          case m: JavaModule => m.forkEnv.asScala.to(Map)
+          case _             => Map.empty
+        }
+        ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, watch))
+        cmd
       }
-      ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, false))
-      cmd
-    }
+  }
 
   val testClassesTask = CachedTaskBuilder
     .make[Seq[DiscoveredFrameworkTests]](
