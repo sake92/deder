@@ -41,6 +41,12 @@ object DederGlobals {
 
   val cancellationTokens: ConcurrentHashMap[String, AtomicBoolean] = new ConcurrentHashMap()
 
+  /** Thread-local that carries the current task's cancellation token.
+    * Set by TasksExecutor before task body execution; checked by CachedTask
+    * after `execute()` returns to decide whether to discard the result cache.
+    */
+  val currentCancellationToken: ThreadLocal[AtomicBoolean] = new ThreadLocal()
+
   /** Caps the number of forked test JVMs alive at any one time across the whole server.
     * Configured from `deder.pkl` (`maxConcurrentTestForks`), defaulting to available CPU cores.
     * Acquired/released around each fork's spawn/exit inside ForkedTestOrchestrator.
