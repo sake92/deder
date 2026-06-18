@@ -253,6 +253,12 @@ sealed trait AbstractTask[T] {
     b.result()
 
   def isResultSuccessful: T => Boolean
+
+  /** Called by TasksExecutor when a request is cancelled, after executeUnsafe
+    * returns. CachedTask overrides this to delete its metadata.json so stale
+    * partial results are not reused on the next build.
+    */
+  private[deder] def cleanupAfterCancellation(module: DederModule): Unit = ()
 }
 
 sealed trait Task[T, Deps <: Tuple, S](using
@@ -451,6 +457,11 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
   }
 
   override def toString(): String = s"CachedTask($name)"
+
+  private[deder] override def cleanupAfterCancellation(module: DederModule): Unit = {
+    val metadataFile = DederGlobals.projectRootDir / ".deder/out" / module.id / name / "metadata.json"
+    if os.exists(metadataFile) then os.remove(metadataFile)
+  }
 
 }
 
