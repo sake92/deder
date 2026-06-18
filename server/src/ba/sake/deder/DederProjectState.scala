@@ -413,14 +413,33 @@ class DederProjectState(
       try {
         allTaskInstances.foreach { taskInstance =>
           internals.updateLockBlocking(requestId, taskInstance.id)
-          if taskLockTimeoutEnabled then
-            val acquired = taskInstance.lock.tryLock(taskLockTimeoutSeconds.toLong, TimeUnit.SECONDS)
-            if !acquired then
-              throw TaskLockTimeoutException(
-                s"Timed out waiting for lock on task '${taskInstance.id}' after ${taskLockTimeoutSeconds}s. " +
-                  s"The lock is held by another in-flight request. Consider increasing 'taskLockTimeoutSeconds' in .deder/server.properties."
-              )
-          else taskInstance.lock.lock()
+          // fork a background thread that periodically reports "waiting for lock" to the CLI
+          val cancelled = new AtomicBoolean(false)
+          val progressThread = Thread.ofVirtual().start(() => {
+            try {
+              Thread.sleep(10_000) // first message after 10 seconds
+              while (!cancelled.get()) {
+                serverNotificationsLogger.add(
+                  ServerNotification.logInfo(s"Waiting for lock on ${taskInstance.id}...")
+                )
+                Thread.sleep(10_000)
+              }
+            } catch {
+              case _: InterruptedException => // stopped
+            }
+          })
+          try
+            if taskLockTimeoutEnabled then
+              val acquired = taskInstance.lock.tryLock(taskLockTimeoutSeconds.toLong, TimeUnit.SECONDS)
+              if !acquired then
+                throw TaskLockTimeoutException(
+                  s"Timed out waiting for lock on task '${taskInstance.id}' after ${taskLockTimeoutSeconds}s. " +
+                    s"The lock is held by another in-flight request. Consider increasing 'taskLockTimeoutSeconds' in .deder/server.properties."
+                )
+            else taskInstance.lock.lock()
+          finally
+            cancelled.set(true)
+            progressThread.interrupt()
           acquiredLocks += taskInstance
           internals.updateLockAcquired(requestId, taskInstance.id)
         }
