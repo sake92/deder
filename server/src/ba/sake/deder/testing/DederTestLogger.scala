@@ -16,16 +16,16 @@ class DederTestLogger(
   def test(msg: String): Unit = info(msg)
 
   def error(msg: String): Unit =
-    serverNotificationsLogger.add(ServerNotification.logError(msg, Some(moduleId)))
+    serverNotificationsLogger.add(ServerNotification.logError(msg, Some(moduleId), source = Some("test")))
 
   def warn(msg: String): Unit =
-    serverNotificationsLogger.add(ServerNotification.logWarning(msg, Some(moduleId)))
+    serverNotificationsLogger.add(ServerNotification.logWarning(msg, Some(moduleId), source = Some("test")))
 
   def info(msg: String): Unit =
-    serverNotificationsLogger.add(ServerNotification.logInfo(msg, Some(moduleId)))
+    serverNotificationsLogger.add(ServerNotification.logInfo(msg, Some(moduleId), source = Some("test")))
 
   def debug(msg: String): Unit =
-    serverNotificationsLogger.add(ServerNotification.logDebug(msg, Some(moduleId)))
+    serverNotificationsLogger.add(ServerNotification.logDebug(msg, Some(moduleId), source = Some("test")))
 
   def trace(t: Throwable): Unit =
     error(t.getStackTrace.mkString("\n"))

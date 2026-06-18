@@ -23,7 +23,7 @@ object TestResultsSummary {
 
   given PlainTextWritable[TestResultsSummary] with {
     def write(summary: TestResultsSummary): String = {
-      val statusIcon = if summary.success then "✅ PASS" else "🔴 FAIL"
+      val statusIcon = if summary.success then "✅ PASSED" else "🔴 FAILED"
       val suitesStr = renderCounts(summary.suitesPassed, summary.suitesFailed, 0, summary.suitesTotal)
       val testsStr = renderCounts(summary.testsPassed, summary.testsFailed, summary.testsSkipped, summary.testsTotal)
       val timeStr = Duration.ofMillis(summary.duration).toPrettyString
@@ -33,7 +33,7 @@ object TestResultsSummary {
       val successfulModules =
         summary.modules.filter { case (_, res) => res.success }.toSeq.sortBy(_._1)
       val successfulModulesSummary = successfulModules
-        .map { case (moduleId, res) => s"  ✅ PASS $moduleId" }
+        .map { case (moduleId, res) => s"  ✅ PASSED $moduleId" }
         .mkString("\n")
       val failedModules = summary.modules.filter { case (_, res) => !res.success }.toSeq.sortBy(_._1)
       val failedModulesSummary = failedModules
@@ -41,7 +41,7 @@ object TestResultsSummary {
           val failedTestsSummary = res.failedTestNames
             .map(testName => s"       - $testName")
             .mkString("\n")
-          Seq(s"  🔴 FAIL $moduleId (${res.failed} failed tests)", failedTestsSummary)
+          Seq(s"  🔴 FAILED $moduleId (${res.failed} failed tests)", failedTestsSummary)
             .filter(_.trim.nonEmpty)
             .mkString("\n")
         }

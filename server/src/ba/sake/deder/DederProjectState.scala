@@ -207,7 +207,7 @@ class DederProjectState(
         val msg =
           if recommendedModuleIds.isEmpty then s"No modules found for selectors: ${moduleSelectors.mkString(", ")}"
           else s"No modules found, did you mean: ${recommendedModuleIds.mkString(", ")} ?"
-        serverNotificationsLogger.add(ServerNotification.logError(msg))
+        serverNotificationsLogger.add(ServerNotification.logError(msg, source = Some("server-cli")))
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
       case Right(moduleIds) =>
         val relevantModuleAndTasks = state.executionPlanner.getTaskInstances(moduleIds, taskName) match {
@@ -215,7 +215,7 @@ class DederProjectState(
             val msg =
               if recommendations.isEmpty then s"No '${taskName}' tasks found"
               else s"No '${taskName}' tasks found, did you mean: ${recommendations.mkString(", ")} ?"
-            serverNotificationsLogger.add(ServerNotification.logError(msg))
+            serverNotificationsLogger.add(ServerNotification.logError(msg, source = Some("server-cli")))
             serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
             Seq.empty
           case Right(values) =>
@@ -252,13 +252,13 @@ class DederProjectState(
           val failures = results.collect {
             case f: TaskExecResult.Failure =>
               serverNotificationsLogger.add(
-                ServerNotification.logError(s"${f.taskInstance.moduleId}: ${f.error}")
+                ServerNotification.logError(s"${f.taskInstance.moduleId}: ${f.error}", source = Some("server-cli"))
               )
               ModuleFailure(f.taskInstance.moduleId, f.error, None)
             case s: TaskExecResult.Skipped =>
               serverNotificationsLogger.add(
                 ServerNotification.logError(
-                  s"${s.taskInstance.moduleId}: Skipped — ${s.because.taskInstance.moduleId} failed: ${s.because.error}"
+                  s"${s.taskInstance.moduleId} skipped — ${s.because.taskInstance.moduleId} failed", source = Some("server-cli")
                 )
               )
               ModuleFailure(s.taskInstance.moduleId, s.because.error, Some(s.because.taskInstance.moduleId))
@@ -314,7 +314,7 @@ class DederProjectState(
     }
   } catch {
     case NonFatal(e) =>
-      serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
+      serverNotificationsLogger.add(ServerNotification.logError(e.getMessage, source = Some("server-cli")))
       if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
   }
 
@@ -361,7 +361,7 @@ class DederProjectState(
           case TaskExecResult.Failure(ti, error) =>
             throw TaskEvaluationException(s"${ti.id}: $error")
           case TaskExecResult.Skipped(ti, because) =>
-            throw TaskEvaluationException(s"${ti.id}: Skipped — ${because.taskInstance.id} failed: ${because.error}")
+            throw TaskEvaluationException(s"${ti.id} skipped — ${because.taskInstance.id} failed")
       }
     } catch {
       case e: Throwable =>
@@ -469,7 +469,7 @@ class DederProjectState(
         val errMsg = Option(e.getMessage).getOrElse(e.getClass.getSimpleName)
         internals.recordRequestCompleted(requestId, taskName, success = false, duration, callerType, error = Some(errMsg))
         // send notification about failure to client
-        serverNotificationsLogger.add(ServerNotification.logError(e.getMessage))
+        serverNotificationsLogger.add(ServerNotification.logError(e.getMessage, source = Some("server")))
         if !watch then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
         throw TaskEvaluationException(s"Error during execution of task '${taskName}': ${e.getMessage}", e)
     } finally {

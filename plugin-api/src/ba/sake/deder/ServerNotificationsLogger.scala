@@ -7,10 +7,7 @@ class ServerNotificationsLogger(callback: ServerNotification => Unit) extends St
     serverNotification match {
       case ServerNotification.Output(text) =>
       case ServerNotification.Log(level, timestamp, message, moduleId, source) =>
-        val prefix = source match {
-          case Some(s) => Some(s)
-          case None    => moduleId
-        }
+        val prefix = moduleId
         val msgWithPrefix = prefix match {
           case Some(p) => s"[$p] $message"
           case None     => message

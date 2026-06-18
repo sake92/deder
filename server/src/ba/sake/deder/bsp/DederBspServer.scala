@@ -87,6 +87,7 @@ class DederBspServer(
       originId: Option[String] = None,
       taskId: Option[TaskId] = None,
       moduleId: Option[String] = None,
+      // true if it calls compile in any of the tasks, even transitively!
       isCompileTask: Boolean = false,
       onCompileResult: (Int, Int) => Unit = (_, _) => ()
   ) = {
@@ -95,13 +96,14 @@ class DederBspServer(
         case n: ServerNotification.Log =>
           // Forward non-zinc errors and warnings to BSP client.
           // Zinc compile log spam is suppressed — compile diagnostics are sent separately.
-          if n.source != Some("zinc") then
+          if n.source != Some("zinc") then {
             n.level match
               case ServerNotification.LogLevel.ERROR =>
                 client.onBuildShowMessage(new ShowMessageParams(MessageType.ERROR, n.message))
               case ServerNotification.LogLevel.WARNING =>
                 client.onBuildShowMessage(new ShowMessageParams(MessageType.WARNING, n.message))
               case _ => // info/debug/trace not forwarded
+          }
         case cs: ServerNotification.CompileStarted =>
           // dont send notification if compile was triggered transitively by another task
           // e.g. mainClasses -> compile

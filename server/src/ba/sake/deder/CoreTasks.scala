@@ -716,7 +716,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
             if diag.range.startLine > 0 then s"${fd.file.path}:${diag.range.startLine}:${diag.range.startChar}"
             else s"${fd.file.path}"
           val text = s"$location: ${diag.message}"
-          logger.add(ServerNotification.log(level, text, Some(moduleId)))
+          logger.add(ServerNotification.log(level, text, Some(moduleId), source = Some("server1")))
         }
       }
     }

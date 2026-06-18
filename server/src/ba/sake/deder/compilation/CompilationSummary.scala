@@ -44,7 +44,7 @@ object CompilationSummary {
       }.mkString("\n")
 
       val failedSection = failedModules.map { case (moduleId, info) =>
-        s"  🔴 FAIL $moduleId (${info.errors} errors, ${info.warnings} warnings)"
+        s"  🔴 FAILED $moduleId (${info.errors} errors, ${info.warnings} warnings)"
       }.mkString("\n")
 
       val skippedSection = skippedModules.map { case (moduleId, info) =>

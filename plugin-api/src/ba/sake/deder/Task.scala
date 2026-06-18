@@ -1,16 +1,16 @@
 package ba.sake.deder
 
-import ba.sake.deder.config.DederProject
-import ba.sake.deder.config.DederProject.{DederModule, ModuleType}
-import ba.sake.deder.deps.DependencyResolverApi
-
 import scala.util.control.Breaks.{break, breakable}
 import scala.Tuple.:*
-import ba.sake.tupson.{*, given}
 import java.time.Duration
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import os.write.over
+import ba.sake.tupson.{*, given}
+import ba.sake.deder.config.DederProject
+import ba.sake.deder.config.DederProject.{DederModule, ModuleType}
+import ba.sake.deder.deps.DependencyResolverApi
+import ba.sake.deder.RequestContext
 
 enum TaskKind {
   case Standard, SourceGenerator, ResourceGenerator
@@ -426,7 +426,8 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
           )
           // served from cache: execute() did not run, so no live notifications were emitted.
           // Replay cached diagnostics to CLI (e.g. compile errors) if a replay hook is set.
-          cliReplayFn.foreach(_(cachedTaskResult.value, module.id, serverNotificationsLogger))
+          if RequestContext.current then
+            cliReplayFn.foreach(_(cachedTaskResult.value, module.id, serverNotificationsLogger))
           (cachedTaskResult, false, true)
         else
           val newRes = computeTaskResult()
@@ -564,7 +565,8 @@ class FanInTask[T: JsonRW: Hashable](
           serverNotificationsLogger.add(
             ServerNotification.logError(
               s"Task ${name} failed because it returns wrong result type for ${collectKind}. This is likely a plugin bug, please report it to the plugin author.",
-              Some(module.id)
+              Some(module.id),
+              source = Some("server")
             )
           )
           throw e
