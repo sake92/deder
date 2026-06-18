@@ -41,7 +41,7 @@ class SummarizableSuite extends munit.FunSuite {
     val rendered = ptw.write(summary)
 
     val lines = rendered.split("\n")
-    assertEquals(lines(1), "🔴 FAIL  3 modules", "header should show FAIL with total module count")
+    assertEquals(lines(1), "🔴 FAILED  3 modules", "header should show FAILED with total module count")
 
     val serverIdx = lines.indexWhere(_.contains("✅ server"))
     val clientIdx = lines.indexWhere(_.contains("🔴 client"))
@@ -69,7 +69,7 @@ class SummarizableSuite extends munit.FunSuite {
     val rendered = ptw.write(summary)
 
     val lines = rendered.split("\n")
-    assertEquals(lines(1), "🔴 FAIL  1 module", "header should show FAIL with module count")
+    assertEquals(lines(1), "🔴 FAILED  1 module", "header should show FAILED with module count")
     assert(lines.exists(_.contains("🔴 server")), "should show failed server module")
     assert(lines.exists(_.contains("compilation failed")), "should include error message")
     assertEquals(lines(0), lines.last, "top and bottom separators should be equal")

@@ -246,12 +246,12 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
     val testStatus = DederTestStatus.fromSbt(event.status())
 
     val statusOpt = event.status() match {
-      case Status.Failure  => Some(fansi.Color.Red("FAIL \uD83D\uDD34"))
-      case Status.Error    => Some(fansi.Color.Red("FAIL \uD83D\uDD34"))
-      case Status.Skipped  => Some(fansi.Color.LightYellow("SKIP 🚫"))
-      case Status.Ignored  => Some(fansi.Color.LightYellow("SKIP 🚫"))
-      case Status.Canceled => Some(fansi.Color.LightYellow("SKIP 🚫"))
-      case Status.Pending  => Some(fansi.Color.LightYellow("SKIP 🚫"))
+      case Status.Failure  => Some(fansi.Color.Red("FAILED \uD83D\uDD34"))
+      case Status.Error    => Some(fansi.Color.Red("FAILED \uD83D\uDD34"))
+      case Status.Skipped  => Some(fansi.Color.LightYellow("SKIPPED 🚫"))
+      case Status.Ignored  => Some(fansi.Color.LightYellow("SKIPPED 🚫"))
+      case Status.Canceled => Some(fansi.Color.LightYellow("SKIPPED 🚫"))
+      case Status.Pending  => Some(fansi.Color.LightYellow("SKIPPED 🚫"))
       case Status.Success  => None // frameworks print their own pass lines
     }
     statusOpt.foreach { status =>

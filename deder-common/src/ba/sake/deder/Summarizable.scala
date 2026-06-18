@@ -23,7 +23,7 @@ object MultiModuleResults:
       val totalModules = mmr.results.size + mmr.failures.size
       val hasFailures = mmr.failures.nonEmpty
       val moduleWord = if totalModules == 1 then "module" else "modules"
-      val header = if hasFailures then s"🔴 FAIL  $totalModules $moduleWord" else s"✅ OK  $totalModules $moduleWord"
+      val header = if hasFailures then s"🔴 FAILED  $totalModules $moduleWord" else s"✅ OK  $totalModules $moduleWord"
 
       val successLines = mmr.results.toSeq
         .sortBy(_._1)

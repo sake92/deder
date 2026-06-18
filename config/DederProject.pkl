@@ -638,11 +638,11 @@ const function javaModules(
         sources = new Listing {
           cfg.mainScalaSrcBase
           ...(cfg.mainExtraSrc)
-          ...(_template.sources)
+          for (s in _template.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.mainResources
-          ...(_template.resources)
+          for (r in _template.resources) { when (r != "resources") { r } }
         }
       }
       test = (_testTemplate) {
@@ -651,11 +651,11 @@ const function javaModules(
         sources = new Listing {
           cfg.testScalaSrcBase
           ...(cfg.testExtraSrc)
-          ...(_testTemplate.sources)
+          for (s in _testTemplate.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.testResources
-          ...(_testTemplate.resources)
+          for (r in _testTemplate.resources) { when (r != "resources") { r } }
         }
         moduleDeps {
           main
@@ -717,11 +717,11 @@ const function scalaModulesWithTestId(
               "\(cfg.mainScalaSrcBase)-\(prefix)"
             }
           }
-          ...(_template.sources)
+          for (s in _template.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.mainResources
-          ...(_template.resources)
+          for (r in _template.resources) { when (r != "resources") { r } }
         }
       }
       test = (_testTemplate) {
@@ -738,11 +738,11 @@ const function scalaModulesWithTestId(
               "\(cfg.testScalaSrcBase)-\(prefix)"
             }
           }
-          ...(_testTemplate.sources)
+          for (s in _testTemplate.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.testResources
-          ...(_testTemplate.resources)
+          for (r in _testTemplate.resources) { when (r != "resources") { r } }
         }
         moduleDeps {
           main
@@ -788,11 +788,11 @@ const function scalaJsModules(
               "\(cfg.mainScalaSrcBase)-\(prefix)"
             }
           }
-          ...(_template.sources)
+          for (s in _template.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.mainResources
-          ...(_template.resources)
+          for (r in _template.resources) { when (r != "resources") { r } }
         }
       }
       test = (_testTemplate) {
@@ -809,11 +809,11 @@ const function scalaJsModules(
               "\(cfg.testScalaSrcBase)-\(prefix)"
             }
           }
-          ...(_testTemplate.sources)
+          for (s in _testTemplate.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.testResources
-          ...(_testTemplate.resources)
+          for (r in _testTemplate.resources) { when (r != "resources") { r } }
         }
         moduleDeps {
           main
@@ -859,11 +859,11 @@ const function scalaNativeModules(
               "\(cfg.mainScalaSrcBase)-\(prefix)"
             }
           }
-          ...(_template.sources)
+          for (s in _template.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.mainResources
-          ...(_template.resources)
+          for (r in _template.resources) { when (r != "resources") { r } }
         }
       }
       test = (_testTemplate) {
@@ -880,11 +880,11 @@ const function scalaNativeModules(
               "\(cfg.testScalaSrcBase)-\(prefix)"
             }
           }
-          ...(_testTemplate.sources)
+          for (s in _testTemplate.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.testResources
-          ...(_testTemplate.resources)
+          for (r in _testTemplate.resources) { when (r != "resources") { r } }
         }
         moduleDeps {
           main
@@ -1033,14 +1033,14 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-          ...(_template.sources)
+          for (s in _template.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.mainResources
           when (sharedPrefix != null) {
             for (r in cfg.mainResources) { "shared/\(r)" }
           }
-          ...(_template.resources)
+          for (r in _template.resources) { when (r != "resources") { r } }
         }
       }
       jvm_test = (_testTemplate) {
@@ -1055,14 +1055,14 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-          ...(_testTemplate.sources)
+          for (s in _testTemplate.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.testResources
           when (sharedPrefix != null) {
             for (r in cfg.testResources) { "shared/\(r)" }
           }
-          ...(_testTemplate.resources)
+          for (r in _testTemplate.resources) { when (r != "resources") { r } }
         }
         moduleDeps {
           jvm
@@ -1080,14 +1080,14 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-          ...(_jsTemplate.sources)
+          for (s in _jsTemplate.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.mainResources
           when (sharedPrefix != null) {
             for (r in cfg.mainResources) { "shared/\(r)" }
           }
-          ...(_jsTemplate.resources)
+          for (r in _jsTemplate.resources) { when (r != "resources") { r } }
         }
       }
       js_test = (_jsTestTemplate) {
@@ -1102,14 +1102,14 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-          ...(_jsTestTemplate.sources)
+          for (s in _jsTestTemplate.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.testResources
           when (sharedPrefix != null) {
             for (r in cfg.testResources) { "shared/\(r)" }
           }
-          ...(_jsTestTemplate.resources)
+          for (r in _jsTestTemplate.resources) { when (r != "resources") { r } }
         }
         moduleDeps {
           js
@@ -1127,14 +1127,14 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-          ...(_nativeTemplate.sources)
+          for (s in _nativeTemplate.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.mainResources
           when (sharedPrefix != null) {
             for (r in cfg.mainResources) { "shared/\(r)" }
           }
-          ...(_nativeTemplate.resources)
+          for (r in _nativeTemplate.resources) { when (r != "resources") { r } }
         }
       }
       native_test = (_nativeTestTemplate) {
@@ -1149,14 +1149,14 @@ const function crossModules(
             cfg.versionStyle,
             sv,
           )
-          ...(_nativeTestTemplate.sources)
+          for (s in _nativeTestTemplate.sources) { when (s != "src") { s } }
         }
         resources = new Listing {
           ...cfg.testResources
           when (sharedPrefix != null) {
             for (r in cfg.testResources) { "shared/\(r)" }
           }
-          ...(_nativeTestTemplate.resources)
+          for (r in _nativeTestTemplate.resources) { when (r != "resources") { r } }
         }
         moduleDeps {
           native
