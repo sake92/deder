@@ -102,8 +102,8 @@ trait DederProjectInternals:
   def loadedPlugins: Seq[LoadedPluginInfo]
 
   /** Per-cache stats keyed by cache identifier.
-   *  Keys: "dep-resolver", "zinc-compilers", "zinc-analysis:<version>",
-   *        "zinc-setup:<version>", "test-classloaders"
+   *  Keys: "dep-resolver", "zinc-compilers", "zinc-setup:<version>",
+   *        "test-classloaders"
    */
   def inMemoryCachesStats: Map[String, InMemCacheStats]
 
