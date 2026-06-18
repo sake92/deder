@@ -32,7 +32,7 @@ class DependencyResolver(
       .maximumSize(50)
       .build()
 
-  cacheRegistry.register("dep-resolver", () => CacheStatsRegistry.statsOf(fetchFilesCache))
+  cacheRegistry.register("dep-resolver", fetchFilesCache)
 
   def doFetch(
       coursierDependencies: Seq[CoursierDependency],

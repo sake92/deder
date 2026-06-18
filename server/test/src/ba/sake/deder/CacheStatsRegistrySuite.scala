@@ -20,7 +20,7 @@ class CacheStatsRegistrySuite extends munit.FunSuite {
     cache.getIfPresent("a") // hit
     cache.getIfPresent("c") // miss
 
-    registry.register("test-cache", () => CacheStatsRegistry.statsOf(cache))
+    registry.register("test-cache", cache)
 
     val stats = registry.getAllStats
     assert(stats.contains("test-cache"))
@@ -54,19 +54,42 @@ class CacheStatsRegistrySuite extends munit.FunSuite {
     assert(stats.isEmpty)
   }
 
-  test("register overwrites previous supplier for same key") {
+  test("register overwrites previous cache for same key") {
     val registry = CacheStatsRegistry()
 
     val cache1 = Scaffeine().recordStats().build[String, String]()
     cache1.put("x", "y")
-    registry.register("same-key", () => CacheStatsRegistry.statsOf(cache1))
+    registry.register("same-key", cache1)
 
     val cache2 = Scaffeine().recordStats().build[String, String]()
     cache2.put("a", "v")
     cache2.put("b", "v")
-    registry.register("same-key", () => CacheStatsRegistry.statsOf(cache2))
+    registry.register("same-key", cache2)
 
     val stats = registry.getAllStats
     assertEquals(stats("same-key").estimatedSize, 2L)
+  }
+
+  test("invalidateAll clears all registered caches") {
+    val registry = CacheStatsRegistry()
+
+    val cache1 = Scaffeine().recordStats().build[String, String]()
+    cache1.put("a", "val1")
+    registry.register("cache-1", cache1)
+
+    val cache2 = Scaffeine().recordStats().build[String, String]()
+    cache2.put("b", "val2")
+    registry.register("cache-2", cache2)
+
+    // Both caches have entries
+    assert(cache1.estimatedSize() > 0)
+    assert(cache2.estimatedSize() > 0)
+
+    val cleared = registry.invalidateAll()
+    assertEquals(cleared, 2)
+
+    // Both caches should now be empty
+    assertEquals(cache1.estimatedSize(), 0L)
+    assertEquals(cache2.estimatedSize(), 0L)
   }
 }

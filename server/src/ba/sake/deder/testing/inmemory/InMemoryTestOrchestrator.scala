@@ -24,7 +24,7 @@ class InMemoryTestOrchestrator(cacheRegistry: CacheStatsRegistry):
       }
       .build()
 
-  cacheRegistry.register("test-classloaders", () => CacheStatsRegistry.statsOf(classLoaderCache))
+  cacheRegistry.register("test-classloaders", classLoaderCache)
 
   def run(
       discoveredTests: Seq[DiscoveredFrameworkTests],

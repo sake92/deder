@@ -988,6 +988,17 @@ class DederBspServer(
       })
   }
 
+  /** Removes completed (stale) in-flight compilation entries and returns the count. */
+  private[deder] def cleanupCompletedInFlight(): Int = {
+    val stale = inFlightCompilations.values().asScala.toSet.filter(_.compileFuture.isDone)
+    stale.foreach { s =>
+      s.modulesBeingCompiled.foreach { modId =>
+        inFlightCompilations.remove(modId, s)
+      }
+    }
+    stale.size
+  }
+
   private def cancelInFlightCompilationsOnShutdown(): Unit = {
     val inFlightSnapshot = inFlightCompilations.values().asScala.toSet
     inFlightSnapshot.foreach { inFlight =>

@@ -17,7 +17,7 @@ class ZincCompilersCache(cacheRegistry: CacheStatsRegistry):
       }
       .build()
 
-  cacheRegistry.register("zinc-compilers", () => CacheStatsRegistry.statsOf(zincCache))
+  cacheRegistry.register("zinc-compilers", zincCache)
 
   def get(scalaVersion: String, dependencyResolver: DependencyResolverApi): ZincCompiler =
     zincCache.get(scalaVersion, _ => makeZincCompiler(scalaVersion, dependencyResolver))

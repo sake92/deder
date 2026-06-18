@@ -48,6 +48,16 @@ class ZincCompiler(
 
   private val incrementalCompiler = ZincUtil.defaultIncrementalCompiler
 
+  // In-memory cache for Zinc analysis, avoids re-reading inc_compile.zip from disk
+  private val analysisCache: Cache[os.Path, AnalysisContents] =
+    Scaffeine()
+      .recordStats()
+      .expireAfterAccess(5.minute)
+      .maximumSize(50)
+      .build()
+
+  cacheRegistry.register(s"zinc-analysis:$scalaVersion", analysisCache)
+
   // Cached compiler setup: classloaders, ScalaInstance, and Compilers
   // are expensive to create (JAR scanning, reflection) and can be reused
   // across compilations when the same compiler/library JARs are used.
@@ -82,7 +92,7 @@ class ZincCompiler(
       }
       .build()
 
-  cacheRegistry.register(s"zinc-setup:$scalaVersion", () => CacheStatsRegistry.statsOf(setupCache))
+  cacheRegistry.register(s"zinc-setup:$scalaVersion", setupCache)
 
   def close(): Unit = {
     setupCache.invalidateAll()
