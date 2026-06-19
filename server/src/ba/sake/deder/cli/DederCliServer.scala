@@ -59,12 +59,12 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
     * Existing client channels are unaffected.
     * Does NOT delete the socket file — that's done by start() of the next server. */
   def stopAccepting(): Unit = {
-    try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
+    CloseUtils.quietly { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() }
   }
 
   def stop(): Unit = {
     logger.info("Shutting down CLI server...")
-    try { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() } catch { case _: Exception => }
+    CloseUtils.quietly { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() }
     // Socket file intentionally NOT deleted here — the next server's start() handles cleanup.
     // Deleting here would race with a new server process that already rebound to the socket.
   }

@@ -126,7 +126,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
           ctx.notifications.add(ServerNotification.RunSubprocess(cmd, Map.empty, ctx.watch))
           cmd
         case None =>
-          throw new Exception(s"No main class specified for Scala.js module: ${ctx.module.id}. " +
+          throw DederException(s"No main class specified for Scala.js module: ${ctx.module.id}. " +
             "Please add a 'mainClass' to the module in deder.pkl, or ensure exactly one @main method is defined.")
       }
     }

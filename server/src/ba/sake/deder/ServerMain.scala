@@ -104,7 +104,6 @@ object ServerMain extends StrictLogging {
     DederGlobals.setCompileSemaphore(maxActiveCompilers)
     DederGlobals.setTestForkSemaphore(maxConcurrentTestForks)
 
-    // TODO check if OTEL still works with virutal threads
     // Use the global OTEL instance for metrics.
     // Export is handled externally (OTEL Java agent, env vars, etc.).
     val metricsMeter = GlobalOpenTelemetry.get().getMeter("deder-server")
@@ -126,10 +125,8 @@ object ServerMain extends StrictLogging {
 
       // 2. Release server lock (may already be released via early callback — idempotent)
       logger.info("Releasing server lock...")
-      try { serverFileLock.release() }
-      catch { case _: Exception => }
-      try { serverLockHandle.close() }
-      catch { case _: Exception => }
+      CloseUtils.quietly(serverFileLock.release())
+      CloseUtils.quietly(serverLockHandle.close())
 
       // 3. Close sockets so new connections go to the new server process
       if (cliServer != null) cliServer.nn.stop()
@@ -214,10 +211,8 @@ object ServerMain extends StrictLogging {
 
     // Wire up early lock release for fast shutdown+restart
     projectState.setReleaseServerLock(() => {
-      try { serverFileLock.release() }
-      catch { case _: Exception => }
-      try { serverLockHandle.close() }
-      catch { case _: Exception => }
+      CloseUtils.quietly(serverFileLock.release())
+      CloseUtils.quietly(serverLockHandle.close())
     })
 
     // Platform thread — Runtime shutdown hooks must execute reliably during JVM teardown
@@ -275,8 +270,8 @@ object ServerMain extends StrictLogging {
                   }
               } catch {
                 case _: InterruptedException => throw new InterruptedException // propagate to exit watcher loop
-                case NonFatal(_)             =>
-                // ignore, config might be bad, tasks might fail, etc
+                case NonFatal(e) =>
+                  logger.debug(s"Non-fatal error in file watcher event handler: ${e.getMessage}", e)
               },
             filter = p => {
               val segs = p.relativeTo(DederGlobals.projectRootDir).segments.toSeq
@@ -302,18 +297,15 @@ object ServerMain extends StrictLogging {
 
   private def stopFileWatcher(): Unit = {
     logger.info("Stopping file watcher...")
-    try { watcherThread.interrupt() }
-    catch { case _: Exception => }
-    try { watcherThread.join(3000) }
-    catch { case _: Exception => }
+    CloseUtils.quietly(watcherThread.interrupt())
+    CloseUtils.quietly(watcherThread.join(3000))
   }
 
   private def stopDebounceScheduler(): Unit = {
     logger.info("Stopping debounce thread...")
     debounceRunning = false
     debounceLock.synchronized { debounceLock.notify() }
-    try { debounceThread.join(3000) }
-    catch { case _: Exception => }
+    CloseUtils.quietly(debounceThread.join(3000))
   }
 
   private def acquireServerLock(projectRoot: os.Path): Unit = {
@@ -378,10 +370,8 @@ object ServerMain extends StrictLogging {
     // Platform thread — Runtime shutdown hooks must execute reliably during JVM teardown
     Runtime.getRuntime.addShutdownHook(new Thread(() => {
       logger.warn("JVM shutdown hook fired (unexpected exit) — releasing lock as safety net")
-      try { serverFileLock.release() }
-      catch { case _: Exception => }
-      try { serverLockHandle.close() }
-      catch { case _: Exception => }
+      CloseUtils.quietly(serverFileLock.release())
+      CloseUtils.quietly(serverLockHandle.close())
     }))
   }
 
