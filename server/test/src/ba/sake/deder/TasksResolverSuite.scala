@@ -110,7 +110,8 @@ class TasksResolverSuite extends munit.FunSuite {
       "publish",
       "fix",
       "fixCheck",
-      "sourceFiles"
+      "sourceFiles",
+      "sleep"
     )
     val taskInstancesPerModule = tasksResolver.taskInstancesPerModule
     locally {

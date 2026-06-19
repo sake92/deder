@@ -1,6 +1,7 @@
 package ba.sake.deder
 
 import java.util.concurrent.{Callable, ConcurrentHashMap, ExecutionException, ExecutorService, TimeUnit}
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -171,6 +172,11 @@ class TasksExecutor(
 
     val taskStartNanos = System.nanoTime()
     val taskSpan = OTEL.TRACER.spanBuilder(ti.id).startSpan()
+
+    DederGlobals.runningTaskThreads
+      .computeIfAbsent(requestId, _ => new ConcurrentLinkedQueue[Thread]())
+      .add(Thread.currentThread())
+
     try {
       Using.resource(taskSpan.makeCurrent()) { scope =>
         val (taskRes, changed, fromCache) = ti.task.executeUnsafe(
@@ -191,6 +197,22 @@ class TasksExecutor(
         ExecutionOutcome(TaskExecResult.Success(ti, taskRes.value, changed, fromCache), Some(taskRes))
       }
     } catch {
+      case _: InterruptedException =>
+        val token = DederGlobals.cancellationTokens.get(requestId)
+        if token != null && token.get() then {
+          ti.task.cleanupAfterCancellation(ti.module)
+          val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
+          val msg = s"Task '${ti.task.name}' on module '${ti.moduleId}' was cancelled"
+          logger.info(msg)
+          internals.recordTaskExecution(ti.task.name, taskDuration, cacheHit = false, errorMessage = Some(msg))
+          taskSpan.setStatus(StatusCode.ERROR)
+          return ExecutionOutcome(TaskExecResult.Cancelled(ti, msg), None)
+        }
+        val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
+        val msg = "Task thread was interrupted unexpectedly"
+        internals.recordTaskExecution(ti.task.name, taskDuration, cacheHit = false, errorMessage = Some(msg))
+        taskSpan.setStatus(StatusCode.ERROR)
+        ExecutionOutcome(TaskExecResult.Failure(ti, msg), None)
       case e: TaskCancelledException =>
         val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
         logger.info(e.getMessage)
@@ -206,6 +228,9 @@ class TasksExecutor(
         taskSpan.setStatus(StatusCode.ERROR)
         ExecutionOutcome(TaskExecResult.Failure(ti, errMsg), None)
     } finally {
+      DederGlobals.runningTaskThreads.get(requestId) match
+        case null => ()
+        case q    => q.remove(Thread.currentThread())
       taskSpan.end()
     }
   }

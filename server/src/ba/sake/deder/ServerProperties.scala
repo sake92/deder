@@ -6,6 +6,7 @@ final case class ServerProperties(
     logLevel: String,
     maxInactiveSeconds: Int,
     taskLockTimeoutSeconds: Int,
+    cancelGracePeriodMs: Long,
     forkTestFlushIntervalMs: Long,
     watchDebounceMillis: Int,
     logRolloverPattern: String,
@@ -13,6 +14,7 @@ final case class ServerProperties(
     logTotalSizeCap: String
 ) {
   require(taskLockTimeoutSeconds > 0, "taskLockTimeoutSeconds must be > 0")
+  require(cancelGracePeriodMs >= 0, "cancelGracePeriodMs must be >= 0")
   require(logMaxHistory >= 0, "logMaxHistory must be >= 0")
 }
 
@@ -21,6 +23,7 @@ object ServerProperties {
     val logLevel = props.getProperty("logLevel", "INFO").toUpperCase
     val maxInactiveSeconds = props.getProperty("maxInactiveSeconds", "1800").toInt
     val taskLockTimeoutSeconds = props.getProperty("taskLockTimeoutSeconds", "600").toInt
+    val cancelGracePeriodMs = props.getProperty("cancelGracePeriodMs", "1500").toLong
     val forkTestFlushIntervalMs = props.getProperty("forkTestFlushIntervalMs", "1000").toLong
     val watchDebounceMillis = props.getProperty("watchDebounceMillis", "300").toInt
     val logRolloverPattern = props.getProperty("logRolloverPattern", "%d{yyyy-MM-dd-HH}")
@@ -30,6 +33,7 @@ object ServerProperties {
       logLevel,
       maxInactiveSeconds,
       taskLockTimeoutSeconds,
+      cancelGracePeriodMs,
       forkTestFlushIntervalMs,
       watchDebounceMillis,
       logRolloverPattern,

@@ -5,7 +5,7 @@ import java.time.format.{DateTimeFormatter, FormatStyle}
 import java.time.ZoneId
 import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{ScheduledFuture, TimeUnit}
 import scala.collection.mutable.ArrayBuffer
 import scala.util.control.NonFatal
 import scala.util.Using
@@ -34,6 +34,7 @@ class DederProjectState(
     tasksRegistry: TasksRegistry,
     maxInactiveSeconds: Int,
     taskLockTimeoutSeconds: Int,
+    cancelGracePeriodMs: Long,
     onShutdown: () => Unit,
     configFile: os.Path,
     val internals: DederProjectInternalsImpl
@@ -510,6 +511,9 @@ class DederProjectState(
           internals.releaseLockHolder(requestId, taskInstance.id)
         }
         DederGlobals.cancellationTokens.remove(requestId)
+        // Cancel any pending interrupt — the request completed cooperatively
+        Option(DederGlobals.interruptFutures.remove(requestId)).foreach(_.cancel(false))
+        DederGlobals.runningTaskThreads.remove(requestId)
       }
     } catch {
       case NonFatal(e) =>
@@ -535,7 +539,28 @@ class DederProjectState(
   def cancelRequest(requestId: String): Unit = {
     val token = DederGlobals.cancellationTokens.get(requestId)
     logger.debug(s"Cancelling request ${requestId} with token ${token}")
-    if token != null then token.set(true)
+    if token != null then {
+      token.set(true) // Phase 1: cooperative cancellation
+
+      // Phase 2: schedule forceful thread interrupt after grace period
+      if cancelGracePeriodMs > 0 then {
+        val future = DederGlobals.interruptScheduler.schedule(
+          new Runnable {
+            override def run(): Unit = {
+              // Only fire if the request hasn't already completed cooperatively
+              if DederGlobals.cancellationTokens.containsKey(requestId) then {
+                Option(DederGlobals.runningTaskThreads.get(requestId)).foreach { threads =>
+                  logger.info(s"Cancel grace period expired for $requestId, interrupting ${threads.size()} task threads")
+                  threads.forEach { t => t.interrupt() }
+                }
+              }
+            }
+          },
+          cancelGracePeriodMs, TimeUnit.MILLISECONDS
+        )
+        DederGlobals.interruptFutures.put(requestId, future)
+      }
+    }
   }
 
   def cleanModules(moduleSelectors: Seq[String], onOutput: String => Unit): Boolean = {
