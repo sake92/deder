@@ -23,6 +23,13 @@ class CliClientSocketReader(
       case _: AsynchronousCloseException =>
       // all good, client disconnected
     }
+    // Client disconnected — cancel any in-flight request for this client.
+    // This handles Ctrl+C for native-image clients where sun.misc.Signal
+    // doesn't fire, so the Cancel message is never sent explicitly.
+    Option(DederGlobals.clientRequestMap.remove(clientId)).foreach { requestId =>
+      logger.info(s"Client $clientId disconnected, cancelling request $requestId")
+      projectState.cancelRequest(requestId)
+    }
   }
 
   // in theory there can be many client messages:
@@ -49,6 +56,12 @@ class CliClientSocketReader(
         }
       val requestId = message.getRequestId
       val ctx = requestContext(clientId, requestId, message)
+
+      // Track this client's request so we can cancel it on disconnect (Ctrl+C)
+      message match
+        case _: CliClientMessage.Exec => DederGlobals.clientRequestMap.put(clientId, requestId)
+        case _: CliClientMessage.Cancel => DederGlobals.clientRequestMap.remove(clientId)
+        case _ => ()
 
       Thread
         .ofVirtual()

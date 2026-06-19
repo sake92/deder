@@ -55,6 +55,10 @@ object DederGlobals {
   // completes cooperatively before the grace period expires
   val interruptFutures: ConcurrentHashMap[String, ScheduledFuture[?]] = new ConcurrentHashMap()
 
+  // Maps CLI clientId -> requestId so that when a client disconnects (Ctrl+C)
+  // the server can cancel the in-flight request automatically.
+  val clientRequestMap: ConcurrentHashMap[String, String] = new ConcurrentHashMap()
+
   /** Caps the number of forked test JVMs alive at any one time across the whole server.
     * Configured from `deder.pkl` (`maxConcurrentTestForks`), defaulting to available CPU cores.
     * Acquired/released around each fork's spawn/exit inside ForkedTestOrchestrator.
