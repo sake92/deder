@@ -19,8 +19,7 @@ class InMemoryTestOrchestrator(cacheRegistry: CacheStatsRegistry):
       .expireAfterAccess(5.minute)
       .maximumSize(20)
       .removalListener[String, URLClassLoader] { (_, cl, _) =>
-        if cl != null then try cl.close()
-        catch { case _: Exception => () }
+        if cl != null then CloseUtils.quietly(cl.close())
       }
       .build()
 

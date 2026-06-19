@@ -434,7 +434,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
                 .map(rel => DederGlobals.projectRootDir / rel)
                 .getOrElse(
                   scala.util.Try(os.Path(pathStr))
-                    .getOrElse(throw RuntimeException(
+                    .getOrElse(throw DederException(
                       s"Invalid publishLocalTo path '${pathStr}' for module '${javaModule.id}'. " +
                         "Provide a valid relative or absolute path."
                     ))

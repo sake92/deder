@@ -5,12 +5,16 @@ import ba.sake.deder.OutputFormat
 
 given TokensReader.Simple[LogLevel] with {
   def shortName = "logLevel"
-  def read(strs: Seq[String]) = Right(LogLevel.valueOf(strs.head.toUpperCase))
+  def read(strs: Seq[String]) =
+    val v = strs.headOption.getOrElse(throw IllegalArgumentException(s"No value provided for $shortName"))
+    Right(LogLevel.valueOf(v.toUpperCase))
 }
 
 given TokensReader.Simple[OutputFormat] with {
   def shortName = "outputFormat"
-  def read(strs: Seq[String]) = strs.head.toLowerCase match {
+  def read(strs: Seq[String]) =
+    val v = strs.headOption.getOrElse(throw IllegalArgumentException(s"No value provided for $shortName"))
+    v.toLowerCase match {
     case "plain"     => Right(OutputFormat.PlainText)
     case "json"      => Right(OutputFormat.Json)
     case "densejson" => Right(OutputFormat.DenseJson)
@@ -91,7 +95,7 @@ enum ImportBuildTool:
 given TokensReader.Simple[ImportBuildTool] with {
   def shortName = "buildTool"
   def read(strs: Seq[String]) = {
-    val strValue = strs.head.toLowerCase
+    val strValue = strs.headOption.getOrElse(throw IllegalArgumentException(s"No value provided for $shortName")).toLowerCase
     try Right(ImportBuildTool.valueOf(strValue))
     catch {
       case e: IllegalArgumentException =>
@@ -115,7 +119,7 @@ enum ShellType:
 given TokensReader.Simple[ShellType] with {
   def shortName = "shellType"
   def read(strs: Seq[String]) = {
-    val strValue = strs.head.toLowerCase
+    val strValue = strs.headOption.getOrElse(throw IllegalArgumentException(s"No value provided for $shortName")).toLowerCase
     try Right(ShellType.valueOf(strValue))
     catch {
       case e: IllegalArgumentException =>

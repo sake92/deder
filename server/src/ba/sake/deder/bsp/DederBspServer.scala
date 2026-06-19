@@ -991,7 +991,7 @@ class DederBspServer(
           case _: InterruptedException =>
         }
         try { onExit() }
-        catch { case _: Exception => }
+        catch { case NonFatal(_) => }
       })
   }
 

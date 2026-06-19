@@ -28,7 +28,7 @@ import xsbti.compile.{
 import scala.util.control.NonFatal
 import com.typesafe.scalalogging.StrictLogging
 import sbt.internal.inc.ScalaInstance
-import ba.sake.deder.{CacheStatsRegistry, DederGlobals, DederPath, FileDiagnostics, OTEL, RequestContext, ServerNotification, ServerNotificationsLogger}
+import ba.sake.deder.{CacheStatsRegistry, CloseUtils, DederGlobals, DederPath, FileDiagnostics, OTEL, RequestContext, ServerNotification, ServerNotificationsLogger}
 import scala.jdk.CollectionConverters.*
 
 object ZincCompiler {
@@ -71,14 +71,10 @@ class ZincCompiler(
       compilers: xsbti.compile.Compilers
   ) {
     def closeClassloaders(): Unit = {
-      try allJarsClassloader.close()
-      catch { case _: Exception => }
-      try compilerClassloader.close()
-      catch { case _: Exception => }
-      try libraryClassloader.close()
-      catch { case _: Exception => }
-      try zincClassloader.close()
-      catch { case _: Exception => }
+      CloseUtils.quietly(allJarsClassloader.close())
+      CloseUtils.quietly(compilerClassloader.close())
+      CloseUtils.quietly(libraryClassloader.close())
+      CloseUtils.quietly(zincClassloader.close())
     }
   }
 

@@ -47,11 +47,11 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
           cmd
         case None =>
           if discoveredMainClasses.length > 1 then
-            throw new Exception(
+            throw DederException(
               s"Multiple main classes discovered for module '${ctx.module.id}': ${discoveredMainClasses.mkString(", ")}. " +
                 "Please specify which one to run in deder.pkl or use runMain task with main class argument."
             )
-          else throw new Exception(s"No main class specified for module: ${ctx.module.id}")
+          else throw DederException(s"No main class specified for module: ${ctx.module.id}")
       }
     }
 
@@ -67,7 +67,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
     .build { ctx =>
       val (runClasspath, discoveredMainClasses, jvmOptions) = ctx.depResults
       val selectedMainClass = ctx.args.headOption.getOrElse(
-        throw RuntimeException(
+        throw DederException(
           "No main class specified to run. Please provide the main class as an argument. " +
             s"Possible candidates: ${discoveredMainClasses.mkString(", ")}"
         )
@@ -85,7 +85,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
           ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, ctx.watch))
           cmd
         case None =>
-          throw new RuntimeException(
+          throw DederException(
             s"Class '${selectedMainClass}' with main method not found for module '${ctx.module.id}'. " +
               s"Possible candidates: ${discoveredMainClasses.mkString(", ")}"
           )
@@ -123,7 +123,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       }
 
       val mvnAppName = ctx.args.headOption.getOrElse(
-        throw new RuntimeException(
+        throw DederException(
           s"No maven app name specified. Available maven apps: ${effectiveMap.keys.mkString(", ")}"
         )
       )
@@ -145,7 +145,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
           ctx.notifications.add(ServerNotification.RunSubprocess(cmd, forkEnv, false))
           cmd
         case _ =>
-          throw new RuntimeException(
+          throw DederException(
             s"Maven app '${mvnAppName}' not found for module '${ctx.module.id}'. " +
               s"Available maven apps: ${effectiveMap.keys.mkString(", ")}"
           )

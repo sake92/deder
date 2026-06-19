@@ -11,6 +11,8 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 
 import java.nio.file.Files
 
+import ba.sake.deder.DederException
+
 object PgpSigner {
 
   // add the provider once at startup
@@ -60,7 +62,7 @@ object PgpSigner {
     val keyRing = pgpSec.getKeyRings.asScala.collectFirst { case ring: PGPSecretKeyRing =>
       ring.getSecretKeys.asScala.find(_.isSigningKey)
     }.flatten
-    keyRing.getOrElse(throw new Exception("No signing key found in the provided env var!"))
+    keyRing.getOrElse(throw DederException("No signing key found in the provided env var!"))
   }
 
 }
