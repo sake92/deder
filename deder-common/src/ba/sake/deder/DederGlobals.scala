@@ -1,6 +1,6 @@
 package ba.sake.deder
 
-import java.util.concurrent.{ConcurrentHashMap, Semaphore}
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue, Executors, ScheduledExecutorService, ScheduledFuture, Semaphore, TimeUnit}
 import java.util.concurrent.atomic.AtomicBoolean
 
 object DederGlobals {
@@ -40,6 +40,20 @@ object DederGlobals {
     (moduleId +: dependentModuleIds).map(classesDir)
 
   val cancellationTokens: ConcurrentHashMap[String, AtomicBoolean] = new ConcurrentHashMap()
+
+  // Track running task threads per requestId so they can be interrupted on cancellation
+  val runningTaskThreads: ConcurrentHashMap[String, ConcurrentLinkedQueue[Thread]] = new ConcurrentHashMap()
+
+  // Single-thread scheduler for delayed thread interrupts (Phase 2 of cancellation)
+  val interruptScheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor(r => {
+    val t = new Thread(r, "deder-cancel-interrupt")
+    t.setDaemon(true)
+    t
+  })
+
+  // Track scheduled interrupt futures so they can be cancelled if the request
+  // completes cooperatively before the grace period expires
+  val interruptFutures: ConcurrentHashMap[String, ScheduledFuture[?]] = new ConcurrentHashMap()
 
   /** Caps the number of forked test JVMs alive at any one time across the whole server.
     * Configured from `deder.pkl` (`maxConcurrentTestForks`), defaulting to available CPU cores.
