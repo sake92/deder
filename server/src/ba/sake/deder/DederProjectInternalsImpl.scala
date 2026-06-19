@@ -1,6 +1,7 @@
 package ba.sake.deder
 
 import java.time.Instant
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong, AtomicReference}
@@ -58,6 +59,9 @@ class DederProjectInternalsImpl private (
   // Delegated purge function — wired after construction by ServerMain
   @volatile private[deder] var purgeCachesFn: () => PurgeCachesResult = () => PurgeCachesResult(0, 0, 0, false)
 
+  // Direct reference to projectState — wired after construction by ServerMain
+  @volatile private[deder] var projectState: Option[DederProjectState] = None
+
   override def currentRequests: Seq[LiveRequest] =
     currentReqs.values().asScala.toSeq
 
@@ -100,6 +104,45 @@ class DederProjectInternalsImpl private (
 
   override def purgeInMemoryCaches(): PurgeCachesResult =
     purgeCachesFn()
+
+  override def invoke(
+      taskName: String,
+      moduleIds: Seq[String],
+      args: Seq[String]
+  ): Seq[TaskInvokeOutcome] = {
+    val state = projectState.getOrElse(
+      throw new IllegalStateException("Server not initialized — projectState reference not wired yet"))
+    val requestId = UUID.randomUUID().toString
+    val noopLogger = ServerNotificationsLogger(_ => ())
+
+    // Resolve wildcards: empty moduleIds → all modules
+    val resolvedIds = state.readState(useLastGood = false) match {
+      case Left(_) => Seq.empty
+      case Right(s) =>
+        val allIds = s.tasksResolver.allModules.map(_.id)
+        if moduleIds.isEmpty then allIds
+        else WildcardUtils.getMatchesOrRecommendations(allIds, moduleIds) match {
+          case Left(_)    => Seq.empty
+          case Right(ids) => ids
+        }
+    }
+
+    val results = state.executeTasks(
+      requestId, CallerType.Plugin, resolvedIds, taskName, args,
+      watch = false, noopLogger, useLastGood = false)
+
+    results.map {
+      case TaskExecResult.Success(ti, _, _, fromCache) =>
+        TaskInvokeOutcome(ti.moduleId, success = true, None, fromCache)
+      case TaskExecResult.Failure(ti, error) =>
+        TaskInvokeOutcome(ti.moduleId, success = false, Some(error), fromCache = false)
+      case TaskExecResult.Skipped(ti, because) =>
+        TaskInvokeOutcome(ti.moduleId, success = false,
+          Some(s"skipped — ${because.taskInstance.moduleId} failed"), fromCache = false)
+      case TaskExecResult.Cancelled(ti, message) =>
+        TaskInvokeOutcome(ti.moduleId, success = false, Some(message), fromCache = false)
+    }
+  }
 
   private[deder] def clearHistory(): Int = {
     val size = history.size()
