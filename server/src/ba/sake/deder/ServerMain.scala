@@ -165,6 +165,7 @@ object ServerMain extends StrictLogging {
       tasksRegistry,
       cfg.maxInactiveSeconds,
       cfg.taskLockTimeoutSeconds,
+      cfg.cancelGracePeriodMs,
       onShutdown,
       configFile = DederGlobals.projectRootDir / "deder.pkl",
       internals = internals
