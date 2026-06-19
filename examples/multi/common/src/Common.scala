@@ -1,5 +1,6 @@
 package common
 
+
 import org.jsoup.Jsoup
 
 object Common {
