@@ -1130,6 +1130,24 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         }
     }
 
+  /** Sleeps for N seconds. Useful for testing server/task locking.
+    * Takes the number of seconds from ctx.args, defaults to 1 if no argument or unparseable.
+    */
+  val sleepTask = TaskBuilder
+    .make[String](
+      name = "sleep",
+      category = "Utility",
+      internal = true
+    )
+    .build { ctx =>
+      val seconds = ctx.args.headOption.flatMap(_.toIntOption).filter(_ > 0).getOrElse(1)
+      logger.info(s"Sleeping for $seconds second(s)...")
+      Thread.sleep(seconds * 1000L)
+      val msg = s"Slept for $seconds second(s)"
+      logger.info(msg)
+      msg
+    }
+
   // order matters for dependency resolution!!
   val all: Seq[Task[?, ?, ?]] = Seq(
     sourcesTask,
@@ -1172,7 +1190,8 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     fixCheckTask,
     testClassesTask,
     testTask,
-    testInMemoryTask
+    testInMemoryTask,
+    sleepTask
   )
 
 }
