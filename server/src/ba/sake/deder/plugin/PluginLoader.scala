@@ -147,7 +147,7 @@ class PluginLoader(
         case Some(plugin) =>
           logger.debug(s"Loaded plugin '$pluginId'")
           logger.debug(s"Plugin config Pkl text: $configText")
-          val params = PluginInitParams(configText, coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, internals, dederProject)
+          val params = PluginInitParams(configText, coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, internals, internals.asInstanceOf[TaskInvokerApi], dederProject)
           plugin.init(params) match {
             case Left(err) =>
               logger.warn(s"Failed to init plugin '$pluginId': $err")

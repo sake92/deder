@@ -155,3 +155,11 @@ case class TaskInvokeOutcome(
     error: Option[String],
     fromCache: Boolean
 ) derives JsonRW
+
+/** Aggregated result of a dynamic task invocation, including per-module outcomes
+  * and a plaintext cross-module summary (same as CLI output).
+  */
+case class TaskInvokeResult(
+    outcomes: Seq[TaskInvokeOutcome],
+    renderedSummary: Option[String]
+) derives JsonRW
