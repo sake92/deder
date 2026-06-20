@@ -106,26 +106,16 @@ class DederProjectInternalsImpl private (
   override def purgeInMemoryCaches(): PurgeCachesResult =
     purgeCachesFn()
 
+  // DederProjectInternals — simple invoke, delegates to TaskInvokerApi version
   override def invoke(
       taskName: String,
       moduleIds: Seq[String],
       args: Seq[String]
-  ): Seq[TaskInvokeOutcome] = {
-    val result = invokeInternal(taskName, moduleIds, args, _ => ())
-    result.outcomes
-  }
+  ): Seq[TaskInvokeOutcome] =
+    invoke(taskName, moduleIds, args, _ => ()).outcomes
 
   // TaskInvokerApi — richer invoke with notification callback and rendered summary
   def invoke(
-      taskName: String,
-      moduleIds: Seq[String],
-      args: Seq[String],
-      onNotification: ServerNotification => Unit
-  ): TaskInvokeResult =
-    invokeInternal(taskName, moduleIds, args, onNotification)
-
-  /** Shared implementation — resolves modules, executes tasks, maps outcomes, renders summary. */
-  private def invokeInternal(
       taskName: String,
       moduleIds: Seq[String],
       args: Seq[String],
