@@ -4,7 +4,7 @@ import java.time.{Duration, Instant}
 import ba.sake.tupson.JsonRW
 
 enum CallerType:
-  case Cli, Bsp
+  case Cli, Bsp, Plugin
 
 case class LiveRequest(
     requestId: String,
@@ -132,3 +132,19 @@ case class PurgeCachesResult(
     historyEntriesRemoved: Int,
     gcSuggested: Boolean
 )
+
+/** Per-module outcome of a dynamic task invocation via [[DederProjectInternals.invoke]]. */
+case class TaskInvokeOutcome(
+    moduleId: String,
+    success: Boolean,
+    error: Option[String],
+    fromCache: Boolean
+) derives JsonRW
+
+/** Aggregated result of a dynamic task invocation, including per-module outcomes
+  * and a plaintext cross-module summary (same as CLI output).
+  */
+case class TaskInvokeResult(
+    outcomes: Seq[TaskInvokeOutcome],
+    renderedSummary: Option[String]
+) derives JsonRW

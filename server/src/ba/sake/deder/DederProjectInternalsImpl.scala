@@ -1,6 +1,7 @@
 package ba.sake.deder
 
 import java.time.Instant
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong, AtomicReference}
@@ -9,6 +10,7 @@ import scala.jdk.CollectionConverters.*
 import io.opentelemetry.api.metrics.{LongCounter, LongHistogram, Meter}
 import io.opentelemetry.api.common.{Attributes, AttributeKey}
 import com.typesafe.scalalogging.StrictLogging
+import ba.sake.tupson.JsonRW
 
 class DederProjectInternalsImpl private (
     private val startTime: Instant,
@@ -20,7 +22,7 @@ class DederProjectInternalsImpl private (
     private val totalErrCount: AtomicLong,
     private val meter: Meter,
     private val cacheStatsRegistry: CacheStatsRegistry
-) extends DederProjectInternals, StrictLogging:
+) extends DederProjectInternals, TaskInvokerApi, StrictLogging:
 
   logger.info(s"DederProjectInternals initialized")
 
@@ -57,6 +59,9 @@ class DederProjectInternalsImpl private (
 
   // Delegated purge function — wired after construction by ServerMain
   @volatile private[deder] var purgeCachesFn: () => PurgeCachesResult = () => PurgeCachesResult(0, 0, 0, false)
+
+  // Direct reference to projectState — wired after construction by ServerMain
+  @volatile private[deder] var projectState: Option[DederProjectState] = None
 
   override def currentRequests: Seq[LiveRequest] =
     currentReqs.values().asScala.toSeq
@@ -100,6 +105,77 @@ class DederProjectInternalsImpl private (
 
   override def purgeInMemoryCaches(): PurgeCachesResult =
     purgeCachesFn()
+
+  // TaskInvokerApi
+  def invoke(
+      taskName: String,
+      moduleIds: Seq[String],
+      args: Seq[String],
+      onNotification: ServerNotification => Unit
+  ): TaskInvokeResult = {
+    val state = projectState.getOrElse(
+      throw new IllegalStateException("Server not initialized — projectState reference not wired yet"))
+    val requestId = UUID.randomUUID().toString
+    val logger = ServerNotificationsLogger(onNotification)
+    val execStartNanos = System.nanoTime()
+
+    // Resolve wildcards: empty moduleIds → all modules
+    val resolvedIds = state.readState(useLastGood = false) match {
+      case Left(_) => Seq.empty
+      case Right(s) =>
+        val allIds = s.tasksResolver.allModules.map(_.id)
+        if moduleIds.isEmpty then allIds
+        else WildcardUtils.getMatchesOrRecommendations(allIds, moduleIds) match {
+          case Left(_)    => Seq.empty
+          case Right(ids) => ids
+        }
+    }
+
+    val results = state.executeTasks(
+      requestId, CallerType.Plugin, resolvedIds, taskName, args,
+      watch = false, logger, useLastGood = false)
+
+    // Map to public outcomes
+    val outcomes = results.map {
+      case TaskExecResult.Success(ti, _, _, fromCache) =>
+        TaskInvokeOutcome(ti.moduleId, success = true, None, fromCache)
+      case TaskExecResult.Failure(ti, error) =>
+        TaskInvokeOutcome(ti.moduleId, success = false, Some(error), fromCache = false)
+      case TaskExecResult.Skipped(ti, because) =>
+        TaskInvokeOutcome(ti.moduleId, success = false,
+          Some(s"skipped — ${because.taskInstance.moduleId} failed"), fromCache = false)
+      case TaskExecResult.Cancelled(ti, message) =>
+        TaskInvokeOutcome(ti.moduleId, success = false, Some(message), fromCache = false)
+    }
+
+    // Render cross-module plaintext summary (same as CLI output)
+    val totalDuration = java.time.Duration.ofNanos(System.nanoTime() - execStartNanos)
+    val renderedSummary = if results.nonEmpty then {
+      val successes = results.collect { case s: TaskExecResult.Success => s }
+      val failures = results.collect {
+        case f: TaskExecResult.Failure => ModuleFailure(f.taskInstance.moduleId, f.error, None)
+        case s: TaskExecResult.Skipped =>
+          ModuleFailure(s.taskInstance.moduleId,
+            s"skipped — ${s.because.taskInstance.moduleId} failed",
+            Some(s.because.taskInstance.moduleId))
+        case c: TaskExecResult.Cancelled => ModuleFailure(c.taskInstance.moduleId, c.message, None)
+      }
+      if successes.nonEmpty then {
+        val task = successes.head.taskInstance.task
+        val moduleResults = successes.sortBy(_.taskInstance.moduleId).map(r => r.taskInstance.moduleId -> r.value)
+        val summary = task.summarizeValueUnsafe(moduleResults, failures, totalDuration)
+        given PlainTextWritable[Any] = task.summarizable.plainTextW.asInstanceOf[PlainTextWritable[Any]]
+        Some(OutputFormat.render[Any](summary, OutputFormat.PlainText)(
+          using task.summarizable.jsonRW.asInstanceOf[JsonRW[Any]],
+          task.summarizable.plainTextW.asInstanceOf[PlainTextWritable[Any]],
+          task.summarizable.dotW.asInstanceOf[DotWritable[Any]],
+          task.summarizable.mermaidW.asInstanceOf[MermaidWritable[Any]]
+        ))
+      } else None
+    } else None
+
+    TaskInvokeResult(outcomes, renderedSummary)
+  }
 
   private[deder] def clearHistory(): Int = {
     val size = history.size()

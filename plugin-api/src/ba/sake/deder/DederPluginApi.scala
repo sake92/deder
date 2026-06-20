@@ -34,6 +34,9 @@ trait DederPluginApi {
   *   Access to the stable Scala Native linking tasks that plugins may depend on.
   * @param internals
   *   Access to server introspection (request metrics, uptime, etc.).
+  * @param taskInvoker
+  *   Dynamic task invocation — trigger builds by name at runtime (like `deder exec`).
+  *   Blocking call with notification callback and plaintext result summary.
   * @param project
   *   The full parsed DederProject config (modules, server properties, repositories, etc.).
   */
@@ -43,8 +46,21 @@ case class PluginInitParams(
     sjsTasks: ScalaJsTasksApi,
     snTasks: ScalaNativeTasksApi,
     internals: DederProjectInternals,
+    taskInvoker: TaskInvokerApi,
     project: DederProject
 )
+
+/** Dynamic task invocation API for plugins. Plugins can trigger builds by task name at runtime,
+  * the same way `deder exec` does from the CLI. Blocking call — returns when all tasks complete.
+  */
+trait TaskInvokerApi {
+  def invoke(
+      taskName: String,
+      moduleIds: Seq[String],
+      args: Seq[String],
+      onNotification: ServerNotification => Unit
+  ): TaskInvokeResult
+}
 
 /** Typed access to all built-in task references that plugins may depend on. This includes core
   * configuration/build tasks, run/test/repl entrypoints, publishing, GraalVM native-image,
