@@ -193,7 +193,7 @@ class TasksExecutor(
         val taskDuration = Duration.ofNanos(System.nanoTime() - taskStartNanos)
         val isUnsuccessful = !ti.task.isResultSuccessfulUnsafe(taskRes.value)
         val errMsg = if isUnsuccessful then Some("result was unsuccessful") else None
-        internals.recordTaskExecution(ti.task.name, taskDuration, !changed, errorMessage = errMsg)
+        internals.recordTaskExecution(ti.task.name, taskDuration, fromCache, errorMessage = errMsg)
         ExecutionOutcome(TaskExecResult.Success(ti, taskRes.value, changed, fromCache), Some(taskRes))
       }
     } catch {
