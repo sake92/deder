@@ -106,15 +106,7 @@ class DederProjectInternalsImpl private (
   override def purgeInMemoryCaches(): PurgeCachesResult =
     purgeCachesFn()
 
-  // DederProjectInternals — simple invoke, delegates to TaskInvokerApi version
-  override def invoke(
-      taskName: String,
-      moduleIds: Seq[String],
-      args: Seq[String]
-  ): Seq[TaskInvokeOutcome] =
-    invoke(taskName, moduleIds, args, _ => ()).outcomes
-
-  // TaskInvokerApi — richer invoke with notification callback and rendered summary
+  // TaskInvokerApi
   def invoke(
       taskName: String,
       moduleIds: Seq[String],

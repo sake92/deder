@@ -121,21 +121,6 @@ trait DederProjectInternals:
   /** Rich status snapshots for all in-flight requests. */
   def allRequestStatuses: Seq[RequestStatus]
 
-  /** Execute a named task on the given modules and block until completion.
-    * Goes through the same execution pipeline as CLI requests (planning, locking, caching).
-    * Returns one outcome per module.
-    *
-    * @param taskName   e.g. "compile", "test", "run"
-    * @param moduleIds  module IDs to execute on; empty = all modules
-    * @param args       forwarded to tasks as `ctx.args` (e.g. test filter args)
-    * @return           per-module outcomes
-    */
-  def invoke(
-      taskName: String,
-      moduleIds: Seq[String],
-      args: Seq[String]
-  ): Seq[TaskInvokeOutcome]
-
   /** Purges all registered in-memory caches (Scaffeine caches, internals history, completed
     * BSP in-flight compilation entries) and suggests a GC to the JVM.
     * Waits up to 10s for in-flight requests to drain; returns a zeroed result if busy. */
