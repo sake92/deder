@@ -37,6 +37,9 @@ trait DederPluginApi {
   * @param taskInvoker
   *   Dynamic task invocation — trigger builds by name at runtime (like `deder exec`).
   *   Blocking call with notification callback and plaintext result summary.
+  * @param taskRegistry
+  *   Read-only access to the full task registry (built-in + plugin tasks).
+  *   Use to discover available task names, metadata, and module type compatibility.
   * @param project
   *   The full parsed DederProject config (modules, server properties, repositories, etc.).
   */
@@ -47,6 +50,7 @@ case class PluginInitParams(
     snTasks: ScalaNativeTasksApi,
     internals: DederProjectInternals,
     taskInvoker: TaskInvokerApi,
+    taskRegistry: TasksRegistryApi,
     project: DederProject
 )
 

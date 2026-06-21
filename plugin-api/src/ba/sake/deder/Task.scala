@@ -11,7 +11,7 @@ import ba.sake.deder.config.DederProject
 import ba.sake.deder.config.DederProject.{DederModule, ModuleType}
 import ba.sake.deder.deps.DependencyResolverApi
 
-enum TaskKind {
+enum TaskKind derives JsonRW {
   case Standard, SourceGenerator, ResourceGenerator
 }
 
@@ -625,7 +625,7 @@ object TaskInstance {
 
 private case class CacheInputsHash(depOutputHashes: Seq[String], args: Seq[String]) derives JsonRW
 
-enum FeatureTag(val emoji: String, val jsonKey: String, val description: String):
+enum FeatureTag(val emoji: String, val jsonKey: String, val description: String) derives JsonRW:
   case SourceAware extends FeatureTag("📁", "source-aware", "watches sources")
   case ConfigAware extends FeatureTag("⚙", "config-aware", "watches config")
   case FanIn extends FeatureTag("🔀", "fan-in", "fan-in")

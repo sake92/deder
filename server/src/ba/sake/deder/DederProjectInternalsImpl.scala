@@ -115,27 +115,54 @@ class DederProjectInternalsImpl private (
   ): TaskInvokeResult = {
     val state = projectState.getOrElse(
       throw new IllegalStateException("Server not initialized — projectState reference not wired yet"))
-    val requestId = UUID.randomUUID().toString
     val logger = ServerNotificationsLogger(onNotification)
-    val execStartNanos = System.nanoTime()
 
-    // Resolve wildcards: empty moduleIds → all modules
-    val resolvedIds = state.readState(useLastGood = false) match {
-      case Left(_) => Seq.empty
-      case Right(s) =>
-        val allIds = s.tasksResolver.allModules.map(_.id)
-        if moduleIds.isEmpty then allIds
-        else WildcardUtils.getMatchesOrRecommendations(allIds, moduleIds) match {
-          case Left(_)    => Seq.empty
-          case Right(ids) => ids
-        }
+    // ── 1. Read project state ──
+    val projectStateData = state.readState(useLastGood = false) match {
+      case Left(err) =>
+        return TaskInvokeResult(Nil, None, Some(s"Project state is not available: $err"))
+      case Right(s) => s
     }
 
+    // ── 2. Resolve module IDs (empty → all modules; wildcards via WildcardUtils) ──
+    val allModuleIds = projectStateData.tasksResolver.allModules.map(_.id)
+    val resolvedModules = if moduleIds.isEmpty then allModuleIds
+    else WildcardUtils.getMatchesOrRecommendations(allModuleIds, moduleIds) match {
+      case Left(recommended) =>
+        val msg = if recommended.isEmpty then
+          s"No modules found for selectors: ${moduleIds.mkString(", ")}"
+        else
+          s"No modules found for selectors: ${moduleIds.mkString(", ")} — did you mean: ${recommended.mkString(", ")}?"
+        return TaskInvokeResult(Nil, None, Some(msg))
+      case Right(ids) => ids
+    }
+
+    // ── 3. Validate task name (mirrors executeCLI) ──
+    val relevantTasks = projectStateData.executionPlanner.getTaskInstances(resolvedModules, taskName) match {
+      case Left(recommended) =>
+        val msg = if recommended.isEmpty then
+          s"No '$taskName' tasks found"
+        else
+          s"No '$taskName' tasks found — did you mean: ${recommended.mkString(", ")}?"
+        return TaskInvokeResult(Nil, None, Some(msg))
+      case Right(values) => values
+    }
+
+    // ── 4. Singleton check (mirrors executeCLI) ──
+    if relevantTasks.exists(_._2.task.singleton) && relevantTasks.length > 1 then
+      return TaskInvokeResult(Nil, None,
+        Some(s"Task '$taskName' is singleton — cannot execute on ${relevantTasks.length} modules at once"))
+
+    val resolvedModuleIds = relevantTasks.map(_._1)
+
+    // ── 5. Execute ──
+    val requestId = UUID.randomUUID().toString
+    val execStartNanos = System.nanoTime()
     val results = state.executeTasks(
-      requestId, CallerType.Plugin, resolvedIds, taskName, args,
+      requestId, CallerType.Plugin, resolvedModuleIds, taskName, args,
       watch = false, logger, useLastGood = false)
 
-    // Map to public outcomes
+    // ── 6. Map results → outcomes ──
     val outcomes = results.map {
       case TaskExecResult.Success(ti, _, _, fromCache) =>
         TaskInvokeOutcome(ti.moduleId, success = true, None, fromCache)
@@ -148,7 +175,7 @@ class DederProjectInternalsImpl private (
         TaskInvokeOutcome(ti.moduleId, success = false, Some(message), fromCache = false)
     }
 
-    // Render cross-module plaintext summary (same as CLI output)
+    // ── 7. Render cross-module plaintext summary (same as CLI output) ──
     val totalDuration = java.time.Duration.ofNanos(System.nanoTime() - execStartNanos)
     val renderedSummary = if results.nonEmpty then {
       val successes = results.collect { case s: TaskExecResult.Success => s }
@@ -174,7 +201,7 @@ class DederProjectInternalsImpl private (
       } else None
     } else None
 
-    TaskInvokeResult(outcomes, renderedSummary)
+    TaskInvokeResult(outcomes, renderedSummary, error = None)
   }
 
   private[deder] def clearHistory(): Int = {

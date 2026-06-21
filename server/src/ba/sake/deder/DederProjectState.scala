@@ -129,8 +129,14 @@ class DederProjectState(
             val coreTasksApi = CoreTasksApiAdapter(coreTasks, runTasks, publishTasks, graalvmNativeImageTasks)
             val scalaJsTasksApi = ScalaJsTasksApiAdapter(scalaJsTasks)
             val scalaNativeTasksApi = ScalaNativeTasksApiAdapter(scalaNativeTasks)
+            // Build a single mutable registry, starting from base tasks.
+            // The adapter wraps this same registry — plugins query it during init(),
+            // and after load we add plugin tasks to it so TasksResolver sees them too.
+            val effectiveRegistry = TasksRegistry(baseTasks)
+            val tasksRegistryApi = TasksRegistryApiAdapter(effectiveRegistry)
             val pluginLoader =
-              PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver, internals)
+              PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver, internals,
+                tasksRegistryApi)
             val loadResult = pluginLoader.load(loadedPlugins, configFile, newConfig)
             loadedPlugins = loadResult.loadedPlugins
 
@@ -147,8 +153,11 @@ class DederProjectState(
               loadedMap.getOrElse(id, LoadedPluginInfo(id, Seq.empty, Some(errorMap.getOrElse(id, "Not loaded"))))
             }
             internals.setLoadedPlugins(allPluginInfo)
-            val pluginTasks = loadedPlugins.flatMap(_.tasks).map(_.asInstanceOf[Task[?, ?, ?]])
-            val effectiveRegistry = TasksRegistry(baseTasks ++ pluginTasks)
+
+            // Add plugin tasks to the same registry the adapter points to
+            for task <- loadedPlugins.flatMap(_.tasks) do
+              effectiveRegistry.add(task.asInstanceOf[Task[?, ?, ?]])
+
             val tasksResolver = TasksResolver(newConfig, effectiveRegistry)
             val executionPlanner =
               ExecutionPlanner(tasksResolver.taskInstancesGraph, tasksResolver.taskInstancesPerModule)

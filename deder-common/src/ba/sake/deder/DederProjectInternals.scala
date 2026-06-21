@@ -143,8 +143,14 @@ case class TaskInvokeOutcome(
 
 /** Aggregated result of a dynamic task invocation, including per-module outcomes
   * and a plaintext cross-module summary (same as CLI output).
+  *
+  * @param error
+  *   Set when module or task validation fails before execution begins (e.g., no modules
+  *   matched the selectors, task name not found, or singleton task invoked on multiple
+  *   modules). When set, `outcomes` is empty and `renderedSummary` is `None`.
   */
 case class TaskInvokeResult(
     outcomes: Seq[TaskInvokeOutcome],
-    renderedSummary: Option[String]
+    renderedSummary: Option[String],
+    error: Option[String]
 ) derives JsonRW

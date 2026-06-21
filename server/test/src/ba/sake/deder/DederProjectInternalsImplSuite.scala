@@ -5,6 +5,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.metrics.SdkMeterProvider
+import ba.sake.tupson.{*, given}
 
 class DederProjectInternalsImplSuite extends munit.FunSuite {
 
@@ -160,5 +161,33 @@ class DederProjectInternalsImplSuite extends munit.FunSuite {
     assertEquals(all.size, 10)
     val totalExecs = all.map(_._2.executions).sum
     assertEquals(totalExecs, 1000L)
+  }
+
+  test("TaskInvokeResult JSON roundtrip with error field") {
+    val withError = TaskInvokeResult(
+      outcomes = Seq.empty,
+      renderedSummary = None,
+      error = Some("No 'badTask' tasks found — did you mean: compile, test?")
+    )
+    val json = withError.toJson
+    val parsed = json.parseJson[TaskInvokeResult]
+    assertEquals(parsed.error, Some("No 'badTask' tasks found — did you mean: compile, test?"))
+    assertEquals(parsed.outcomes, Seq.empty)
+    assertEquals(parsed.renderedSummary, None)
+  }
+
+  test("TaskInvokeResult JSON roundtrip without error (success case)") {
+    val withoutError = TaskInvokeResult(
+      outcomes = Seq(TaskInvokeOutcome("app", success = true, error = None, fromCache = false)),
+      renderedSummary = Some("Build succeeded"),
+      error = None
+    )
+    val json = withoutError.toJson
+    val parsed = json.parseJson[TaskInvokeResult]
+    assertEquals(parsed.error, None)
+    assertEquals(parsed.outcomes.size, 1)
+    assertEquals(parsed.outcomes.head.moduleId, "app")
+    assertEquals(parsed.outcomes.head.success, true)
+    assertEquals(parsed.renderedSummary, Some("Build succeeded"))
   }
 }
