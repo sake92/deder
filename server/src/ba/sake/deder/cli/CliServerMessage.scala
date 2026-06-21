@@ -27,17 +27,55 @@ object CliServerMessage {
       case LogLevel.DEBUG   => fansi.Color.LightGreen(msgLevelString)
       case LogLevel.TRACE   => fansi.Color.LightGray(msgLevelString)
     }
+    val coloredText = msgLevel match {
+      case LogLevel.ERROR   => fansi.Color.Red(text)
+      case LogLevel.WARNING => fansi.Color.Yellow(text)
+      case LogLevel.INFO    => text
+      case LogLevel.DEBUG   => fansi.Color.LightGreen(text)
+      case LogLevel.TRACE   => fansi.Color.LightGray(text)
+    }
     val showLevel = RequestContext.current.get().logLevel.ordinal >= LogLevel.DEBUG.ordinal
     val prefix = (showLevel, moduleId) match {
       case (false, None) => ""
       case (true, None)  => s"[${msgLevelAnsi}] "
       case (false, Some(mod)) =>
-        "" + fansi.Color.Cyan(s"[${mod}] ")
+        val mc = moduleColor(mod)
+        s"[${mc(mod)}] "
       case (true, Some(mod)) =>
-        val coloredMod = fansi.Color.Cyan(s"[${mod}]")
-        s"[${msgLevelAnsi}] ${coloredMod} "
+        val mc = moduleColor(mod)
+        s"[${msgLevelAnsi}] [${mc(mod)}] "
     }
-    CliServerMessage.Log(s"${prefix}${text}", msgLevel)
+    CliServerMessage.Log(s"${prefix}${coloredText}", msgLevel)
+  }
+
+  private def moduleColor(moduleId: String): fansi.Attr = {
+    val base = moduleId.stripSuffix("-test").stripSuffix("-main")
+    val hue = spreadHash(base) % 360
+    val offset = if moduleId.endsWith("-test") then 15 else if moduleId.endsWith("-main") then -15 else 0
+    val h = (hue + offset + 360) % 360
+    val (r, g, b) = hslToRgb(h, 0.7, 0.6) // h, s, l
+    fansi.Color.True(r, g, b)
+  }
+
+  /** Positional-weighted ASCII hash for good hue spread on short strings. */
+  private def spreadHash(s: String): Int =
+    s.zipWithIndex.map((c, i) => c.toInt * (i + 1)).sum
+
+  /** HSL → RGB. h in [0,360), s,l in [0,1]. Returns (r,g,b) each in [0,255]. */
+  private def hslToRgb(h: Int, s: Double, l: Double): (Int, Int, Int) = {
+    val c = (1 - math.abs(2 * l - 1)) * s
+    val hh = h / 60.0
+    val x = c * (1 - math.abs(hh % 2 - 1))
+    val m = l - c / 2
+    val (r1, g1, b1) = hh.toInt match {
+      case 0 => (c, x, 0.0)
+      case 1 => (x, c, 0.0)
+      case 2 => (0.0, c, x)
+      case 3 => (0.0, x, c)
+      case 4 => (x, 0.0, c)
+      case _ => (c, 0.0, x)
+    }
+    (((r1 + m) * 255).toInt, ((g1 + m) * 255).toInt, ((b1 + m) * 255).toInt)
   }
 
   def fromServerNotification(sn: ServerNotification): Option[CliServerMessage] = sn match {
