@@ -94,4 +94,39 @@ class CliServerMessageSuite extends munit.FunSuite {
   private def assertContains(haystack: String, needle: String)(implicit loc: munit.Location): Unit = {
     assert(haystack.contains(needle), s"Expected '$haystack' to contain '$needle'")
   }
+
+  test("log() produces plain text (no ANSI escapes) when noColor is true") {
+    val ctx = RequestContext(noColor = true)
+    RequestContext.current.supervisedWhere(ctx) {
+      val errMsg = CliServerMessage.log("build failed", LogLevel.ERROR)
+      assert(!errMsg.text.contains("\u001b["), "should not contain ANSI escapes")
+      assertContains(errMsg.text, "build failed")
+
+      val warnMsg = CliServerMessage.log("deprecated", LogLevel.WARNING)
+      assert(!warnMsg.text.contains("\u001b["), "should not contain ANSI escapes")
+      assertContains(warnMsg.text, "deprecated")
+
+      val infoMsg = CliServerMessage.log("all good", LogLevel.INFO)
+      assertEquals(infoMsg.text, "all good")
+    }
+  }
+
+  test("log() strips pre-existing ANSI codes from text when noColor is true") {
+    val ctx = RequestContext(noColor = true)
+    RequestContext.current.supervisedWhere(ctx) {
+      // Simulate text that has pre-existing ANSI (like from DederTestRunner)
+      val coloredText = fansi.Color.Red("FAILED").toString()
+      val msg = CliServerMessage.log(coloredText, LogLevel.ERROR)
+      assert(!msg.text.contains("\u001b["), "should strip pre-existing ANSI")
+      assertContains(msg.text, "FAILED")
+    }
+  }
+
+  test("log() keeps existing colored behavior when noColor is false (default)") {
+    val ctx = RequestContext(noColor = false, logLevel = LogLevel.INFO)
+    RequestContext.current.supervisedWhere(ctx) {
+      val errMsg = CliServerMessage.log("build failed", LogLevel.ERROR)
+      assertContains(errMsg.text, fansi.Color.Red("build failed").toString())
+    }
+  }
 }
