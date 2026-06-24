@@ -54,7 +54,8 @@ class TabCompleter(moduleIds: Seq[String], taskIds: Seq[String], toolNames: Seq[
       FlagDef("--modules", Some("-m"), Some(ValueType.ModuleIds)),
       FlagDef("--log-level", Some("-l"), Some(ValueType.LogLevels)),
       FlagDef("--format", Some("-f"), Some(ValueType.OutputFormats)),
-      FlagDef("--watch", Some("-w"), None)
+      FlagDef("--watch", Some("-w"), None),
+      FlagDef("--no-color", None, None)
     ),
     "import" -> Seq(
       FlagDef("--from", None, Some(ValueType.ImportFrom))

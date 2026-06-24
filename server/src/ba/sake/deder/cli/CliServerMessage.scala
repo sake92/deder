@@ -19,33 +19,46 @@ object CliServerMessage {
     log(text, LogLevel.INFO)
 
   def log(text: String, msgLevel: LogLevel, moduleId: Option[String] = None): CliServerMessage.Log = {
-    val msgLevelString = msgLevel.toString.toLowerCase
-    val msgLevelAnsi = msgLevel match {
-      case LogLevel.ERROR   => fansi.Color.Red(msgLevelString)
-      case LogLevel.WARNING => fansi.Color.Yellow(msgLevelString)
-      case LogLevel.INFO    => fansi.Color.Green(msgLevelString)
-      case LogLevel.DEBUG   => fansi.Color.LightGreen(msgLevelString)
-      case LogLevel.TRACE   => fansi.Color.LightGray(msgLevelString)
+    val ctx = RequestContext.current.get()
+    if (ctx.noColor) {
+      val strippedText = fansi.Str(text).plainText
+      val showLevel = ctx.logLevel.ordinal >= LogLevel.DEBUG.ordinal
+      val prefix = (showLevel, moduleId) match {
+        case (false, None) => ""
+        case (true, None)  => s"[${msgLevel.toString.toLowerCase}] "
+        case (false, Some(mod)) => s"[$mod] "
+        case (true, Some(mod))  => s"[${msgLevel.toString.toLowerCase}] [$mod] "
+      }
+      CliServerMessage.Log(s"$prefix$strippedText", msgLevel)
+    } else {
+      val msgLevelString = msgLevel.toString.toLowerCase
+      val msgLevelAnsi = msgLevel match {
+        case LogLevel.ERROR   => fansi.Color.Red(msgLevelString)
+        case LogLevel.WARNING => fansi.Color.Yellow(msgLevelString)
+        case LogLevel.INFO    => fansi.Color.Green(msgLevelString)
+        case LogLevel.DEBUG   => fansi.Color.LightGreen(msgLevelString)
+        case LogLevel.TRACE   => fansi.Color.LightGray(msgLevelString)
+      }
+      val coloredText = msgLevel match {
+        case LogLevel.ERROR   => fansi.Color.Red(text)
+        case LogLevel.WARNING => fansi.Color.Yellow(text)
+        case LogLevel.INFO    => text
+        case LogLevel.DEBUG   => fansi.Color.LightGreen(text)
+        case LogLevel.TRACE   => fansi.Color.LightGray(text)
+      }
+      val showLevel = ctx.logLevel.ordinal >= LogLevel.DEBUG.ordinal
+      val prefix = (showLevel, moduleId) match {
+        case (false, None) => ""
+        case (true, None)  => s"[${msgLevelAnsi}] "
+        case (false, Some(mod)) =>
+          val mc = moduleColor(mod)
+          s"[${mc(mod)}] "
+        case (true, Some(mod)) =>
+          val mc = moduleColor(mod)
+          s"[${msgLevelAnsi}] [${mc(mod)}] "
+      }
+      CliServerMessage.Log(s"${prefix}${coloredText}", msgLevel)
     }
-    val coloredText = msgLevel match {
-      case LogLevel.ERROR   => fansi.Color.Red(text)
-      case LogLevel.WARNING => fansi.Color.Yellow(text)
-      case LogLevel.INFO    => text
-      case LogLevel.DEBUG   => fansi.Color.LightGreen(text)
-      case LogLevel.TRACE   => fansi.Color.LightGray(text)
-    }
-    val showLevel = RequestContext.current.get().logLevel.ordinal >= LogLevel.DEBUG.ordinal
-    val prefix = (showLevel, moduleId) match {
-      case (false, None) => ""
-      case (true, None)  => s"[${msgLevelAnsi}] "
-      case (false, Some(mod)) =>
-        val mc = moduleColor(mod)
-        s"[${mc(mod)}] "
-      case (true, Some(mod)) =>
-        val mc = moduleColor(mod)
-        s"[${msgLevelAnsi}] [${mc(mod)}] "
-    }
-    CliServerMessage.Log(s"${prefix}${coloredText}", msgLevel)
   }
 
   private def moduleColor(moduleId: String): fansi.Attr = {

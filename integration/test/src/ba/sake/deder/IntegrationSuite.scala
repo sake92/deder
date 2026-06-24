@@ -278,4 +278,36 @@ class IntegrationSuite extends BaseIntegrationSuite {
       }
     }
   }
+
+  test("deder exec should respect NO_COLOR env var and --no-color flag") {
+    withTestProject("sample-projects/multi") { projectPath =>
+    // Use debug log level so colored prefixes are generated (INFO body is plain)
+    // Test 1: NO_COLOR env var — colors should be suppressed even at debug level
+    locally {
+      val cmd = Seq("java", "-jar", dederClientPath, "exec", "-t", "compile", "-m", "backend", "-l", "debug")
+      val res = os.proc(cmd).call(
+        cwd = projectPath,
+        env = Map("NO_COLOR" -> "1"),
+        stderr = os.Pipe,
+        check = false
+      )
+      val output = res.out.text() + res.err.text()
+      assert(!output.contains("\u001b["), s"output should not contain ANSI escapes with NO_COLOR=1")
+    }
+    // Test 2: --no-color flag — colors should be suppressed even at debug level
+    locally {
+      val cmd = Seq("java", "-jar", dederClientPath, "exec", "-t", "compile", "-m", "backend", "-l", "debug", "--no-color")
+      val res = os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe, check = false)
+      val output = res.out.text() + res.err.text()
+      assert(!output.contains("\u001b["), s"output should not contain ANSI escapes with --no-color flag")
+    }
+    // Test 3: Without flag or env var, colors should be present at debug level (sanity check)
+    locally {
+      val cmd = Seq("java", "-jar", dederClientPath, "exec", "-t", "compile", "-m", "backend", "-l", "debug")
+      val res = os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe, check = false)
+      val output = res.out.text() + res.err.text()
+      assert(output.contains("\u001b["), s"output should contain ANSI escapes by default")
+    }
+    }
+  }
 }
