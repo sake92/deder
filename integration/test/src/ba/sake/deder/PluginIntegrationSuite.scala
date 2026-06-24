@@ -55,8 +55,8 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
-  test("plugins are preserved across deder.pkl reload when unchanged") {
-    val tempParent = os.pwd / "tmp" / s"selective-reload-${System.currentTimeMillis()}"
+  test("plugins are reloaded on every deder.pkl change") {
+    val tempParent = os.pwd / "tmp" / s"full-reload-${System.currentTimeMillis()}"
     val pluginPath = stageSiblingProject(tempParent, "hello-plugin")
     val consumerPath = stageSiblingProject(tempParent, "hello-plugin-consumer")
 
@@ -82,7 +82,7 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
       os.write.append(dederPkl, "\n")
       Thread.sleep(2000) // give file watcher time to detect and reload
 
-      // Second run: plugin should still work (proves it survived selective reload)
+      // Second run: plugin should still work after full reload
       val res2 = executeDederCommand(consumerPath, "exec", "-m", "app", "-t", "hello")
       assert(
         res2.exitCode == 0,
