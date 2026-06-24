@@ -31,16 +31,16 @@ modules {
 }
 ```
 
-This assumes you have a project folder structure like this:
+This assumes you have a project folder structure like this (the [flat-style layout](/reference/project-layout.html#flat-style-default)):
 
 ```
 deder.pkl
 my-module/
-    src/
-        Main.scala
-    test/
-        src/
-            MainTest.scala
+├── src/
+│   └── Main.scala
+└── test/
+    └── src/
+        └── MainTest.scala
 ```
 
 ## Run Your First Task

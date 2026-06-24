@@ -26,6 +26,8 @@ references:
     url: "/reference/files-layout.html"
   - label: "Server Properties"
     url: "/reference/server-properties.html"
+  - label: "Project layout"
+    url: "/reference/project-layout.html"
   - label: "Repositories"
     url: "/reference/repositories.html"
   - label: "Tasks"
