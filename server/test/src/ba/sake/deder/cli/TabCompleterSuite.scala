@@ -81,12 +81,12 @@ class TabCompleterSuite extends munit.FunSuite {
 
     assertEquals(
       completer.complete("deder exec ", cs("deder exec ")).toSet,
-      Set("-m", "--modules", "-t", "--task", "-f", "--format", "-w", "--watch", "-l", "--log-level")
+      Set("-m", "--modules", "-t", "--task", "-f", "--format", "-w", "--watch", "-l", "--log-level", "--no-color")
     )
 
     assertEquals(
       completer.complete("deder exec --", cs("deder exec --")).toSet,
-      Set("--modules", "--task", "--format", "--watch", "--log-level")
+      Set("--modules", "--task", "--format", "--watch", "--log-level", "--no-color")
     )
   }
 
