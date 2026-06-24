@@ -7,6 +7,14 @@ Config based, concurrent-first, client-server JVM build tool.
 
 Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 
+## Demo
+
+### Hello world
+[![asciicast](https://asciinema.org/a/1258813.svg)](https://asciinema.org/a/1258813)
+
+### Watch mode
+[![asciicast](https://asciinema.org/a/1258808.svg)](https://asciinema.org/a/1258808)
+
 ## Current status and features
 - CLI client with shell completions
 - BSP client with support for VSCode and IntelliJ

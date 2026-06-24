@@ -1,10 +1,11 @@
-amends "https://sake92.github.io/deder/config/v0.19.5/DederProject.pkl"
+amends "https://sake92.github.io/deder/config/v0.20.0/DederProject.pkl"
 // amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 
 import "https://sake92.github.io/deder-plugins/config/deder-web-dashboard/v0.4.0/WebDashboardPlugin.pkl" as WD
 
 plugins {
   new WD.WebDashboardPlugin {
+    version = "0.6.0"
     config {
       enabled = false
     }
