@@ -19,6 +19,8 @@ Before making any code changes:
 2. The branch name should describe the change (e.g., `fix/server-restart-hardening`, `feat/watch-ignore-paths`)
 3. All edits, commits, and builds happen inside the worktree
 4. This keeps `main` clean and avoids conflicts with the running Deder server
+5. When finished, always run `deder shutdown && sleep 1` to stop the Deder server — especially before switching branches or deleting the worktree
+6. A running Deder server holds `.deder/server-cli.sock` and `.deder/server-bsp.sock`. Leaving it alive can block socket binding on the next worktree, cause stale lockfiles, or leave orphaned compile daemons consuming resources
 
 **Every feature, fix, or refactor starts with a worktree. No exceptions.**
 
