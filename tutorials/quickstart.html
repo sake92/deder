@@ -78,14 +78,14 @@ modules {
   ...myModules
 }
 </code></pre>
-   <p>This assumes you have a project folder structure like this:</p>
+   <p>This assumes you have a project folder structure like this (the <a href="https://sake92.github.io/deder/reference/project-layout.html#flat-style-default">flat-style layout</a>):</p>
    <pre><code class="language- hljs language-stylus" data-highlighted="yes">deder<span class="hljs-selector-class">.pkl</span>
 my-module/
-    <span class="hljs-attribute">src</span>/
-        Main<span class="hljs-selector-class">.scala</span>
-    test/
-        <span class="hljs-attribute">src</span>/
-            MainTest<span class="hljs-selector-class">.scala</span>
+├── <span class="hljs-attribute">src</span>/
+│   └── Main<span class="hljs-selector-class">.scala</span>
+└── test/
+    └── <span class="hljs-attribute">src</span>/
+        └── MainTest<span class="hljs-selector-class">.scala</span>
 </code></pre>
    <h2 id="run-your-first-task">Run Your First Task<a href="#run-your-first-task" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <pre><code class="language-bash hljs" data-highlighted="yes"><span class="hljs-comment"># Compile all modules</span>

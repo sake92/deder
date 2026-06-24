@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Project layout | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/">Home</a></li>
+    </ul>
+    <ul>
+     <li>
+      <form action="https://sake92.github.io/deder/search/results.html" method="GET">
+       <input name="q" type="search" placeholder="Search">
+      </form>
+     </li>
+    </ul>
+    <ul>
+     <li><a href="https://sake92.github.io/deder/tutorials">Tutorials</a></li>
+     <li><a href="https://sake92.github.io/deder/howtos">How-Tos</a></li>
+     <li><a href="https://sake92.github.io/deder/reference">Reference</a></li>
+     <li><a href="https://sake92.github.io/deder/philosophy">Philosophy</a></li>
+    </ul>
+   </nav>
+  </header>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details>
+      <summary>Table of Contents</summary>
+      <div>
+       <ul>
+        <li><a href="#project-layout">Project layout</a>
+         <ul>
+          <li><a href="#quick-reference">Quick reference</a></li>
+          <li><a href="#flat-style-default">Flat-style (default)</a></li>
+          <li><a href="#maven--sbt-style-maven-sbt">Maven / SBT style (maven, sbt)</a></li>
+          <li><a href="#version-specific-source-directories">Version-specific source directories</a>
+           <ul>
+            <li><a href="#deder-style-versionstyle--deder">Deder style (versionStyle = "deder")</a></li>
+            <li><a href="#sbt-style-versionstyle--sbt">SBT style (versionStyle = "sbt")</a></li>
+           </ul></li>
+          <li><a href="#cross-platform-layouts">Cross-platform layouts</a>
+           <ul>
+            <li><a href="#sbt-cross-full">sbt-cross-full</a></li>
+            <li><a href="#sbt-cross-pure">sbt-cross-pure</a></li>
+            <li><a href="#sbt-cross-dummy">sbt-cross-dummy</a></li>
+           </ul></li>
+          <li><a href="#configuration">Configuration</a></li>
+         </ul></li>
+       </ul>
+      </div>
+     </details>
+     <hr>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="project-layout">Project layout<a href="#project-layout" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Deder supports several standard directory layouts for organizing source files. The layout is controlled by the <code>layout</code> parameter on <code>CreateScalaModules</code>, <code>CreateJavaModules</code>, or <code>CreateCrossModules</code>.</p>
+   <h2 id="quick-reference">Quick reference<a href="#quick-reference" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <table>
+    <thead>
+     <tr>
+      <th>Layout</th>
+      <th>Main Scala source</th>
+      <th>Test Scala source</th>
+      <th>Resources</th>
+      <th>Test module root</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr>
+      <td><code>default</code></td>
+      <td><code>{root}/src</code></td>
+      <td><code>{root}/test/src</code></td>
+      <td><code>{root}/resources</code></td>
+      <td><code>{root}/test</code></td>
+     </tr>
+     <tr>
+      <td><code>maven</code></td>
+      <td><code>{root}/src/main/scala</code></td>
+      <td><code>{root}/src/test/scala</code></td>
+      <td><code>{root}/src/main/resources</code></td>
+      <td><code>{root}</code></td>
+     </tr>
+     <tr>
+      <td><code>sbt</code></td>
+      <td><code>{root}/src/main/scala</code></td>
+      <td><code>{root}/src/test/scala</code></td>
+      <td><code>{root}/src/main/resources</code></td>
+      <td><code>{root}</code></td>
+     </tr>
+     <tr>
+      <td><code>sbt-cross-full</code></td>
+      <td>shared + <code>jvm/.../scala</code></td>
+      <td>shared + <code>jvm/test/...</code></td>
+      <td><code>{root}/shared/src/main/resources</code></td>
+      <td><code>{root}</code></td>
+     </tr>
+     <tr>
+      <td><code>sbt-cross-pure</code></td>
+      <td>shared + <code>.jvm/.../scala</code></td>
+      <td>shared + <code>.jvm/test/...</code></td>
+      <td><code>{root}/src/main/resources</code></td>
+      <td><code>{root}</code></td>
+     </tr>
+     <tr>
+      <td><code>sbt-cross-dummy</code></td>
+      <td><code>jvm/src/main/scala</code></td>
+      <td><code>jvm/src/test/scala</code></td>
+      <td><code>{root}/src/main/resources</code></td>
+      <td><code>{root}</code></td>
+     </tr>
+    </tbody>
+   </table>
+   <p>For Java modules, replace <code>scala</code> with <code>java</code> and note that <code>maven</code>/<code>sbt</code> layouts do <strong>not</strong> add <code>src/main/scala</code> as an extra source.</p>
+   <h2 id="flat-style-default">Flat-style (<code>default</code>)<a href="#flat-style-default" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>The default layout uses a flat directory structure — main sources go directly under <code>src/</code> at the module root, and the test module lives in a <code>test/</code> subdirectory.</p>
+   <pre><code class="language- hljs language-nix" data-highlighted="yes">my-module<span class="hljs-symbol">/</span>
+├── src<span class="hljs-symbol">/</span>
+│   └── mymodule<span class="hljs-symbol">/Main.scala</span>
+├── resources<span class="hljs-symbol">/</span>
+│   └── application.conf
+└── test<span class="hljs-symbol">/</span>
+    ├── src<span class="hljs-symbol">/</span>
+    │   └── mymodule<span class="hljs-symbol">/MainTest.scala</span>
+    └── resources<span class="hljs-symbol">/</span>
+        └── application.conf
+</code></pre>
+   <pre><code class="language-pkl">local const myModules = new CreateScalaModules {
+  root = "my-module"
+  layout = "default"  // this is the default, can be omitted
+  template = new { ... }
+}
+</code></pre>
+   <p>Key conventions:</p>
+   <ul>
+    <li>Main sources: <code>{root}/src/</code></li>
+    <li>Main resources: <code>{root}/resources/</code></li>
+    <li>Test module root: <code>{root}/test/</code> (suffix <code>/test</code> is appended automatically)</li>
+    <li>Test sources: <code>{root}/test/src/</code></li>
+    <li>Test resources: <code>{root}/test/resources/</code></li>
+   </ul>
+   <h2 id="maven--sbt-style-maven-sbt">Maven / SBT style (<code>maven</code>, <code>sbt</code>)<a href="#maven--sbt-style-maven-sbt" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Both layouts follow the <code>src/main/...</code> and <code>src/test/...</code> convention used by Maven, Gradle, and SBT. The directory structure is identical; the difference is whether version-specific source directories are added (see <a href="#version-specific-source-directories">below</a>).</p>
+   <pre><code class="language- hljs language-nix" data-highlighted="yes">my-module<span class="hljs-symbol">/</span>
+├── src<span class="hljs-symbol">/</span>
+│   ├── main<span class="hljs-symbol">/</span>
+│   │   ├── scala<span class="hljs-symbol">/</span>
+│   │   │   └── mymodule<span class="hljs-symbol">/Main.scala</span>
+│   │   ├── java<span class="hljs-symbol">/</span>                         ← only for Scala modules
+│   │   │   └── mymodule<span class="hljs-symbol">/Helper.java</span>
+│   │   └── resources<span class="hljs-symbol">/</span>
+│   │       └── application.conf
+│   └── test<span class="hljs-symbol">/</span>
+│       ├── scala<span class="hljs-symbol">/</span>
+│       │   └── mymodule<span class="hljs-symbol">/MainTest.scala</span>
+│       ├── java<span class="hljs-symbol">/</span>                         ← only for Scala modules
+│       │   └── mymodule<span class="hljs-symbol">/HelperTest.java</span>
+│       └── resources<span class="hljs-symbol">/</span>
+│           └── application.conf
+</code></pre>
+   <pre><code class="language-pkl">// Scala module — also picks up src/main/java as an extra source
+local const myModules = new CreateScalaModules {
+  root = "my-module"
+  layout = "maven"  // or "sbt" for SBT-style version dirs
+  template = new { ... }
+}
+</code></pre>
+   <p>Key differences from <code>default</code>:</p>
+   <ul>
+    <li>Main and test modules share the same root (no <code>/test</code> suffix on the test module)</li>
+    <li>For Scala modules, <code>src/main/java</code> is automatically added as an extra source directory (Java modules only get <code>src/main/java</code>)</li>
+    <li>Resources live under <code>src/main/resources</code> and <code>src/test/resources</code></li>
+   </ul>
+   <h2 id="version-specific-source-directories">Version-specific source directories<a href="#version-specific-source-directories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Scala modules can use version-specific source directories to share code across Scala versions. Deder has two naming styles, controlled by the layout's <code>versionStyle</code>.</p>
+   <blockquote>
+    <p><strong>Note:</strong> Version-specific directories are only added for Scala-family modules (Scala, Scala.js, Scala Native). Java modules do not get version-specific source dirs.</p>
+   </blockquote>
+   <h3 id="deder-style-versionstyle--deder">Deder style (<code>versionStyle = "deder"</code>)<a href="#deder-style-versionstyle--deder" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>Used by <code>default</code> and <code>maven</code> layouts. For Scala version <code>3.7.4</code>:</p>
+   <pre><code class="language- hljs language-apache" data-highlighted="yes"><span class="hljs-attribute">src</span>-<span class="hljs-number">3</span>/           # major version
+<span class="hljs-attribute">src</span>-<span class="hljs-number">3</span>.<span class="hljs-number">7</span>/         # minor version
+<span class="hljs-attribute">src</span>-<span class="hljs-number">3</span>.<span class="hljs-number">7</span>.<span class="hljs-number">4</span>/       # patch version
+</code></pre>
+   <p>Example with <code>maven</code> layout:</p>
+   <pre><code class="language- hljs language-nix" data-highlighted="yes">my-module<span class="hljs-symbol">/</span>
+└── src<span class="hljs-symbol">/</span>
+    └── main<span class="hljs-symbol">/</span>
+        └── scala<span class="hljs-symbol">/</span>
+            ├── scala-<span class="hljs-number">3</span><span class="hljs-symbol">/</span>                  ← version-specific (deder style)
+            ├── scala-<span class="hljs-number">3.7</span><span class="hljs-symbol">/</span>
+            └── scala-<span class="hljs-number">3.7</span>.<span class="hljs-number">4</span><span class="hljs-symbol">/</span>
+</code></pre>
+   <h3 id="sbt-style-versionstyle--sbt">SBT style (<code>versionStyle = "sbt"</code>)<a href="#sbt-style-versionstyle--sbt" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>Used by all <code>sbt*</code> layouts. For Scala version <code>3.7.4</code>:</p>
+   <pre><code class="language- hljs language-apache" data-highlighted="yes"><span class="hljs-attribute">src</span>/main/scala-<span class="hljs-number">3</span>/
+<span class="hljs-attribute">src</span>/main/scala-<span class="hljs-number">3</span>.<span class="hljs-number">7</span>/
+<span class="hljs-attribute">src</span>/main/scala-<span class="hljs-number">3</span>.<span class="hljs-number">7</span>.<span class="hljs-number">4</span>/
+<span class="hljs-attribute">src</span>/main/scala-<span class="hljs-number">3</span>.<span class="hljs-number">7</span>+/      # binary version and higher
+<span class="hljs-attribute">src</span>/main/scala-<span class="hljs-number">2</span>.<span class="hljs-number">13</span>+/     # cross-compilation (always added for Scala <span class="hljs-number">3</span>)
+</code></pre>
+   <p>The SBT style adds two extra "binary version" directories:</p>
+   <ul>
+    <li><code>X.Y+</code> — matches the current binary version and any higher</li>
+    <li><code>2.13+</code> — for Scala 3.x targets, this enables sharing code with <code>2.13</code> cross-builds</li>
+   </ul>
+   <h2 id="cross-platform-layouts">Cross-platform layouts<a href="#cross-platform-layouts" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>For projects targeting multiple platforms (JVM, JS, Native), <code>CreateCrossModules</code> supports three layout styles via the <code>layout</code> parameter.</p>
+   <h3 id="sbt-cross-full"><code>sbt-cross-full</code><a href="#sbt-cross-full" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>Shared sources go under a <code>shared/</code> prefix, platform-specific sources under <code>jvm/</code>, <code>js/</code>, <code>native/</code>:</p>
+   <pre><code class="language- hljs language-nix" data-highlighted="yes">my-module<span class="hljs-symbol">/</span>
+├── shared<span class="hljs-symbol">/</span>
+│   ├── src<span class="hljs-symbol">/</span>
+│   │   ├── main<span class="hljs-symbol">/</span>
+│   │   │   ├── scala<span class="hljs-symbol">/</span>                   ← shared across all platforms
+│   │   │   ├── scala-<span class="hljs-number">3</span><span class="hljs-symbol">/</span>                 ← version-specific (sbt style)
+│   │   │   └── scala-<span class="hljs-number">3.7</span><span class="hljs-symbol">/</span>
+│   │   └── test<span class="hljs-symbol">/</span>
+│   │       └── scala<span class="hljs-symbol">/</span>                   ← shared test sources
+│   └── resources<span class="hljs-symbol">/</span>                       ← shared resources
+├── jvm<span class="hljs-symbol">/</span>
+│   └── src<span class="hljs-symbol">/</span>
+│       ├── main<span class="hljs-symbol">/</span>
+│       │   └── scala<span class="hljs-symbol">/</span>                   ← JVM-specific
+│       └── test<span class="hljs-symbol">/</span>
+│           └── scala<span class="hljs-symbol">/</span>                   ← JVM-specific test
+├── js<span class="hljs-symbol">/</span>
+│   └── src<span class="hljs-symbol">/</span>
+│       └── main<span class="hljs-symbol">/</span>
+│           └── scala<span class="hljs-symbol">/</span>                   ← JS-specific
+└── native<span class="hljs-symbol">/</span>
+    └── src<span class="hljs-symbol">/</span>
+        └── main<span class="hljs-symbol">/</span>
+            └── scala<span class="hljs-symbol">/</span>                   ← Native-specific
+</code></pre>
+   <h3 id="sbt-cross-pure"><code>sbt-cross-pure</code><a href="#sbt-cross-pure" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>Like <code>full</code>, but shared sources stay at the normal location (no <code>shared/</code> prefix). Platform sources go under dot-prefixed hidden directories:</p>
+   <pre><code class="language- hljs language-nix" data-highlighted="yes">my-module<span class="hljs-symbol">/</span>
+├── src<span class="hljs-symbol">/</span>
+│   ├── main<span class="hljs-symbol">/</span>
+│   │   ├── scala<span class="hljs-symbol">/</span>                       ← shared (no prefix)
+│   │   ├── scala-<span class="hljs-number">3</span><span class="hljs-symbol">/</span>                     ← version-specific (sbt style)
+│   │   └── resources<span class="hljs-symbol">/</span>
+│   └── test<span class="hljs-symbol">/</span>
+│       └── scala<span class="hljs-symbol">/</span>                       ← shared test sources
+├── .jvm<span class="hljs-symbol">/</span>
+│   └── src<span class="hljs-symbol">/</span>
+│       └── main<span class="hljs-symbol">/</span>
+│           └── scala<span class="hljs-symbol">/</span>                   ← JVM-specific
+├── .js<span class="hljs-symbol">/</span>
+│   └── src<span class="hljs-symbol">/</span>
+│       └── main<span class="hljs-symbol">/</span>
+│           └── scala<span class="hljs-symbol">/</span>                   ← JS-specific
+└── .native<span class="hljs-symbol">/</span>
+    └── src<span class="hljs-symbol">/</span>
+        └── main<span class="hljs-symbol">/</span>
+            └── scala<span class="hljs-symbol">/</span>                   ← Native-specific
+</code></pre>
+   <h3 id="sbt-cross-dummy"><code>sbt-cross-dummy</code><a href="#sbt-cross-dummy" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>No shared sources at all. Each platform carries its own complete source tree:</p>
+   <pre><code class="language- hljs language-nix" data-highlighted="yes">my-module<span class="hljs-symbol">/</span>
+├── jvm<span class="hljs-symbol">/</span>
+│   └── src<span class="hljs-symbol">/</span>
+│       ├── main<span class="hljs-symbol">/</span>
+│       │   └── scala<span class="hljs-symbol">/</span>                   ← JVM only
+│       └── test<span class="hljs-symbol">/</span>
+│           └── scala<span class="hljs-symbol">/</span>
+├── js<span class="hljs-symbol">/</span>
+│   └── src<span class="hljs-symbol">/</span>
+│       └── main<span class="hljs-symbol">/</span>
+│           └── scala<span class="hljs-symbol">/</span>                   ← JS only
+└── native<span class="hljs-symbol">/</span>
+    └── src<span class="hljs-symbol">/</span>
+        └── main<span class="hljs-symbol">/</span>
+            └── scala<span class="hljs-symbol">/</span>                   ← Native only
+</code></pre>
+   <h2 id="configuration">Configuration<a href="#configuration" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Set the <code>layout</code> parameter on the creation helper class:</p>
+   <pre><code class="language-pkl">// Flat-style (default)
+new CreateScalaModules {
+  root = "myapp"
+  layout = "default"
+  template = new { ... }
+}
+
+// Maven-style
+new CreateScalaModules {
+  root = "myapp"
+  layout = "maven"
+  template = new { ... }
+}
+
+// SBT-style with version-specific dirs and 2.13+ cross-build support
+new CreateScalaModules {
+  root = "myapp"
+  layout = "sbt"
+  template = new { ... }
+}
+
+// Cross-platform with full shared layout
+new CreateCrossModules {
+  root = "myapp"
+  layout = "sbt-cross-full"
+  template = new { ... }
+}
+</code></pre>
+   <p>The <code>layout</code> parameter is optional and defaults to <code>"default"</code>.</p>
+   <p>For fine-grained control, you can also define modules manually (without the creation helpers) and specify <code>sources</code> and <code>resources</code> explicitly:</p>
+   <pre><code class="language-pkl">modules {
+  new JavaModule {
+    id = "mylib"
+    root = "mylib"
+    sources { "src/main/java"; "src/main/generated" }
+    resources { "src/main/resources" }
+    type = "java"
+  }
+}
+</code></pre>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/reference/server-properties.html">⬅️ Server Properties</a> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/repositories.html">Repositories ➡️</a>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+ </body>
+</html>
