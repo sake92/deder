@@ -86,6 +86,8 @@ case class DederCliExecOptions(
     format: OutputFormat = OutputFormat.PlainText,
     @arg(doc = "Watch mode - re-execute task on source changes", short = 'w')
     watch: Flag,
+    @arg(doc = "Disable terminal color output")
+    noColor: Flag,
     args: Leftover[String]
 )
 
