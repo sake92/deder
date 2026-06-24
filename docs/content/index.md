@@ -13,6 +13,15 @@ It uses [Pkl](https://pkl-lang.org/) for configuration, providing type safety, I
 > **New here?** Start with the [Installation](/tutorials/installation.html) tutorial, then follow the [Quickstart](/tutorials/quickstart.html).
 > Already set up? Browse the [Cheatsheet](/reference/cheatsheet.html) for a quick command reference.
 
+## Demos
+
+### Hello World!
+<script src="https://asciinema.org/a/1258813.js" id="asciicast-1258813" async="true"></script>
+
+## Watch mode
+<script src="https://asciinema.org/a/1258808.js" id="asciicast-1258808" async="true"></script>
+
+
 ## Key Concepts
 
 **Project** is the root directory where your build configuration lives (usually the git repo root).
