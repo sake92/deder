@@ -7,7 +7,8 @@ case class RequestContext(
     requestId: String = scala.util.Random.alphanumeric.take(8).mkString,
     envVars: Map[String, String] = Map.empty,
     outputFormat: OutputFormat = OutputFormat.PlainText,
-    logLevel: cli.LogLevel = cli.LogLevel.INFO
+    logLevel: cli.LogLevel = cli.LogLevel.INFO,
+    noColor: Boolean = false
 )
 
 object RequestContext {
