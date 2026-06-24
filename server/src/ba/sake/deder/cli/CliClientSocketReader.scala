@@ -95,7 +95,8 @@ class CliClientSocketReader(
           .toOption
         val outputFormat = opts.map(_.format).getOrElse(OutputFormat.PlainText)
         val logLevel = opts.map(_.logLevel).getOrElse(cli.LogLevel.INFO)
-        RequestContext(clientId, requestId, m.envVars, outputFormat, logLevel)
+        val noColor = m.envVars.contains("NO_COLOR") || opts.exists(_.noColor.value)
+        RequestContext(clientId, requestId, m.envVars, outputFormat, logLevel, noColor)
       case _ =>
         RequestContext(clientId, requestId)
     }
