@@ -46,7 +46,14 @@ The [examples](examples) folder has working projects that show you how to use De
 
 ## Installation
 
-Deder requires JDK 21+.
+Deder has 2 components: server and client.  
+Client automatically downloads correct server from [Github releases](https://github.com/sake92/deder/releases) (version is based on `amends` in your `deder.pkl` build definition).
+
+Deder server requires **JDK 21**+ (using virtual threads).
+
+So you only have to install the CLI client.  
+We provide **native executables** (built with GraalVM) as a brew package on macOS/Linux and as scoop package on Windows.  
+If none of those work for you, you can use plain JAR from the releases (you might want to write a helper script..).
 
 ### macOS and Linux (Homebrew)
 
