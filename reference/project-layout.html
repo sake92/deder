@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -139,10 +143,10 @@
     └── resources<span class="hljs-symbol">/</span>
         └── application.conf
 </code></pre>
-   <pre><code class="language-pkl">local const myModules = new CreateScalaModules {
-  root = "my-module"
-  layout = "default"  // this is the default, can be omitted
-  template = new { ... }
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-keyword">local</span> <span class="hljs-keyword">const</span> <span class="hljs-property">myModules</span> = <span class="hljs-keyword">new</span> <span class="hljs-property">CreateScalaModules</span> {
+  <span class="hljs-property">root</span> = <span class="hljs-string">"my-module"</span>
+  <span class="hljs-property">layout</span> = <span class="hljs-string">"default"</span>  <span class="hljs-comment">// this is the default, can be omitted</span>
+  <span class="hljs-property">template</span> = <span class="hljs-property">new</span> { ... }
 }
 </code></pre>
    <p>Key conventions:</p>
@@ -172,11 +176,11 @@
 │       └── resources<span class="hljs-symbol">/</span>
 │           └── application.conf
 </code></pre>
-   <pre><code class="language-pkl">// Scala module — also picks up src/main/java as an extra source
-local const myModules = new CreateScalaModules {
-  root = "my-module"
-  layout = "maven"  // or "sbt" for SBT-style version dirs
-  template = new { ... }
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-comment">// Scala module — also picks up src/main/java as an extra source</span>
+<span class="hljs-keyword">local</span> <span class="hljs-keyword">const</span> <span class="hljs-property">myModules</span> = <span class="hljs-keyword">new</span> <span class="hljs-property">CreateScalaModules</span> {
+  <span class="hljs-property">root</span> = <span class="hljs-string">"my-module"</span>
+  <span class="hljs-property">layout</span> = <span class="hljs-string">"maven"</span>  <span class="hljs-comment">// or "sbt" for SBT-style version dirs</span>
+  <span class="hljs-property">template</span> = <span class="hljs-property">new</span> { ... }
 }
 </code></pre>
    <p>Key differences from <code>default</code>:</p>
@@ -290,43 +294,43 @@ local const myModules = new CreateScalaModules {
 </code></pre>
    <h2 id="configuration">Configuration<a href="#configuration" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Set the <code>layout</code> parameter on the creation helper class:</p>
-   <pre><code class="language-pkl">// Flat-style (default)
-new CreateScalaModules {
-  root = "myapp"
-  layout = "default"
-  template = new { ... }
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-comment">// Flat-style (default)</span>
+<span class="hljs-keyword">new</span> <span class="hljs-property">CreateScalaModules</span> {
+  <span class="hljs-property">root</span> = <span class="hljs-string">"myapp"</span>
+  <span class="hljs-property">layout</span> = <span class="hljs-string">"default"</span>
+  <span class="hljs-property">template</span> = <span class="hljs-property">new</span> { ... }
 }
 
-// Maven-style
-new CreateScalaModules {
-  root = "myapp"
-  layout = "maven"
-  template = new { ... }
+<span class="hljs-comment">// Maven-style</span>
+<span class="hljs-keyword">new</span> <span class="hljs-property">CreateScalaModules</span> {
+  <span class="hljs-property">root</span> = <span class="hljs-string">"myapp"</span>
+  <span class="hljs-property">layout</span> = <span class="hljs-string">"maven"</span>
+  <span class="hljs-property">template</span> = <span class="hljs-property">new</span> { ... }
 }
 
-// SBT-style with version-specific dirs and 2.13+ cross-build support
-new CreateScalaModules {
-  root = "myapp"
-  layout = "sbt"
-  template = new { ... }
+<span class="hljs-comment">// SBT-style with version-specific dirs and 2.13+ cross-build support</span>
+<span class="hljs-keyword">new</span> <span class="hljs-property">CreateScalaModules</span> {
+  <span class="hljs-property">root</span> = <span class="hljs-string">"myapp"</span>
+  <span class="hljs-property">layout</span> = <span class="hljs-string">"sbt"</span>
+  <span class="hljs-property">template</span> = <span class="hljs-property">new</span> { ... }
 }
 
-// Cross-platform with full shared layout
-new CreateCrossModules {
-  root = "myapp"
-  layout = "sbt-cross-full"
-  template = new { ... }
+<span class="hljs-comment">// Cross-platform with full shared layout</span>
+<span class="hljs-keyword">new</span> <span class="hljs-property">CreateCrossModules</span> {
+  <span class="hljs-property">root</span> = <span class="hljs-string">"myapp"</span>
+  <span class="hljs-property">layout</span> = <span class="hljs-string">"sbt-cross-full"</span>
+  <span class="hljs-property">template</span> = <span class="hljs-property">new</span> { ... }
 }
 </code></pre>
    <p>The <code>layout</code> parameter is optional and defaults to <code>"default"</code>.</p>
    <p>For fine-grained control, you can also define modules manually (without the creation helpers) and specify <code>sources</code> and <code>resources</code> explicitly:</p>
-   <pre><code class="language-pkl">modules {
-  new JavaModule {
-    id = "mylib"
-    root = "mylib"
-    sources { "src/main/java"; "src/main/generated" }
-    resources { "src/main/resources" }
-    type = "java"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">modules</span> {
+  <span class="hljs-keyword">new</span> <span class="hljs-property">JavaModule</span> {
+    <span class="hljs-property">id</span> = <span class="hljs-string">"mylib"</span>
+    <span class="hljs-property">root</span> = <span class="hljs-string">"mylib"</span>
+    <span class="hljs-property">sources</span> { <span class="hljs-string">"src/main/java"</span>; <span class="hljs-string">"src/main/generated"</span> }
+    <span class="hljs-property">resources</span> { <span class="hljs-string">"src/main/resources"</span> }
+    <span class="hljs-property">type</span> = <span class="hljs-string">"java"</span>
   }
 }
 </code></pre>

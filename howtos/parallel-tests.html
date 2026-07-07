@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -58,10 +62,10 @@
    <h1 id="running-tests-in-parallel">Running tests in parallel<a href="#running-tests-in-parallel" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
    <p>By default, Deder runs test classes <strong>serially</strong> within a single test JVM. This matches sbt (<code>Test / testForkedParallel = false</code>) and Mill (<code>testForked</code>), and avoids flakiness caused by tests that share mutable state (static fields, <code>System.setProperty</code>, security providers, etc.).</p>
    <p>If your tests are safe to run concurrently within the same JVM, opt in per-module with the <code>testParallelism</code> field:</p>
-   <pre><code class="language-pkl">// deder.pkl — example for a Scala test module
-testTemplate = (template.asTest()) {
-  testParallelism = 8
-  // ...
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-comment">// deder.pkl — example for a Scala test module</span>
+<span class="hljs-property">testTemplate</span> = (template.<span class="hljs-property">asTest</span>()) {
+  <span class="hljs-property">testParallelism</span> = <span class="hljs-number">8</span>
+  <span class="hljs-comment">// ...</span>
 }
 </code></pre>
    <p>Supported on:</p>

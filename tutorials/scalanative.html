@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -52,15 +56,15 @@
    </div>
    <h1 id="scala-native-tutorial">Scala Native Tutorial<a href="#scala-native-tutorial" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
    <p>Create a <code>deder.pkl</code> file in your project root:</p>
-   <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-meta">amends <span class="hljs-string">"https://sake92.github.io/deder/config/early-access/DederProject.pkl"</span></span>
 
-local const cli: ScalaNativeModule = new {
-  id = "cli"
-  scalaVersion = "3.7.4"
-  scalaNativeVersion = "0.5.10"
+<span class="hljs-keyword">local</span> <span class="hljs-keyword">const</span> <span class="hljs-property">cli</span>: <span class="hljs-type"><span class="hljs-type">ScalaNativeModule</span> </span>= <span class="hljs-property">new</span> {
+  <span class="hljs-property">id</span> = <span class="hljs-string">"cli"</span>
+  <span class="hljs-property">scalaVersion</span> = <span class="hljs-string">"3.7.4"</span>
+  <span class="hljs-property">scalaNativeVersion</span> = <span class="hljs-string">"0.5.10"</span>
 }
 
-modules {
+<span class="hljs-property">modules</span> {
   cli
 }
 </code></pre>

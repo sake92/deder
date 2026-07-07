@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -63,14 +67,14 @@
    <p>Dependencies are written using Coursier's Dependency syntax. See <a href="https://github.com/coursier/dependency">https://github.com/coursier/dependency</a> for more details.</p>
    <h2 id="how-to-add-a-java-library-dependency">How to add a Java library dependency?<a href="#how-to-add-a-java-library-dependency" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Similar to Gradle syntax, you use colons to separate <code>groupId</code>, <code>artifactId</code>, and <code>version</code>:</p>
-   <pre><code class="language-pkl">deps {
-  "org.immutables:value-annotations:2.12.0"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">deps</span> {
+  <span class="hljs-string">"org.immutables:value-annotations:2.12.0"</span>
 }
 </code></pre>
    <h2 id="how-to-add-a-scala-library-dependency">How to add a Scala library dependency?<a href="#how-to-add-a-scala-library-dependency" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Here you need to use double-colon syntax for first separator:</p>
-   <pre><code class="language-pkl">deps {
-  "ba.sake::sharaf-undertow:0.17.0"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">deps</span> {
+  <span class="hljs-string">"ba.sake::sharaf-undertow:0.17.0"</span>
 }
 </code></pre>
    <p>If this is a Scala 3 module, then it resolves to <code>"ba.sake:sharaf-undertow_3:0.17.0"</code>. Notice how it adds the Scala binary version suffix <code>_3</code>, and goes back to single-colon.</p>
@@ -79,37 +83,37 @@
    </blockquote>
    <h2 id="how-to-add-a-scalajs-library-dependency">How to add a Scala.js library dependency?<a href="#how-to-add-a-scalajs-library-dependency" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>For Scala.js modules, use double-colon syntax in BOTH places:</p>
-   <pre><code class="language-pkl">deps {
-  "org.scala-js::scalajs-dom::2.2.0"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">deps</span> {
+  <span class="hljs-string">"org.scala-js::scalajs-dom::2.2.0"</span>
 }
 </code></pre>
    <p>Besides the Scala binary version suffix <code>_3</code>, it will also prepend the <em>platform suffix</em>, it will resolve to <code>"org.scala-js:scalajs-dom_sjs1_3:2.2.0"</code>. Notice the <code>_sjs1</code> suffix, which means it is a Scala.js 1 dependency.</p>
    <h2 id="how-to-add-a-scala-native-library-dependency">How to add a Scala Native library dependency?<a href="#how-to-add-a-scala-native-library-dependency" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Scala Native also uses double-colon syntax in both places:</p>
-   <pre><code class="language-pkl">deps {
-  "com.armanbilge::epollcat::0.1.4"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">deps</span> {
+  <span class="hljs-string">"com.armanbilge::epollcat::0.1.4"</span>
 }
 </code></pre>
    <p>It resolves with a native platform suffix (for example <code>_native0.5</code>).</p>
    <h2 id="how-to-add-a-scalac-plugin-dependency">How to add a Scalac plugin dependency?<a href="#how-to-add-a-scalac-plugin-dependency" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Here you need to use triple-colon syntax as first separator:</p>
-   <pre><code class="language-pkl">scalacPluginDeps {
-  "org.wartremover:::wartremover:3.5.0"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">scalacPluginDeps</span> {
+  <span class="hljs-string">"org.wartremover:::wartremover:3.5.0"</span>
 }
 </code></pre>
    <p>If this is a Scala <code>3.7.2</code> module, then it resolves to <code>"org.wartremover:wartremover_3.7.2:3.5.0"</code>.</p>
    <p>Notice how it adds the <em>full Scala version</em> suffix <code>_3.7.2</code>, not just the binary version. This is because compiler plugins depend on compiler internals, so they have to use a specific version.</p>
    <h2 id="advanced-declarations">Advanced declarations<a href="#advanced-declarations" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Deder passes dependency strings to Coursier's parser (<code>DependencyParser.parse</code>), so you can use advanced declarations like:</p>
-   <pre><code class="language-pkl">deps {
-  // Exclude a transitive dependency:
-  "org.other:lib:2.0,exclude=org.example%%transitive-dep"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">deps</span> {
+  <span class="hljs-comment">// Exclude a transitive dependency:</span>
+  <span class="hljs-string">"org.other:lib:2.0,exclude=org.example%%transitive-dep"</span>
 
-  // Override artifact download URL (direct file URL):
-  "com.lihaoyi:os-lib_3:0.11.6,url=https://repo1.maven.org/maven2/com/lihaoyi/os-lib_3/0.11.6/os-lib_3-0.11.6.jar"
+  <span class="hljs-comment">// Override artifact download URL (direct file URL):</span>
+  <span class="hljs-string">"com.lihaoyi:os-lib_3:0.11.6,url=https://repo1.maven.org/maven2/com/lihaoyi/os-lib_3/0.11.6/os-lib_3-0.11.6.jar"</span>
 
-  // Keep only the direct dependency (no transitives):
-  "com.lihaoyi:os-lib_3:0.11.6,intransitive"
+  <span class="hljs-comment">// Keep only the direct dependency (no transitives):</span>
+  <span class="hljs-string">"com.lihaoyi:os-lib_3:0.11.6,intransitive"</span>
 }
 </code></pre>
    <h2 id="using-dependencies-from-publishlocal">Using dependencies from <code>publishLocal</code><a href="#using-dependencies-from-publishlocal" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>

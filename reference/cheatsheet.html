@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -163,37 +167,37 @@ deder exec -t depsTree -m mymodule
     <li>Total dependency tree size</li>
    </ul>
    <p><strong>Example tree output:</strong></p>
-   <pre><code class="language- hljs language-nix" data-highlighted="yes">Dependency Tree for <span class="hljs-params">module:</span> core
-Total <span class="hljs-params">size:</span> <span class="hljs-number">245</span>MB
-⚠️  <span class="hljs-params">Conflicts:</span> <span class="hljs-number">1</span>
+   <pre><code class="language- hljs language-pkl" data-highlighted="yes">Dependency Tree <span class="hljs-keyword">for</span> <span class="hljs-property">module</span>: <span class="hljs-type"><span class="hljs-type">core</span></span>
+Total <span class="hljs-property">size</span>: <span class="hljs-type">245<span class="hljs-type">MB</span></span>
+⚠️  <span class="hljs-property">Conflicts</span>: <span class="hljs-type">1</span>
 
-Direct <span class="hljs-params">Dependencies:</span>
-└── org.junit.jupiter:junit-jupiter-api:<span class="hljs-number">5.9</span>.<span class="hljs-number">2</span> (<span class="hljs-number">2.1</span>MB | <span class="hljs-number">3.3</span>MB)
-    ├── org.opentest4j:opentest4j:<span class="hljs-number">1.2</span>.<span class="hljs-number">1</span> (<span class="hljs-number">95</span>KB | <span class="hljs-number">95</span>KB)
-    └── org.junit.platform:junit-platform-commons:<span class="hljs-number">1.9</span>.<span class="hljs-number">2</span> (<span class="hljs-number">1.2</span>MB | <span class="hljs-number">1.2</span>MB)
+Direct <span class="hljs-property">Dependencies</span>:
+<span class="hljs-type">└── <span class="hljs-type">org</span>.<span class="hljs-type">junit</span>.<span class="hljs-type">jupiter</span>:<span class="hljs-type">junit</span>-<span class="hljs-type">jupiter</span>-<span class="hljs-type">api</span>:5.9.2 (2.1<span class="hljs-type">MB</span> | 3.3<span class="hljs-type">MB</span></span>)
+    ├── org.<span class="hljs-property">opentest4j</span>:<span class="hljs-type"><span class="hljs-type">opentest4j</span>:1.2.1 (95<span class="hljs-type">KB</span> | 95<span class="hljs-type">KB</span></span>)
+    └── org.<span class="hljs-property">junit</span>.<span class="hljs-property">platform</span>:<span class="hljs-type"><span class="hljs-type">junit</span>-<span class="hljs-type">platform</span>-<span class="hljs-type">commons</span>:1.9.2 (1.2<span class="hljs-type">MB</span> | 1.2<span class="hljs-type">MB</span></span>)
 
-⚠️  Version <span class="hljs-params">Conflicts:</span>
-  org.opentest4j:<span class="hljs-params">opentest4j:</span>
+⚠️  Version <span class="hljs-property">Conflicts</span>:
+  <span class="hljs-type"><span class="hljs-type">org</span>.<span class="hljs-type">opentest4j</span>:<span class="hljs-type">opentest4j</span>:</span>
     • <span class="hljs-number">1.2</span>.<span class="hljs-number">0</span>
     • <span class="hljs-number">1.2</span>.<span class="hljs-number">1</span>
-    ➜ <span class="hljs-params">Resolved:</span> <span class="hljs-number">1.2</span>.<span class="hljs-number">1</span>
+    ➜ <span class="hljs-property">Resolved</span>: <span class="hljs-type">1.2.1</span>
 </code></pre>
    <h2 id="custom-repositories">Custom repositories<a href="#custom-repositories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Declare extra Maven repositories in <code>deder.pkl</code>:</p>
-   <pre><code class="language-pkl">repositories {
-  new MavenRepository { url = "https://nexus.example.com/releases/" }
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">repositories</span> {
+  <span class="hljs-keyword">new</span> <span class="hljs-property">MavenRepository</span> { <span class="hljs-property">url</span> = <span class="hljs-string">"https://nexus.example.com/releases/"</span> }
 }
-# includeDefaultRepos = false  # force empty default repos, no local .m2 and Maven Central
+# <span class="hljs-property">includeDefaultRepos</span> = <span class="hljs-literal">false</span>  # force empty default repos, no <span class="hljs-keyword">local</span> .<span class="hljs-property">m2</span> and Maven Central
 </code></pre>
    <p>See <a href="https://sake92.github.io/deder/reference/repositories.html">Repositories</a> for details.</p>
    <h2 id="dependency-exclusions">Dependency Exclusions<a href="#dependency-exclusions" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Exclude transitive dependencies at declaration time using Coursier's <code>,exclude=</code> syntax:</p>
-   <pre><code class="language-pkl">deps {
-  "org.example:lib:1.0"
-  // exclude a specific transitive dependency:
-  "org.other:lib:2.0,exclude=org.example%%transitive-dep"
-  // multiple exclusions are comma-separated:
-  "org.another:lib:3.0,exclude=org.foo%foo-lib,exclude=org.bar%%bar-lib"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">deps</span> {
+  <span class="hljs-string">"org.example:lib:1.0"</span>
+  <span class="hljs-comment">// exclude a specific transitive dependency:</span>
+  <span class="hljs-string">"org.other:lib:2.0,exclude=org.example%%transitive-dep"</span>
+  <span class="hljs-comment">// multiple exclusions are comma-separated:</span>
+  <span class="hljs-string">"org.another:lib:3.0,exclude=org.foo%foo-lib,exclude=org.bar%%bar-lib"</span>
 }
 </code></pre>
    <p>Use <code>%%</code> for Scala cross-versioned modules and <code>%</code> for plain Java modules in the exclusion coordinates.</p>

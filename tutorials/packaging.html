@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -56,32 +60,32 @@
    </div>
    <h1 id="packaging-tutorial">Packaging Tutorial<a href="#packaging-tutorial" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
    <p>Create this <code>deder.pkl</code> file:</p>
-   <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-meta">amends <span class="hljs-string">"https://sake92.github.io/deder/config/early-access/DederProject.pkl"</span></span>
 
-local const myappModules = new CreateScalaModules {
-  root = "myapp"
-  template = new {
-    scalaVersion = "3.7.1"
-    deps {
-      "com.lihaoyi::pprint:0.9.5"
+<span class="hljs-keyword">local</span> <span class="hljs-keyword">const</span> <span class="hljs-property">myappModules</span> = <span class="hljs-keyword">new</span> <span class="hljs-property">CreateScalaModules</span> {
+  <span class="hljs-property">root</span> = <span class="hljs-string">"myapp"</span>
+  <span class="hljs-property">template</span> = <span class="hljs-property">new</span> {
+    <span class="hljs-property">scalaVersion</span> = <span class="hljs-string">"3.7.1"</span>
+    <span class="hljs-property">deps</span> {
+      <span class="hljs-string">"com.lihaoyi::pprint:0.9.5"</span>
     }
-    mainClass = "myapp.Main"
+    <span class="hljs-property">mainClass</span> = <span class="hljs-string">"myapp.Main"</span>
   }
-  testTemplate = (template.asTest()) {
-    deps {
-      "org.scalameta::munit:1.2.1"
+  <span class="hljs-property">testTemplate</span> = (template.<span class="hljs-property">asTest</span>()) {
+    <span class="hljs-property">deps</span> {
+      <span class="hljs-string">"org.scalameta::munit:1.2.1"</span>
     }
   }
-}.get
+}.<span class="hljs-property">get</span>
 
-modules {
-  ...myappModules.all
+<span class="hljs-property">modules</span> {
+  ...<span class="hljs-property">myappModules</span>.<span class="hljs-property">all</span>
 }
 </code></pre>
    <p>then add <code>myapp/src/myapp/Main.scala</code>:</p>
-   <pre><code class="language- hljs language-ruby" data-highlighted="yes">package myapp
+   <pre><code class="language- hljs language-pkl" data-highlighted="yes">package myapp
 
-<span class="hljs-variable">@main</span> <span class="hljs-keyword">def</span> <span class="hljs-title function_">Main</span>() =
+<span class="hljs-meta">@main</span> def Main() =
   println(<span class="hljs-string">"Hello world!"</span>)
 </code></pre>
    <p>then run it just to verify it works: <code>deder exec -t run -m myapp</code>.
@@ -94,10 +98,10 @@ modules {
 [error] POM settings are not set for myapp
 </code></pre>
    <p>Let's add just the minimal <code>pomSettings</code> so we can build it, add this inside <code>template</code> block:</p>
-   <pre><code class="language- hljs language-abnf" data-highlighted="yes">pomSettings {
-  groupId <span class="hljs-operator">=</span> <span class="hljs-string">"com.example"</span>
-  artifactId <span class="hljs-operator">=</span> <span class="hljs-string">"myapp"</span>
-  name <span class="hljs-operator">=</span> <span class="hljs-string">"myapp"</span>
+   <pre><code class="language- hljs language-pkl" data-highlighted="yes"><span class="hljs-property">pomSettings</span> {
+  <span class="hljs-property">groupId</span> = <span class="hljs-string">"com.example"</span>
+  <span class="hljs-property">artifactId</span> = <span class="hljs-string">"myapp"</span>
+  <span class="hljs-property">name</span> = <span class="hljs-string">"myapp"</span>
 }
 </code></pre>
    <p>then run this:</p>

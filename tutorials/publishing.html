@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -57,42 +61,42 @@
    </div>
    <h1 id="publishing-tutorial">Publishing Tutorial<a href="#publishing-tutorial" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
    <p>Make a minimal <code>deder.pkl</code> file in your project root:</p>
-   <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-meta">amends <span class="hljs-string">"https://sake92.github.io/deder/config/early-access/DederProject.pkl"</span></span>
 
-local const mylibrary = new ScalaModule {
-  scalaVersion = "3.7.1"
-  id = "mylibrary"
-  deps {
-    "ba.sake::sharaf-undertow:0.13.0"
+<span class="hljs-keyword">local</span> <span class="hljs-keyword">const</span> <span class="hljs-property">mylibrary</span> = <span class="hljs-keyword">new</span> <span class="hljs-property">ScalaModule</span> {
+  <span class="hljs-property">scalaVersion</span> = <span class="hljs-string">"3.7.1"</span>
+  <span class="hljs-property">id</span> = <span class="hljs-string">"mylibrary"</span>
+  <span class="hljs-property">deps</span> {
+    <span class="hljs-string">"ba.sake::sharaf-undertow:0.13.0"</span>
   }
-  pomSettings {
-    groupId = "com.example"
-    artifactId = "deder-example-library"
-    version = "0.0.1-SNAPSHOT"
-    name = "Deder Publish Example"
-    description = "Deder example library"
-    url = "https://github.com/myuser/deder-example-library"
-    licenses {
-      new PomLicense {
-        name = "MIT License"
-        url = "http://www.opensource.org/licenses/mit-license.php"
+  <span class="hljs-property">pomSettings</span> {
+    <span class="hljs-property">groupId</span> = <span class="hljs-string">"com.example"</span>
+    <span class="hljs-property">artifactId</span> = <span class="hljs-string">"deder-example-library"</span>
+    <span class="hljs-property">version</span> = <span class="hljs-string">"0.0.1-SNAPSHOT"</span>
+    <span class="hljs-property">name</span> = <span class="hljs-string">"Deder Publish Example"</span>
+    <span class="hljs-property">description</span> = <span class="hljs-string">"Deder example library"</span>
+    <span class="hljs-property">url</span> = <span class="hljs-string">"https://github.com/myuser/deder-example-library"</span>
+    <span class="hljs-property">licenses</span> {
+      <span class="hljs-keyword">new</span> <span class="hljs-property">PomLicense</span> {
+        <span class="hljs-property">name</span> = <span class="hljs-string">"MIT License"</span>
+        <span class="hljs-property">url</span> = <span class="hljs-string">"http://www.opensource.org/licenses/mit-license.php"</span>
       }
     }
-    developers {
-      new PomDeveloper {
-        id = "myuser"
-        name = "My User"
-        email = "myuser@example.com"
+    <span class="hljs-property">developers</span> {
+      <span class="hljs-keyword">new</span> <span class="hljs-property">PomDeveloper</span> {
+        <span class="hljs-property">id</span> = <span class="hljs-string">"myuser"</span>
+        <span class="hljs-property">name</span> = <span class="hljs-string">"My User"</span>
+        <span class="hljs-property">email</span> = <span class="hljs-string">"myuser@example.com"</span>
       }
     }
-    scm {
-      url = "https://github.com/myuser/mylib"
-      connection = "scm:git:git://github.com/myuser/mylib.git"
+    <span class="hljs-property">scm</span> {
+      <span class="hljs-property">url</span> = <span class="hljs-string">"https://github.com/myuser/mylib"</span>
+      <span class="hljs-property">connection</span> = <span class="hljs-string">"scm:git:git://github.com/myuser/mylib.git"</span>
     }
   }
 }
 
-modules {
+<span class="hljs-property">modules</span> {
   mylibrary
 }
 </code></pre>
@@ -116,8 +120,8 @@ modules {
     <p>For <code>publishLocal</code> purposes, only <code>groupId</code>, <code>artifactId</code>, <code>version</code>, <code>name</code> are needed.</p>
    </blockquote>
    <p>After running this command, you can find the published artifact in your local <code>.m2</code> repository, located at <code>~/.m2/repository/com/example/deder-example-library_3/0.0.1-SNAPSHOT/</code>. Then you can use it in other projects by adding the dependency:</p>
-   <pre><code class="language-pkl">deps {
-  "com.example::deder-example-library:0.0.1-SNAPSHOT"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">deps</span> {
+  <span class="hljs-string">"com.example::deder-example-library:0.0.1-SNAPSHOT"</span>
 }
 </code></pre>
    <h2 id="publish-to-sonatype-maven-central">Publish to Sonatype Maven Central<a href="#publish-to-sonatype-maven-central" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>

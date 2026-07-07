@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -169,23 +173,23 @@
    </blockquote>
    <h2 id="typed-plugin-config">Typed plugin config<a href="#typed-plugin-config" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <h3 id="1-define-the-pkl-schema-bundled-in-the-plugin-jar">1. Define the Pkl schema (bundled in the plugin JAR)<a href="#1-define-the-pkl-schema-bundled-in-the-plugin-jar" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
-   <pre><code class="language-pkl">// MyPluginModule.pkl
-module com.example.MyPluginModule
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-comment">// MyPluginModule.pkl</span>
+<span class="hljs-meta">module com.example.MyPluginModule</span>
 
-import "https://sake92.github.io/deder/config/early-access/DederProject.pkl" as P
+<span class="hljs-meta"><span class="hljs-keyword">import</span> <span class="hljs-string">"https://sake92.github.io/deder/config/early-access/DederProject.pkl"</span> <span class="hljs-keyword">as</span> P</span>
 
-class MyPlugin extends P.DederPlugin {
-  id = "my-plugin"
-  deps { "com.example::my-deder-plugin:1.0.0" }
-  config: MyPluginConfig = new {}
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MyPlugin</span> <span class="hljs-title">extends</span> <span class="hljs-title">P</span>.<span class="hljs-title">DederPlugin</span> </span>{
+  <span class="hljs-property">id</span> = <span class="hljs-string">"my-plugin"</span>
+  <span class="hljs-property">deps</span> { <span class="hljs-string">"com.example::my-deder-plugin:1.0.0"</span> }
+  <span class="hljs-property">config</span>: <span class="hljs-type"><span class="hljs-type">MyPluginConfig</span> </span>= <span class="hljs-property">new</span> {}
 }
 
-class MyPluginConfig {
-  greeting: String = "Hello"
+<span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MyPluginConfig</span> </span>{
+  <span class="hljs-property">greeting</span>: <span class="hljs-type"><span class="hljs-type">String</span> </span>= <span class="hljs-string">"Hello"</span>
 }
 
-// used for parsing on the plugin side
-config: MyPluginConfig = new {}
+<span class="hljs-comment">// used for parsing on the plugin side</span>
+<span class="hljs-property">config</span>: <span class="hljs-type"><span class="hljs-type">MyPluginConfig</span> </span>= <span class="hljs-property">new</span> {}
 </code></pre>
    <h3 id="2-generate-java-bindings">2. Generate Java bindings<a href="#2-generate-java-bindings" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p>After writing or modifying the <code>.pkl</code> file, regenerate the Java config classes using <code>pkl-codegen-java</code>:</p>
@@ -223,14 +227,14 @@ pkl-codegen-java \
 </code></pre>
    <h3 id="4-use-typed-config-in-a-dederpkl-consumer-project">4. Use typed config in a <code>deder.pkl</code> (consumer project)<a href="#4-use-typed-config-in-a-dederpkl-consumer-project" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p>Import your plugin's Pkl module and instantiate the typed plugin class directly:</p>
-   <pre><code class="language-pkl">amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-meta">amends <span class="hljs-string">"https://sake92.github.io/deder/config/early-access/DederProject.pkl"</span></span>
 
-import "https://example.github.io/myuser/my-deder-plugin/MyPluginModule.pkl" as MPM
+<span class="hljs-meta"><span class="hljs-keyword">import</span> <span class="hljs-string">"https://example.github.io/myuser/my-deder-plugin/MyPluginModule.pkl"</span> <span class="hljs-keyword">as</span> MPM</span>
 
-plugins {
-  new MPM.MyPlugin {
-    config = new {
-      greeting = "Hello from typed config!"
+<span class="hljs-property">plugins</span> {
+  <span class="hljs-keyword">new</span> MPM.<span class="hljs-property">MyPlugin</span> {
+    <span class="hljs-property">config</span> = <span class="hljs-property">new</span> {
+      <span class="hljs-property">greeting</span> = <span class="hljs-string">"Hello from typed config!"</span>
     }
   }
 }

@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -104,10 +108,10 @@
    <hr>
    <h2 id="junit-xml-reports">JUnit XML reports<a href="#junit-xml-reports" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Deder can emit standard JUnit XML reports for any test module. Reports are opt-in and use the common CI-friendly layout of <strong>one file per executed suite/class</strong>:</p>
-   <pre><code class="language-pkl">testTemplate = (template.asTest()) {
-  junitXmlReport {
-    enabled = true
-    // outputDir = "build/test-results" // optional, relative to the module root
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">testTemplate</span> = (template.<span class="hljs-property">asTest</span>()) {
+  <span class="hljs-property">junitXmlReport</span> {
+    <span class="hljs-property">enabled</span> = <span class="hljs-literal">true</span>
+    <span class="hljs-comment">// outputDir = "build/test-results" // optional, relative to the module root</span>
   }
 }
 </code></pre>
@@ -128,30 +132,30 @@
    <p>Deder supports three independent parallelism knobs that compose together (forked <code>test</code> task only).</p>
    <h3 id="serial-execution">Serial execution<a href="#serial-execution" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p>To run test classes one at a time inside a single forked JVM (same behaviour as sbt's <code>Test / testForkedParallel = false</code> and Mill's <code>testForked</code>), set both to <code>1</code>:</p>
-   <pre><code class="language-pkl">testTemplate = (template.asTest()) {
-  maxTestForks    = 1
-  testParallelism = 1
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">testTemplate</span> = (template.<span class="hljs-property">asTest</span>()) {
+  <span class="hljs-property">maxTestForks</span>    = <span class="hljs-number">1</span>
+  <span class="hljs-property">testParallelism</span> = <span class="hljs-number">1</span>
 }
 </code></pre>
    <h3 id="intra-jvm-thread-parallelism-testparallelism">Intra-JVM thread parallelism (<code>testParallelism</code>)<a href="#intra-jvm-thread-parallelism-testparallelism" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p><code>testParallelism</code> controls how many test <strong>classes</strong> run concurrently inside one JVM using a fixed thread pool. Framework-level parallelism (JUnit Jupiter <code>@Execution(CONCURRENT)</code>, ZIO Test, weaver, etc.) is independent and unaffected.</p>
-   <pre><code class="language-pkl">testTemplate = (template.asTest()) {
-  testParallelism = 8   // up to 8 test classes at once in the same JVM
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">testTemplate</span> = (template.<span class="hljs-property">asTest</span>()) {
+  <span class="hljs-property">testParallelism</span> = <span class="hljs-number">8</span>   <span class="hljs-comment">// up to 8 test classes at once in the same JVM</span>
 }
 </code></pre>
    <p>Safe to increase only when all tests in the module avoid JVM-global mutable state (static fields, <code>System.setProperty</code>, security providers, default locale/timezone, shared ports, shared temp files).</p>
    <p>Valid range: <code>1</code>–<code>256</code>.</p>
    <h3 id="multi-fork-parallelism-maxtestforks">Multi-fork parallelism (<code>maxTestForks</code>)<a href="#multi-fork-parallelism-maxtestforks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p><code>maxTestForks</code> spawns multiple forked JVMs for the same module. Test classes are distributed across forks upfront using <strong>LPT (Longest-Processing-Time) bin packing</strong>: the slowest known class is placed first, spreading work as evenly as possible. Effective fork count is <code>min(maxTestForks, discoveredTestClasses)</code> — Deder never spawns an empty fork.</p>
-   <pre><code class="language-pkl">testTemplate = (template.asTest()) {
-  maxTestForks = 4   // up to 4 forked JVMs for this module
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">testTemplate</span> = (template.<span class="hljs-property">asTest</span>()) {
+  <span class="hljs-property">maxTestForks</span> = <span class="hljs-number">4</span>   <span class="hljs-comment">// up to 4 forked JVMs for this module</span>
 }
 </code></pre>
    <p>Multi-fork and <code>testParallelism</code> compose: each of the N forks independently runs up to <code>testParallelism</code> classes in parallel.</p>
    <p>Valid range: <code>1</code>–<code>64</code>.</p>
    <h3 id="server-wide-fork-cap-maxconcurrenttestforks">Server-wide fork cap (<code>maxConcurrentTestForks</code>)<a href="#server-wide-fork-cap-maxconcurrenttestforks" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p>The <code>maxConcurrentTestForks</code> field in <code>deder.pkl</code> caps the total number of live forked JVMs across <strong>all</strong> concurrent test tasks. Per-module <code>maxTestForks</code> is capped by this value.</p>
-   <pre><code class="language-pkl">maxConcurrentTestForks = 16   // 0 = auto-detect (Runtime.availableProcessors())
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">maxConcurrentTestForks</span> = <span class="hljs-number">16</span>   <span class="hljs-comment">// 0 = auto-detect (Runtime.availableProcessors())</span>
 </code></pre>
    <h3 id="summary">Summary<a href="#summary" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <table>
@@ -241,7 +245,7 @@
    <h2 id="test-history">Test history<a href="#test-history" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Deder records per-class timing and status after every test run to enable accurate LPT distribution in subsequent runs.</p>
    <h3 id="location">Location<a href="#location" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
-   <pre><code class="language- hljs language-x86asm" data-highlighted="yes"><span class="hljs-meta">.deder</span>/<span class="hljs-keyword">out</span>/&lt;module-id&gt;/<span class="hljs-keyword">test</span>-history<span class="hljs-number">.</span>json
+   <pre><code class="language- hljs language-pkl" data-highlighted="yes">.<span class="hljs-property">deder</span>/<span class="hljs-keyword">out</span>/&lt;<span class="hljs-keyword">module</span>-id&gt;/test-history.<span class="hljs-property">json</span>
 </code></pre>
    <h3 id="format">Format<a href="#format" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <pre><code class="language-json hljs" data-highlighted="yes"><span class="hljs-punctuation">{</span>

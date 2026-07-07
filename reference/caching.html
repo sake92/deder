@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -76,7 +80,7 @@
    <p><code>compile</code> is a <code>CachedTask</code>, so it <em>should</em> skip when its inputs are unchanged — but see the "never content-hash a task's own outputs" anti-pattern below: it currently has self-referential dependencies that keep it from hitting. Even when it does run, Zinc skips unchanged sources internally.</p>
    <h3 id="where-cached-data-lives">Where cached data lives<a href="#where-cached-data-lives" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p>Every cached task writes a <code>metadata.json</code> (plus any task-specific artifacts) under:</p>
-   <pre><code class="language- hljs language-crystal" data-highlighted="yes">.deder/<span class="hljs-keyword">out</span>/&lt;<span class="hljs-class"><span class="hljs-keyword">module</span>-<span class="hljs-title">id</span>&gt;/&lt;<span class="hljs-title">task</span>-<span class="hljs-title">name</span>&gt;/<span class="hljs-title">metadata</span>.<span class="hljs-title">json</span></span>
+   <pre><code class="language- hljs language-pkl" data-highlighted="yes">.<span class="hljs-property">deder</span>/<span class="hljs-keyword">out</span>/&lt;<span class="hljs-keyword">module</span>-id&gt;/&lt;task-name&gt;/metadata.<span class="hljs-property">json</span>
 </code></pre>
    <p><code>metadata.json</code> stores the task's stored value, <code>inputsHash</code>, and <code>outputHash</code>.</p>
    <h3 id="what-invalidates-a-cached-task">What invalidates a cached task<a href="#what-invalidates-a-cached-task" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>

@@ -1,0 +1,157 @@
+:root {
+    --pico-font-family: "Inter", system-ui, sans-serif;
+    --pico-font-family-monospace: "IBM Plex Mono", Consolas, monospace;
+
+    --pico-font-size: 15px;
+    --pico-line-height: 1.6;
+
+    --pico-spacing: .85rem;
+    --pico-block-spacing-vertical: 1.1rem;
+
+    --pico-border-radius: 8px;
+
+    /* shadow scale */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* === layout === */
+
+.container {
+    max-width: 920px;
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 4.5rem;
+}
+
+/* === nav === */
+
+body > header {
+    border-bottom: 1px solid var(--pico-muted-border-color);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(6px);
+    background: color-mix(in srgb, var(--pico-background-color) 85%, transparent);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding-top: .5rem;
+    padding-bottom: .5rem;
+}
+
+body > header nav {
+    justify-content: space-between;
+}
+
+/* === typography === */
+
+h1, h2, h3 {
+    font-weight: 600;
+    letter-spacing: -.02em;
+}
+
+h2 {
+    margin-top: 2rem;
+    padding-bottom: .35rem;
+    border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+ul, ol {
+    padding-left: 1.35rem;
+}
+
+li {
+    margin: .2rem 0;
+}
+
+/* === code blocks === */
+
+pre {
+    padding: 1rem;
+    border-radius: var(--pico-border-radius);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--pico-muted-border-color);
+    transition: box-shadow .15s ease;
+}
+
+pre:hover {
+    box-shadow: var(--shadow-md);
+}
+
+:not(pre) > code {
+    padding: .15em .4em;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--pico-muted-border-color) 30%, transparent);
+}
+
+/* === blockquotes (callouts) === */
+
+blockquote {
+    border-radius: var(--pico-border-radius);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--pico-muted-border-color);
+    border-left: 4px solid var(--pico-primary);
+    padding: 1rem 1.2rem;
+    background: color-mix(in srgb, var(--pico-primary) 4%, transparent);
+}
+
+/* === toc sidebar === */
+
+main > .grid {
+    padding-top: 1rem;
+}
+
+main details {
+    margin-bottom: 1.5rem;
+    padding: .5rem .75rem;
+    border-radius: var(--pico-border-radius);
+    border: 1px solid var(--pico-muted-border-color);
+    background: color-mix(in srgb, var(--pico-muted-border-color) 25%, transparent);
+}
+
+main details summary {
+    font-weight: 500;
+}
+
+main details ul {
+    padding-left: 1rem;
+    font-size: .9em;
+}
+
+main details li {
+    margin: .35rem 0;
+}
+
+/* === footer === */
+
+body > footer {
+    border-top: 1px solid var(--pico-muted-border-color);
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.03);
+}
+
+/* === prev/next buttons === */
+
+[role="group"] a[role="button"] {
+    transition: box-shadow .15s ease, transform .15s ease;
+}
+
+[role="group"] a[role="button"]:hover {
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+
+/* === links === */
+
+a {
+    transition: color .15s ease;
+}
+
+/* === tables === */
+
+table {
+    border-radius: var(--pico-border-radius);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}

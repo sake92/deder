@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -58,9 +62,9 @@
    </div>
    <h1 id="custom-repositories">Custom Repositories<a href="#custom-repositories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
    <p>By default, Deder resolves dependencies from Maven Central, the local Maven repository (<code>~/.m2/repository</code>), and the local Ivy2 cache. To pull artifacts from an internal Nexus/Artifactory, a public mirror, JitPack, Sonatype snapshots, or an on-disk Maven layout, declare them in your <code>deder.pkl</code>:</p>
-   <pre><code class="language-pkl">repositories {
-  new MavenRepository { url = "https://nexus.mycompany.com/repository/maven-releases/" }
-  new MavenRepository { url = "https://jitpack.io" }
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">repositories</span> {
+  <span class="hljs-keyword">new</span> <span class="hljs-property">MavenRepository</span> { <span class="hljs-property">url</span> = <span class="hljs-string">"https://nexus.mycompany.com/repository/maven-releases/"</span> }
+  <span class="hljs-keyword">new</span> <span class="hljs-property">MavenRepository</span> { <span class="hljs-property">url</span> = <span class="hljs-string">"https://jitpack.io"</span> }
 }
 </code></pre>
    <h2 id="resolution-order">Resolution order<a href="#resolution-order" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
@@ -79,24 +83,24 @@
    <p>"Custom first" means lookups for internal artifacts resolve against your Nexus before Deder hits Maven Central — faster on a LAN, no 404 noise, no leaking internal <code>groupId</code>s to the public repo.</p>
    <h2 id="disabling-default-repositories">Disabling default repositories<a href="#disabling-default-repositories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>For air-gapped or strict-internal-only setups, turn off the defaults:</p>
-   <pre><code class="language-pkl">repositories {
-  new MavenRepository { url = "https://nexus.mycompany.com/repository/maven-public/" }
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">repositories</span> {
+  <span class="hljs-keyword">new</span> <span class="hljs-property">MavenRepository</span> { <span class="hljs-property">url</span> = <span class="hljs-string">"https://nexus.mycompany.com/repository/maven-public/"</span> }
 }
 
-includeDefaultRepos = false
+<span class="hljs-property">includeDefaultRepos</span> = <span class="hljs-literal">false</span>
 </code></pre>
    <p>Deder will refuse to load the project if <code>includeDefaultRepos = false</code> and <code>repositories</code> is empty.</p>
    <p>If you disable defaults and still want to consume artifacts from <code>publishLocal</code>, add your local Maven repo explicitly:</p>
-   <pre><code class="language-pkl">repositories {
-  new MavenRepository { url = "file:///home/your-user/.m2/repository" }
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">repositories</span> {
+  <span class="hljs-keyword">new</span> <span class="hljs-property">MavenRepository</span> { <span class="hljs-property">url</span> = <span class="hljs-string">"file:///home/your-user/.m2/repository"</span> }
 }
 
-includeDefaultRepos = false
+<span class="hljs-property">includeDefaultRepos</span> = <span class="hljs-literal">false</span>
 </code></pre>
    <h2 id="local-directories">Local directories<a href="#local-directories" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Use a <code>file://</code> URL with a Maven-layout directory:</p>
-   <pre><code class="language-pkl">repositories {
-  new MavenRepository { url = "file:///abs/path/to/local-repo" }
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">repositories</span> {
+  <span class="hljs-keyword">new</span> <span class="hljs-property">MavenRepository</span> { <span class="hljs-property">url</span> = <span class="hljs-string">"file:///abs/path/to/local-repo"</span> }
 }
 </code></pre>
    <h2 id="credentials">Credentials<a href="#credentials" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>

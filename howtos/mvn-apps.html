@@ -11,7 +11,11 @@
   <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
  </head>
  <body>
   <header class="pico container">
@@ -54,14 +58,14 @@
    <p>Deder provides a convenient way to invoke JARs from Maven as part of your build.
     <br>
     This can be useful for checking formatting, generating code etc.</p>
-   <pre><code class="language-pkl">mvnApps = new Mapping {
-  ["myapp"] = new MvnApp {
-    deps { "com.example:myapp:1.0.0" }
-    mainClass = "com.example.myapp.Main"
-    args {
-      // e.g. pass in some arguments to the main class
-      "someparameter"
-      ...m.sources.toList().map((src) -&gt; "\(m.root)/\(src)")
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-property">mvnApps</span> = <span class="hljs-keyword">new</span> <span class="hljs-property">Mapping</span> {
+  [<span class="hljs-string">"myapp"</span>] = <span class="hljs-keyword">new</span> <span class="hljs-property">MvnApp</span> {
+    <span class="hljs-property">deps</span> { <span class="hljs-string">"com.example:myapp:1.0.0"</span> }
+    <span class="hljs-property">mainClass</span> = <span class="hljs-string">"com.example.myapp.Main"</span>
+    <span class="hljs-property">args</span> {
+      <span class="hljs-comment">// e.g. pass in some arguments to the main class</span>
+      <span class="hljs-string">"someparameter"</span>
+      ...<span class="hljs-property">m</span>.<span class="hljs-property">sources</span>.<span class="hljs-property">toList</span>().<span class="hljs-property">map</span>((src) -&gt; <span class="hljs-string">"<span class="hljs-subst">\(m.root)</span>/<span class="hljs-subst">\(src)</span>"</span>)
     }
   }
 }
