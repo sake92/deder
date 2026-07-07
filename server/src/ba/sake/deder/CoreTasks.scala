@@ -946,6 +946,24 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         }
     }
 
+  val bspMainClassesTask = TaskBuilder
+    .make[Seq[String]](
+      name = "bspMainClasses",
+      category = "Run",
+      internal = true
+    )
+    .build { ctx =>
+      val configMainClass = ctx.module match {
+        case m: JavaModule => Option(m.mainClass)
+        case _             => None
+      }
+      val classesDir = DederGlobals.classesDir(ctx.module.id)
+      val mainClasses = if os.exists(classesDir) then
+        MainClassesDiscovery.discover(Seq(classesDir))
+      else Seq.empty
+      (configMainClass.toSeq ++ mainClasses).distinct
+    }
+
   val fixTask = scalafixTask("fix", extraArgs = Seq.empty, watch = true)
 
   val fixCheckTask = scalafixTask("fixCheck", extraArgs = Seq("--test"), watch = false)
@@ -1185,6 +1203,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     mainClassTask,
     mainClassesTask,
     finalMainClassTask,
+    bspMainClassesTask,
     jvmOptionsTask,
     fixTask,
     fixCheckTask,
