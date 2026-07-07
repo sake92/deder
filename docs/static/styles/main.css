@@ -1,0 +1,37 @@
+:root {
+    --pico-font-family: "Inter", system-ui, sans-serif;
+    --pico-font-family-monospace: "JetBrains Mono", Consolas, monospace;
+
+    --pico-font-size: 15px;
+    --pico-line-height: 1.6;
+
+    --pico-spacing: .85rem;
+    --pico-block-spacing-vertical: 1.1rem;
+
+    --pico-border-radius: 8px;
+}
+
+.container {
+    max-width: 920px;
+}
+
+h1, h2, h3 {
+    font-weight: 600;
+    letter-spacing: -.02em;
+}
+
+h2 {
+    margin-top: 2rem;
+}
+
+ul, ol {
+    padding-left: 1.35rem;
+}
+
+li {
+    margin: .2rem 0;
+}
+
+pre {
+    padding: 1rem;
+}
