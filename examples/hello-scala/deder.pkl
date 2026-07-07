@@ -1,0 +1,25 @@
+amends "https://sake92.github.io/deder/config/v0.20.0/DederProject.pkl"
+
+local const app: ScalaModule = new {
+  id = "app"
+  scalaVersion = "3.7.4"
+  deps {
+    "com.lihaoyi::pprint:0.9.5"
+  }
+}
+
+local const appTest: ScalaTestModule = new {
+  id = "app-test"
+  root = "app/test"
+  scalaVersion = "3.7.4"
+  moduleDeps { app }
+  deps {
+    "org.scalameta::munit::1.0.4"
+  }
+}
+
+
+modules {
+  app
+  appTest
+}
