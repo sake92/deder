@@ -638,11 +638,11 @@ class DederBspServer(
       resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).map { case (targetId, module) =>
         val moduleId = module.id
         val jvmOptions = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.jvmOptionsTask)(Seq.empty)
-        val items =
-          tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.finalMainClassTask)(None).map { mainClass =>
-            ScalaMainClass(mainClass, List.empty.asJava, jvmOptions.asJava)
-          }.toList
-        ScalaMainClassesItem(targetId, items.asJava)
+        val mainClasses = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.bspMainClassesTask)(Seq.empty)
+        val scalaMainClasses = mainClasses.map { mc =>
+          ScalaMainClass(mc, List.empty.asJava, jvmOptions.asJava)
+        }
+        ScalaMainClassesItem(targetId, scalaMainClasses.asJava)
       }
     }
     val result = ScalaMainClassesResult(items.asJava)
@@ -768,7 +768,7 @@ class DederBspServer(
         val serverNotificationsLogger = makeServerNotificationsLogger()
         resolveVisibleTargets(projectStateData, params.getTargets.asScala.toSeq).map { case (targetId, module) =>
           val moduleId = module.id
-          val mainClasses = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.mainClassesTask)(Seq.empty)
+          val mainClasses = tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.bspMainClassesTask)(Seq.empty)
           val classpath =
             tryExecuteTask(serverNotificationsLogger, moduleId, coreTasks.runClasspathTask)(Seq.empty)
               .map(_.toNIO.toUri.toString)
@@ -859,7 +859,7 @@ class DederBspServer(
         executeTask(
           serverNotificationsLogger,
           moduleId,
-          coreTasks.finalMainClassTask,
+          coreTasks.mainClassTask,
           originId = params.getOriginId
         ) match {
           case Some(mainClass) =>
@@ -882,7 +882,7 @@ class DederBspServer(
             }
           case None =>
             runSucceeded = false
-            throw DederException(s"Module ${moduleId} does not have a main class to run")
+            throw DederException(s"Module ${moduleId} does not have a mainClass set in deder.pkl")
         }
       }
       result.setOriginId(params.getOriginId)
@@ -1041,8 +1041,10 @@ class DederBspServer(
     val id = buildTargetId(module)
     val isTestModule0 = isTestModule(module)
 
-    val serverNotificationsLogger = makeServerNotificationsLogger(moduleId = Some(module.id))
-    val isAppModule = tryExecuteTask(serverNotificationsLogger, module.id, coreTasks.finalMainClassTask)(None).isDefined
+    val isAppModule = module.`type` match {
+      case ModuleType.JAVA | ModuleType.SCALA => true
+      case _                                  => false
+    }
     val tags = List(
       List(BuildTargetTag.APPLICATION).filter(_ => isAppModule),
       List(BuildTargetTag.TEST).filter(_ => isTestModule0),
