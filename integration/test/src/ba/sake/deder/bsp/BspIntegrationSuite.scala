@@ -151,6 +151,16 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     assert(item.getClasses.asScala.forall(_.getJvmOptions != null), "jvmOptions should be set")
   }
 
+  test("buildTargetScalaMainClasses returns config mainClass without compilation") {
+    val result = buildServer
+      .buildTargetScalaMainClasses(new ScalaMainClassesParams(List(targetId("uber")).asJava))
+      .get(30, TimeUnit.SECONDS)
+    val items = result.getItems.asScala
+    assertEquals(items.size, 1)
+    val classes = items.head.getClasses.asScala
+    assertEquals(classes.map(_.getClassName).toSet, Set("uber.Main"))
+  }
+
   test("buildTargetScalaTestClasses returns test class for test module") {
     val result = buildServer
       .buildTargetScalaTestClasses(new ScalaTestClassesParams(List(targetId("uber-test")).asJava))
