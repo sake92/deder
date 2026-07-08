@@ -100,6 +100,7 @@ class TasksResolverSuite extends munit.FunSuite {
       "allJars",
       "assembly",
       "assemblyDeps",
+      "bspMainClasses",
       "sourcesJar",
       "javadocJar",
       "version",
