@@ -26,6 +26,9 @@ object DiagnosticConversion {
   /** Group problems (that have a source file) by source file, converting to DederPath keys.
     * Every file in `allSources` is present as a key; clean files map to Nil.
     * Problems without a source position are dropped here (the live path surfaces those as messages).
+    * Problems located OUTSIDE `allSources` are dropped too: after a rename/delete, Zinc's stored
+    * analysis can still hold SourceInfos for removed files; publishing them would re-surface
+    * stale diagnostics for files that no longer exist.
     */
   def groupByFile(
       problems: Seq[Problem],
@@ -44,6 +47,7 @@ object DiagnosticConversion {
         }
         .map { case (k, ps) => k -> ps.map(toDiagnostic).toList }
 
-    base ++ grouped
+    val inScope = grouped.filter((k, _) => base.contains(k))
+    base ++ inScope
   }
 }
