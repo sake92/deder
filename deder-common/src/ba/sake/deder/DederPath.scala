@@ -20,7 +20,13 @@ object DederPath {
   given Hashable[DederPath] with {
     def hashStr(value: DederPath): String =
       val finalPath = value.absPath
-      if os.exists(finalPath) then Hashable[os.Path].hashStr(finalPath)
+      // Bind the path to the content hash: renaming a file with unchanged content
+      // must still change the hash. Otherwise tasks whose results are path sets
+      // (sourceFiles, resources) keep identical output hashes and downstream cached
+      // tasks (compile) never invalidate — stale diagnostics referencing the old
+      // file name get replayed forever.
+      if os.exists(finalPath) then
+        HashUtils.hashStr(s"${value.path.toString}=${Hashable[os.Path].hashStr(finalPath)}")
       else ""
   }
 
