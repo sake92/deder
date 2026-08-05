@@ -48,6 +48,7 @@
         <li><a href="#deder-architecture">Deder Architecture</a>
          <ul>
           <li><a href="#general-design">General design</a></li>
+          <li><a href="#bsp-server-diagnostics">BSP server diagnostics</a></li>
          </ul></li>
        </ul>
       </div>
@@ -68,6 +69,14 @@
      </ul></li>
    </ul>
    <p><img src="https://sake92.github.io/deder/images/deder_architecture.svg" alt=""></p>
+   <h2 id="bsp-server-diagnostics">BSP server diagnostics<a href="#bsp-server-diagnostics" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>The BSP server publishes compile diagnostics to the IDE as a complete, per-module picture:</p>
+   <ul>
+    <li>After every compile (live or cache hit), every <strong>current</strong> source file of the module is published with <code>reset=true</code> — clean files get an empty list, so stale IDE markers are cleared.</li>
+    <li>Files that <strong>left</strong> the module (renamed/deleted) receive an explicit empty <code>reset=true</code> publish, so the client drops their old diagnostics. Without this, an IDE keeps showing errors under the old file name after a rename.</li>
+    <li><code>sourceFiles</code>/<code>resources</code> result hashes bind file <strong>paths</strong> to content hashes, so a rename with unchanged content still invalidates the <code>compile</code> cache and triggers a recompile with the new source set.</li>
+    <li>Zinc diagnostics are filtered to the module's current source set, so problems left over in Zinc's analysis for removed files are never re-published.</li>
+   </ul>
    <div role="group">
     <a role="button" href="https://sake92.github.io/deder/reference/cheatsheet.html">⬅️ Cheatsheet</a> <span></span> <a role="button" href="https://sake92.github.io/deder/reference/caching.html">Task caching ➡️</a>
    </div>
