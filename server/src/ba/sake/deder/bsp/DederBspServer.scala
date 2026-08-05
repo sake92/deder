@@ -47,6 +47,11 @@ class DederBspServer(
   // so overlapping requests (including subsets like [A,B] vs [B]) are correctly buffered.
   private val inFlightCompilations = new ConcurrentHashMap[String, InFlightCompilation]
 
+  // moduleId -> URIs of files last published by renderCompileResult.
+  // Lets us publish empty resets for files that left the module (renamed/deleted) —
+  // the only way a BSP client clears stale IDE markers.
+  private val lastPublishedDiagnosticFiles = new ConcurrentHashMap[String, Set[String]]
+
   private case class InFlightCompilation(
       modulesBeingCompiled: Set[String],
       primaryOriginId: String,
@@ -353,11 +358,16 @@ class DederBspServer(
             moduleId = Some(moduleId)
           )
           val targetIdForRender = resolveModule(moduleId).map(buildTargetId).orNull
+          // The TaskEvaluationException catch below synthesizes a CompileResult without a
+          // diagnostics picture (diagnostics = Nil); rendering it would wipe all previously
+          // published diagnostics for the module, hiding real code errors. Skip rendering then.
+          var isSynthesizedFailure = false
           val (compileResult, fromCache) =
             try {
               executeCompileTask(serverNotificationsLogger, moduleId, params.getOriginId)
             } catch {
               case _: TaskEvaluationException =>
+                isSynthesizedFailure = true
                 val classesDir = DederPath(DederGlobals.classesDir(moduleId))
                 (ba.sake.deder.CompileResult(classesDir, errors = 1, warnings = 0, sourceCount = 0), false)
             }
@@ -371,7 +381,7 @@ class DederBspServer(
             startP.setData(new CompileTask(targetIdForRender))
             client.onBuildTaskStart(startP)
 
-            renderCompileResult(compileResult, targetIdForRender)
+            renderCompileResult(moduleId, compileResult, targetIdForRender)
 
             val cStatus = if compileResult.errors == 0 then StatusCode.OK else StatusCode.ERROR
             val finishP = TaskFinishParams(subtaskId, cStatus)
@@ -381,11 +391,11 @@ class DederBspServer(
             finishP.setDataKind(TaskFinishDataKind.COMPILE_REPORT)
             finishP.setData(new CompileReport(targetIdForRender, compileResult.errors, compileResult.warnings))
             client.onBuildTaskFinish(finishP)
-          } else if targetIdForRender != null then {
+          } else if targetIdForRender != null && !isSynthesizedFailure then {
             // Live path already streamed start/diagnostics/finish via notifications. Finalize with
             // the complete map so warnings on files an incremental compile didn't recompile (and
             // that CompileStarted reset) are restored.
-            renderCompileResult(compileResult, targetIdForRender)
+            renderCompileResult(moduleId, compileResult, targetIdForRender)
           }
           if compileResult.errors > 0 then allCompileSucceeded = false
         }
@@ -1221,13 +1231,23 @@ class DederBspServer(
   }
 
   /** Render the complete diagnostics picture for a module from a CompileResult: publish each known source file with
-    * reset=true. Clean files (empty list) thereby clear stale IDE markers; files with diagnostics set them. Used on
-    * cache hits and to finalize cache-miss compiles, so both converge on identical, complete state.
+    * reset=true. Clean files (empty list) thereby clear stale IDE markers; files with diagnostics set them. Files that
+    * were published before but are no longer part of the picture (renamed/deleted) receive an explicit empty reset —
+    * without it the client never clears their stale markers. Used on cache hits and to finalize cache-miss compiles,
+    * so both converge on identical, complete state.
     */
   private def renderCompileResult(
+      moduleId: String,
       result: ba.sake.deder.CompileResult,
       targetId: BuildTargetIdentifier
-  ): Unit =
+  ): Unit = {
+    val currentUris = result.diagnostics.map(fd => fd.file.absPath.toNIO.toUri.toString).toSet
+    val previousUris = Option(lastPublishedDiagnosticFiles.put(moduleId, currentUris)).getOrElse(Set.empty)
+    (previousUris -- currentUris).foreach { uri =>
+      client.onBuildPublishDiagnostics(
+        PublishDiagnosticsParams(TextDocumentIdentifier(uri), targetId, List.empty.asJava, true)
+      )
+    }
     result.diagnostics.foreach { fd =>
       val uri = fd.file.absPath.toNIO.toUri.toString
       val diags = fd.diagnostics.map(bspDiagnostic).asJava
@@ -1235,6 +1255,7 @@ class DederBspServer(
         PublishDiagnosticsParams(TextDocumentIdentifier(uri), targetId, diags, true)
       )
     }
+  }
 
   /** Silent background compilation of all visible modules on BSP init. Suppresses task progress notifications (no
     * onBuildTaskStart/Progress/Finish) — only diagnostics are published. Called asynchronously from
@@ -1251,7 +1272,7 @@ class DederBspServer(
             val silentLogger = makeServerNotificationsLogger(moduleId = Some(moduleId))
             val (compileResult, _) = executeCompileTask(silentLogger, moduleId, originId = null)
             resolveModule(moduleId).map(buildTargetId).foreach { targetId =>
-              renderCompileResult(compileResult, targetId)
+              renderCompileResult(moduleId, compileResult, targetId)
             }
           } catch {
             case _: TaskEvaluationException =>

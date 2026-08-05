@@ -398,6 +398,56 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("buildTargetCompile clears diagnostics for a renamed source file") {
+    val oldFile = testDir / "common/src/renamedOld.scala"
+    val newFile = testDir / "common/src/renamedNew.scala"
+    os.write.over(oldFile, "package common\nval renamedOld: Int = \"wrong type\"")
+    try {
+      // 1. compile with the OLD name -> error diagnostic for the old URI
+      val r1 = compileCommon()
+      assertEquals(r1.getStatusCode, StatusCode.ERROR)
+      val oldDiag = capturingClient.awaitDiagnostic(predicate =
+        p =>
+          p.getTextDocument.getUri.contains("renamedOld.scala") &&
+            p.getDiagnostics.asScala.nonEmpty
+      )
+      assert(oldDiag.isDefined, "error diagnostic for renamedOld.scala should be published before the rename")
+
+      // 2. rename old -> new, then compile again
+      os.move(oldFile, newFile)
+      capturingClient.clear()
+      val r2 = compileCommon()
+      assertEquals(r2.getStatusCode, StatusCode.ERROR)
+
+      // 3a. the new file must carry the error now
+      val newDiag = capturingClient.awaitDiagnostic(predicate =
+        p =>
+          p.getTextDocument.getUri.contains("renamedNew.scala") &&
+            p.getDiagnostics.asScala.nonEmpty
+      )
+      assert(newDiag.isDefined, "renamedNew.scala should show the error after the rename")
+
+      // 3b. the old URI must receive an EMPTY reset publish (clears stale IDE markers)
+      val oldCleared = capturingClient.awaitDiagnostic(predicate =
+        p =>
+          p.getTextDocument.getUri.contains("renamedOld.scala") &&
+            p.getDiagnostics.asScala.isEmpty &&
+            p.getReset
+      )
+      assert(oldCleared.isDefined, "renamedOld.scala diagnostics should be cleared (empty reset) after the rename")
+
+      // 3c. no non-empty diagnostics may be published for the old URI anymore
+      val staleErrors = capturingClient.diagnostics.asScala.filter(p =>
+        p.getTextDocument.getUri.contains("renamedOld.scala") && p.getDiagnostics.asScala.nonEmpty
+      )
+      assert(staleErrors.isEmpty, s"no stale error diagnostics for renamedOld.scala, got: $staleErrors")
+    } finally {
+      os.remove(newFile)
+      capturingClient.clear()
+      compileCommon() // restore clean state for subsequent tests
+    }
+  }
+
   test("buildTargetOutputPaths returns excluded directory paths") {
     val params = new OutputPathsParams(List(targetId("common")).asJava)
     val result = buildServer.buildTargetOutputPaths(params).get(30, TimeUnit.SECONDS)
