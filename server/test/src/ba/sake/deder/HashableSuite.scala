@@ -67,19 +67,20 @@ class HashableSuite extends munit.FunSuite {
     } finally os.remove.all(dir)
   }
 
-  test("dir hash changes when a subdirectory is renamed (contents unchanged)") {
-    val dir = os.temp.dir()
+  test("DederPath hash changes when a file is renamed (content unchanged)") {
+    val root = os.temp.dir()
+    System.setProperty("DEDER_PROJECT_ROOT_DIR", root.toString)
     try {
-      os.makeDir.all(dir / "foo")
-      os.write(dir / "foo" / "x.txt", "contents")
-      val before = Hashable[os.Path].hashStr(dir)
+      val a = root / "a.txt"
+      os.write(a, "same content")
+      val h1 = Hashable[DederPath].hashStr(DederPath("a.txt"))
 
-      // Rename foo -> fop (sole child, sort order trivially preserved). Contents unchanged.
-      os.move(dir / "foo", dir / "fop")
-      val after = Hashable[os.Path].hashStr(dir)
+      // Rename a.txt -> b.txt, content unchanged.
+      os.move(a, root / "b.txt")
+      val h2 = Hashable[DederPath].hashStr(DederPath("b.txt"))
 
-      assertNotEquals(before, after, "renaming a subdirectory must change the parent dir hash")
-    } finally os.remove.all(dir)
+      assertNotEquals(h1, h2, "renaming a file must change the DederPath hash even when content is unchanged")
+    } finally System.clearProperty("DEDER_PROJECT_ROOT_DIR")
   }
 
 }

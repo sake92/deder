@@ -63,4 +63,26 @@ class DiagnosticConversionSuite extends munit.FunSuite {
     val key = DederPath(cleanAbs.subRelativeTo(root))
     assertEquals(result.get(key), Some(Nil))
   }
+
+  test("problems for files outside the current source set are dropped") {
+    val root = os.temp.dir()
+    val currentAbs = root / "src" / "Current.scala"
+    val staleAbs = root / "src" / "Stale.scala"
+    os.makeDir.all(currentAbs / os.up)
+    os.write.over(currentAbs, "")
+    os.write.over(staleAbs, "")
+
+    val staleProblem = problem(pos(staleAbs.toIO, 1, 1, 1, 5), "stale error", XSeverity.Error, "")
+    val result = DiagnosticConversion.groupByFile(
+      problems = Seq(staleProblem),
+      allSources = Seq(currentAbs),
+      projectRoot = root
+    )
+
+    // a problem located in a file that is no longer a source (renamed/deleted)
+    // must not resurrect that file in the diagnostics map
+    assertEquals(result.get(DederPath(staleAbs.subRelativeTo(root))), None)
+    // current file still present as a clean key
+    assertEquals(result.get(DederPath(currentAbs.subRelativeTo(root))), Some(Nil))
+  }
 }
