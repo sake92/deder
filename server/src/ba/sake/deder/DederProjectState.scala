@@ -72,6 +72,7 @@ class DederProjectState(
   reloadProject()
 
   scheduleInactiveShutdownChecker()
+  scheduleProjectRootChecker()
 
   def readState(useLastGood: Boolean): Either[String, DederProjectStateData] =
     stateLock.synchronized {
@@ -747,6 +748,37 @@ class DederProjectState(
             case _: InterruptedException => running = false
             case NonFatal(e) =>
               logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
+          }
+        }
+      })
+  }
+
+  /** Checks periodically whether the project root directory still exists (e.g. the folder
+    * was deleted, or a git worktree was removed). If it's gone, the server is useless —
+    * its sockets, lock file and watcher all live under the deleted root — so log the reason
+    * and shut down cleanly, instead of lingering until the idle timeout.
+    */
+  private def scheduleProjectRootChecker(): Unit = {
+    Thread
+      .ofVirtual()
+      .name("project-root-checker")
+      .start(() => {
+        var running = true
+        while (running && !shutdownStarted) {
+          try {
+            Thread.sleep(TimeUnit.SECONDS.toMillis(10))
+            val projectRoot = DederGlobals.projectRootDir
+            if !os.exists(projectRoot) then {
+              val msg = s"Project root directory '$projectRoot' was deleted or moved. Shutting down server."
+              logger.warn(msg)
+              System.err.println(msg)
+              shutdown()
+              running = false
+            }
+          } catch {
+            case _: InterruptedException => running = false
+            case NonFatal(e) =>
+              logger.error(s"Error during project root checker: ${e.getMessage}")
           }
         }
       })
