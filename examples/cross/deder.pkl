@@ -20,7 +20,7 @@ local const commonModules: List<ScalaModule> =
           deps { "org.scalameta::munit:1.2.1" }
         }
         jsTemplate = (template.asJs()) {
-          scalaJsVersion = "1.20.2"
+          scalaJsVersion = "1.22.0"
         }
         jsTestTemplate = (jsTemplate.asTest()) {
           deps { "org.scalameta::munit::1.2.1" }

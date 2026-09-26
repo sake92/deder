@@ -144,9 +144,10 @@ local const serverModules =
         "ch.epfl.scala:bsp4j:2.2.0-M2"
         "com.github.blemale::scaffeine:5.3.0"
         "com.eed3si9n.jarjarabrams::jarjar-abrams-core:1.16.0"
-        // withDottyCompat → _2.13 artifacts
-        "org.scala-js:scalajs-linker_2.13:1.20.2"
-        "org.scala-js:scalajs-sbt-test-adapter_2.13:1.20.2"
+        // Keep the linker on Scala 2.13: the Scala 3 artifacts pull their own
+        // Scala 3 standard library onto Deder's compiler classpath.
+        "org.scala-js:scalajs-linker_2.13:1.22.0"
+        "org.scala-js:scalajs-sbt-test-adapter_2.13:1.22.0"
         "org.scala-js:scalajs-env-nodejs_2.13:1.5.0"
         "org.scala-native::tools:0.5.10"
         "org.scala-native::test-runner:0.5.10"

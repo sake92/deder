@@ -16,9 +16,9 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
         val frontendCompileClasspath = dederOutput.results("frontend")
         assert(frontendCompileClasspath(0).endsWith("/.deder/out/frontend/compile/classes"))
         assert(frontendCompileClasspath.exists(_.contains("scala3-library_sjs1_3-3.7.1.jar")))
-        assert(frontendCompileClasspath.exists(_.contains("scalajs-library_2.13-1.20.2.jar")))
-        assert(frontendCompileClasspath.exists(_.contains("scala-library-2.13.17.jar")))
-        assert(frontendCompileClasspath.exists(_.contains("scalajs-javalib-1.20.2.jar")))
+        assert(frontendCompileClasspath.exists(_.contains("scalajs-library_2.13-1.22.0.jar")))
+        assert(frontendCompileClasspath.exists(_.matches(".*scala-library-2\\.13\\.\\d+\\.jar")))
+        assert(frontendCompileClasspath.exists(_.contains("scalajs-javalib-1.22.0.jar")))
         assert(frontendCompileClasspath.exists(_.contains("scalajs-scalalib_2.13")))
       }
       locally {

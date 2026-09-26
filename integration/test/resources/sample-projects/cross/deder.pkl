@@ -17,7 +17,7 @@ local const commonModules: List<ScalaModule> =
           }
         }
         jsTemplate = (template.asJs()) {
-          scalaJsVersion = "1.20.2"
+          scalaJsVersion = "1.22.0"
         }
         nativeTemplate = (template.asNative()) {
           scalaNativeVersion = "0.5.10"
@@ -31,4 +31,3 @@ local const commonModules: List<ScalaModule> =
 modules {
   ...commonModules
 }
-
