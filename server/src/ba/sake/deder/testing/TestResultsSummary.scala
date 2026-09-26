@@ -16,7 +16,8 @@ case class TestResultsSummary(
     testsPassed: Int,
     duration: Long,
     totalDurationMillis: Long,
-    modules: Map[String, DederTestResults]
+    modules: Map[String, DederTestResults],
+    failures: Seq[ModuleFailure] = Seq.empty
 ) derives JsonRW
 
 object TestResultsSummary {
@@ -47,11 +48,23 @@ object TestResultsSummary {
         }
         .mkString("\n")
 
+      val (skippedModuleFailures, failedModuleFailures) = summary.failures.partition(_.causedBy.isDefined)
+      val failedModuleFailuresSummary = failedModuleFailures.sortBy(_.moduleId)
+        .map(f => s"  🔴 FAILED ${f.moduleId} (${f.error})")
+        .mkString("\n")
+      val skippedModuleFailuresSummary = skippedModuleFailures.sortBy(_.moduleId)
+        .map { f =>
+          s"  ⏭️  SKIPPED ${f.moduleId} (${f.causedBy.get} failed)"
+        }
+        .mkString("\n")
+
       Seq(
         separator,
         summaryLine,
         successfulModulesSummary,
         failedModulesSummary,
+        failedModuleFailuresSummary,
+        skippedModuleFailuresSummary,
         separator
       ).filter(_.trim.nonEmpty).mkString("\n")
     }
@@ -71,7 +84,7 @@ object TestResultsSummary {
     def summarize(resultsMap: Seq[(String, DederTestResults)], failures: Seq[ModuleFailure], totalDuration: java.time.Duration): TestResultsSummary = {
       val allResults = resultsMap.map(_._2)
       TestResultsSummary(
-        success = allResults.forall(_.success),
+        success = allResults.forall(_.success) && failures.isEmpty,
         suitesTotal = allResults.map(_.suitesTotal).sum,
         suitesFailed = allResults.map(_.suitesFailed).sum,
         suitesPassed = allResults.map(_.suitesPassed).sum,
@@ -81,7 +94,8 @@ object TestResultsSummary {
         testsPassed = allResults.map(_.passed).sum,
         duration = allResults.map(_.duration).sum,
         totalDurationMillis = totalDuration.toMillis(),
-        modules = resultsMap.toMap
+        modules = resultsMap.toMap,
+        failures = failures
       )
     }
 
