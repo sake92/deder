@@ -189,19 +189,46 @@ local const client = new JavaModule {
   }
 }
 
-local const integrationTest = new ScalaTestModule {
-  id = "integration-test"
-  root = "integration/test"
+local const integrationTestSupport = new ScalaModule {
+  id = "integration-test-support"
+  root = "integration/test-support"
   scalaVersion = scalaVer
+  publish = false
   moduleDeps { serverModules.main }
   deps {
     "org.scalameta::munit:1.2.1"
   }
-//  maxTestForks = 16
+}
+
+local const integrationTest = new ScalaTestModule {
+  id = "integration-test"
+  root = "integration/test"
+  scalaVersion = scalaVer
+  moduleDeps { serverModules.main; integrationTestSupport }
+  deps {
+    "org.scalameta::munit:1.2.1"
+  }
   forkEnv {
     ["DEDER_TMP_M2_REPO"] = read?("env:DEDER_TMP_M2_REPO") ?? "./tmp/m2"
     ["DEDER_PLUGIN_API_VERSION"] = "it-test-version"
   }
+  junitXmlReport {
+    enabled = true
+  }
+}
+
+local const bspIntegrationTest = new ScalaTestModule {
+  id = "bsp-integration-test"
+  root = "integration/bsp-test"
+  scalaVersion = scalaVer
+  publish = false
+  moduleDeps { serverModules.main; integrationTestSupport }
+  deps {
+    "org.scalameta::munit:1.2.1"
+  }
+  // BSP suites start real servers and use Unix sockets, so keep them isolated.
+  maxTestForks = 1
+  testParallelism = 1
   junitXmlReport {
     enabled = true
   }
@@ -214,5 +241,7 @@ modules {
   testRunner
   ...serverModules.all
   client
+  integrationTestSupport
   integrationTest
+  bspIntegrationTest
 }
