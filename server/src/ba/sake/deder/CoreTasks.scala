@@ -351,7 +351,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
               )
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
-              Seq(
+              val nativeDependencies = Seq(
                 Dependency.make(s"org.scala-lang::scala3-library:${scalaVersion}", scalaVersion),
                 Dependency.make(
                   s"org.scala-native::scala3lib::${scalaSpecificVersion}",
@@ -389,6 +389,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
                   ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
                 )
               )
+              nativeDependencies ++ nativeTestInterfaceDependency(m, scalaVersion)
             case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang::scala3-library:${scalaVersion}", scalaVersion))
             case _              => Seq.empty
           }
@@ -424,7 +425,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
               )
             case m: ScalaNativeModule =>
               val scalaSpecificVersion = s"${scalaVersion}+${m.scalaNativeVersion}"
-              Seq(
+              val nativeDependencies = Seq(
                 Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion),
                 Dependency.make(
                   s"org.scala-native::scalalib::${scalaSpecificVersion}",
@@ -457,10 +458,25 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
                   ScalaVersion.nativeBinary(m.scalaNativeVersion).map("native" + _)
                 )
               )
+              nativeDependencies ++ nativeTestInterfaceDependency(m, scalaVersion)
             case m: ScalaModule => Seq(Dependency.make(s"org.scala-lang:scala-library:${scalaVersion}", scalaVersion))
             case _              => Seq.empty
           }
       scalaLibDeps
+    }
+
+  private def nativeTestInterfaceDependency(nativeModule: ScalaNativeModule, scalaVersion: String): Seq[deps.Dependency] =
+    nativeModule match {
+      case testModule: ScalaNativeTestModule =>
+        val artifactId =
+          s"test-interface_native${ScalaVersion.nativeBinary(testModule.scalaNativeVersion).get}_${ScalaVersion.binary(scalaVersion)}"
+        Seq(
+          Dependency.make(
+            s"org.scala-native:${artifactId}:${testModule.scalaNativeVersion}",
+            scalaVersion
+          )
+        )
+      case _ => Seq.empty
     }
 
   val compileClasspathTask = CachedTaskBuilder
