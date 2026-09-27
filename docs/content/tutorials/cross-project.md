@@ -28,7 +28,7 @@ local const commonModules: List<ScalaModule> =
             scalaVersion = sv
           }
           jsTemplate = (template.asJs()) {
-            scalaJsVersion = "1.20.2"
+            scalaJsVersion = "1.22.0"
           }
           nativeTemplate = (template.asNative()) {
             scalaNativeVersion = "0.5.10"
@@ -88,4 +88,3 @@ modules {
   ...commonModules.filter((m) -> !m.id.endsWith("-native-3.7.4"))
 }
 ```
-

@@ -6,7 +6,7 @@ local const frontendModules = new CreateScalaJsModules {
   root = "frontend"
   template = new {
     scalaVersion = "3.7.1"
-    scalaJsVersion = "1.20.2"
+    scalaJsVersion = "1.22.0"
     moduleKind = "es-module"
     //linkerConfig {
     //   moduleSplitStyle = "smallest-modules"

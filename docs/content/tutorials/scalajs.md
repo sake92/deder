@@ -14,7 +14,7 @@ amends "https://sake92.github.io/deder/config/early-access/DederProject.pkl"
 local const frontend: ScalaJsModule = new {
   id = "frontend"
   scalaVersion = "3.7.1"
-  scalaJsVersion = "1.20.2"
+  scalaJsVersion = "1.22.0"
   moduleKind = "es-module"
   deps {
     "org.scala-js::scalajs-dom::2.2.0"
