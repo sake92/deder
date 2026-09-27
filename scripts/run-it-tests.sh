@@ -24,7 +24,8 @@ export DEDER_TEST_RUNNER_PATH=$(realpath .deder/out/test-runner/assembly/out.jar
 deder exec -t publishLocal -m config -m plugin-api
 
 if [ $# -eq 0 ]; then
-    deder exec -t test -m integration-test 
+    deder exec -t test -m integration-test
+    deder exec -t test -m bsp-integration-test
 else
     deder exec -t test -m integration-test $1
 fi
