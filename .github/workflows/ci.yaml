@@ -77,6 +77,8 @@ jobs:
         run: brew install sake92/tap/deder
       # for testing importing from sbt
       - uses: sbt/setup-sbt@v1
+        with:
+          sbt-runner-version: 1.12.11
       - name: Integration Test Suite
         run: |
           ./scripts/run-it-tests.sh
