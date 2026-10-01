@@ -1,0 +1,92 @@
+/// Extracts version prefixes from a scalaVersion string using Mill-style prefix matching.
+/// Example: "3.7.4" → ["3", "3.7", "3.7.4"], "2.13" → ["2", "2.13"]
+/// Coursier suffixes (e.g. "2.13.18+3") are stripped: only leading digits and dots are kept.
+const function versionPrefixes(scalaVersion: String): List<String> =
+  let (cleanVersion = scalaVersion.replaceAll(Regex("\\+.*$"), ""))
+  let (parts = cleanVersion.split(".").toList())
+  let (len = parts.length)
+  let (major = "\(parts[0])")
+  let (minor = if (len >= 2) "\(parts[0]).\(parts[1])" else null)
+  let (patch = if (len >= 3) "\(parts[0]).\(parts[1]).\(parts[2])" else null)
+    new Listing {
+      major
+      when (minor != null) { minor }
+      when (patch != null) { patch }
+    }.toList()
+
+/// Returns version-specific source directories for a given base directory and scalaVersion (deder style).
+/// Example: versionSourceDirs("3.7.4", "src/main/scala") → ["src/main/scala-3", "src/main/scala-3.7", "src/main/scala-3.7.4"]
+const function versionSourceDirs(scalaVersion: String, baseDir: String): Listing<String> = new Listing {
+  for (prefix in versionPrefixes(scalaVersion)) {
+    "\(baseDir)-\(prefix)"
+  }
+}
+
+/// sbt-style version prefixes for cross-version source directories.
+/// Examples:
+///   sbtVersionPrefixes("2.13.18") → ["2", "2.13", "2.13.18", "2.13+"]
+///   sbtVersionPrefixes("3.3.4")   → ["3", "3.3", "3.3.4", "3.3+", "2.13+"]
+/// The "+" suffix means "this binary version and higher" using simple semver comparison.
+/// For Scala 3.x, the 2.13+ dir is included automatically (most common cross-version pattern).
+const function sbtVersionPrefixes(scalaVersion: String): List<String> =
+  let (cleanVersion = scalaVersion.replaceAll(Regex("\\+.*$"), ""))
+  let (parts = cleanVersion.split(".").toList())
+  let (len = parts.length)
+  let (majorStr = parts[0])
+  let (minorStr = if (len >= 2) parts[1] else "0")
+  let (patchStr = if (len >= 3) parts[2] else null)
+  let (major = majorStr.toInt())
+  let (minor = minorStr.toInt())
+  
+  let (exactPrefixes = new Listing {
+      majorStr
+      when (len >= 2) { "\(majorStr).\(minorStr)" }
+      when (patchStr != null) { "\(majorStr).\(minorStr).\(patchStr)" }
+    })
+  
+  let (currentPlus = "\(majorStr).\(minorStr)+")
+  
+  let (crossPlus = if (major >= 3) new Listing { "2.13+" } else new Listing {})
+  
+  new Listing {
+    for (p in exactPrefixes) { p }
+    currentPlus
+    for (p in crossPlus) { p }
+  }.toList().distinct
+
+/// Returns sbt-style version-specific source directories for a given base directory and scalaVersion.
+/// Example: sbtVersionSourceDirs("2.13.18", "src/main/scala") → ["src/main/scala-2", "src/main/scala-2.13", "src/main/scala-2.13.18", "src/main/scala-2.13+"]
+const function sbtVersionSourceDirs(scalaVersion: String, baseDir: String): Listing<String> = new Listing {
+  for (prefix in sbtVersionPrefixes(scalaVersion)) {
+    "\(baseDir)-\(prefix)"
+  }
+}
+
+/// Dispatches version source dirs based on versionStyle.
+const function resolveVersionSourceDirs(versionStyle: String, scalaVersion: String, baseDir: String): Listing<String> =
+  if (versionStyle == "sbt") sbtVersionSourceDirs(scalaVersion, baseDir)
+  else versionSourceDirs(scalaVersion, baseDir)
+
+/// Builds source directory list for crossModules: shared base (with extra+versioned) + platform-specific base.
+const function crossPlatformSources(baseDir: String, platformDir: String, extraSrc: Listing<String>, includeShared: Boolean, versionStyle: String, scalaVersion: String): Listing<String> =
+  new Listing {
+    when (includeShared) {
+      baseDir
+      ...(extraSrc)
+      ...resolveVersionSourceDirs(versionStyle, scalaVersion, baseDir)
+    }
+    platformDir
+  }
+
+/// Resolves layout-specific directory paths for Create*Modules helpers.
+class LayoutConfig {
+  mainScalaSrcBase: String
+  testScalaSrcBase: String
+  mainExtraSrc: Listing<String>
+  testExtraSrc: Listing<String>
+  mainResources: Listing<String>
+  testResources: Listing<String>
+  testRootSuffix: String
+  versionStyle: String = "deder"
+  crossType: String?
+}
