@@ -56,6 +56,13 @@ Check out @README.md @CONTRIBUTING.md @docs/content/reference/server-properties.
 - prefer running single unit test 
 - prefer running single integration test, because they take very long and can be flaky
 
+### Token-efficient CLI usage
+
+- For routine automation, use `deder exec --log-level warning --no-color`; set `NO_COLOR=1` when passing flags is inconvenient. Raise the log level only to diagnose an issue.
+- Scope execution to the affected module and task with `-m <module>` and `-t <task>` instead of building the entire project.
+- Run tests selectively: `deder exec -t test -m <module>`, `deder exec -t test <suite>`, or `deder exec -t test <suite>#<test>`.
+- Prefer `deder modules`, `deder tasks`, and `deder plan -m <module> -t <task>` to inspect targeted work; use `--format densejson` for compact structured output.
+
 ### Task DAG
 The core abstraction is `Task[T, Deps]` (`server/src/ba/sake/deder/Task.scala`). Tasks form a typed DAG:
 - `ConfigValueTask` — reads from Pkl config, cached by value hash
