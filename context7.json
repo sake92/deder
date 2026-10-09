@@ -1,0 +1,13 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Deder",
+  "description": "A config-based, concurrent client-server JVM build tool for Scala and Java projects.",
+  "rules": [
+    "For token-efficient automation, run `deder exec` with `--log-level warning` and use `--no-color` (or set `NO_COLOR=1`). Raise the log level only while diagnosing a problem.",
+    "Scope work to the affected module with `-m <module>` and task with `-t <task>`; avoid unqualified `deder exec` and `deder exec -t test` unless the whole project is required.",
+    "Run tests selectively: `deder exec -t test -m <module>`, `deder exec -t test <suite>`, or `deder exec -t test <suite>#<test>`.",
+    "To run related modules or test suites without selecting everything, use `%` as a wildcard and prefix a selector with `~` to exclude it, for example `-m app% -m ~app-test` or `deder exec -t test app.%`.",
+    "Use `deder modules`, `deder tasks`, and `deder plan -m <module> -t <task>` to inspect the build before executing it. Request `--format densejson` when structured output is more useful than terminal-oriented text.",
+    "After modifying `.deder/server.properties`, run `deder shutdown` before the next command so the server reloads the configuration."
+  ]
+}
