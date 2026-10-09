@@ -61,6 +61,7 @@ Check out @README.md @CONTRIBUTING.md @docs/content/reference/server-properties.
 - For routine automation, use `deder exec --log-level warning --no-color`; set `NO_COLOR=1` when passing flags is inconvenient. Raise the log level only to diagnose an issue.
 - Scope execution to the affected module and task with `-m <module>` and `-t <task>` instead of building the entire project.
 - Run tests selectively: `deder exec -t test -m <module>`, `deder exec -t test <suite>`, or `deder exec -t test <suite>#<test>`.
+- Use `%` to select related modules or test suites and prefix a selector with `~` to exclude it, e.g. `-m app% -m ~app-test` or `deder exec -t test app.%`.
 - Prefer `deder modules`, `deder tasks`, and `deder plan -m <module> -t <task>` to inspect targeted work; use `--format densejson` for compact structured output.
 
 ### Task DAG
