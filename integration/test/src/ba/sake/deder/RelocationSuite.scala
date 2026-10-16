@@ -53,11 +53,16 @@ class RelocationSuite extends BaseIntegrationSuite {
 
   private def zipContains(file: os.Path, needle: String): Boolean = {
     val bytes = needle.getBytes("UTF-8")
-    val zip = new ZipFile(file.toIO)
     try
-      zip.entries().asScala.exists { e =>
-        e.getName.contains(needle) || (!e.isDirectory && zip.getInputStream(e).readAllBytes().containsSlice(bytes))
-      }
-    finally zip.close()
+      val zip = new ZipFile(file.toIO)
+      try
+        zip.entries().asScala.exists { e =>
+          e.getName.contains(needle) || (!e.isDirectory && zip.getInputStream(e).readAllBytes().containsSlice(bytes))
+        }
+      finally zip.close()
+    catch
+      // not a valid zip (e.g. empty/partial file): fall back to a raw byte scan
+      case _: java.util.zip.ZipException | _: java.io.IOException =>
+        os.read.bytes(file).containsSlice(bytes)
   }
 }
