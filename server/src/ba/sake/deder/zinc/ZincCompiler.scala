@@ -9,7 +9,6 @@ import com.github.blemale.scaffeine.*
 import sbt.internal.inc.{MappedFileConverter, ZincUtil}
 import sbt.internal.inc.Locate
 import sbt.internal.inc.consistent.ConsistentFileAnalysisStore
-import xsbti.compile.analysis.ReadWriteMappers
 import xsbti.compile.{
   AnalysisContents,
   ClasspathOptionsUtil,
@@ -235,7 +234,12 @@ class ZincCompiler(
       moduleId: String,
       notifications: ServerNotificationsLogger
   ): ZincCompileResult = {
-    val converter = MappedFileConverter.empty
+    // Root-relative file ids + machine-independent analysis keep .deder/out relocatable
+    // (copying the project to another directory must not force a full recompile).
+    // allowMachinePath: paths outside the project (coursier jars, JDK) stay absolute.
+    val projectRoot = DederGlobals.projectRootDir.toNIO
+    val converter = MappedFileConverter(Map("PROJECT_ROOT" -> projectRoot), true)
+    val mappers = RelocatableMappers(projectRoot)
     val sourcesVFs = sources.map(s => converter.toVirtualFile(s.toNIO)).toArray
     val classpathVFs = compileClasspath.map(f => converter.toVirtualFile(f.toNIO)).toArray
 
@@ -256,7 +260,7 @@ class ZincCompiler(
           if os.exists(inferredZincCache) then
             val store = ConsistentFileAnalysisStore.binary(
               file = inferredZincCache.toIO,
-              mappers = ReadWriteMappers.getEmptyMappers,
+              mappers = mappers,
               reproducible = true,
               parallelism = math.min(Runtime.getRuntime.availableProcessors(), 8)
             )
@@ -273,12 +277,16 @@ class ZincCompiler(
       /*_javacOptions =*/ javacOptions.toArray,
       /*_maxErrors =*/ 100,
       /*_sourcePositionMapper =*/ null,
-      /*_order =*/ compileOrder
+      /*_order =*/ compileOrder,
+      /*_temporaryClassesDirectory =*/ Optional.empty[Path](),
+      /*_converter =*/ Optional.of[xsbti.FileConverter](converter),
+      /*_stamper =*/ Optional.empty[xsbti.compile.analysis.ReadStamps](),
+      /*_earlyOutput =*/ Optional.empty[xsbti.compile.Output]()
     )
 
     val analysisStore = ConsistentFileAnalysisStore.binary(
       file = zincCacheFile.toIO,
-      mappers = ReadWriteMappers.getEmptyMappers,
+      mappers = mappers,
       reproducible = true,
       // No need to utilize more than 8 cores to serialize a small file
       parallelism = math.min(Runtime.getRuntime.availableProcessors(), 8)
