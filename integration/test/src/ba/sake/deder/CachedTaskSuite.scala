@@ -7,28 +7,28 @@ class CachedTaskSuite extends BaseIntegrationSuite {
   test("cached tasks: first run computes, second run uses cache") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
       // First run — should compute the result
-      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "allDependencies")
       val logAfterFirst = os.read.lines(projectPath / ".deder/logs/server.log")
       assert(
-        logAfterFirst.exists(_.contains("Computed result for compileClasspath")),
-        "Expected 'Computed result for compileClasspath' in log on first run"
+        logAfterFirst.exists(_.contains("Computed result for allDependencies")),
+        "Expected 'Computed result for allDependencies' in log on first run"
       )
       assert(
-        !logAfterFirst.exists(_.contains("Using cached result for compileClasspath")),
-        "Did not expect 'Using cached result for compileClasspath' in log on first run"
+        !logAfterFirst.exists(_.contains("Using cached result for allDependencies")),
+        "Did not expect 'Using cached result for allDependencies' in log on first run"
       )
 
       // Second run — should use the cached result
       val offsetAfterFirst = serverLogOffset(projectPath)
-      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "allDependencies")
       val newLines = readNewServerLogLines(projectPath, offsetAfterFirst)
       assert(
-        newLines.exists(_.contains("Using cached result for compileClasspath")),
-        "Expected 'Using cached result for compileClasspath' in second run log"
+        newLines.exists(_.contains("Using cached result for allDependencies")),
+        "Expected 'Using cached result for allDependencies' in second run log"
       )
       assert(
-        !newLines.exists(_.contains("Computed result for compileClasspath")),
-        "Did not expect 'Computed result for compileClasspath' in second run log"
+        !newLines.exists(_.contains("Computed result for allDependencies")),
+        "Did not expect 'Computed result for allDependencies' in second run log"
       )
     }
   }
@@ -61,10 +61,10 @@ class CachedTaskSuite extends BaseIntegrationSuite {
 
   test("cached tasks: should recompute after dependency change") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
-      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "allDependencies")
       val offsetAfterFirstRun = serverLogOffset(projectPath)
       // Add jsoup dep to common module — this changes the `deps` task output hash,
-      // which invalidates the `compileClasspath` cache entry for common
+      // which invalidates the `allDependencies` cache entry for common
       val pklContent = os.read(projectPath / "deder.pkl")
       os.write.over(
         projectPath / "deder.pkl",
@@ -75,11 +75,11 @@ class CachedTaskSuite extends BaseIntegrationSuite {
       )
       // Give the server file watcher a moment to pick up the config change
       Thread.sleep(500)
-      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "allDependencies")
       val newLines = readNewServerLogLines(projectPath, offsetAfterFirstRun)
       assert(
-        newLines.exists(_.contains("Computed result for compileClasspath")),
-        "Expected 'Computed result for compileClasspath' after dependency change"
+        newLines.exists(_.contains("Computed result for allDependencies")),
+        "Expected 'Computed result for allDependencies' after dependency change"
       )
     }
   }
@@ -105,18 +105,18 @@ class CachedTaskSuite extends BaseIntegrationSuite {
 
   test("cached tasks: should handle corrupted metadata.json gracefully") {
     withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
-      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
+      executeDederCommand(projectPath, "exec", "-m", "common", "-t", "allDependencies")
       os.write.over(
-        projectPath / ".deder/out/common/compileClasspath/metadata.json",
+        projectPath / ".deder/out/common/allDependencies/metadata.json",
         "not valid json {{{"
       )
       val offsetAfterCorrupt = serverLogOffset(projectPath)
-      val result = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "compileClasspath")
+      val result = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "allDependencies")
       assertEquals(result.exitCode, 0, "Expected successful exit after corrupted metadata")
       val newLines = readNewServerLogLines(projectPath, offsetAfterCorrupt)
       assert(
-        newLines.exists(_.contains("Computed result for compileClasspath")),
-        "Expected 'Computed result for compileClasspath' after corrupted metadata"
+        newLines.exists(_.contains("Computed result for allDependencies")),
+        "Expected 'Computed result for allDependencies' after corrupted metadata"
       )
     }
   }
