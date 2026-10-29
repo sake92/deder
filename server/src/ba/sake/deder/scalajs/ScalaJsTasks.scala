@@ -1,10 +1,24 @@
 package ba.sake.deder.scalajs
 
-import ba.sake.deder.config.DederProject.{ModuleType, ScalaJsModule, ScalaJsTestModule}
+import ba.sake.deder.config.DederProject.{ModuleType, ScalaJsModule, ScalaJsModuleKind, ScalaJsTestModule}
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, JUnitXmlReportWriter, TestResultsSummary}
 import ba.sake.deder.*
 
 class ScalaJsTasks(coreTasks: CoreTasks) {
+
+  private val moduleKindTask = ConfigValueTask[String](
+    name = "moduleKind",
+    supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST),
+    internal = true,
+    execute = ctx => ctx.module.asInstanceOf[ScalaJsModule].moduleKind.name()
+  )
+
+  private val linkerConfigTask = ConfigValueTask[ScalaJsLinkerSettings](
+    name = "linkerConfig",
+    supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST),
+    internal = true,
+    execute = ctx => ScalaJsLinkerSettings.fromConfig(ctx.module.asInstanceOf[ScalaJsModule].linkerConfig)
+  )
 
   val fastLinkJsTask = CachedTaskBuilder
     .make[String](
@@ -14,8 +28,10 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
+    .dependsOn(moduleKindTask)
+    .dependsOn(linkerConfigTask)
     .build { ctx =>
-      val (classpath, mainClass) = ctx.depResults
+      val (classpath, mainClass, moduleKind, linkerConfig) = ctx.depResults
       val irContainers = classpath
       os.makeDir.all(ctx.out)
       // TODO thread pool.. ?
@@ -29,14 +45,13 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
             org.scalajs.linker.interface.ModuleInitializer.mainMethodWithArgs(mc, "main")
           }.toSeq
       }
-      val jsModule = ctx.module.asInstanceOf[ScalaJsModule]
       val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
       linker.linkFast(
         irContainers = irContainers,
         outputDir = ctx.out,
         moduleInitializers = moduleInitializers,
-        jsModuleKind = jsModule.moduleKind,
-        linkerConfig = jsModule.linkerConfig
+        jsModuleKind = ScalaJsModuleKind.valueOf(moduleKind),
+        linkerConfig = linkerConfig
       )
       ctx.out.toString
     }
@@ -49,8 +64,10 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
+    .dependsOn(moduleKindTask)
+    .dependsOn(linkerConfigTask)
     .build { ctx =>
-      val (classpath, mainClass) = ctx.depResults
+      val (classpath, mainClass, moduleKind, linkerConfig) = ctx.depResults
       os.makeDir.all(ctx.out)
       import scala.concurrent.ExecutionContext.Implicits.global
       val moduleInitializers = ctx.module match {
@@ -62,14 +79,13 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
             org.scalajs.linker.interface.ModuleInitializer.mainMethodWithArgs(mc, "main")
           }.toSeq
       }
-      val jsModule = ctx.module.asInstanceOf[ScalaJsModule]
       val linker = new ScalaJsLinker(ctx.notifications, ctx.module.id)
       linker.linkFull(
         irContainers = classpath,
         outputDir = ctx.out,
         moduleInitializers = moduleInitializers,
-        jsModuleKind = jsModule.moduleKind,
-        linkerConfig = jsModule.linkerConfig
+        jsModuleKind = ScalaJsModuleKind.valueOf(moduleKind),
+        linkerConfig = linkerConfig
       )
       ctx.out.toString
     }
@@ -82,12 +98,13 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
+    .dependsOn(moduleKindTask)
+    .dependsOn(linkerConfigTask)
     .build { ctx =>
-      val (classpath, mainClass) = ctx.depResults
+      val (classpath, mainClass, moduleKind, linkerConfig) = ctx.depResults
       val irContainers = classpath
       os.makeDir.all(ctx.out)
       import scala.concurrent.ExecutionContext.Implicits.global
-      val jsModule = ctx.module.asInstanceOf[ScalaJsModule]
       val moduleInitializers = ctx.module match {
         case _: ScalaJsTestModule =>
           val init = org.scalajs.testing.adapter.TestAdapterInitializer
@@ -102,8 +119,8 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
         irContainers = irContainers,
         outputDir = ctx.out,
         moduleInitializers = moduleInitializers,
-        jsModuleKind = jsModule.moduleKind,
-        linkerConfig = jsModule.linkerConfig
+        jsModuleKind = ScalaJsModuleKind.valueOf(moduleKind),
+        linkerConfig = linkerConfig
       )
       ctx.out.toString
     }
@@ -161,6 +178,8 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
     )
 
   val all: Seq[Task[?, ?, ?]] = Seq(
+    moduleKindTask,
+    linkerConfigTask,
     fastLinkJsTask,
     fullLinkJsTask,
     linkJsTask,

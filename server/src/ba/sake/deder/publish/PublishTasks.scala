@@ -175,6 +175,17 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       depsJarPath
     }
 
+  private val shadeRulesFileTask = SourceFilesTask(
+    name = "shadeRulesFile",
+    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST),
+    internal = true,
+    execute = { ctx =>
+      val module = ctx.module.asInstanceOf[JavaModule]
+      val moduleRoot = DederGlobals.projectRootDir / module.root
+      Option(module.shadeRulesFile).toSeq.map(path => DederPath(os.Path(path, moduleRoot)))
+    }
+  )
+
   val assemblyTask = CachedTaskBuilder
     .make[DederPath](
       name = "assembly",
@@ -184,8 +195,9 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     .dependsOn(finalManifestSettingsTask)
     .dependsOn(assemblyDepsTask)
     .dependsOn(allJarsTask)
+    .dependsOn(shadeRulesFileTask)
     .build { ctx =>
-      val (manifestEntries, assemblyDepsJar, allModulesJars) = ctx.depResults
+      val (manifestEntries, assemblyDepsJar, allModulesJars, shadeRulesFiles) = ctx.depResults
       val t0 = System.currentTimeMillis()
       os.makeDir.all(ctx.out)
       val mergedJar = ctx.out / "mergedJar.jar"
@@ -197,19 +209,9 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       )
       val resultJarPath = ctx.out / "out.jar"
       
-      val shadeRulesOpt = ctx.module match {
-        case jm: JavaModule =>
-          val shadeRulesFile = jm.shadeRulesFile
-          if (shadeRulesFile != null) {
-            val moduleRoot = DederGlobals.projectRootDir / jm.root
-            val rules = JarUtils.resolveShadeRules(Some(shadeRulesFile), moduleRoot)
-            if (rules.nonEmpty) Some(rules) else None
-          } else {
-            None
-          }
-        case _ => None
-      }
-      
+      val rules = JarUtils.resolveShadeRules(shadeRulesFiles.headOption.map(_.absPath.toString), DederGlobals.projectRootDir)
+      val shadeRulesOpt = Option.when(rules.nonEmpty)(rules)
+
       shadeRulesOpt match {
         case Some(_) =>
           JarUtils.createAssemblyJar(resultJarPath, mergedJar, shadeRulesOpt)
@@ -543,6 +545,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     jarTask,
     allJarsTask,
     assemblyDepsTask,
+    shadeRulesFileTask,
     assemblyTask,
     moduleDepsPomSettingsTask,
     sourcesJarTask,
