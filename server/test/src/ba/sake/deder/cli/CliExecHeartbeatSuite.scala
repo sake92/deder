@@ -16,7 +16,8 @@ class CliExecHeartbeatSuite extends munit.FunSuite {
       assertNoHeartbeat(emitted)
 
       clock.advanceBy(Duration.ofSeconds(1))
-      clock.awaitSleepCount(2)
+      // Allow the worker to be scheduled while the other suites run in parallel.
+      clock.awaitSleepCount(2, timeout = Duration.ofSeconds(5))
       assertEquals(heartbeatLogs(emitted).map(_.level), Seq(LogLevel.INFO))
     }
   }

@@ -12,13 +12,37 @@ plugins {
   }
 }
 
-local const scalaVer = "3.7.4"
+// Keep Scala on the LTS line; do not upgrade to a non-LTS release.
+local const scalaVer = "3.9.0"
 
 local const versions = new {
-  osLib = "0.11.6"
-  tupson = "0.20.0"
-  commonsCodec = "1.20.0"
-  scalaLogging = "3.9.5"
+  avajeJsonb = "3.16"
+  bouncyCastle = "1.86"
+  bsp4j = "2.2.0-M2"
+  classgraph = "4.8.199"
+  commonsCodec = "1.23.0"
+  coursierDependency = "0.3.3"
+  coursierInterface = "1.0.30"
+  fansi = "0.5.1"
+  jarjarAbrams = "1.18.1"
+  jgrapht = "1.5.3"
+  logback = "1.6.6"
+  mainargs = "0.7.8"
+  maven = "3.10.0"
+  methanol = "1.9.0"
+  munit = "1.3.6"
+  openTelemetry = "1.67.0"
+  osLib = "0.11.10"
+  ox = "1.1.0"
+  pkl = "0.32.2"
+  scaffeine = "5.3.0"
+  scalaJs = "1.22.0"
+  scalaJsNodejs = "1.6.0"
+  scalaLogging = "3.9.6"
+  scalaNative = "0.5.12"
+  testInterface = "1.0"
+  tupson = "0.31.0"
+  zinc = "1.13.0"
 }
 
 local const function pom(artId: String, artName: String): PomSettings = new {
@@ -50,7 +74,7 @@ local const function pom(artId: String, artName: String): PomSettings = new {
 local const config = new JavaModule {
   id = "config"
   deps {
-    "org.pkl-lang:pkl-config-java:0.30.2"
+    "org.pkl-lang:pkl-config-java:\(versions.pkl)"
   }
   pomSettings = pom("deder-config", "Deder config")
   publish = true
@@ -68,14 +92,14 @@ local const dederCommonModules =
       deps {
         "ba.sake::tupson:\(versions.tupson)"
         "com.lihaoyi::os-lib:\(versions.osLib)"
-        "org.scala-sbt:test-interface:1.0"
-        "com.lihaoyi::fansi:0.5.1"
+        "org.scala-sbt:test-interface:\(versions.testInterface)"
+        "com.lihaoyi::fansi:\(versions.fansi)"
         "commons-codec:commons-codec:\(versions.commonsCodec)"
       }
     }
     testTemplate = (template.asTest()) {
       deps {
-        "org.scalameta::munit:1.2.1"
+        "org.scalameta::munit:\(versions.munit)"
       }
       junitXmlReport {
         enabled = true
@@ -104,10 +128,10 @@ local const pluginApi = new ScalaModule {
     "ba.sake::tupson:\(versions.tupson)"
     "com.lihaoyi::os-lib:\(versions.osLib)"
     "com.typesafe.scala-logging::scala-logging:\(versions.scalaLogging)"
-    "ch.qos.logback:logback-classic:1.5.23"
-    "io.get-coursier::dependency:0.3.2"
-    "io.get-coursier::dependency-interface:0.3.2"
-    "io.opentelemetry:opentelemetry-api:1.58.0"
+    "ch.qos.logback:logback-classic:\(versions.logback)"
+    "io.get-coursier::dependency:\(versions.coursierDependency)"
+    "io.get-coursier::dependency-interface:\(versions.coursierDependency)"
+    "io.opentelemetry:opentelemetry-api:\(versions.openTelemetry)"
   }
 }
 
@@ -129,39 +153,39 @@ local const serverModules =
       }
       pomSettings = pom("deder-server", "Deder server")
       deps {
-        "com.softwaremill.ox::core:1.0.4"
-        "org.jgrapht:jgrapht-core:1.5.2"
-        "org.jgrapht:jgrapht-io:1.5.2"
+        "com.softwaremill.ox::core:\(versions.ox)"
+        "org.jgrapht:jgrapht-core:\(versions.jgrapht)"
+        "org.jgrapht:jgrapht-io:\(versions.jgrapht)"
         "com.lihaoyi::os-lib-watch:\(versions.osLib)"
         "commons-codec:commons-codec:\(versions.commonsCodec)"
-        "org.scala-sbt:zinc_2.13:1.11.0"
-        "org.scala-sbt:compiler-interface:1.11.0"
-        "io.get-coursier::dependency:0.3.2"
-        "io.get-coursier::dependency-interface:0.3.2"
-        "io.get-coursier:interface:1.0.25"
-        "com.lihaoyi::mainargs:0.7.8"
-        "io.github.classgraph:classgraph:4.8.184"
-        "ch.epfl.scala:bsp4j:2.2.0-M2"
-        "com.github.blemale::scaffeine:5.3.0"
-        "com.eed3si9n.jarjarabrams::jarjar-abrams-core:1.16.0"
+        "org.scala-sbt:zinc_2.13:\(versions.zinc)"
+        "org.scala-sbt:compiler-interface:\(versions.zinc)"
+        "io.get-coursier::dependency:\(versions.coursierDependency)"
+        "io.get-coursier::dependency-interface:\(versions.coursierDependency)"
+        "io.get-coursier:interface:\(versions.coursierInterface)"
+        "com.lihaoyi::mainargs:\(versions.mainargs)"
+        "io.github.classgraph:classgraph:\(versions.classgraph)"
+        "ch.epfl.scala:bsp4j:\(versions.bsp4j)"
+        "com.github.blemale::scaffeine:\(versions.scaffeine)"
+        "com.eed3si9n.jarjarabrams::jarjar-abrams-core:\(versions.jarjarAbrams)"
         // Keep the linker on Scala 2.13: the Scala 3 artifacts pull their own
         // Scala 3 standard library onto Deder's compiler classpath.
-        "org.scala-js:scalajs-linker_2.13:1.22.0"
-        "org.scala-js:scalajs-sbt-test-adapter_2.13:1.22.0"
-        "org.scala-js:scalajs-env-nodejs_2.13:1.5.0"
-        "org.scala-native::tools:0.5.10"
-        "org.scala-native::test-runner:0.5.10"
-        "org.apache.maven:maven-model:3.9.12"
-        "org.bouncycastle:bcpg-jdk18on:1.78"
-        "org.bouncycastle:bcpkix-jdk18on:1.78"
-        "com.github.mizosoft.methanol:methanol:1.9.0"
+        "org.scala-js:scalajs-linker_2.13:\(versions.scalaJs)"
+        "org.scala-js:scalajs-sbt-test-adapter_2.13:\(versions.scalaJs)"
+        "org.scala-js:scalajs-env-nodejs_2.13:\(versions.scalaJsNodejs)"
+        "org.scala-native::tools:\(versions.scalaNative)"
+        "org.scala-native::test-runner:\(versions.scalaNative)"
+        "org.apache.maven:maven-model:\(versions.maven)"
+        "org.bouncycastle:bcpg-jdk18on:\(versions.bouncyCastle)"
+        "org.bouncycastle:bcpkix-jdk18on:\(versions.bouncyCastle)"
+        "com.github.mizosoft.methanol:methanol:\(versions.methanol)"
       }
     }
     testTemplate = (template.asTest()) {
       deps {
-        "org.scalameta::munit:1.2.1"
-        "io.opentelemetry:opentelemetry-sdk:1.58.0"
-        "io.opentelemetry:opentelemetry-sdk-metrics:1.58.0"
+        "org.scalameta::munit:\(versions.munit)"
+        "io.opentelemetry:opentelemetry-sdk:\(versions.openTelemetry)"
+        "io.opentelemetry:opentelemetry-sdk-metrics:\(versions.openTelemetry)"
       }
       junitXmlReport {
         enabled = true
@@ -175,10 +199,10 @@ local const client = new JavaModule {
   mainClass = "ba.sake.deder.client.Main"
   pomSettings = pom("deder-client", "Deder client")
   deps {
-    "io.avaje:avaje-jsonb:3.13"
+    "io.avaje:avaje-jsonb:\(versions.avajeJsonb)"
   }
   javacAnnotationProcessorDeps {
-    "io.avaje:avaje-jsonb-generator:3.13"
+    "io.avaje:avaje-jsonb-generator:\(versions.avajeJsonb)"
   }
   graalvm {
     nativeImageOptions {
@@ -196,7 +220,7 @@ local const integrationTestSupport = new ScalaModule {
   publish = false
   moduleDeps { serverModules.main }
   deps {
-    "org.scalameta::munit:1.2.1"
+    "org.scalameta::munit:\(versions.munit)"
   }
 }
 
@@ -206,7 +230,7 @@ local const integrationTest = new ScalaTestModule {
   scalaVersion = scalaVer
   moduleDeps { serverModules.main; integrationTestSupport }
   deps {
-    "org.scalameta::munit:1.2.1"
+    "org.scalameta::munit:\(versions.munit)"
   }
   forkEnv {
     ["DEDER_TMP_M2_REPO"] = read?("env:DEDER_TMP_M2_REPO") ?? "./tmp/m2"
@@ -224,7 +248,7 @@ local const bspIntegrationTest = new ScalaTestModule {
   publish = false
   moduleDeps { serverModules.main; integrationTestSupport }
   deps {
-    "org.scalameta::munit:1.2.1"
+    "org.scalameta::munit:\(versions.munit)"
   }
   // BSP suites start real servers and use Unix sockets, so keep them isolated.
   maxTestForks = 1
