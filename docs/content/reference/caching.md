@@ -27,12 +27,25 @@ Every cached task writes a `metadata.json` (plus any task-specific artifacts) un
 
 `metadata.json` stores the task's stored value, `inputsHash`, and `outputHash`.
 
+Before a task re-executes, its previous metadata is removed. New metadata is written to a temporary file in the same directory, then published with an atomic move. A failed execution or metadata write leaves no reusable entry from that execution. Temporary files are removed on handled failures; an abrupt process termination can leave an unused temporary file. Artifact writes themselves are not transactional.
+
+### Task implementation versions
+
+`CachedTaskBuilder.withCacheVersion(n)` sets a task-specific implementation version. The default, `0`, preserves the original cache-key calculation and existing entries. Nonzero versions are included in the input hash; changing the version invalidates that task's stored result. Deder's release/build version is not part of this key.
+
+Downstream invalidation continues to follow dependency output hashes. A task whose output identity includes its input hash, such as `compile`, propagates the version change through that identity; an unchanged value-based result can remain reusable downstream.
+
+### Complete cache restores
+
+Cache reuse assumes all cached artifacts were copied or restored completely. Deder does not check artifact presence or contents on cache hits. Missing or manually deleted outputs require cleaning and rebuilding the affected tasks. No output manifests are maintained.
+
 ### What invalidates a cached task
 
 - Source **file content** change.
 - Source **filename** change within a source directory
 - Config value change in `deder.pkl` that the task reads.
 - Any dependency task's `outputHash` changing (propagates up the chain).
+- An explicit task implementation version change.
 
 ### Clearing the cache
 
@@ -58,7 +71,7 @@ Wildcard patterns (`%`) are supported for both `-m` and `-t` flags.
 ### Two task kinds
 
 - **`TaskImpl`** — always executes. Computes `outputHash = Hashable[T].hashStr(result)` so downstream tasks can detect changes. No `inputsHash` is stored; `changed` is always reported as `true`.
-- **`CachedTask`** — computes `inputsHash = hash(deps' outputHashes joined)`. If a `metadata.json` with the same `inputsHash` already exists on disk, the stored result is reused; otherwise the task re-executes and writes new metadata. `changed = newOutputHash != oldOutputHash`. A `CachedTask` must have at least one dep — enforced at compile time via `Deps <:< NonEmptyTuple` on `CachedTaskBuilder.build`.
+- **`CachedTask`** — computes `inputsHash` from dependency output hashes, arguments, and an optional task implementation version. If a `metadata.json` with the same `inputsHash` already exists on disk, the stored result is reused; otherwise the task re-executes and writes new metadata. `changed = newOutputHash != oldOutputHash`. A `CachedTask` must have at least one dep — enforced at compile time via `Deps <:< NonEmptyTuple` on `CachedTaskBuilder.build`.
 
 ### The hash chain
 

@@ -148,6 +148,51 @@ class CachedTaskSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("cached tasks: failed packaging discards old metadata and recovers without cleaning") {
+    withTestProject("sample-projects/multi", serverProperties = Map("logLevel" -> "DEBUG")) { projectPath =>
+      os.write(
+        projectPath / "common/src/CacheMain.java",
+        "public class CacheMain { public static void main(String[] args) { System.out.println(\"packaged-cache-ok\"); } }"
+      )
+      val first = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "jar")
+      assertEquals(first.exitCode, 0, first.err.text())
+      val metadata = projectPath / ".deder/out/common/jar/metadata.json"
+      assert(os.isFile(metadata))
+      val config = projectPath / "deder.pkl"
+      val originalConfig = os.read(config)
+      assert(originalConfig.contains("publish = false"))
+
+      // Restart explicitly so this test does not depend on file-watcher timing.
+      executeDederCommand(projectPath, "shutdown")
+      os.write.over(
+        config,
+        originalConfig.replace(
+          "publish = false",
+          "publish = false\n  manifest { mainAttributes { [\"bad key\"] = \"invalid\" } }"
+        )
+      )
+      val failed = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "jar")
+      assertNotEquals(failed.exitCode, 0)
+      assert(failed.err.text().contains("bad key"), failed.err.text())
+      assert(!os.exists(metadata), "Failed packaging must not retain the previous cache entry")
+
+      executeDederCommand(projectPath, "shutdown")
+      os.write.over(config, originalConfig)
+      val recovered = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "jar")
+      assertEquals(recovered.exitCode, 0, recovered.err.text())
+      assert(os.isFile(metadata))
+      assert(!os.list(metadata / os.up).exists(_.ext == "tmp"))
+      val packaged = os.proc("java", "-cp", (metadata / os.up / "common.jar").toString, "CacheMain")
+        .call(cwd = projectPath)
+      assertEquals(packaged.out.text().trim, "packaged-cache-ok")
+
+      val offset = serverLogOffset(projectPath)
+      val repeated = executeDederCommand(projectPath, "exec", "-m", "common", "-t", "jar")
+      assertEquals(repeated.exitCode, 0, repeated.err.text())
+      assert(readNewServerLogLines(projectPath, offset).exists(_.trim.endsWith("Using cached result for jar")))
+    }
+  }
+
   private def serverLogOffset(projectPath: os.Path): Long = {
     val logFile = projectPath / ".deder/logs/server.log"
     if os.exists(logFile) then os.stat(logFile).size else 0L

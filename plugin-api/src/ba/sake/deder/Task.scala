@@ -100,7 +100,8 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
     category: String,
     kind: TaskKind,
     internal: Boolean,
-    cliReplayFn: Option[(T, String, ServerNotificationsLogger) => Unit] = None
+    cliReplayFn: Option[(T, String, ServerNotificationsLogger) => Unit] = None,
+    cacheVersion: Int = 0
 )(using ev: TaskDeps[Deps] =:= true, summarizable: Summarizable[T, S]) {
   def dependsOn[T2](t: AbstractTask[T2]): CachedTaskBuilder[T, Deps :* AbstractTask[T2], S] =
     CachedTaskBuilder(
@@ -113,7 +114,8 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       category,
       kind,
       internal,
-      cliReplayFn
+      cliReplayFn,
+      cacheVersion
     )
 
   def withCliReplay(f: (T, String, ServerNotificationsLogger) => Unit): CachedTaskBuilder[T, Deps, S] =
@@ -127,8 +129,15 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       category,
       kind,
       internal,
-      cliReplayFn = Some(f)
+      cliReplayFn = Some(f),
+      cacheVersion = cacheVersion
     )
+
+  /** Bump when changed task behavior makes previously cached results unsuitable for reuse.
+    * Version 0 preserves the original cache key; Deder upgrades alone do not invalidate caches.
+    */
+  def withCacheVersion(version: Int): CachedTaskBuilder[T, Deps, S] =
+    copy(cacheVersion = version)
 
   /** Requires nonempty dependencies because caching only makes sense if there are inputs to hash. If there are no
     * dependencies, the task will always execute...
@@ -145,7 +154,8 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       category = category,
       kind = kind,
       internal = internal,
-      cliReplayFn = cliReplayFn
+      cliReplayFn = cliReplayFn,
+      cacheVersion = cacheVersion
     )
 
   // TODO can we do this in build function?
@@ -168,7 +178,8 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       kind = kind,
       isResultSuccessful = isResultSuccessful,
       internal = internal,
-      cliReplayFn = cliReplayFn
+      cliReplayFn = cliReplayFn,
+      cacheVersion = cacheVersion
     )
 }
 
@@ -378,7 +389,8 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
     val kind: TaskKind = TaskKind.Standard,
     override val isResultSuccessful: T => Boolean = (_: T) => true,
     override val internal: Boolean = false,
-    val cliReplayFn: Option[(T, String, ServerNotificationsLogger) => Unit] = None
+    val cliReplayFn: Option[(T, String, ServerNotificationsLogger) => Unit] = None,
+    val cacheVersion: Int = 0
 )(using
     summarizable: Summarizable[T, S],
     ev: TaskDeps[Deps] =:= true
@@ -405,9 +417,14 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
 
     val allDepResults = depResults ++ transitiveResults.headOption.getOrElse(Seq.empty) // only first level for hashing
     val inputsPayload = CacheInputsHash(allDepResults.map(_.outputHash), args)
-    val inputsHash = HashUtils.hashStr(inputsPayload.toJson(spaces = 0, sort = true))
+    val inputsJson = inputsPayload.toJson(spaces = 0, sort = true)
+    // Keep the exact legacy key for unversioned tasks, including restored caches.
+    val versionedInputs = if cacheVersion == 0 then inputsJson else s"$cacheVersion:$inputsJson"
+    val inputsHash = HashUtils.hashStr(versionedInputs)
 
     def computeTaskResult(): TaskResult[T] = {
+      // Execution may overwrite artifacts. Old metadata must not authorize them after a failed rebuild.
+      java.nio.file.Files.deleteIfExists(metadataFile.toNIO)
       val depResultsUnsafe = Tuple.fromArray(depResults.map(_.value).toArray).asInstanceOf[TaskDepResults[Deps]]
       val transitiveResultsUnsafe = transitiveResults.asInstanceOf[Seq[Seq[TaskResult[T]]]]
       val res = execute(
@@ -427,32 +444,31 @@ class CachedTask[T: JsonRW: Hashable, Deps <: Tuple, S](
       )
       val outputHash = Hashable[T].hashStr(res)
       val taskResult = TaskResult(res, inputsHash, outputHash)
-      os.write.over(metadataFile, taskResult.toJson(spaces = 2, sort = true), createFolders = true)
+      CacheMetadata.write(metadataFile, taskResult.toJson(spaces = 2, sort = true))
       serverNotificationsLogger.add(
         ServerNotification.logDebug(s"Computed result for ${name}", Some(module.id))
       )
       taskResult
     }
 
-    if os.exists(metadataFile) then {
-      try {
-        val cachedTaskResult = os.read(metadataFile).parseJson[TaskResult[T]]
-        val hasDeps = allDepResults.nonEmpty
-        if hasDeps && inputsHash == cachedTaskResult.inputsHash then
-          serverNotificationsLogger.add(
-            ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id))
-          )
-          (cachedTaskResult, false, true)
-        else
-          val newRes = computeTaskResult()
-          (newRes, newRes.outputHash != cachedTaskResult.outputHash, false)
-      } catch {
-        case _: TupsonException =>
-          // if metadata file is corrupted, just recompute
-          (computeTaskResult(), true, false)
-      }
-    } else {
-      (computeTaskResult(), true, false)
+    val cachedResult =
+      if os.exists(metadataFile) then
+        try Some(os.read(metadataFile).parseJson[TaskResult[T]])
+        catch {
+          case _: TupsonException => None // Corrupt metadata is a cache miss, not an execution retry.
+        }
+      else None
+
+    cachedResult match {
+      case Some(cached) if allDepResults.nonEmpty && inputsHash == cached.inputsHash =>
+        serverNotificationsLogger.add(
+          ServerNotification.logDebug(s"Using cached result for ${name}", Some(module.id))
+        )
+        (cached, false, true)
+      case _ =>
+        val newRes = computeTaskResult()
+        val changed = cachedResult.forall(_.outputHash != newRes.outputHash)
+        (newRes, changed, false)
     }
   }
 
