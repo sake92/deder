@@ -26,7 +26,7 @@ class PluginLoader(
 ) extends PluginLoaderApi,
       StrictLogging {
 
-  private val scalaVer = "3.7.4" // deder scala version
+  private val scalaVer = "3.9.0" // deder Scala LTS version
 
   override def load(
       loadedPlugins: Seq[LoadedPlugin],
