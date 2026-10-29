@@ -239,6 +239,7 @@ class ZincCompiler(
     // allowMachinePath: paths outside the project (coursier jars, JDK) stay absolute.
     val projectRoot = DederGlobals.projectRootDir.toNIO
     val converter = MappedFileConverter(Map("PROJECT_ROOT" -> projectRoot), true)
+    val relocatableAnalysis = new RelocatableAnalysis(converter)
     val mappers = RelocatableMappers(projectRoot)
     val sourcesVFs = sources.map(s => converter.toVirtualFile(s.toNIO)).toArray
     val classpathVFs = compileClasspath.map(f => converter.toVirtualFile(f.toNIO)).toArray
@@ -266,7 +267,7 @@ class ZincCompiler(
             )
             Option(store.get().orElse(null))
           else None
-        contentsOpt.map(ac => entryNio -> ac.getAnalysis)
+        contentsOpt.map(ac => entryNio -> relocatableAnalysis.read(ac.getAnalysis))
       }.toMap
 
     val compileOptions = CompileOptions.of(
@@ -298,7 +299,7 @@ class ZincCompiler(
       try {
         val previous = analysisStore.get()
         PreviousResult.of(
-          previous.map(_.getAnalysis),
+          previous.map(ac => relocatableAnalysis.read(ac.getAnalysis)),
           previous.map(_.getMiniSetup)
         )
       } finally span.end()
@@ -336,7 +337,7 @@ class ZincCompiler(
         .setAttribute("moduleId", moduleId)
         .startSpan()
       try {
-        val contents = AnalysisContents.create(newResult.analysis(), newResult.setup())
+        val contents = AnalysisContents.create(relocatableAnalysis.write(newResult.analysis()), newResult.setup())
         analysisStore.set(contents)
       } finally storeSpan.end()
     } catch {
@@ -418,7 +419,12 @@ class ZincCompiler(
 
     val skip: Boolean = false
     val cache: GlobalsCache = CompilerCache.getDefault
-    val incOptions: IncOptions = IncOptions.of()
+    // Scala 3 reads APIs from .tasty files, so deleting only .class products can leave
+    // downstream compilation succeeding against a source that no longer exists.
+    val incOptions: IncOptions =
+      if scalaVersion.startsWith("3.") then
+        IncOptions.of().withAuxiliaryClassFiles(Array(xsbti.compile.TastyFiles.instance()))
+      else IncOptions.of()
 
     val compileProgress = new CompileProgress {
       override def advance(current: Int, total: Int, prevPhase: String, nextPhase: String): Boolean = {

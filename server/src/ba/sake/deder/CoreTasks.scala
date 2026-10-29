@@ -479,7 +479,8 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       case _ => Seq.empty
     }
 
-  val compileClasspathTask = CachedTaskBuilder
+  // Derive absolute classpath entries from the current global root; never persist them across copies.
+  val compileClasspathTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "compileClasspath",
       category = "Dependencies"
@@ -907,7 +908,8 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     category = "Configuration"
   )
 
-  val runClasspathTask = CachedTaskBuilder
+  // Includes project-local classes/resources, so derive these paths for the current root too.
+  val runClasspathTask = TaskBuilder
     .make[Seq[os.Path]](
       name = "runClasspath",
       transitive = true,
