@@ -1,19 +1,19 @@
 package ba.sake.deder.scalajs
 
 import scala.concurrent.duration.Duration
-import scala.jdk.CollectionConverters.*
 import scala.concurrent.{Await, ExecutionContext, Future}
 import org.scalajs.linker.*
 import org.scalajs.linker.interface.*
 import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
 import ba.sake.deder.config.DederProject.{
-  ScalaJsLinkerConfig,
   ScalaJsModuleKind,
   ScalaJsModuleSplitStyle,
   ScalaJsESVersion
 }
 
-class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(using ExecutionContext) {
+private[scalajs] class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(using
+    ExecutionContext
+) {
 
   /** Config-driven link: applies all user settings verbatim, no overrides. */
   def link(
@@ -21,7 +21,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
       outputDir: os.Path,
       moduleInitializers: Seq[ModuleInitializer],
       jsModuleKind: ScalaJsModuleKind,
-      linkerConfig: ScalaJsLinkerConfig
+      linkerConfig: ScalaJsLinkerSettings
   ): Report = {
     notifications.add(ServerNotification.logInfo("Linking scalajs module...", Some(moduleId), source = Some("scalajs")))
     val config = buildLinkerConfig(jsModuleKind, linkerConfig)
@@ -34,7 +34,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
       outputDir: os.Path,
       moduleInitializers: Seq[ModuleInitializer],
       jsModuleKind: ScalaJsModuleKind,
-      linkerConfig: ScalaJsLinkerConfig
+      linkerConfig: ScalaJsLinkerSettings
   ): Report = {
     notifications.add(ServerNotification.logInfo("Fast-linking scalajs module...", Some(moduleId), source = Some("scalajs")))
     val config = buildLinkerConfig(jsModuleKind, linkerConfig)
@@ -53,7 +53,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
       outputDir: os.Path,
       moduleInitializers: Seq[ModuleInitializer],
       jsModuleKind: ScalaJsModuleKind,
-      linkerConfig: ScalaJsLinkerConfig
+      linkerConfig: ScalaJsLinkerSettings
   ): Report = {
     notifications.add(ServerNotification.logInfo("Full-linking scalajs module...", Some(moduleId), source = Some("scalajs")))
     val config = buildLinkerConfig(jsModuleKind, linkerConfig)
@@ -100,7 +100,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
 
   private def buildLinkerConfig(
       jsModuleKind: ScalaJsModuleKind,
-      cfg: ScalaJsLinkerConfig
+      cfg: ScalaJsLinkerSettings
   ): StandardConfig = {
     val moduleKind = jsModuleKind match {
       case ScalaJsModuleKind.NO_MODULE       => ModuleKind.NoModule
@@ -108,17 +108,17 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
       case ScalaJsModuleKind.COMMONJS_MODULE => ModuleKind.CommonJSModule
     }
 
-    val moduleSplitStyle = cfg.moduleSplitStyle match {
+    val moduleSplitStyle = ScalaJsModuleSplitStyle.valueOf(cfg.moduleSplitStyle) match {
       case ScalaJsModuleSplitStyle.FEWEST_MODULES =>
         ModuleSplitStyle.FewestModules
       case ScalaJsModuleSplitStyle.SMALLEST_MODULES =>
         ModuleSplitStyle.SmallestModules
       case ScalaJsModuleSplitStyle.SMALL_MODULES_FOR =>
-        val pkgs = cfg.smallModulesFor.asScala.toList
+        val pkgs = cfg.smallModulesFor.toList
         ModuleSplitStyle.SmallModulesFor(pkgs)
     }
 
-    val esVersion = cfg.esVersion match {
+    val esVersion = ScalaJsESVersion.valueOf(cfg.esVersion) match {
       case ScalaJsESVersion.ES2015 => ESVersion.ES2015
       case ScalaJsESVersion.ES2016 => ESVersion.ES2016
       case ScalaJsESVersion.ES2017 => ESVersion.ES2017
@@ -136,7 +136,7 @@ class ScalaJsLinker(notifications: ServerNotificationsLogger, moduleId: String)(
 
     val semantics = if (cfg.productionMode) Semantics.Defaults.optimized else Semantics.Defaults
 
-    val relativizeSourceMapBaseOpt = Option(cfg.relativizeSourceMapBase).map { uriStr =>
+    val relativizeSourceMapBaseOpt = cfg.relativizeSourceMapBase.map { uriStr =>
       java.net.URI.create(uriStr)
     }
 

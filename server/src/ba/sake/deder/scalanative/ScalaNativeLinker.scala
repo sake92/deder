@@ -3,39 +3,39 @@ package ba.sake.deder.scalanative
 import ba.sake.deder.{ServerNotification, ServerNotificationsLogger}
 
 import scala.concurrent.ExecutionContext
-import scala.jdk.CollectionConverters.*
 import scala.scalanative.build.*
 import scala.scalanative.util.Scope
-import ba.sake.deder.config.DederProject.ScalaNativeModule
 
-class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: String)(using ExecutionContext) {
+private[scalanative] class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: String)(using
+    ExecutionContext
+) {
 
   /** Config-driven link: applies all user settings verbatim, no overrides. */
   def link(
       nirPaths: Seq[os.Path],
       outputDir: os.Path,
       mainClass: Option[String],
-      nativeModule: ScalaNativeModule
+      settings: ScalaNativeLinkerSettings
   ): os.Path = linkImpl(
     nirPaths = nirPaths,
     outputDir = outputDir,
     mainClass = mainClass,
-    gc = nativeModule.gc.toString,
-    mode = nativeModule.mode.toString,
-    multithreading = nativeModule.multithreading,
-    lto = nativeModule.lto.toString,
-    embedResources = nativeModule.embedResources,
-    linkStubs = nativeModule.linkStubs,
-    check = nativeModule.check,
-    checkFatalWarnings = nativeModule.checkFatalWarnings,
-    optimize = nativeModule.optimize,
-    targetTriple = Option(nativeModule.targetTriple),
-    extraLinkingOptions = nativeModule.nativeLinkingOptions.asScala.toSeq,
-    extraCompileOptions = nativeModule.nativeCompileOptions.asScala.toSeq,
-    extraCOptions = nativeModule.nativeCOptions.asScala.toSeq,
-    extraCppOptions = nativeModule.nativeCppOptions.asScala.toSeq,
-    resourceIncludePatterns = nativeModule.resourceIncludePatterns.asScala.toSeq,
-    resourceExcludePatterns = nativeModule.resourceExcludePatterns.asScala.toSeq,
+    gc = settings.gc,
+    mode = settings.mode,
+    multithreading = settings.multithreading,
+    lto = settings.lto,
+    embedResources = settings.embedResources,
+    linkStubs = settings.linkStubs,
+    check = settings.check,
+    checkFatalWarnings = settings.checkFatalWarnings,
+    optimize = settings.optimize,
+    targetTriple = settings.targetTriple,
+    extraLinkingOptions = settings.nativeLinkingOptions,
+    extraCompileOptions = settings.nativeCompileOptions,
+    extraCOptions = settings.nativeCOptions,
+    extraCppOptions = settings.nativeCppOptions,
+    resourceIncludePatterns = settings.resourceIncludePatterns,
+    resourceExcludePatterns = settings.resourceExcludePatterns,
     label = "Linking"
   )
 
@@ -44,27 +44,27 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
       nirPaths: Seq[os.Path],
       outputDir: os.Path,
       mainClass: Option[String],
-      nativeModule: ScalaNativeModule
+      settings: ScalaNativeLinkerSettings
   ): os.Path = linkImpl(
     nirPaths = nirPaths,
     outputDir = outputDir,
     mainClass = mainClass,
-    gc = nativeModule.gc.toString,
+    gc = settings.gc,
     mode = "debug",
-    multithreading = nativeModule.multithreading,
+    multithreading = settings.multithreading,
     lto = "none",
-    embedResources = nativeModule.embedResources,
-    linkStubs = nativeModule.linkStubs,
-    check = nativeModule.check,
-    checkFatalWarnings = nativeModule.checkFatalWarnings,
-    optimize = nativeModule.optimize,
-    targetTriple = Option(nativeModule.targetTriple),
-    extraLinkingOptions = nativeModule.nativeLinkingOptions.asScala.toSeq,
-    extraCompileOptions = nativeModule.nativeCompileOptions.asScala.toSeq,
-    extraCOptions = nativeModule.nativeCOptions.asScala.toSeq,
-    extraCppOptions = nativeModule.nativeCppOptions.asScala.toSeq,
-    resourceIncludePatterns = nativeModule.resourceIncludePatterns.asScala.toSeq,
-    resourceExcludePatterns = nativeModule.resourceExcludePatterns.asScala.toSeq,
+    embedResources = settings.embedResources,
+    linkStubs = settings.linkStubs,
+    check = settings.check,
+    checkFatalWarnings = settings.checkFatalWarnings,
+    optimize = settings.optimize,
+    targetTriple = settings.targetTriple,
+    extraLinkingOptions = settings.nativeLinkingOptions,
+    extraCompileOptions = settings.nativeCompileOptions,
+    extraCOptions = settings.nativeCOptions,
+    extraCppOptions = settings.nativeCppOptions,
+    resourceIncludePatterns = settings.resourceIncludePatterns,
+    resourceExcludePatterns = settings.resourceExcludePatterns,
     label = "Fast-linking"
   )
 
@@ -73,27 +73,27 @@ class ScalaNativeLinker(notifications: ServerNotificationsLogger, moduleId: Stri
       nirPaths: Seq[os.Path],
       outputDir: os.Path,
       mainClass: Option[String],
-      nativeModule: ScalaNativeModule
+      settings: ScalaNativeLinkerSettings
   ): os.Path = linkImpl(
     nirPaths = nirPaths,
     outputDir = outputDir,
     mainClass = mainClass,
-    gc = nativeModule.gc.toString,
+    gc = settings.gc,
     mode = "release-full",
-    multithreading = nativeModule.multithreading,
+    multithreading = settings.multithreading,
     lto = "full",
-    embedResources = nativeModule.embedResources,
-    linkStubs = nativeModule.linkStubs,
-    check = nativeModule.check,
-    checkFatalWarnings = nativeModule.checkFatalWarnings,
-    optimize = nativeModule.optimize,
-    targetTriple = Option(nativeModule.targetTriple),
-    extraLinkingOptions = nativeModule.nativeLinkingOptions.asScala.toSeq,
-    extraCompileOptions = nativeModule.nativeCompileOptions.asScala.toSeq,
-    extraCOptions = nativeModule.nativeCOptions.asScala.toSeq,
-    extraCppOptions = nativeModule.nativeCppOptions.asScala.toSeq,
-    resourceIncludePatterns = nativeModule.resourceIncludePatterns.asScala.toSeq,
-    resourceExcludePatterns = nativeModule.resourceExcludePatterns.asScala.toSeq,
+    embedResources = settings.embedResources,
+    linkStubs = settings.linkStubs,
+    check = settings.check,
+    checkFatalWarnings = settings.checkFatalWarnings,
+    optimize = settings.optimize,
+    targetTriple = settings.targetTriple,
+    extraLinkingOptions = settings.nativeLinkingOptions,
+    extraCompileOptions = settings.nativeCompileOptions,
+    extraCOptions = settings.nativeCOptions,
+    extraCppOptions = settings.nativeCppOptions,
+    resourceIncludePatterns = settings.resourceIncludePatterns,
+    resourceExcludePatterns = settings.resourceExcludePatterns,
     label = "Full-linking"
   )
 

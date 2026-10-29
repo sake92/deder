@@ -154,6 +154,12 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     category = "Configuration"
   )
 
+  private val compileOrderTask = ConfigValueTask[String](
+    name = "compileOrder",
+    internal = true,
+    execute = ctx => ctx.module.asInstanceOf[JavaModule].compileOrder.name()
+  )
+
   val javacOptionsTask = ConfigValueTask[Seq[String]](
     name = "javacOptions",
     execute = { ctx =>
@@ -721,6 +727,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     .dependsOn(javaSemanticdbVersionTask)
     .dependsOn(scalaSemanticdbVersionTask)
     .dependsOn(semanticdbEnabledTask)
+    .dependsOn(compileOrderTask)
     .withCliReplay { (result, moduleId, logger) =>
       result.diagnostics.foreach { fd =>
         fd.diagnostics.foreach { diag =>
@@ -755,7 +762,8 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
           javacAnnotationProcessors,
           javaSemanticdbVersion,
           scalaSemanticdbVersion,
-          semanticdbEnabled
+          semanticdbEnabled,
+          compileOrderName
         ) = ctx.depResults
         // classes and semanticdb dirs are this task's OWN outputs — derive their paths instead of
         // taking content-hashed dependencies on them (which would make the cache key self-referential).
@@ -849,13 +857,10 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
           scalacOptions ++ allScalacPlugins
             .map(p => s"-Xplugin:${p.toString}") ++ platformSpecificScalacOptions ++ semanticDbScalacOpts
 
-        val compileOrder = (ctx.module: @unchecked) match {
-          case m: JavaModule =>
-            m.compileOrder match {
-              case ConfigCompileOrder.JAVA_THEN_SCALA => CompileOrder.JavaThenScala
-              case ConfigCompileOrder.SCALA_THEN_JAVA => CompileOrder.ScalaThenJava
-              case ConfigCompileOrder.MIXED           => CompileOrder.Mixed
-            }
+        val compileOrder = ConfigCompileOrder.valueOf(compileOrderName) match {
+          case ConfigCompileOrder.JAVA_THEN_SCALA => CompileOrder.JavaThenScala
+          case ConfigCompileOrder.SCALA_THEN_JAVA => CompileOrder.ScalaThenJava
+          case ConfigCompileOrder.MIXED           => CompileOrder.Mixed
         }
 
         val sem = DederGlobals.compileSemaphore
@@ -1193,6 +1198,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     allGeneratedResourcesTask,
     javaHomeTask,
     javaVersionTask,
+    compileOrderTask,
     scalaVersionTask,
     resourcesTask,
     javacOptionsTask,

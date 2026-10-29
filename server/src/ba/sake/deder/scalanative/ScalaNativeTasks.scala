@@ -2,12 +2,96 @@ package ba.sake.deder.scalanative
 
 import java.nio.file.Files
 import scala.util.Properties
+import scala.jdk.CollectionConverters.*
+import ba.sake.tupson.JsonRW
 import scala.concurrent.ExecutionContext.Implicits.global
 import ba.sake.deder.config.DederProject.{DederModule, ModuleType, ScalaNativeModule, ScalaNativeTestModule}
 import ba.sake.deder.testing.{DederTestOptions, DederTestResults, JUnitXmlReportWriter, TestResultsSummary}
 import ba.sake.deder.*
 
 class ScalaNativeTasks(coreTasks: CoreTasks) {
+
+  private val gcTask = configValue[String]("gc")(_.gc.toString)
+  private val modeTask = configValue[String]("mode")(_.mode.toString)
+  private val multithreadingTask = configValue[Boolean]("multithreading")(_.multithreading)
+  private val ltoTask = configValue[String]("lto")(_.lto.toString)
+  private val embedResourcesTask = configValue[Boolean]("embedResources")(_.embedResources)
+  private val linkStubsTask = configValue[Boolean]("linkStubs")(_.linkStubs)
+  private val checkTask = configValue[Boolean]("check")(_.check)
+  private val checkFatalWarningsTask = configValue[Boolean]("checkFatalWarnings")(_.checkFatalWarnings)
+  private val optimizeTask = configValue[Boolean]("optimize")(_.optimize)
+  private val targetTripleTask = configValue[Option[String]]("targetTriple")(m => Option(m.targetTriple))
+  private val nativeLinkingOptionsTask =
+    configValue[Seq[String]]("nativeLinkingOptions")(_.nativeLinkingOptions.asScala.toSeq)
+  private val nativeCompileOptionsTask =
+    configValue[Seq[String]]("nativeCompileOptions")(_.nativeCompileOptions.asScala.toSeq)
+  private val nativeCOptionsTask = configValue[Seq[String]]("nativeCOptions")(_.nativeCOptions.asScala.toSeq)
+  private val nativeCppOptionsTask = configValue[Seq[String]]("nativeCppOptions")(_.nativeCppOptions.asScala.toSeq)
+  private val resourceIncludePatternsTask =
+    configValue[Seq[String]]("resourceIncludePatterns")(_.resourceIncludePatterns.asScala.toSeq)
+  private val resourceExcludePatternsTask =
+    configValue[Seq[String]]("resourceExcludePatterns")(_.resourceExcludePatterns.asScala.toSeq)
+
+  private val linkerConfigTask = TaskBuilder
+    .make[ScalaNativeLinkerSettings](
+      name = "nativeLinkerConfig",
+      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST),
+      internal = true
+    )
+    .dependsOn(gcTask)
+    .dependsOn(modeTask)
+    .dependsOn(multithreadingTask)
+    .dependsOn(ltoTask)
+    .dependsOn(embedResourcesTask)
+    .dependsOn(linkStubsTask)
+    .dependsOn(checkTask)
+    .dependsOn(checkFatalWarningsTask)
+    .dependsOn(optimizeTask)
+    .dependsOn(targetTripleTask)
+    .dependsOn(nativeLinkingOptionsTask)
+    .dependsOn(nativeCompileOptionsTask)
+    .dependsOn(nativeCOptionsTask)
+    .dependsOn(nativeCppOptionsTask)
+    .dependsOn(resourceIncludePatternsTask)
+    .dependsOn(resourceExcludePatternsTask)
+    .build { ctx =>
+      val (
+        gc,
+        mode,
+        multithreading,
+        lto,
+        embedResources,
+        linkStubs,
+        check,
+        checkFatalWarnings,
+        optimize,
+        targetTriple,
+        nativeLinkingOptions,
+        nativeCompileOptions,
+        nativeCOptions,
+        nativeCppOptions,
+        resourceIncludePatterns,
+        resourceExcludePatterns
+      ) = ctx.depResults
+      ScalaNativeLinkerSettings(
+        gc,
+        mode,
+        multithreading,
+        lto,
+        embedResources,
+        linkStubs,
+        check,
+        checkFatalWarnings,
+        optimize,
+        targetTriple,
+        nativeLinkingOptions,
+        nativeCompileOptions,
+        nativeCOptions,
+        nativeCppOptions,
+        resourceIncludePatterns,
+        resourceExcludePatterns
+      )
+    }
 
   val fastNativeLinkTask = CachedTaskBuilder
     .make[String](
@@ -16,11 +100,12 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
+    .dependsOn(linkerConfigTask)
     .build { ctx =>
-      val (classpath, mainClass) = ctx.depResults
+      val (classpath, mainClass, linkerConfig) = ctx.depResults
       os.makeDir.all(ctx.out)
-      buildNativeLink(ctx.module, ctx.notifications, classpath, mainClass, ctx.out) { (linker, nativeModule, mc) =>
-        linker.linkFast(nirPaths = classpath, outputDir = ctx.out, mainClass = mc, nativeModule = nativeModule)
+      buildNativeLink(ctx.module, ctx.notifications, classpath, mainClass, linkerConfig, ctx.out) { (linker, settings, mc) =>
+        linker.linkFast(nirPaths = classpath, outputDir = ctx.out, mainClass = mc, settings = settings)
       }.toString
     }
 
@@ -31,11 +116,12 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
+    .dependsOn(linkerConfigTask)
     .build { ctx =>
-      val (classpath, mainClass) = ctx.depResults
+      val (classpath, mainClass, linkerConfig) = ctx.depResults
       os.makeDir.all(ctx.out)
-      buildNativeLink(ctx.module, ctx.notifications, classpath, mainClass, ctx.out) { (linker, nativeModule, mc) =>
-        linker.linkFull(nirPaths = classpath, outputDir = ctx.out, mainClass = mc, nativeModule = nativeModule)
+      buildNativeLink(ctx.module, ctx.notifications, classpath, mainClass, linkerConfig, ctx.out) { (linker, settings, mc) =>
+        linker.linkFull(nirPaths = classpath, outputDir = ctx.out, mainClass = mc, settings = settings)
       }.toString
     }
 
@@ -47,11 +133,12 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     )
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
+    .dependsOn(linkerConfigTask)
     .build { ctx =>
-      val (classpath, mainClass) = ctx.depResults
+      val (classpath, mainClass, linkerConfig) = ctx.depResults
       os.makeDir.all(ctx.out)
-      buildNativeLink(ctx.module, ctx.notifications, classpath, mainClass, ctx.out) { (linker, nativeModule, mc) =>
-        linker.link(nirPaths = classpath, outputDir = ctx.out, mainClass = mc, nativeModule = nativeModule)
+      buildNativeLink(ctx.module, ctx.notifications, classpath, mainClass, linkerConfig, ctx.out) { (linker, settings, mc) =>
+        linker.link(nirPaths = classpath, outputDir = ctx.out, mainClass = mc, settings = settings)
       }.toString
     }
 
@@ -98,6 +185,23 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     )
 
   val all: Seq[Task[?, ?, ?]] = Seq(
+    gcTask,
+    modeTask,
+    multithreadingTask,
+    ltoTask,
+    embedResourcesTask,
+    linkStubsTask,
+    checkTask,
+    checkFatalWarningsTask,
+    optimizeTask,
+    targetTripleTask,
+    nativeLinkingOptionsTask,
+    nativeCompileOptionsTask,
+    nativeCOptionsTask,
+    nativeCppOptionsTask,
+    resourceIncludePatternsTask,
+    resourceExcludePatternsTask,
+    linkerConfigTask,
     fastNativeLinkTask,
     fullNativeLinkTask,
     nativeLinkTask,
@@ -105,20 +209,28 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
     testNativeTask
   )
 
+  private def configValue[T: JsonRW: Hashable](name: String)(read: ScalaNativeModule => T) =
+    ConfigValueTask[T](
+      name = name,
+      supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST),
+      internal = true,
+      execute = ctx => read(ctx.module.asInstanceOf[ScalaNativeModule])
+    )
+
   private def buildNativeLink(
       module: DederModule,
       notifications: ServerNotificationsLogger,
       classpath: Seq[os.Path],
       mainClass: Option[String],
+      settings: ScalaNativeLinkerSettings,
       outputDir: os.Path
-  )(linkFn: (ScalaNativeLinker, ScalaNativeModule, Option[String]) => os.Path): os.Path = {
+  )(linkFn: (ScalaNativeLinker, ScalaNativeLinkerSettings, Option[String]) => os.Path): os.Path = {
     val effectiveMainClass = module match {
       case _: ScalaNativeTestModule => Some("scala.scalanative.testinterface.TestMain")
       case _                        => mainClass
     }
     val linker = new ScalaNativeLinker(notifications, module.id)
-    val nativeModule = module.asInstanceOf[ScalaNativeModule]
-    linkFn(linker, nativeModule, effectiveMainClass)
+    linkFn(linker, settings, effectiveMainClass)
   }
 }
 
