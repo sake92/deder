@@ -39,7 +39,11 @@ jobs:
         shell: bash -eo pipefail {0}
         run: |
           ./scripts/gen-config-bindings.sh
-          deder exec -t test -m server-test -m test-common-test
+          # Bootstrap with the released server, then test with this branch's Scala runtime.
+          deder exec -t assembly -m test-runner
+          echo "testRunnerLocalPath=$(realpath .deder/out/test-runner/assembly/out.jar)" >> .deder/server.properties
+          deder shutdown && sleep 1
+          deder exec -t test -m server-test -m deder-common-test
           pkl test config/DederProjectTest.pkl
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v6

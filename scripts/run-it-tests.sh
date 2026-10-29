@@ -19,6 +19,11 @@ export DEDER_CLIENT_PATH=$(realpath .deder/out/client/assembly/out.jar)
 export DEDER_SERVER_PATH=$(realpath .deder/out/server/assembly/out.jar)
 export DEDER_TEST_RUNNER_PATH=$(realpath .deder/out/test-runner/assembly/out.jar)
 
+# The outer integration suites also need this branch's Scala runtime, rather
+# than the older runtime bundled in the released bootstrap test runner.
+echo "testRunnerLocalPath=$DEDER_TEST_RUNNER_PATH" >> .deder/server.properties
+deder shutdown && sleep 1
+
 # Publish plugin-api + config with a fixed version so the hello-plugin integration test can resolve them
 # (publishes to DEDER_TMP_M2_REPO when set, otherwise to ~/.m2)
 deder exec -t publishLocal -m config -m plugin-api
