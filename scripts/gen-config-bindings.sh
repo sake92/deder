@@ -9,8 +9,9 @@ echo "Generating Java config bindings from PKL files..."
 TMP_GEN="config/tmp_gen"
 rm -rf "$TMP_GEN"
 
-if [ ! -f pkl-codegen-java ]; then
-    curl -L -o pkl-codegen-java https://github.com/apple/pkl/releases/download/0.30.2/pkl-codegen-java
+PKL_VERSION="0.32.2"
+if [ ! -x pkl-codegen-java ] || [[ "$(./pkl-codegen-java --version)" != "pkl-codegen-java $PKL_VERSION "* ]]; then
+    curl -fL -o pkl-codegen-java "https://github.com/apple/pkl/releases/download/$PKL_VERSION/pkl-codegen-java"
 fi
 chmod +x pkl-codegen-java
 ./pkl-codegen-java config/DederProject.pkl config/DederCredentials.pkl config/DederTpolecat.pkl config/DederTypelevel.pkl \

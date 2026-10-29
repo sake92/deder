@@ -95,7 +95,7 @@ CLI communication uses newline-delimited JSON over Unix sockets. Message types a
 
 ## Conventions
 
-- **Scala 3.7.x** with `os-lib` for filesystem ops, `tupson` for JSON serialization, `mainargs` for CLI parsing
+- **Scala 3.9.0 LTS** (keep Scala on the LTS line for future updates) with `os-lib` for filesystem ops, `tupson` for JSON serialization, `mainargs` for CLI parsing
 - **Logging**: `StrictLogging` trait from scala-logging (backed by Logback)
 - **OpenTelemetry**: tracing spans wrap BSP/CLI requests (`OTEL.TRACER`, see `OTEL.scala`). Use `traced()` / `javaFuture()` wrappers in BSP server
 - **Test framework**: munit for both unit and integration tests

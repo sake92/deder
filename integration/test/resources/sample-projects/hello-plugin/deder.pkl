@@ -9,7 +9,7 @@ modules {
   new ScalaModule {
     root = "."
     id = "hello-plugin"
-    scalaVersion = "3.7.4"
+    scalaVersion = "3.9.0"
     resources { "resources" }
     deps {
       "ba.sake::deder-plugin-api:\(read("env:DEDER_PLUGIN_API_VERSION"))"
