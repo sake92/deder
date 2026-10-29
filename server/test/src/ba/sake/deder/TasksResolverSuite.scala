@@ -245,6 +245,7 @@ class TasksResolverSuite extends munit.FunSuite {
       (s"${moduleId}.finalManifest", s"${moduleId}.version"),
       (s"${moduleId}.jar", s"${moduleId}.compile"),
       (s"${moduleId}.jar", s"${moduleId}.resources"),
+      (s"${moduleId}.jar", s"${moduleId}.allGeneratedResources"),
       (s"${moduleId}.jar", s"${moduleId}.finalManifest"),
       (s"${moduleId}.javadocJar", s"${moduleId}.scalaVersion"),
       (s"${moduleId}.javadocJar", s"${moduleId}.compilerDeps"),

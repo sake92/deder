@@ -23,6 +23,15 @@ class HelloPluginImpl extends DederPluginApi {
         greeting
       }
 
-    Right(Seq(helloTask))
+    val generatedResourceTask = TaskBuilder
+      .make[DederPath](name = "generatedResource", kind = TaskKind.ResourceGenerator)
+      .build { ctx =>
+        val content = os.read(DederGlobals.projectRootDir / "generated-resource.txt")
+        val output = ctx.out / "plugin-generated-resource.txt"
+        os.write.over(output, content, createFolders = true)
+        DederPath(ctx.out)
+      }
+
+    Right(Seq(helloTask, generatedResourceTask))
   }
 }

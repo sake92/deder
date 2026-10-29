@@ -112,11 +112,13 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     .make[DederPath](name = "jar", category = "Publishing")
     .dependsOn(coreTasks.compileTask)
     .dependsOn(coreTasks.resourcesTask)
+    .dependsOn(coreTasks.allGeneratedResourcesTask)
     .dependsOn(finalManifestSettingsTask)
     .build { ctx =>
-      val (localClasspath, resources, manifestEntries) = ctx.depResults
+      val (localClasspath, resources, generatedResources, manifestEntries) = ctx.depResults
       val resultJarPath = ctx.out / s"${ctx.module.id}.jar"
-      val jarInputPaths = Seq(localClasspath.classesDir.absPath) ++ resources.map(_.absPath)
+      val jarInputPaths =
+        Seq(localClasspath.classesDir.absPath) ++ resources.map(_.absPath) ++ generatedResources.map(_.absPath)
       JarUtils.createJar(
         resultJarPath,
         jarInputPaths,

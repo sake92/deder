@@ -1,6 +1,8 @@
 package ba.sake.deder
 
+import java.util.jar.JarFile
 import scala.concurrent.duration.*
+import scala.util.Using
 
 class PluginIntegrationSuite extends BaseIntegrationSuite {
 
@@ -90,6 +92,60 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
       )
       val out2 = res2.out.text() + res2.err.text()
       assert(out2.contains("Hello from typed config!"), s"Expected typed greeting after reload, got: $out2")
+    } finally {
+      executeDederCommand(pluginPath, "shutdown")
+      executeDederCommand(consumerPath, "shutdown")
+    }
+  }
+
+  test("plugin-generated resources are packaged and invalidate JARs and assemblies") {
+    val tempParent = os.pwd / "tmp" / s"generated-resource-packaging-${System.currentTimeMillis()}"
+    val pluginPath = stageSiblingProject(tempParent, "hello-plugin")
+    val consumerPath = stageSiblingProject(tempParent, "hello-plugin-consumer")
+    val expectedInitial = "hello from generated resource\n"
+    val expectedUpdated = "updated generated resource\n"
+
+    try {
+      val publishRes = executeDederCommand(pluginPath, "exec", "-m", "hello-plugin", "-t", "publishLocal")
+      assert(
+        publishRes.exitCode == 0,
+        s"publishLocal failed: exit=${publishRes.exitCode}\nstderr=${publishRes.err.text()}\nstdout=${publishRes.out.text()}"
+      )
+
+      def packagedResource(jar: os.Path): String =
+        Using.resource(new JarFile(jar.toIO)) { jarFile =>
+          val entry = jarFile.getJarEntry("plugin-generated-resource.txt")
+          assert(entry != null, s"generated resource missing from $jar")
+          Using.resource(jarFile.getInputStream(entry)) { stream =>
+            String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
+          }
+        }
+
+      def runPackaged(jar: os.Path): String =
+        os.proc("java", "-jar", jar.toString).call(cwd = consumerPath, stderr = os.Pipe).out.text()
+
+      val jarRes = executeDederCommand(consumerPath, "exec", "-m", "app", "-t", "jar")
+      assert(jarRes.exitCode == 0, s"jar failed: ${jarRes.err.text()}\n${jarRes.out.text()}")
+      val jarPath = consumerPath / ".deder/out/app/jar/app.jar"
+      assertEquals(packagedResource(jarPath), expectedInitial)
+
+      val assemblyRes = executeDederCommand(consumerPath, "exec", "-m", "app", "-t", "assembly")
+      assert(assemblyRes.exitCode == 0, s"assembly failed: ${assemblyRes.err.text()}\n${assemblyRes.out.text()}")
+      val assemblyPath = consumerPath / ".deder/out/app/assembly/out.jar"
+      assertEquals(runPackaged(assemblyPath), expectedInitial)
+
+      os.write.over(consumerPath / "generated-resource.txt", expectedUpdated)
+
+      val updatedJarRes = executeDederCommand(consumerPath, "exec", "-m", "app", "-t", "jar")
+      assert(updatedJarRes.exitCode == 0, s"updated jar failed: ${updatedJarRes.err.text()}\n${updatedJarRes.out.text()}")
+      assertEquals(packagedResource(jarPath), expectedUpdated)
+
+      val updatedAssemblyRes = executeDederCommand(consumerPath, "exec", "-m", "app", "-t", "assembly")
+      assert(
+        updatedAssemblyRes.exitCode == 0,
+        s"updated assembly failed: ${updatedAssemblyRes.err.text()}\n${updatedAssemblyRes.out.text()}"
+      )
+      assertEquals(runPackaged(assemblyPath), expectedUpdated)
     } finally {
       executeDederCommand(pluginPath, "shutdown")
       executeDederCommand(consumerPath, "shutdown")
