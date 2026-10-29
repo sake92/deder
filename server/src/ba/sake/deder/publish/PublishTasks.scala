@@ -175,44 +175,16 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       depsJarPath
     }
 
-  private val shadeRulesFileTask = ConfigValueTask[Option[String]](
+  private val shadeRulesFileTask = SourceFilesTask(
     name = "shadeRulesFile",
-    supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST),
-    internal = true,
-    execute = ctx => Option(ctx.module.asInstanceOf[JavaModule].shadeRulesFile)
-  )
-
-  // Source tasks let watch mode react to rules inside the project. External absolute paths
-  // are still content-hashed by shadeRulesTask on each explicit invocation.
-  private val shadeRulesSourcesTask = SourceFilesTask(
-    name = "shadeRulesSources",
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST),
     internal = true,
     execute = { ctx =>
       val module = ctx.module.asInstanceOf[JavaModule]
-      Option(module.shadeRulesFile).toSeq
-        .map(path => resolveShadeRulesPath(path, module.root))
-        .filter(_.startsWith(DederGlobals.projectRootDir))
-        .map(DederPath(_))
+      val moduleRoot = DederGlobals.projectRootDir / module.root
+      Option(module.shadeRulesFile).toSeq.map(path => DederPath(os.Path(path, moduleRoot)))
     }
   )
-
-  private val shadeRulesTask = TaskBuilder
-    .make[Option[os.Path]](
-      name = "shadeRules",
-      supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST),
-      internal = true
-    )
-    .dependsOn(shadeRulesFileTask)
-    .dependsOn(shadeRulesSourcesTask)
-    .build { ctx =>
-      val (rulesFile, _) = ctx.depResults
-      rulesFile.map(path => resolveShadeRulesPath(path, ctx.module.root))
-    }
-
-  private def resolveShadeRulesPath(path: String, moduleRoot: String): os.Path =
-    if java.nio.file.Paths.get(path).isAbsolute then os.Path(path)
-    else DederGlobals.projectRootDir / moduleRoot / os.RelPath(path)
 
   val assemblyTask = CachedTaskBuilder
     .make[DederPath](
@@ -223,9 +195,9 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     .dependsOn(finalManifestSettingsTask)
     .dependsOn(assemblyDepsTask)
     .dependsOn(allJarsTask)
-    .dependsOn(shadeRulesTask)
+    .dependsOn(shadeRulesFileTask)
     .build { ctx =>
-      val (manifestEntries, assemblyDepsJar, allModulesJars, shadeRulesFile) = ctx.depResults
+      val (manifestEntries, assemblyDepsJar, allModulesJars, shadeRulesFiles) = ctx.depResults
       val t0 = System.currentTimeMillis()
       os.makeDir.all(ctx.out)
       val mergedJar = ctx.out / "mergedJar.jar"
@@ -237,7 +209,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       )
       val resultJarPath = ctx.out / "out.jar"
       
-      val rules = JarUtils.resolveShadeRules(shadeRulesFile.map(_.toString), DederGlobals.projectRootDir)
+      val rules = JarUtils.resolveShadeRules(shadeRulesFiles.headOption.map(_.absPath.toString), DederGlobals.projectRootDir)
       val shadeRulesOpt = Option.when(rules.nonEmpty)(rules)
 
       shadeRulesOpt match {
@@ -574,8 +546,6 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
     allJarsTask,
     assemblyDepsTask,
     shadeRulesFileTask,
-    shadeRulesSourcesTask,
-    shadeRulesTask,
     assemblyTask,
     moduleDepsPomSettingsTask,
     sourcesJarTask,
