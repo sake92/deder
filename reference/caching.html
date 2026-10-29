@@ -49,6 +49,8 @@ for (const link of document.querySelectorAll('body > header > nav > div > a')) {
            <ul>
             <li><a href="#cached-vs-always-run-tasks">Cached vs always-run tasks</a></li>
             <li><a href="#where-cached-data-lives">Where cached data lives</a></li>
+            <li><a href="#task-implementation-versions">Task implementation versions</a></li>
+            <li><a href="#complete-cache-restores">Complete cache restores</a></li>
             <li><a href="#what-invalidates-a-cached-task">What invalidates a cached task</a></li>
             <li><a href="#clearing-the-cache">Clearing the cache</a></li>
            </ul></li>
@@ -80,12 +82,19 @@ for (const link of document.querySelectorAll('body > header > nav > div > a')) {
    <pre><code class="language- hljs language-pkl" data-highlighted="yes">.<span class="hljs-property">deder</span>/<span class="hljs-keyword">out</span>/&lt;<span class="hljs-keyword">module</span>-id&gt;/&lt;task-name&gt;/metadata.<span class="hljs-property">json</span>
 </code></pre>
    <p><code>metadata.json</code> stores the task's stored value, <code>inputsHash</code>, and <code>outputHash</code>.</p>
+   <p>Before a task re-executes, its previous metadata is removed. New metadata is written to a temporary file in the same directory, then published with an atomic move. A failed execution or metadata write leaves no reusable entry from that execution. Temporary files are removed on handled failures; an abrupt process termination can leave an unused temporary file. Artifact writes themselves are not transactional.</p>
+   <h3 id="task-implementation-versions">Task implementation versions<a href="#task-implementation-versions" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p><code>CachedTaskBuilder.withCacheVersion(n)</code> sets a task-specific implementation version. The default, <code>0</code>, preserves the original cache-key calculation and existing entries. Nonzero versions are included in the input hash; changing the version invalidates that task's stored result. Deder's release/build version is not part of this key.</p>
+   <p>Downstream invalidation continues to follow dependency output hashes. A task whose output identity includes its input hash, such as <code>compile</code>, propagates the version change through that identity; an unchanged value-based result can remain reusable downstream.</p>
+   <h3 id="complete-cache-restores">Complete cache restores<a href="#complete-cache-restores" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
+   <p>Cache reuse assumes all cached artifacts were copied or restored completely. Deder does not check artifact presence or contents on cache hits. Missing or manually deleted outputs require cleaning and rebuilding the affected tasks. No output manifests are maintained.</p>
    <h3 id="what-invalidates-a-cached-task">What invalidates a cached task<a href="#what-invalidates-a-cached-task" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <ul>
     <li>Source <strong>file content</strong> change.</li>
     <li>Source <strong>filename</strong> change within a source directory</li>
     <li>Config value change in <code>deder.pkl</code> that the task reads.</li>
     <li>Any dependency task's <code>outputHash</code> changing (propagates up the chain).</li>
+    <li>An explicit task implementation version change.</li>
    </ul>
    <h3 id="clearing-the-cache">Clearing the cache<a href="#clearing-the-cache" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <p><code>deder clean -m &lt;module-id&gt;</code> removes <code>.deder/out/&lt;module&gt;/</code> entirely (all cached artifacts and metadata for that module). Multiple <code>-m</code> flags clean multiple modules:</p>
@@ -102,7 +111,7 @@ deder clean -m mod% -t compile%
    <h3 id="two-task-kinds">Two task kinds<a href="#two-task-kinds" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <ul>
     <li><strong><code>TaskImpl</code></strong> — always executes. Computes <code>outputHash = Hashable[T].hashStr(result)</code> so downstream tasks can detect changes. No <code>inputsHash</code> is stored; <code>changed</code> is always reported as <code>true</code>.</li>
-    <li><strong><code>CachedTask</code></strong> — computes <code>inputsHash = hash(deps' outputHashes joined)</code>. If a <code>metadata.json</code> with the same <code>inputsHash</code> already exists on disk, the stored result is reused; otherwise the task re-executes and writes new metadata. <code>changed = newOutputHash != oldOutputHash</code>. A <code>CachedTask</code> must have at least one dep — enforced at compile time via <code>Deps &lt;:&lt; NonEmptyTuple</code> on <code>CachedTaskBuilder.build</code>.</li>
+    <li><strong><code>CachedTask</code></strong> — computes <code>inputsHash</code> from dependency output hashes, arguments, and an optional task implementation version. If a <code>metadata.json</code> with the same <code>inputsHash</code> already exists on disk, the stored result is reused; otherwise the task re-executes and writes new metadata. <code>changed = newOutputHash != oldOutputHash</code>. A <code>CachedTask</code> must have at least one dep — enforced at compile time via <code>Deps &lt;:&lt; NonEmptyTuple</code> on <code>CachedTaskBuilder.build</code>.</li>
    </ul>
    <h3 id="the-hash-chain">The hash chain<a href="#the-hash-chain" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h3>
    <pre><code class="language- hljs language-isbl" data-highlighted="yes"><span class="hljs-variable">SourceFileTask</span> (<span class="hljs-variable">CachedTask</span> <span class="hljs-variable">leaf</span>) ──► <span class="hljs-variable">outputHash</span> = <span class="hljs-function"><span class="hljs-title">hash</span>(<span class="hljs-variable">file</span> <span class="hljs-variable">contents</span>)</span>
