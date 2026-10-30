@@ -53,16 +53,23 @@ jobs:
           deder shutdown && sleep 1
           deder exec -t test -m server-test -m deder-common-test
           pkl test config/DederProjectTest.pkl
-      - name: Build Windows smoke-test server
+      - name: Build Windows test server
         run: deder exec --log-level warning --no-color -t assembly -m server -m test-runner
-      - name: Upload Windows smoke-test server
+      - name: Upload Windows test server
         uses: actions/upload-artifact@v4
         with:
-          name: windows-smoke-server
+          name: windows-test-server
           include-hidden-files: true
           path: |
             .deder/out/server/assembly/out.jar
             .deder/out/test-runner/assembly/out.jar
+      - name: Upload generated config bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-config-bindings
+          path: |
+            config/src/
+            config/resources/
       - name: Save Deder output cache
         if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.deder-output-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
@@ -130,7 +137,7 @@ jobs:
           path: |
             .deder/logs/server.log
 
-  windows-client:
+  windows-tests:
     needs: [tests]
     runs-on: windows-2025
     steps:
@@ -141,8 +148,13 @@ jobs:
           java-version: 25
       - uses: actions/download-artifact@v4
         with:
-          name: windows-smoke-server
+          name: windows-test-server
           path: bootstrap
+      - name: Download generated config bindings
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-config-bindings
+          path: config
       - uses: MinoruSekine/setup-scoop@v4.0.2
       - name: Install bootstrap client
         shell: pwsh
@@ -168,6 +180,16 @@ jobs:
           # Read the saved analysis as well as writing it.
           echo '// Windows incremental compile smoke test' >> client/src/ba/sake/deder/client/Main.java
           deder exec --log-level warning --no-color -m client -t compile
+      - name: Run all unit tests
+        shell: bash
+        run: deder exec --log-level warning --no-color -t test -m server-test -m deder-common-test
+      - name: Upload Windows unit test reports
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-unit-test-reports
+          include-hidden-files: true
+          path: .deder/out/**/reports/junit/TEST-*.xml
       - name: Stop Deder
         if: always()
         shell: bash
@@ -176,6 +198,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: windows-client-logs
+          name: windows-test-logs
           include-hidden-files: true
           path: .deder/logs/
