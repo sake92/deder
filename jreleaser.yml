@@ -47,15 +47,13 @@ distributions:
         platform: linux-x86_64
       - path: deder-client-osx-aarch_64
         platform: osx-aarch_64
-      # Windows native releases are paused until windows-tests CI passes.
-      # - path: deder-client-windows-x86_64.zip
-      #   platform: windows-x86_64
+      - path: deder-client-windows-x86_64.zip
+        platform: windows-x86_64
     brew:
       active: RELEASE
       formulaName: deder
     scoop:
-      # active: RELEASE
-      active: NEVER
+      active: RELEASE
       packageName: deder
   # doesnt work with FLAT_BINARY
    # winget:
