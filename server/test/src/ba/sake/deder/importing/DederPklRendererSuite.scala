@@ -17,15 +17,15 @@ class DederPklRendererSuite extends FunSuite {
     val rewritten = pklText
       .replaceAll(
         """"https://sake92\.github\.io/deder/config/[^/]+/DederProject\.pkl"""",
-        s""""${configDir / "DederProject.pkl"}""""
+        s""""${(configDir / "DederProject.pkl").toNIO.toUri}""""
       )
       .replaceAll(
         """"https://sake92\.github\.io/deder/config/[^/]+/DederTpolecat\.pkl"""",
-        s""""${configDir / "DederTpolecat.pkl"}""""
+        s""""${(configDir / "DederTpolecat.pkl").toNIO.toUri}""""
       )
       .replaceAll(
         """"https://sake92\.github\.io/deder/config/[^/]+/DederTypelevel\.pkl"""",
-        s""""${configDir / "DederTypelevel.pkl"}""""
+        s""""${(configDir / "DederTypelevel.pkl").toNIO.toUri}""""
       )
     val tmpDir = os.temp.dir()
     try {

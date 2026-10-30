@@ -53,6 +53,23 @@ jobs:
           deder shutdown && sleep 1
           deder exec -t test -m server-test -m deder-common-test
           pkl test config/DederProjectTest.pkl
+      - name: Build Windows test server
+        run: deder exec --log-level warning --no-color -t assembly -m server -m test-runner
+      - name: Upload Windows test server
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-server
+          include-hidden-files: true
+          path: |
+            .deder/out/server/assembly/out.jar
+            .deder/out/test-runner/assembly/out.jar
+      - name: Upload generated config bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-config-bindings
+          path: |
+            config/src/
+            config/resources/
       - name: Save Deder output cache
         if: ${{ success() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.deder-output-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
@@ -119,3 +136,69 @@ jobs:
           name: deder-logs
           path: |
             .deder/logs/server.log
+
+  windows-tests:
+    continue-on-error: true # Report Windows failures without blocking CI or early-access.
+    needs: [tests]
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: 25
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-test-server
+          path: bootstrap
+      - name: Download generated config bindings
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-config-bindings
+          path: config
+      - uses: MinoruSekine/setup-scoop@v4.0.2
+      - name: Install bootstrap client
+        shell: pwsh
+        run: |
+          scoop bucket add sake92 https://github.com/sake92/scoop-bucket.git
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          scoop install deder
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      # Deliberately do not restore .deder/out: exercise a clean compile.
+      - name: Compile client with dependencies on another drive
+        shell: bash
+        run: |
+          project_root="$(cygpath -m "$PWD")"
+          user_home="$(cygpath -m "$USERPROFILE")"
+          test "${project_root:0:2}" != "${user_home:0:2}"
+          export COURSIER_CACHE="$user_home/.cache/deder-windows-smoke"
+          mkdir -p .deder
+          echo "localPath=$project_root/bootstrap/server/assembly/out.jar" >> .deder/server.properties
+          echo "testRunnerLocalPath=$project_root/bootstrap/test-runner/assembly/out.jar" >> .deder/server.properties
+          deder exec --log-level warning --no-color -m client -t assembly
+          test -f .deder/out/client/assembly/out.jar
+          test -f .deder/out/client/compile/zinc/inc_compile.zip
+          # Read the saved analysis as well as writing it.
+          echo '// Windows incremental compile smoke test' >> client/src/ba/sake/deder/client/Main.java
+          deder exec --log-level warning --no-color -m client -t compile
+      - name: Run all unit tests
+        shell: bash
+        run: deder exec --log-level warning --no-color -t test -m server-test -m deder-common-test
+      - name: Upload Windows unit test reports
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-unit-test-reports
+          include-hidden-files: true
+          path: .deder/out/**/reports/junit/TEST-*.xml
+      - name: Stop Deder
+        if: always()
+        shell: bash
+        run: deder shutdown && sleep 1
+      - name: Upload Windows failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-logs
+          include-hidden-files: true
+          path: .deder/logs/
