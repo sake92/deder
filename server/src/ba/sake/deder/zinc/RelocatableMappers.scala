@@ -27,7 +27,10 @@ object RelocatableMappers {
 
   private class RootWriteMapper(d: WriteMapper, root: String) extends WriteMapper {
     private def relative(p: Path): Path =
-      Path.of(RelativePathMarker + Path.of(root).relativize(p).toString)
+      // Windows dependencies and the checkout can live on different drives.
+      // Such paths cannot be relativized and must remain machine-absolute.
+      if p.getRoot != Path.of(root).getRoot then p
+      else Path.of(RelativePathMarker + Path.of(root).relativize(p).toString)
 
     def mapSourceFile(f: VirtualFileRef): VirtualFileRef = d.mapSourceFile(f)
     def mapBinaryFile(f: VirtualFileRef): VirtualFileRef = d.mapBinaryFile(f)
@@ -45,6 +48,7 @@ object RelocatableMappers {
 
   private class RootReadMapper(d: ReadMapper, root: String) extends ReadMapper {
     private def absolute(p: Path): Path = {
+      if p.isAbsolute then return p
       val value = p.toString
       require(value.startsWith(RelativePathMarker), s"Unsupported relative analysis path: $p")
       Path.of(root).resolve(value.stripPrefix(RelativePathMarker))
