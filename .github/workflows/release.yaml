@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (no v prefix!, e.g. 1.2.3)'
+        description: 'Release version (e.g. 1.2.3 or v1.2.3). Try early-access locally first: clean compile, tests, and real builds on Deder or another repo! :D'
         required: true
 
 permissions:
@@ -30,9 +30,11 @@ jobs:
       - name: Version
         id: vars
         shell: bash
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          echo "VERSION=$(echo $VERSION)" >> $GITHUB_OUTPUT
+          VERSION="${VERSION#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --global user.name "GitHub Action"
           git commit -a --allow-empty -m "Releasing version $VERSION"
