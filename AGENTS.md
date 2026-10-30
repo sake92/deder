@@ -115,6 +115,8 @@ All build artifacts go under `.deder/out/<moduleId>/<taskName>/`. Cache metadata
 
 ## Testing
 
+- Keep `server-test` configured with `testParallelism = 1` in `deder.pkl`: suites mutate JVM-wide state such as `DEDER_PROJECT_ROOT_DIR`. Concurrent suites can overwrite or clear another suite's root, causing spurious cache misses and project-load failures. Separate JVM forks (`maxTestForks`) may still run in parallel; passing on a machine with many forks does not prove suites are safe to overlap within one JVM.
+
 - Before making a release and after substantial changes, validate the [early-access release](https://github.com/sake92/deder/releases/tag/early-access) containing those changes on this repository or another real Deder project. Start with a clean compile without reusing `.deder/` outputs or analysis caches, run relevant tests and assemblies, then exercise representative workflows (for example, a no-op rebuild and an incremental rebuild after a source edit). Resolve regressions before releasing.
 - For major changes affecting compilation or bundling, use the newly built Deder artifacts to build the Deder repository itself in a clean directory without reusing `.deder/` outputs or analysis caches. Regenerate config bindings, compile all modules, and build the client, server, and test-runner assemblies.
 

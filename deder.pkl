@@ -181,6 +181,9 @@ local const serverModules =
       }
     }
     testTemplate = (template.asTest()) {
+      // Suites mutate JVM-wide state (for example DEDER_PROJECT_ROOT_DIR).
+      // Keep suites serial within a fork; separate JVM forks can still run in parallel.
+      testParallelism = 1
       deps {
         "org.scalameta::munit:\(versions.munit)"
         "io.opentelemetry:opentelemetry-sdk:\(versions.openTelemetry)"
