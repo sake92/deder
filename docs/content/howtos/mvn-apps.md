@@ -28,6 +28,9 @@ then you can invoke the app from your build like this:
 deder exec -t runMvnApp myapp -- some_additional_args
 ```
 
+Maven applications use the module's configured `javaHome` for their runtime when it is set;
+otherwise they use `java` from `PATH`.
+
 Note that `some_additional_args` will be appended to the `args` defined in the `MvnApp`.
 
 See [examples/mvnApp](https://github.com/sake92/deder/blob/main/examples/mvnApp/deder.pkl) for an even more type-safe example.

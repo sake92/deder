@@ -32,12 +32,13 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
     .dependsOn(mainClassesTask)
     .dependsOn(finalMainClassTask)
     .dependsOn(jvmOptionsTask)
+    .dependsOn(javaHomeTask)
     .build { ctx =>
-      val (runClasspath, discoveredMainClasses, finalMainClass, jvmOptions) = ctx.depResults
+      val (runClasspath, discoveredMainClasses, finalMainClass, jvmOptions, javaHome) = ctx.depResults
       finalMainClass match {
         case Some(mc) =>
           val argfile = Argfile.write(ctx.out, "run", jvmOptions, Classpath(runClasspath), mainClass = mc)
-          val cmd = Seq("java", s"@${argfile}") ++ ctx.args
+          val cmd = Seq(JvmUtils.javaBinary(javaHome), s"@${argfile}") ++ ctx.args
           logger.debug(s"Client should run command: ${cmd}")
           val forkEnv = ctx.module match {
             case m: JavaModule => m.forkEnv.asScala.to(Map)
@@ -64,8 +65,9 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
     .dependsOn(runClasspathTask)
     .dependsOn(mainClassesTask)
     .dependsOn(jvmOptionsTask)
+    .dependsOn(javaHomeTask)
     .build { ctx =>
-      val (runClasspath, discoveredMainClasses, jvmOptions) = ctx.depResults
+      val (runClasspath, discoveredMainClasses, jvmOptions, javaHome) = ctx.depResults
       val selectedMainClass = ctx.args.headOption.getOrElse(
         throw DederException(
           "No main class specified to run. Please provide the main class as an argument. " +
@@ -76,7 +78,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       finalMainClass match {
         case Some(mc) =>
           val argfile = Argfile.write(ctx.out, "run", jvmOptions, Classpath(runClasspath), mainClass = mc)
-          val cmd = Seq("java", s"@${argfile}") ++ ctx.args.tail
+          val cmd = Seq(JvmUtils.javaBinary(javaHome), s"@${argfile}") ++ ctx.args.tail
           logger.debug(s"Client should run command: ${cmd}")
           val forkEnv = ctx.module match {
             case m: JavaModule => m.forkEnv.asScala.to(Map)
@@ -100,8 +102,9 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
     .dependsOn(sourcesTask)
     .dependsOn(scalaVersionTask)
     .dependsOn(jvmOptionsTask)
+    .dependsOn(javaHomeTask)
     .build { ctx =>
-      val (sources, scalaVersion, jvmOptions) = ctx.depResults
+      val (sources, scalaVersion, jvmOptions, javaHome) = ctx.depResults
       val sourcePaths = sources.map(_.absPath).filter(os.exists(_)).map(_.toString)
 
       val userMvnAppsMap: Map[String, DederProject.MvnApp] = ctx.module match {
@@ -136,7 +139,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
           val jars = ctx.dependencyResolver.fetchFiles(dependencies, Some(ctx.notifications))
           logger.info(s"Resolved jars for maven app '${mvnAppName}': ${jars.map(_.toString).mkString(", ")}")
           val argfile = Argfile.write(ctx.out, mvnAppName, jvmOptions, Classpath(jars), mainClass = mainClass, args = args)
-          val cmd = Seq("java", s"@${argfile}") ++ ctx.args.tail
+          val cmd = Seq(JvmUtils.javaBinary(javaHome), s"@${argfile}") ++ ctx.args.tail
           logger.info(s"Running maven app '${mvnAppName}': ${cmd}")
           val forkEnv = ctx.module match {
             case m: JavaModule => m.forkEnv.asScala.to(Map)
@@ -219,9 +222,9 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
             else "scala.tools.nsc.MainGenericRunner"
           val argfile = Argfile.write(ctx.out, "repl", jvmOptions, Classpath(replJars),
             mainClass = mainClass, args = Seq("-classpath", userClasspath))
-          Seq("java", s"@${argfile}") ++ ctx.args
+          Seq(JvmUtils.javaBinary(javaHome), s"@${argfile}") ++ ctx.args
         case _ =>
-          val jshellBin = javaHome.map(h => (h / "bin" / "jshell").toString).getOrElse("jshell")
+          val jshellBin = JvmUtils.jshellBinary(javaHome)
           val userClasspath = runClasspath.map(_.toString).mkString(File.pathSeparator)
           Seq(jshellBin, "--class-path", userClasspath) ++ ctx.args
       }
