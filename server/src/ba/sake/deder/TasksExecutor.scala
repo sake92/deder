@@ -145,6 +145,7 @@ class TasksExecutor(
         case NonFatal(e) =>
           stageSpan.recordException(e)
           stageSpan.setStatus(StatusCode.ERROR)
+          throw e
       } finally stageSpan.end()
     }
 
@@ -161,24 +162,23 @@ class TasksExecutor(
       dependencyResolver: DependencyResolver,
       requestId: String
   ): ExecutionOutcome = {
-    val allTaskDeps = tasksGraph.outgoingEdgesOf(ti).asScala.toSeq
-    val depResults = allTaskDeps.flatMap { depEdge =>
-      val d = tasksGraph.getEdgeTarget(depEdge)
-      val depRes = taskResults(d.id)
-      Option.when(d.module == ti.module)(depRes)
-    }
-    val transitiveResults = getTransitiveResults(ti, taskResults, allTaskDeps)
-    val dependentModulesTree = dependentModulesTreeFor(ti.module)
-
     val taskStartNanos = System.nanoTime()
     val taskSpan = OTEL.TRACER.spanBuilder(ti.id).startSpan()
 
-    DederGlobals.runningTaskThreads
-      .computeIfAbsent(requestId, _ => new ConcurrentLinkedQueue[Thread]())
-      .add(Thread.currentThread())
-
     try {
+      DederGlobals.runningTaskThreads
+        .computeIfAbsent(requestId, _ => new ConcurrentLinkedQueue[Thread]())
+        .add(Thread.currentThread())
+
       Using.resource(taskSpan.makeCurrent()) { scope =>
+        val allTaskDeps = tasksGraph.outgoingEdgesOf(ti).asScala.toSeq
+        val depResults = allTaskDeps.flatMap { depEdge =>
+          val d = tasksGraph.getEdgeTarget(depEdge)
+          val depRes = taskResults(d.id)
+          Option.when(d.module == ti.module)(depRes)
+        }
+        val transitiveResults = getTransitiveResults(ti, taskResults, allTaskDeps)
+        val dependentModulesTree = dependentModulesTreeFor(ti.module)
         val (taskRes, changed, fromCache) = ti.task.executeUnsafe(
           projectConfig, ti.module, depResults, transitiveResults, dependentModulesTree,
           args, watch, serverNotificationsLogger, dependencyResolver
