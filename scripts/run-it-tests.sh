@@ -1,6 +1,59 @@
 #!/bin/bash
 set -euo pipefail
 
+usage() {
+    cat <<'EOF'
+Usage: ./scripts/run-it-tests.sh [--shard jvm-js|native|bsp] [suite-selector]
+
+Run the integration tests, optionally selecting one independent shard. Without
+--shard, run the existing integration and BSP suites in sequence.
+EOF
+}
+
+die() {
+    echo "run-it-tests.sh: $*" >&2
+    echo "Try --help for usage." >&2
+    exit 2
+}
+
+shard=""
+suite_selector=""
+while (($# > 0)); do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --shard)
+            (($# >= 2)) || die "--shard requires one of: jvm-js, native, bsp"
+            [[ -n "$2" ]] || die "--shard requires one of: jvm-js, native, bsp"
+            [[ -z "$shard" ]] || die "--shard may only be specified once"
+            shard="$2"
+            shift 2
+            ;;
+        --*)
+            die "unknown option: $1"
+            ;;
+        *)
+            [[ -z "$suite_selector" ]] || die "only one suite selector may be specified"
+            suite_selector="$1"
+            shift
+            ;;
+    esac
+done
+
+case "$shard" in
+    ""|jvm-js|native|bsp) ;;
+    *) die "invalid shard '$shard'; expected jvm-js, native, or bsp" ;;
+esac
+
+cleanup() {
+    deder shutdown >/dev/null 2>&1 || true
+    sleep 1
+}
+
+trap cleanup EXIT
+
 export DEDER_PLUGIN_API_VERSION="it-test-version"
 export VERSION="$DEDER_PLUGIN_API_VERSION"
 
@@ -28,9 +81,39 @@ deder shutdown && sleep 1
 # (publishes to DEDER_TMP_M2_REPO when set, otherwise to ~/.m2)
 deder exec -t publishLocal -m config -m plugin-api
 
-if [ $# -eq 0 ]; then
-    deder exec -t test -m integration-test
-    deder exec -t test -m bsp-integration-test
-else
-    deder exec -t test -m integration-test $1
-fi
+run_test_task() {
+    local module="$1"
+    shift
+    deder exec -t test -m "$module" "$@"
+}
+
+case "$shard" in
+    jvm-js)
+        selectors=()
+        [[ -z "$suite_selector" ]] || selectors+=("$suite_selector")
+        selectors+=("~ba.sake.deder.ScalaNativeIntegrationSuite")
+        run_test_task integration-test "${selectors[@]}"
+        ;;
+    native)
+        if [[ -n "$suite_selector" ]]; then
+            run_test_task integration-test "$suite_selector"
+        else
+            run_test_task integration-test ba.sake.deder.ScalaNativeIntegrationSuite
+        fi
+        ;;
+    bsp)
+        if [[ -n "$suite_selector" ]]; then
+            run_test_task bsp-integration-test "$suite_selector"
+        else
+            run_test_task bsp-integration-test
+        fi
+        ;;
+    "")
+        if [[ -n "$suite_selector" ]]; then
+            run_test_task integration-test "$suite_selector"
+        else
+            run_test_task integration-test
+            run_test_task bsp-integration-test
+        fi
+        ;;
+esac
