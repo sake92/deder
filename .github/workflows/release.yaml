@@ -49,6 +49,13 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+      - name: Restore Deder output cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .deder/out
+          key: deder-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            deder-${{ runner.os }}-${{ runner.arch }}-
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
@@ -104,6 +111,13 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+      - name: Restore Deder output cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .deder/out
+          key: deder-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            deder-${{ runner.os }}-${{ runner.arch }}-
       - name: Setup GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
@@ -163,6 +177,13 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+      - name: Restore Deder output cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .deder/out
+          key: deder-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            deder-${{ runner.os }}-${{ runner.arch }}-
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
