@@ -1,9 +1,11 @@
 
 # Misc
 
-- rename file in vscode -> old file errors shown..?
+- dogfood .deder/out caching in CI
+
 - publish pkl configs as proper Pkl modules, good for offline/caching
 - init like giter8, autoimport from sbt? maybe a separate "tool" CLI APP, noice
+- import from scala-cli
 - import from other maven effective POM etc
 - import from other mill
 - import from other gradle
@@ -14,7 +16,6 @@
 
 
 ## Plugins
-- add plugin starter github repo
 
 # Caching
 - harden the abstraction
