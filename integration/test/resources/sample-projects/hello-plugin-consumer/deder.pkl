@@ -18,8 +18,9 @@ plugins {
 modules {
   new ScalaModule {
     id = "app"
-    root = "."
+    root = "app"
     scalaVersion = "3.7.4"
-    mainClass = "Main"
+    mainClass = "main"
+    shadeRulesFile = "shade.rules"
   }
 }
