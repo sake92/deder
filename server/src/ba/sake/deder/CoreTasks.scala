@@ -1003,10 +1003,11 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       .dependsOn(scalaVersionTask)
       .dependsOn(scalacOptionsTask)
       .dependsOn(jvmOptionsTask)
+      .dependsOn(javaHomeTask)
       .dependsOn(compileTask)
       .dependsOn(compileClasspathTask)
       .build { ctx =>
-        val (sources, scalaVersion, scalacOptions, jvmOptions, _, compileClasspath) = ctx.depResults
+        val (sources, scalaVersion, scalacOptions, jvmOptions, javaHome, _, compileClasspath) = ctx.depResults
         val semanticdbDir = DederPath(DederGlobals.semanticdbDir(ctx.module.id))
         val dependency = Dependency.make(ScalafixUtils.scalafixDep(scalaVersion), scalaVersion)
         val jars = ctx.dependencyResolver.fetchFiles(Seq(dependency), Some(ctx.notifications))
@@ -1017,7 +1018,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         )
         val argfile = Argfile.write(ctx.out, "scalafix", jvmOptions, Classpath(jars),
           mainClass = "scalafix.cli.Cli", args = scalafixArgs)
-        val cmd = Seq("java", s"@${argfile}")
+        val cmd = Seq(JvmUtils.javaBinary(javaHome), s"@${argfile}")
         logger.info(s"Running scalafix $name: ${cmd}")
         val forkEnv = ctx.module match {
           case m: JavaModule => m.forkEnv.asScala.to(Map)

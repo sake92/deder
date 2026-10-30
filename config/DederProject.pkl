@@ -250,7 +250,7 @@ open class JavaModule extends DederModule {
   javaHome: String?
   /// JVM options to use for running and testing, e.g. "-DXmx2g". These are not used for compilation, which uses `javacOptions` instead.
   jvmOptions: Listing<String> = new Listing {}
-  /// Java version to use for compilation, e.g. "1.8", "11", "17". This is used for setting the `--release` flag during compilation and for selecting the appropriate Java runtime when running the app.
+  /// Java version target for compilation, e.g. "1.8", "11", "17". This sets the `--release` flag; runtime selection is controlled separately by `javaHome`.
   javaVersion: String?
   /// Zinc compile order: controls how Java and Scala sources are ordered during compilation.
   /// `java-then-scala` (default): compile all Java first, then Scala. Standard for most projects.

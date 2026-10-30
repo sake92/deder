@@ -98,7 +98,7 @@ object ForkedTestOrchestrator extends StrictLogging {
         )
       )
 
-    val javaBinary = resolveJavaBinary(javaHome)
+    val javaBinary = JvmUtils.javaBinary(javaHome.map(os.Path(_)), fallbackToEnvironment = true)
     val fullClasspath = buildClasspath(runtimeClasspath)
 
     val showForkTag = effectiveForks > 1
@@ -553,12 +553,6 @@ object ForkedTestOrchestrator extends StrictLogging {
     val testRunnerClasspath = Seq(DederGlobals.projectRootDir / ".deder/test-runner.jar")
     (testRunnerClasspath ++ runtimeClasspath).map(_.toString).mkString(java.io.File.pathSeparator)
   }
-
-  private def resolveJavaBinary(javaHome: Option[String]): String =
-    javaHome
-      .orElse(Option(System.getenv("JAVA_HOME")).filter(_.nonEmpty))
-      .map(home => s"$home/bin/java")
-      .getOrElse("java")
 
   private def withProcessCleanup[T](proc: os.SubProcess)(body: => T): T =
     try body
