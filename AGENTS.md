@@ -115,6 +115,8 @@ All build artifacts go under `.deder/out/<moduleId>/<taskName>/`. Cache metadata
 
 ## Testing
 
+- For major changes affecting compilation or bundling, use the newly built Deder artifacts to build the Deder repository itself in a clean directory without reusing `.deder/` outputs or analysis caches. Regenerate config bindings, compile all modules, and build the client, server, and test-runner assemblies.
+
 **Make a change work in a real/example project FIRST, then write the tests.** When fixing behavior (especially caching/incremental/build-graph changes), build the server and verify the actual behavior against an `examples/` scenario (or another real project) — confirm it does what you intended — *before* writing or tuning integration tests. Don't iterate on a test harness to infer whether the fix works; prove it in a real project, then encode that as a test. (A loose `String.contains` assertion or harness quirk can give false greens — e.g. `"...for compile"` matches `compilerJars`/`compileOnlyDeps`.)
 
 Check @CONTRIBUTING.md for technical details, how to test server, client, test-runner changes locally.  

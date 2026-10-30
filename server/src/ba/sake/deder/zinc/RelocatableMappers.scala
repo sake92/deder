@@ -15,6 +15,8 @@ import xsbti.compile.analysis.{ReadMapper, ReadWriteMappers, Stamp, WriteMapper}
 object RelocatableMappers {
 
   private val Placeholder = "${PROJECT_ROOT}"
+  // Zinc's built-in marker contains snowmen, which Path rejects under an ASCII filesystem encoding.
+  private val RelativePathMarker = "__DEDER_RELATIVE__"
 
   def apply(projectRoot: Path): ReadWriteMappers = {
     val root = projectRoot.toString
@@ -24,12 +26,15 @@ object RelocatableMappers {
   }
 
   private class RootWriteMapper(d: WriteMapper, root: String) extends WriteMapper {
+    private def relative(p: Path): Path =
+      Path.of(RelativePathMarker + Path.of(root).relativize(p).toString)
+
     def mapSourceFile(f: VirtualFileRef): VirtualFileRef = d.mapSourceFile(f)
     def mapBinaryFile(f: VirtualFileRef): VirtualFileRef = d.mapBinaryFile(f)
     def mapProductFile(f: VirtualFileRef): VirtualFileRef = d.mapProductFile(f)
-    def mapOutputDir(p: Path): Path = d.mapOutputDir(p)
-    def mapSourceDir(p: Path): Path = d.mapSourceDir(p)
-    def mapClasspathEntry(p: Path): Path = d.mapClasspathEntry(p)
+    def mapOutputDir(p: Path): Path = relative(p)
+    def mapSourceDir(p: Path): Path = relative(p)
+    def mapClasspathEntry(p: Path): Path = relative(p)
     def mapJavacOption(o: String): String = o.replace(root, Placeholder)
     def mapScalacOption(o: String): String = o.replace(root, Placeholder)
     def mapProductStamp(f: VirtualFileRef, s: Stamp): Stamp = d.mapProductStamp(f, s)
@@ -39,12 +44,18 @@ object RelocatableMappers {
   }
 
   private class RootReadMapper(d: ReadMapper, root: String) extends ReadMapper {
+    private def absolute(p: Path): Path = {
+      val value = p.toString
+      require(value.startsWith(RelativePathMarker), s"Unsupported relative analysis path: $p")
+      Path.of(root).resolve(value.stripPrefix(RelativePathMarker))
+    }
+
     def mapSourceFile(f: VirtualFileRef): VirtualFileRef = d.mapSourceFile(f)
     def mapBinaryFile(f: VirtualFileRef): VirtualFileRef = d.mapBinaryFile(f)
     def mapProductFile(f: VirtualFileRef): VirtualFileRef = d.mapProductFile(f)
-    def mapOutputDir(p: Path): Path = d.mapOutputDir(p)
-    def mapSourceDir(p: Path): Path = d.mapSourceDir(p)
-    def mapClasspathEntry(p: Path): Path = d.mapClasspathEntry(p)
+    def mapOutputDir(p: Path): Path = absolute(p)
+    def mapSourceDir(p: Path): Path = absolute(p)
+    def mapClasspathEntry(p: Path): Path = absolute(p)
     def mapJavacOption(o: String): String = o.replace(Placeholder, root)
     def mapScalacOption(o: String): String = o.replace(Placeholder, root)
     def mapProductStamp(f: VirtualFileRef, s: Stamp): Stamp = d.mapProductStamp(f, s)
