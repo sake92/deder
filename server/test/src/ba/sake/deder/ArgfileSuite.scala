@@ -13,11 +13,8 @@ class ArgfileSuite extends munit.FunSuite {
     assert(file.last.contains("run-jvm-opts"), s"filename should contain 'run-jvm-opts'")
 
     val content = os.read(file)
-    val expected =
-      """|-Dfoo=bar
-         |-Xmx2g
-         |-cp
-         |/a.jar:/b.jar""".stripMargin
+    val expectedClasspath = Seq(p("/a.jar"), p("/b.jar")).mkString(java.io.File.pathSeparator)
+    val expected = s"-Dfoo=bar\n-Xmx2g\n-cp\n$expectedClasspath"
     assertEquals(content, expected)
   }
 
@@ -27,9 +24,8 @@ class ArgfileSuite extends munit.FunSuite {
     val file = Argfile.write(dir, "scalafix", Seq.empty, cp)
 
     val content = os.read(file)
-    val expected =
-      """|-cp
-         |/x.jar:/y.jar""".stripMargin
+    val expectedClasspath = Seq(p("/x.jar"), p("/y.jar")).mkString(java.io.File.pathSeparator)
+    val expected = s"-cp\n$expectedClasspath"
     assertEquals(content, expected)
   }
 

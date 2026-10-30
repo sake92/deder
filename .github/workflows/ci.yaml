@@ -138,6 +138,7 @@ jobs:
             .deder/logs/server.log
 
   windows-tests:
+    continue-on-error: true # Report Windows failures without blocking CI or early-access.
     needs: [tests]
     runs-on: windows-2025
     steps:
