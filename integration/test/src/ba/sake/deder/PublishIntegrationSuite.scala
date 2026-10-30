@@ -21,6 +21,16 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
 
   // --- shared-server tests (6 tests, no mutations to the fixture) ---
 
+  test("publish should warn and succeed when all selected modules have publishing disabled") {
+    val result = executeDederCommand(projectPath, "exec", "-t", "publish")
+    assertEquals(result.exitCode, 0)
+    val err = result.err.text()
+    assert(err.contains(
+      "All selected modules were skipped because publish = false. Set publish = true in deder.pkl to enable publishing."
+    ))
+    assert(!err.contains("No 'publish' tasks found"), s"disabled publishing should be a warning, got: $err")
+  }
+
   test("deder should make publishArtifacts") {
     executeDederCommand(projectPath, "exec", "-m", "lib1", "-t", "publishArtifacts").out.text()
     locally {

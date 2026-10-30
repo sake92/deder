@@ -13,6 +13,7 @@ import com.typesafe.scalalogging.StrictLogging
 import io.opentelemetry.api.trace.StatusCode
 import scala.jdk.CollectionConverters.*
 import ba.sake.deder.config.{ConfigParser, DederProject}
+import ba.sake.deder.config.DederProject.JavaModule
 import ba.sake.deder.cli.TabCompleter
 import ba.sake.deder.deps.{DependencyResolver, DependencyResolverApi}
 import ba.sake.deder.plugin.{LoadedPlugin, PluginLoader, PluginLoaderApi}
@@ -83,6 +84,20 @@ class DederProjectState(
         }
       else current
     }
+
+  private def allSelectedModulesHavePublishingDisabled(
+      state: DederProjectStateData,
+      moduleIds: Seq[String],
+      taskName: String
+  ): Boolean =
+    (taskName == "publish" || taskName == "publishLocal") &&
+      moduleIds.nonEmpty &&
+      moduleIds.forall { moduleId =>
+        state.tasksResolver.modulesMap.get(moduleId).exists {
+          case module: JavaModule => !module.publish
+          case _                  => false
+        }
+      }
 
   private def readCurrentOrLastGood: Either[String, DederProjectStateData] =
     stateLock.synchronized { current.orElse(lastGood) }
@@ -222,13 +237,26 @@ class DederProjectState(
         serverNotificationsLogger.add(ServerNotification.logError(msg, source = Some("server-cli")))
         serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
       case Right(moduleIds) =>
+        val allSelectedModulesPublishDisabled =
+          allSelectedModulesHavePublishingDisabled(state, moduleIds, taskName)
         val relevantModuleAndTasks = state.executionPlanner.getTaskInstances(moduleIds, taskName) match {
           case Left(recommendations) =>
-            val msg =
-              if recommendations.isEmpty then s"No '${taskName}' tasks found"
-              else s"No '${taskName}' tasks found, did you mean: ${recommendations.mkString(", ")} ?"
-            serverNotificationsLogger.add(ServerNotification.logError(msg, source = Some("server-cli")))
-            serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
+            if allSelectedModulesPublishDisabled then {
+              serverNotificationsLogger.add(
+                ServerNotification.logWarning(
+                  "All selected modules were skipped because publish = false. Set publish = true in deder.pkl to enable publishing.",
+                  source = Some("server-cli")
+                )
+              )
+              if exitOnEnd then serverNotificationsLogger.add(ServerNotification.RequestFinished(success = true))
+              return
+            } else {
+              val msg =
+                if recommendations.isEmpty then s"No '${taskName}' tasks found"
+                else s"No '${taskName}' tasks found, did you mean: ${recommendations.mkString(", ")} ?"
+              serverNotificationsLogger.add(ServerNotification.logError(msg, source = Some("server-cli")))
+              serverNotificationsLogger.add(ServerNotification.RequestFinished(success = false))
+            }
             Seq.empty
           case Right(values) =>
             val plural = if values.size > 1 then "s" else ""
