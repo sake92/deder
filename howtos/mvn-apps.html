@@ -70,6 +70,7 @@ for (const link of document.querySelectorAll('body > header > nav > div > a')) {
    <p>then you can invoke the app from your build like this:</p>
    <pre><code class="language-shell hljs" data-highlighted="yes">deder exec -t runMvnApp myapp -- some_additional_args
 </code></pre>
+   <p>Maven applications use the module's configured <code>javaHome</code> for their runtime when it is set; otherwise they use <code>java</code> from <code>PATH</code>.</p>
    <p>Note that <code>some_additional_args</code> will be appended to the <code>args</code> defined in the <code>MvnApp</code>.</p>
    <p>See <a href="https://github.com/sake92/deder/blob/main/examples/mvnApp/deder.pkl">examples/mvnApp</a> for an even more type-safe example.</p>
    <div role="group">
