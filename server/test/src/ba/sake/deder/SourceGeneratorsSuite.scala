@@ -124,7 +124,7 @@ class SourceGeneratorsSuite extends munit.FunSuite {
     val tasksRegistry = TasksRegistry(coreTasks.all ++ Seq(gen, fanIn))
     val pool = java.util.concurrent.Executors.newFixedThreadPool(4)
     try {
-      val state =
+      val state = ProjectContext.run(ProjectContext(testProjectDir)) {
         DederProjectState(
           coreTasks,
           runTasks,
@@ -138,9 +138,9 @@ class SourceGeneratorsSuite extends munit.FunSuite {
           0L,
           () => (),
           configFile = testProjectDir / "deder.pkl",
-          projectContext = ProjectContext(testProjectDir),
           internals = noopInternals
         )
+      }
       val notif = new ServerNotificationsLogger(_ => ())
       val results = ProjectContext.run(ProjectContext(testProjectDir)) {
         state.executeTasks(

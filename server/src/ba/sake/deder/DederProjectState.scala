@@ -23,6 +23,7 @@ import ba.sake.deder.scalajs.ScalaJsTasks
 import ba.sake.deder.scalanative.ScalaNativeTasks
 import ba.sake.deder.graalvm.GraalVmNativeImageTasks
 import ba.sake.deder.publish.PublishTasks
+import ox.*
 
 class DederProjectState(
     coreTasks: CoreTasks,
@@ -37,7 +38,6 @@ class DederProjectState(
     cancelGracePeriodMs: Long,
     onShutdown: () => Unit,
     configFile: os.Path,
-    projectContext: ProjectContext,
     val internals: DederProjectInternalsImpl
 ) extends StrictLogging {
 
@@ -70,11 +70,12 @@ class DederProjectState(
   def setReleaseServerLock(cb: () => Unit): Unit = { releaseServerLockCallback = cb }
   def releaseServerLock(): Unit = releaseServerLockCallback()
 
-  ProjectContext.run(projectContext) {
-    reloadProject()
-    scheduleInactiveShutdownChecker()
-    scheduleProjectRootChecker()
-  }
+  reloadProject()
+
+  /** Start server-owned background workers in the startup project scope. */
+  def startBackgroundWorkers()(using Ox): Unit =
+    forkUserDiscard { runInactiveShutdownChecker() }
+    forkUserDiscard { runProjectRootChecker() }
 
   def readState(useLastGood: Boolean): Either[String, DederProjectStateData] =
     stateLock.synchronized {
@@ -737,66 +738,52 @@ class DederProjectState(
       case (0, f)           => s"🔴 All $f ${item}s failed. $sizeStr freed"
       case (s, f)           => s"✅ Cleaned $s ${item}s, $f ${item}s failed. $sizeStr freed"
 
-  private def scheduleInactiveShutdownChecker(): Unit = {
-    Thread
-      .ofVirtual()
-      .name("inactivity-checker")
-      .start(() =>
-        ProjectContext.run(projectContext) {
-          var running = true
-          while (running && !shutdownStarted) {
-            try {
-              Thread.sleep(TimeUnit.MINUTES.toMillis(1))
-              if (inFlightRequests.get() == 0) {
-                val now = Instant.now()
-                val lastEnded = lastRequestEndedAt.get()
-                val inactiveDuration = Duration.between(lastEnded, now)
-                if (inactiveDuration.compareTo(maxInactiveDuration) > 0) {
-                  logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
-                  shutdown()
-                  running = false
-                }
-              }
-            } catch {
-              case _: InterruptedException => running = false
-              case NonFatal(e) =>
-                logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
-            }
+  private def runInactiveShutdownChecker(): Unit = {
+    var running = true
+    while (running && !shutdownStarted) {
+      try {
+        Thread.sleep(TimeUnit.MINUTES.toMillis(1))
+        if (inFlightRequests.get() == 0) {
+          val now = Instant.now()
+          val lastEnded = lastRequestEndedAt.get()
+          val inactiveDuration = Duration.between(lastEnded, now)
+          if (inactiveDuration.compareTo(maxInactiveDuration) > 0) {
+            logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
+            shutdown()
+            running = false
           }
         }
-      )
+      } catch {
+        case _: InterruptedException => running = false
+        case NonFatal(e) =>
+          logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
+      }
+    }
   }
 
   /** Checks periodically whether the project root directory still exists (e.g. the folder was deleted, or a git
     * worktree was removed). If it's gone, the server is useless — its sockets, lock file and watcher all live under the
     * deleted root — so log the reason and shut down cleanly, instead of lingering until the idle timeout.
     */
-  private def scheduleProjectRootChecker(): Unit = {
-    Thread
-      .ofVirtual()
-      .name("project-root-checker")
-      .start(() =>
-        ProjectContext.run(projectContext) {
-          var running = true
-          while (running && !shutdownStarted) {
-            try {
-              Thread.sleep(TimeUnit.SECONDS.toMillis(10))
-              val projectRoot = DederGlobals.projectRootDir
-              if !os.exists(projectRoot) then {
-                val msg = s"Project root directory '$projectRoot' was deleted or moved. Shutting down server."
-                logger.warn(msg)
-                System.err.println(msg)
-                shutdown()
-                running = false
-              }
-            } catch {
-              case _: InterruptedException => running = false
-              case NonFatal(e) =>
-                logger.error(s"Error during project root checker: ${e.getMessage}")
-            }
-          }
+  private def runProjectRootChecker(): Unit = {
+    var running = true
+    while (running && !shutdownStarted) {
+      try {
+        Thread.sleep(TimeUnit.SECONDS.toMillis(10))
+        val projectRoot = DederGlobals.projectRootDir
+        if !os.exists(projectRoot) then {
+          val msg = s"Project root directory '$projectRoot' was deleted or moved. Shutting down server."
+          logger.warn(msg)
+          System.err.println(msg)
+          shutdown()
+          running = false
         }
-      )
+      } catch {
+        case _: InterruptedException => running = false
+        case NonFatal(e) =>
+          logger.error(s"Error during project root checker: ${e.getMessage}")
+      }
+    }
   }
 
   def triggerFileWatchedTasks(changedPaths: Set[os.Path]): Unit = {
@@ -840,6 +827,7 @@ class DederProjectState(
       }
       if affected then {
         val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
+        val projectContext = ProjectContext.requireCurrent
         Thread
           .ofVirtual()
           .start(() =>
@@ -905,6 +893,7 @@ class DederProjectState(
           s"Config value dependencies of watched task ${watchedTask.taskInstance.id} have changed, re-executing..."
         )
         val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
+        val projectContext = ProjectContext.requireCurrent
         Thread
           .ofVirtual()
           .start(() =>

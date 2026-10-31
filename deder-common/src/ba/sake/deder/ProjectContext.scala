@@ -21,7 +21,5 @@ object ProjectContext {
 
   /** Runs code in a fresh Ox scope with the supplied project context. */
   def run[T](context: ProjectContext)(f: Ox ?=> T): T =
-    ox.supervised {
-      current.supervisedWhere(Some(context))(f)
-    }
+    current.supervisedWhere(Some(context))(f)
 }

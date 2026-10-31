@@ -23,7 +23,7 @@ class DederCliServer(projectState: DederProjectState, projectContext: ProjectCon
 
   private var serverChannel: ServerSocketChannel = uninitialized
 
-  def start(): Unit = ProjectContext.run(projectContext) {
+  def start(): Unit = {
 
     val relativeSocketPath = ".deder/server-cli.sock"
     val socketPath = DederGlobals.projectRootDir / os.RelPath(relativeSocketPath)
@@ -56,6 +56,9 @@ class DederCliServer(projectState: DederProjectState, projectContext: ProjectCon
           .start(() => ProjectContext.run(projectContext)(clientReadRunner.run()))
         // no join, just let them run
       }
+    } catch {
+      case _: AsynchronousCloseException if !serverChannel.isOpen =>
+        // stopAccepting/stop closes the blocking accept socket during normal shutdown.
     } finally {
       stop()
     }

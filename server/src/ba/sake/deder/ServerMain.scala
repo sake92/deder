@@ -23,6 +23,7 @@ import ba.sake.deder.bsp.DederBspProxyServer
 import ba.sake.deder.publish.PublishTasks
 import ba.sake.deder.graalvm.GraalVmNativeImageTasks
 import ba.sake.deder.config.ConfigParser
+import ox.*
 
 object ServerMain extends StrictLogging {
 
@@ -166,9 +167,9 @@ object ServerMain extends StrictLogging {
         cfg.cancelGracePeriodMs,
         onShutdown,
         configFile = DederGlobals.projectRootDir / "deder.pkl",
-        projectContext = ProjectContext.requireCurrent,
         internals = internals
       )
+      projectState.startBackgroundWorkers()
       internals.cancelFn = projectState.cancelRequest
       internals.purgeCachesFn = () => projectState.purgeInMemoryCachesImpl()
       internals.projectState = Some(projectState)
@@ -229,15 +230,14 @@ object ServerMain extends StrictLogging {
       }))
 
       cliServer = DederCliServer(projectState, ProjectContext.requireCurrent)
-      // Platform thread — root accept loop keeping the JVM alive
-      val cliServerThread = new Thread(() => ProjectContext.run(projectContext) { cliServer.nn.start() }, "DederCliServer")
-      cliServerThread.start()
+      // Keep the CLI accept loop in the startup scope. A raw Thread created from
+      // this scope would inherit the virtual fork's daemon status and not keep the
+      // server process alive after the startup body returns.
+      forkUserDiscard { cliServer.nn.start() }
 
-      // Platform thread — root accept loop keeping the JVM alive
       if bspEnabled then {
         bspProxyServer = DederBspProxyServer(coreTasks, runTasks, scalaJsTasks, scalaNativeTasks, projectState, ProjectContext.requireCurrent)
-        val bspProxyServerThread = new Thread(() => ProjectContext.run(projectContext) { bspProxyServer.nn.start() }, "DederBspProxyServer")
-        bspProxyServerThread.start()
+        forkUserDiscard { bspProxyServer.nn.start() }
       }
 
       logger.info("Deder server started.")
@@ -297,7 +297,6 @@ object ServerMain extends StrictLogging {
       )
       watcherThread.setDaemon(true)
       watcherThread.start()
-      watcherThread.join()
     }
   }
 

@@ -45,7 +45,8 @@ class ConcurrencySuite extends munit.FunSuite {
     tasksRegistry.add(task1)
     val dederExecutorService = java.util.concurrent.Executors.newFixedThreadPool(8)
 
-    val state = DederProjectState(
+    val state = ProjectContext.run(activeProjectContext) {
+      DederProjectState(
       coreTasks,
       runTasks,
       publishTasks,
@@ -58,9 +59,9 @@ class ConcurrencySuite extends munit.FunSuite {
       0L,
       () => (),
       configFile = testProjectDir / "deder.pkl",
-      projectContext = activeProjectContext,
       internals = noopInternals
-    )
+      )
+    }
     val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
     // simulate clients calling "task1" concurrently
     val clientsCount = 10
@@ -110,7 +111,8 @@ class ConcurrencySuite extends munit.FunSuite {
     tasksRegistry.add(task1)
     tasksRegistry.add(task2)
     val dederExecutorService = java.util.concurrent.Executors.newFixedThreadPool(8)
-    val state = DederProjectState(
+    val state = ProjectContext.run(activeProjectContext) {
+      DederProjectState(
       coreTasks,
       runTasks,
       publishTasks,
@@ -123,9 +125,9 @@ class ConcurrencySuite extends munit.FunSuite {
       0L,
       () => (),
       configFile = testProjectDir / "deder.pkl",
-      projectContext = activeProjectContext,
       internals = noopInternals
-    )
+      )
+    }
     val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
     // simulate clients calling random tasks concurrently
     val taskNames = Seq("compile", "sources", "javacOptions")
@@ -168,7 +170,8 @@ class ConcurrencySuite extends munit.FunSuite {
       }
     tasksRegistry.add(slowTask)
 
-    val state = DederProjectState(
+    val state = ProjectContext.run(activeProjectContext) {
+      DederProjectState(
       coreTasks,
       runTasks,
       publishTasks,
@@ -181,9 +184,9 @@ class ConcurrencySuite extends munit.FunSuite {
       0L,
       () => (),
       configFile = testProjectDir / "deder.pkl",
-      projectContext = activeProjectContext,
       internals = noopInternals
-    )
+      )
+    }
     val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
 
     val requestId1 = UUID.randomUUID().toString
@@ -249,7 +252,8 @@ class ConcurrencySuite extends munit.FunSuite {
       }
     tasksRegistry.add(slowTask)
 
-    val state = DederProjectState(
+    val state = ProjectContext.run(activeProjectContext) {
+      DederProjectState(
       coreTasks,
       runTasks,
       publishTasks,
@@ -262,9 +266,9 @@ class ConcurrencySuite extends munit.FunSuite {
       0L,
       () => (),
       configFile = testProjectDir / "deder.pkl",
-      projectContext = activeProjectContext,
       internals = noopInternals
-    )
+      )
+    }
     val serverNotificationsLogger = new ServerNotificationsLogger(_ => ())
 
     val requestId1 = UUID.randomUUID().toString
