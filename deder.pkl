@@ -223,9 +223,9 @@ local const integrationTestSupport = new ScalaModule {
   }
 }
 
-local const integrationTest = new ScalaTestModule {
-  id = "integration-test"
-  root = "integration/test"
+local const function integrationTestModule(moduleId: String, moduleRoot: String): ScalaTestModule = new {
+  id = moduleId
+  root = moduleRoot
   scalaVersion = scalaVer
   moduleDeps { serverModules.main; integrationTestSupport }
   deps {
@@ -239,6 +239,13 @@ local const integrationTest = new ScalaTestModule {
     enabled = true
   }
 }
+
+local const jvmIntegrationTest = integrationTestModule("jvm-integration-test", "integration/jvm-test")
+local const scalaJsIntegrationTest = integrationTestModule("scalajs-integration-test", "integration/scalajs-test")
+local const scalaNativeIntegrationTest = integrationTestModule(
+  "scalanative-integration-test",
+  "integration/scalanative-test"
+)
 
 local const bspIntegrationTest = new ScalaTestModule {
   id = "bsp-integration-test"
@@ -265,6 +272,8 @@ modules {
   ...serverModules.all
   client
   integrationTestSupport
-  integrationTest
+  jvmIntegrationTest
+  scalaJsIntegrationTest
+  scalaNativeIntegrationTest
   bspIntegrationTest
 }
