@@ -60,196 +60,198 @@ object ServerMain extends StrictLogging {
           projectRootDir
       }
     val projectRoot = os.Path(realProjectDir)
-    System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
 
-    // Tee stdout/stderr so test output reaches CLI clients
-    System.setOut(TeePrintStream(System.out, isStdErr = false))
-    System.setErr(TeePrintStream(System.err, isStdErr = true))
+    ProjectContext.run(ProjectContext(projectRoot)) {
+      val projectContext = ProjectContext.requireCurrent
+      // Tee stdout/stderr so test output reaches CLI clients
+      System.setOut(TeePrintStream(System.out, isStdErr = false))
+      System.setErr(TeePrintStream(System.err, isStdErr = true))
 
-    acquireServerLock(projectRoot)
+      acquireServerLock(projectRoot)
 
-    val propFile = projectRoot / ".deder/server.properties"
-    val props = new ju.Properties()
-    if (os.exists(propFile) && os.isFile(propFile)) {
-      Using.resource(os.read.inputStream(propFile))(props.load)
-    }
+      val propFile = projectRoot / ".deder/server.properties"
+      val props = new ju.Properties()
+      if (os.exists(propFile) && os.isFile(propFile)) {
+        Using.resource(os.read.inputStream(propFile))(props.load)
+      }
 
-    val cfg = ServerProperties.from(props)
-    DederGlobals.setForkTestFlushIntervalMs(cfg.forkTestFlushIntervalMs)
-    LoggingUtils.configureLogging(cfg)
+      val cfg = ServerProperties.from(props)
+      DederGlobals.setForkTestFlushIntervalMs(cfg.forkTestFlushIntervalMs)
+      LoggingUtils.configureLogging(cfg)
 
-    val watchDebounceMs = cfg.watchDebounceMillis
+      val watchDebounceMs = cfg.watchDebounceMillis
 
-    // Early parse of deder.pkl for boot-time project settings (bspEnabled, maxActiveCompilers, maxConcurrentTestForks).
-    // Fall back to sensible defaults if parsing fails — the server must always boot.
-    val cpus = Runtime.getRuntime.availableProcessors()
-    val (bspEnabled, maxActiveCompilers, maxConcurrentTestForks) =
-      val dederFile = DederPath(os.SubPath("deder.pkl")).absPath
-      if os.exists(dederFile) && os.isFile(dederFile) then
-        val parser = ConfigParser(writeJson = false)
-        parser.parse(dederFile) match {
-          case Right(project) =>
-            // Java primitives are auto-unboxed to Scala types — no null possible
-            val bsp = project.bspEnabled
-            val compilers = if project.maxActiveCompilers <= 0 then cpus else project.maxActiveCompilers.toInt
-            val forks = if project.maxConcurrentTestForks <= 0 then cpus else project.maxConcurrentTestForks.toInt
-            (bsp, compilers, forks)
-          case Left(error) =>
-            logger.warn(s"Failed to parse deder.pkl for boot settings, using defaults: $error")
-            (true, cpus, cpus)
-        }
-      else
-        (true, cpus, cpus)
-
-    DederGlobals.setCompileSemaphore(maxActiveCompilers)
-    DederGlobals.setTestForkSemaphore(maxConcurrentTestForks)
-
-    // Use the global OTEL instance for metrics.
-    // Export is handled externally (OTEL Java agent, env vars, etc.).
-    val metricsMeter = GlobalOpenTelemetry.get().getMeter("deder-server")
-    val cacheStatsRegistry = CacheStatsRegistry()
-    val internals = DederProjectInternalsImpl(metricsMeter, cacheStatsRegistry)
-
-
-
-    // Must be declared before onShutdown to avoid forward reference error (var, not val)
-    var cliServer: DederCliServer | Null = null
-    var bspProxyServer: DederBspProxyServer | Null = null
-
-    val onShutdown: () => Unit = () => {
-      logger.info("Deder server is shutting down...")
-
-      // 1. Stop file watcher and debounce scheduler (prevents events during shutdown)
-      stopFileWatcher()
-      stopDebounceScheduler()
-
-      // 2. Release server lock (may already be released via early callback — idempotent)
-      logger.info("Releasing server lock...")
-      CloseUtils.quietly(serverFileLock.release())
-      CloseUtils.quietly(serverLockHandle.close())
-
-      // 3. Close sockets so new connections go to the new server process
-      if (cliServer != null) cliServer.nn.stop()
-      if bspProxyServer != null then bspProxyServer.stop()
-
-      logger.info("Server shutdown complete.")
-      sys.exit(0)
-    }
-
-    val configFile = projectRoot / "deder.pkl"
-    if !os.exists(configFile) || !os.isFile(configFile) then
-      logger.warn(
-        s"No deder.pkl found at '${configFile}'. Create a deder.pkl configuration file in your project root to get started."
-      )
-
-    val coreTasks = CoreTasks(cacheStatsRegistry)
-    val runTasks = RunTasks(coreTasks)
-    val publishTasks = PublishTasks(coreTasks)
-    val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)
-    val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
-    val graalvmNativeImageTasks = GraalVmNativeImageTasks(coreTasks)
-
-    val allTasks =
-      coreTasks.all ++ runTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
-    val tasksRegistry = TasksRegistry(allTasks)
-    val projectState = DederProjectState(
-      coreTasks,
-      runTasks,
-      publishTasks,
-      scalaJsTasks,
-      scalaNativeTasks,
-      graalvmNativeImageTasks,
-      tasksRegistry,
-      cfg.maxInactiveSeconds,
-      cfg.taskLockTimeoutSeconds,
-      cfg.cancelGracePeriodMs,
-      onShutdown,
-      configFile = DederGlobals.projectRootDir / "deder.pkl",
-      internals = internals
-    )
-    internals.cancelFn = projectState.cancelRequest
-    internals.purgeCachesFn = () => projectState.purgeInMemoryCachesImpl()
-    internals.projectState = Some(projectState)
-
-    debounceThread = Thread.ofVirtual().name("watch-debounce").start(() => {
-      var running = true
-      while (running) {
-        // Wait for the quiet period (watchDebounceMs with no new changes) to expire
-        debounceLock.synchronized {
-          var remaining: Long = watchDebounceMs
-          if (lastChangeMillis > 0) {
-            val elapsed = System.currentTimeMillis() - lastChangeMillis
-            remaining = (watchDebounceMs - elapsed).max(0L)
+      // Early parse of deder.pkl for boot-time project settings (bspEnabled, maxActiveCompilers, maxConcurrentTestForks).
+      // Fall back to sensible defaults if parsing fails — the server must always boot.
+      val cpus = Runtime.getRuntime.availableProcessors()
+      val (bspEnabled, maxActiveCompilers, maxConcurrentTestForks) =
+        val dederFile = DederPath(os.SubPath("deder.pkl")).absPath
+        if os.exists(dederFile) && os.isFile(dederFile) then
+          val parser = ConfigParser(writeJson = false)
+          parser.parse(dederFile) match {
+            case Right(project) =>
+              // Java primitives are auto-unboxed to Scala types — no null possible
+              val bsp = project.bspEnabled
+              val compilers = if project.maxActiveCompilers <= 0 then cpus else project.maxActiveCompilers.toInt
+              val forks = if project.maxConcurrentTestForks <= 0 then cpus else project.maxConcurrentTestForks.toInt
+              (bsp, compilers, forks)
+            case Left(error) =>
+              logger.warn(s"Failed to parse deder.pkl for boot settings, using defaults: $error")
+              (true, cpus, cpus)
           }
-          while (remaining > 0 && debounceRunning) {
-            debounceLock.wait(remaining.toInt)
-            if (debounceRunning) {
+        else
+          (true, cpus, cpus)
+
+      DederGlobals.setCompileSemaphore(maxActiveCompilers)
+      DederGlobals.setTestForkSemaphore(maxConcurrentTestForks)
+
+      // Use the global OTEL instance for metrics.
+      // Export is handled externally (OTEL Java agent, env vars, etc.).
+      val metricsMeter = GlobalOpenTelemetry.get().getMeter("deder-server")
+      val cacheStatsRegistry = CacheStatsRegistry()
+      val internals = DederProjectInternalsImpl(metricsMeter, cacheStatsRegistry)
+
+
+
+      // Must be declared before onShutdown to avoid forward reference error (var, not val)
+      var cliServer: DederCliServer | Null = null
+      var bspProxyServer: DederBspProxyServer | Null = null
+
+      val onShutdown: () => Unit = () => {
+        logger.info("Deder server is shutting down...")
+
+        // 1. Stop file watcher and debounce scheduler (prevents events during shutdown)
+        stopFileWatcher()
+        stopDebounceScheduler()
+
+        // 2. Release server lock (may already be released via early callback — idempotent)
+        logger.info("Releasing server lock...")
+        CloseUtils.quietly(serverFileLock.release())
+        CloseUtils.quietly(serverLockHandle.close())
+
+        // 3. Close sockets so new connections go to the new server process
+        if (cliServer != null) cliServer.nn.stop()
+        if bspProxyServer != null then bspProxyServer.stop()
+
+        logger.info("Server shutdown complete.")
+        sys.exit(0)
+      }
+
+      val configFile = projectRoot / "deder.pkl"
+      if !os.exists(configFile) || !os.isFile(configFile) then
+        logger.warn(
+          s"No deder.pkl found at '${configFile}'. Create a deder.pkl configuration file in your project root to get started."
+        )
+
+      val coreTasks = CoreTasks(cacheStatsRegistry)
+      val runTasks = RunTasks(coreTasks)
+      val publishTasks = PublishTasks(coreTasks)
+      val scalaJsTasks = scalajs.ScalaJsTasks(coreTasks)
+      val scalaNativeTasks = scalanative.ScalaNativeTasks(coreTasks)
+      val graalvmNativeImageTasks = GraalVmNativeImageTasks(coreTasks)
+
+      val allTasks =
+        coreTasks.all ++ runTasks.all ++ publishTasks.all ++ scalaJsTasks.all ++ scalaNativeTasks.all ++ graalvmNativeImageTasks.all
+      val tasksRegistry = TasksRegistry(allTasks)
+      val projectState = DederProjectState(
+        coreTasks,
+        runTasks,
+        publishTasks,
+        scalaJsTasks,
+        scalaNativeTasks,
+        graalvmNativeImageTasks,
+        tasksRegistry,
+        cfg.maxInactiveSeconds,
+        cfg.taskLockTimeoutSeconds,
+        cfg.cancelGracePeriodMs,
+        onShutdown,
+        configFile = DederGlobals.projectRootDir / "deder.pkl",
+        projectContext = ProjectContext.requireCurrent,
+        internals = internals
+      )
+      internals.cancelFn = projectState.cancelRequest
+      internals.purgeCachesFn = () => projectState.purgeInMemoryCachesImpl()
+      internals.projectState = Some(projectState)
+
+      debounceThread = Thread.ofVirtual().name("watch-debounce").start(() => ProjectContext.run(projectContext) {
+        var running = true
+        while (running) {
+          // Wait for the quiet period (watchDebounceMs with no new changes) to expire
+          debounceLock.synchronized {
+            var remaining: Long = watchDebounceMs
+            if (lastChangeMillis > 0) {
               val elapsed = System.currentTimeMillis() - lastChangeMillis
-              remaining = if (elapsed >= watchDebounceMs) 0L else watchDebounceMs - elapsed
+              remaining = (watchDebounceMs - elapsed).max(0L)
+            }
+            while (remaining > 0 && debounceRunning) {
+              debounceLock.wait(remaining.toInt)
+              if (debounceRunning) {
+                val elapsed = System.currentTimeMillis() - lastChangeMillis
+                remaining = if (elapsed >= watchDebounceMs) 0L else watchDebounceMs - elapsed
+              }
+            }
+            running = debounceRunning
+          }
+          // Quiet period expired — drain accumulated paths if still running
+          if (running) {
+            val snapshot = {
+              val iter = accumulatedChangedPaths.iterator()
+              val buf = Set.newBuilder[os.Path]
+              while (iter.hasNext) do
+                buf += iter.next()
+                iter.remove()
+              buf.result()
+            }
+            debounceLock.synchronized { lastChangeMillis = 0L }
+            if (snapshot.nonEmpty) {
+              logger.debug(
+                s"Debounce fired, triggering tasks for ${snapshot.size} changed paths: ${snapshot.take(3).mkString(", ")}..."
+              )
+              projectState.triggerFileWatchedTasks(snapshot)
             }
           }
-          running = debounceRunning
         }
-        // Quiet period expired — drain accumulated paths if still running
-        if (running) {
-          val snapshot = {
-            val iter = accumulatedChangedPaths.iterator()
-            val buf = Set.newBuilder[os.Path]
-            while (iter.hasNext) do
-              buf += iter.next()
-              iter.remove()
-            buf.result()
-          }
-          debounceLock.synchronized { lastChangeMillis = 0L }
-          if (snapshot.nonEmpty) {
-            logger.debug(
-              s"Debounce fired, triggering tasks for ${snapshot.size} changed paths: ${snapshot.take(3).mkString(", ")}..."
-            )
-            projectState.triggerFileWatchedTasks(snapshot)
-          }
-        }
+      })
+
+      // Wire up early lock release for fast shutdown+restart
+      projectState.setReleaseServerLock(() => {
+        CloseUtils.quietly(serverFileLock.release())
+        CloseUtils.quietly(serverLockHandle.close())
+      })
+
+      // Platform thread — Runtime shutdown hooks must execute reliably during JVM teardown
+      Runtime.getRuntime.addShutdownHook(new Thread(() => {
+        logger.warn("JVM shutdown hook fired — best-effort BSP request cancellation")
+        try projectState.notifyBspClientsShuttingDown()
+        catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP clients during shutdown hook: ${e.getMessage}") }
+        try Thread.sleep(300) // short flush window for cancelled responses
+        catch { case _: InterruptedException => }
+      }))
+
+      cliServer = DederCliServer(projectState, ProjectContext.requireCurrent)
+      // Platform thread — root accept loop keeping the JVM alive
+      val cliServerThread = new Thread(() => ProjectContext.run(projectContext) { cliServer.nn.start() }, "DederCliServer")
+      cliServerThread.start()
+
+      // Platform thread — root accept loop keeping the JVM alive
+      if bspEnabled then {
+        bspProxyServer = DederBspProxyServer(coreTasks, runTasks, scalaJsTasks, scalaNativeTasks, projectState, ProjectContext.requireCurrent)
+        val bspProxyServerThread = new Thread(() => ProjectContext.run(projectContext) { bspProxyServer.nn.start() }, "DederBspProxyServer")
+        bspProxyServerThread.start()
       }
-    })
 
-    // Wire up early lock release for fast shutdown+restart
-    projectState.setReleaseServerLock(() => {
-      CloseUtils.quietly(serverFileLock.release())
-      CloseUtils.quietly(serverLockHandle.close())
-    })
+      logger.info("Deder server started.")
 
-    // Platform thread — Runtime shutdown hooks must execute reliably during JVM teardown
-    Runtime.getRuntime.addShutdownHook(new Thread(() => {
-      logger.warn("JVM shutdown hook fired — best-effort BSP request cancellation")
-      try projectState.notifyBspClientsShuttingDown()
-      catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP clients during shutdown hook: ${e.getMessage}") }
-      try Thread.sleep(300) // short flush window for cancelled responses
-      catch { case _: InterruptedException => }
-    }))
+      loadGitignore()
 
-    cliServer = DederCliServer(projectState)
-    // Platform thread — root accept loop keeping the JVM alive
-    val cliServerThread = new Thread(() => cliServer.nn.start(), "DederCliServer")
-    cliServerThread.start()
-
-    // Platform thread — root accept loop keeping the JVM alive
-    if bspEnabled then {
-      bspProxyServer = DederBspProxyServer(coreTasks, runTasks, scalaJsTasks, scalaNativeTasks, projectState)
-      val bspProxyServerThread = new Thread(() => bspProxyServer.nn.start(), "DederBspProxyServer")
-      bspProxyServerThread.start()
-    }
-
-    logger.info("Deder server started.")
-
-    loadGitignore()
-
-    // Run file watcher on a dedicated daemon thread so it can be interrupted during shutdown
-    // Platform thread — uses native filesystem I/O (os.watch.watch); joined from main to keep JVM alive
-    watcherThread = new Thread(
-      () => {
-        try {
-          os.watch.watch(
-            roots = Seq(projectRoot),
-            onEvent = paths =>
+      // Run file watcher on a dedicated daemon thread so it can be interrupted during shutdown
+      // Platform thread — uses native filesystem I/O (os.watch.watch); joined from main to keep JVM alive
+      watcherThread = new Thread(
+        () => {
+          try {
+            os.watch.watch(
+              roots = Seq(projectRoot),
+            onEvent = paths => ProjectContext.run(projectContext) {
               try {
                 if paths.exists(isServerConfigFile) then
                   logger.debug(
@@ -274,8 +276,9 @@ object ServerMain extends StrictLogging {
                 case _: InterruptedException => throw new InterruptedException // propagate to exit watcher loop
                 case NonFatal(e) =>
                   logger.debug(s"Non-fatal error in file watcher event handler: ${e.getMessage}", e)
-              },
-            filter = p => {
+              }
+            },
+            filter = p => ProjectContext.run(projectContext) {
               val segs = p.relativeTo(DederGlobals.projectRootDir).segments.toSeq
               val firstSeg = segs.headOption.getOrElse("")
               val isDederSubdir =
@@ -283,18 +286,19 @@ object ServerMain extends StrictLogging {
               val isDevDir = FileWatchUtils.ignoredDirNames.contains(firstSeg)
               !(isDederSubdir || isDevDir)
             }
-          )
-        } catch {
-          case _: InterruptedException => logger.info("File watcher interrupted, stopping...")
-          case NonFatal(e)             => logger.error(s"File watcher error: ${e.getMessage}", e)
-        }
-        ()
-      },
-      "file-watcher"
-    )
-    watcherThread.setDaemon(true)
-    watcherThread.start()
-    watcherThread.join()
+            )
+          } catch {
+            case _: InterruptedException => logger.info("File watcher interrupted, stopping...")
+            case NonFatal(e)             => logger.error(s"File watcher error: ${e.getMessage}", e)
+          }
+          ()
+        },
+        "file-watcher"
+      )
+      watcherThread.setDaemon(true)
+      watcherThread.start()
+      watcherThread.join()
+    }
   }
 
   private def stopFileWatcher(): Unit = {

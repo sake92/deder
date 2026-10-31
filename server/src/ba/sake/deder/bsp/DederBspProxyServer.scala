@@ -23,12 +23,13 @@ class DederBspProxyServer(
     runTasks: RunTasks,
     scalaJsTasks: ScalaJsTasks,
     scalaNativeTasks: ScalaNativeTasks,
-    projectState: DederProjectState
+    projectState: DederProjectState,
+    projectContext: ProjectContext
 ) extends StrictLogging {
 
   private var serverChannel: ServerSocketChannel = uninitialized
 
-  def start(): Unit = {
+  def start(): Unit = ProjectContext.run(projectContext) {
     val relativeSocketPath = ".deder/server-bsp.sock"
     val socketPath = DederGlobals.projectRootDir / os.RelPath(relativeSocketPath)
     os.makeDir.all(socketPath / os.up)
@@ -51,7 +52,8 @@ class DederBspProxyServer(
             scalaJsTasks,
             scalaNativeTasks,
             projectState,
-            () => clientChannel.close()
+            () => clientChannel.close(),
+            projectContext
           )
           val os = Channels.newOutputStream(clientChannel)
           val is = Channels.newInputStream(clientChannel)

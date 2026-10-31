@@ -19,11 +19,11 @@ import java.util.UUID
 import scala.util.Using
 import scala.compiletime.uninitialized
 
-class DederCliServer(projectState: DederProjectState) extends StrictLogging {
+class DederCliServer(projectState: DederProjectState, projectContext: ProjectContext) extends StrictLogging {
 
   private var serverChannel: ServerSocketChannel = uninitialized
 
-  def start(): Unit = {
+  def start(): Unit = ProjectContext.run(projectContext) {
 
     val relativeSocketPath = ".deder/server-cli.sock"
     val socketPath = DederGlobals.projectRootDir / os.RelPath(relativeSocketPath)
@@ -44,10 +44,16 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         val serverMessages = new LinkedBlockingQueue[CliServerMessage]()
         val handler = new CliClientMessageHandler(projectState, serverMessages, this)
         val clientReadRunner =
-          new CliClientSocketReader(projectState, handler, clientChannel, clientId, serverMessages)
+          new CliClientSocketReader(projectState, handler, clientChannel, clientId, serverMessages, projectContext)
         val clientWriteRunner = new CliClientSocketWriter(projectState, clientChannel, clientId, serverMessages)
-        Thread.ofVirtual().name(s"CliClientSocketWriter-${clientId}").start(clientWriteRunner)
-        Thread.ofVirtual().name(s"CliClientSocketReader-${clientId}").start(clientReadRunner)
+        Thread
+          .ofVirtual()
+          .name(s"CliClientSocketWriter-${clientId}")
+          .start(() => ProjectContext.run(projectContext)(clientWriteRunner.run()))
+        Thread
+          .ofVirtual()
+          .name(s"CliClientSocketReader-${clientId}")
+          .start(() => ProjectContext.run(projectContext)(clientReadRunner.run()))
         // no join, just let them run
       }
     } finally {
@@ -55,9 +61,9 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
     }
   }
 
-  /** Close the accept socket immediately so no new clients can connect.
-    * Existing client channels are unaffected.
-    * Does NOT delete the socket file — that's done by start() of the next server. */
+  /** Close the accept socket immediately so no new clients can connect. Existing client channels are unaffected. Does
+    * NOT delete the socket file — that's done by start() of the next server.
+    */
   def stopAccepting(): Unit = {
     CloseUtils.quietly { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() }
   }

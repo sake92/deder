@@ -12,17 +12,21 @@ class TasksExecutorSuite extends munit.FunSuite {
 
   private val projectRoot = os.pwd / "server/test/resources/sample-projects/simple"
   private val projectConfig =
-    ConfigParser(writeJson = false).parse(projectRoot / "deder.pkl")
+    ConfigParser(writeJson = false)
+      .parse(projectRoot / "deder.pkl")
       .getOrElse(fail("Failed to parse simple test project configuration"))
   private val coreTasks = CoreTasks()
 
   override def beforeEach(context: BeforeEach): Unit =
     super.beforeEach(context)
-    System.setProperty("DEDER_PROJECT_ROOT_DIR", projectRoot.toString)
+
+  private def inProjectContext[T](body: => T): T =
+    ProjectContext.run(ProjectContext(projectRoot))(body)
 
   private def newExecutor(extraTasks: Seq[Task[?, ?, ?]] = Seq.empty): TasksExecutor = {
     val tasksResolver = TasksResolver(projectConfig, TasksRegistry(coreTasks.all ++ extraTasks))
-    val sdk = OpenTelemetrySdk.builder()
+    val sdk = OpenTelemetrySdk
+      .builder()
       .setMeterProvider(SdkMeterProvider.builder().build())
       .build()
     val internals = DederProjectInternalsImpl(sdk.getMeter("test"), CacheStatsRegistry())
@@ -43,7 +47,9 @@ class TasksExecutorSuite extends munit.FunSuite {
       moduleId: String = "core"
   ): TaskInstance = {
     val tasksResolver = TasksResolver(projectConfig, TasksRegistry(coreTasks.all ++ extraTasks))
-    tasksResolver.taskInstancesPerModule(moduleId).find(_.task.name == taskName)
+    tasksResolver
+      .taskInstancesPerModule(moduleId)
+      .find(_.task.name == taskName)
       .getOrElse(fail(s"Task '$taskName' not found on module '$moduleId'"))
   }
 
@@ -58,17 +64,20 @@ class TasksExecutorSuite extends munit.FunSuite {
       }
     val ti = taskInstance(prepFailure.name, Seq(prepFailure))
 
-    val results = newExecutor(Seq(prepFailure)).execute(
-      requestId = "prep-failure",
-      stages = Seq(Seq(ti)),
-      moduleIds = Seq("core"),
-      taskName = prepFailure.name,
-      args = Seq.empty,
-      watch = false,
-      serverNotificationsLogger = ServerNotificationsLogger(_ => ())
-    )
+    val results = inProjectContext {
+      newExecutor(Seq(prepFailure)).execute(
+        requestId = "prep-failure",
+        stages = Seq(Seq(ti)),
+        moduleIds = Seq("core"),
+        taskName = prepFailure.name,
+        args = Seq.empty,
+        watch = false,
+        serverNotificationsLogger = ServerNotificationsLogger(_ => ())
+      )
+    }
 
-    val failure = results.collectFirst { case f: TaskExecResult.Failure => f }
+    val failure = results
+      .collectFirst { case f: TaskExecResult.Failure => f }
       .getOrElse(fail(s"Expected a failure result, got $results"))
     assertEquals(failure.taskInstance.id, ti.id)
     assert(failure.error.contains("core.scalaVersion"), s"Unexpected preparation error: ${failure.error}")
@@ -88,15 +97,17 @@ class TasksExecutorSuite extends munit.FunSuite {
     }
 
     val error = intercept[RuntimeException] {
-      executor.execute(
-        requestId = "stage-failure",
-        stages = Seq(explodingStage),
-        moduleIds = Seq("core"),
-        taskName = "compile",
-        args = Seq.empty,
-        watch = false,
-        serverNotificationsLogger = ServerNotificationsLogger(_ => ())
-      )
+      inProjectContext {
+        executor.execute(
+          requestId = "stage-failure",
+          stages = Seq(explodingStage),
+          moduleIds = Seq("core"),
+          taskName = "compile",
+          args = Seq.empty,
+          watch = false,
+          serverNotificationsLogger = ServerNotificationsLogger(_ => ())
+        )
+      }
     }
     assertEquals(error.getMessage, "stage failure")
   }
@@ -107,15 +118,17 @@ class TasksExecutorSuite extends munit.FunSuite {
       .build { _ => throw RuntimeException("ordinary failure") }
     val ti = taskInstance(ordinaryFailure.name, Seq(ordinaryFailure))
 
-    val results = newExecutor(Seq(ordinaryFailure)).execute(
-      requestId = "ordinary-failure",
-      stages = Seq(Seq(ti)),
-      moduleIds = Seq("core"),
-      taskName = ordinaryFailure.name,
-      args = Seq.empty,
-      watch = false,
-      serverNotificationsLogger = ServerNotificationsLogger(_ => ())
-    )
+    val results = inProjectContext {
+      newExecutor(Seq(ordinaryFailure)).execute(
+        requestId = "ordinary-failure",
+        stages = Seq(Seq(ti)),
+        moduleIds = Seq("core"),
+        taskName = ordinaryFailure.name,
+        args = Seq.empty,
+        watch = false,
+        serverNotificationsLogger = ServerNotificationsLogger(_ => ())
+      )
+    }
 
     assertEquals(results.collect { case f: TaskExecResult.Failure => f }.map(_.error), Seq("ordinary failure"))
   }
@@ -134,15 +147,17 @@ class TasksExecutorSuite extends munit.FunSuite {
       taskInstance(mixedOutcome.name, Seq(mixedOutcome), moduleId = "app")
     )
 
-    val results = newExecutor(Seq(mixedOutcome)).execute(
-      requestId = "independent-modules",
-      stages = Seq(taskInstances),
-      moduleIds = Seq("core", "app"),
-      taskName = mixedOutcome.name,
-      args = Seq.empty,
-      watch = false,
-      serverNotificationsLogger = ServerNotificationsLogger(_ => ())
-    )
+    val results = inProjectContext {
+      newExecutor(Seq(mixedOutcome)).execute(
+        requestId = "independent-modules",
+        stages = Seq(taskInstances),
+        moduleIds = Seq("core", "app"),
+        taskName = mixedOutcome.name,
+        args = Seq.empty,
+        watch = false,
+        serverNotificationsLogger = ServerNotificationsLogger(_ => ())
+      )
+    }
 
     assertEquals(results.collect { case f: TaskExecResult.Failure => f }.map(_.taskInstance.moduleId), Seq("core"))
     assertEquals(results.collect { case s: TaskExecResult.Success => s }.map(_.taskInstance.moduleId), Seq("app"))
@@ -158,17 +173,20 @@ class TasksExecutorSuite extends munit.FunSuite {
     DederGlobals.cancellationTokens.put(requestId, new AtomicBoolean(true))
 
     try {
-      val results = newExecutor(Seq(cancelledTask)).execute(
-        requestId = requestId,
-        stages = Seq(Seq(ti)),
-        moduleIds = Seq("core"),
-        taskName = cancelledTask.name,
-        args = Seq.empty,
-        watch = false,
-        serverNotificationsLogger = ServerNotificationsLogger(_ => ())
-      )
+      val results = inProjectContext {
+        newExecutor(Seq(cancelledTask)).execute(
+          requestId = requestId,
+          stages = Seq(Seq(ti)),
+          moduleIds = Seq("core"),
+          taskName = cancelledTask.name,
+          args = Seq.empty,
+          watch = false,
+          serverNotificationsLogger = ServerNotificationsLogger(_ => ())
+        )
+      }
 
-      val cancelled = results.collectFirst { case c: TaskExecResult.Cancelled => c }
+      val cancelled = results
+        .collectFirst { case c: TaskExecResult.Cancelled => c }
         .getOrElse(fail(s"Expected a cancellation result, got $results"))
       assertEquals(cancelled.taskInstance.id, ti.id)
       assert(cancelled.message.contains("cancelled"), s"Unexpected cancellation message: ${cancelled.message}")

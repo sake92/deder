@@ -69,18 +69,19 @@ class HashableSuite extends munit.FunSuite {
 
   test("DederPath hash changes when a file is renamed (content unchanged)") {
     val root = os.temp.dir()
-    System.setProperty("DEDER_PROJECT_ROOT_DIR", root.toString)
-    try {
-      val a = root / "a.txt"
-      os.write(a, "same content")
-      val h1 = Hashable[DederPath].hashStr(DederPath("a.txt"))
+    try
+      ProjectContext.run(ProjectContext(root)) {
+        val a = root / "a.txt"
+        os.write(a, "same content")
+        val h1 = Hashable[DederPath].hashStr(DederPath("a.txt"))
 
-      // Rename a.txt -> b.txt, content unchanged.
-      os.move(a, root / "b.txt")
-      val h2 = Hashable[DederPath].hashStr(DederPath("b.txt"))
+        // Rename a.txt -> b.txt, content unchanged.
+        os.move(a, root / "b.txt")
+        val h2 = Hashable[DederPath].hashStr(DederPath("b.txt"))
 
-      assertNotEquals(h1, h2, "renaming a file must change the DederPath hash even when content is unchanged")
-    } finally System.clearProperty("DEDER_PROJECT_ROOT_DIR")
+        assertNotEquals(h1, h2, "renaming a file must change the DederPath hash even when content is unchanged")
+      }
+    finally os.remove.all(root)
   }
 
 }

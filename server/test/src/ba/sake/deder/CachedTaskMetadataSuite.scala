@@ -18,16 +18,8 @@ class CachedTaskMetadataSuite extends munit.FunSuite {
 
   private def withProject(testCode: os.Path => Unit): Unit = {
     val root = os.temp.dir()
-    val previousRoot = Option(System.getProperty("DEDER_PROJECT_ROOT_DIR"))
-    System.setProperty("DEDER_PROJECT_ROOT_DIR", root.toString)
-    try testCode(root)
-    finally {
-      previousRoot match {
-        case Some(value) => System.setProperty("DEDER_PROJECT_ROOT_DIR", value)
-        case None        => System.clearProperty("DEDER_PROJECT_ROOT_DIR")
-      }
-      os.remove.all(root)
-    }
+    try ProjectContext.run(ProjectContext(root)) { testCode(root) }
+    finally os.remove.all(root)
   }
 
   private def execute[T, Deps <: Tuple, S](
@@ -68,7 +60,8 @@ class CachedTaskMetadataSuite extends munit.FunSuite {
   test("version survives dependency and replay builders and invalidates only when changed") {
     withProject { root =>
       var executions = 0
-      def producer(version: Int) = CachedTaskBuilder.make[String]("producer")
+      def producer(version: Int) = CachedTaskBuilder
+        .make[String]("producer")
         .withCacheVersion(version)
         .dependsOn(input)
         .withCliReplay((_, _, _) => ())
@@ -91,7 +84,8 @@ class CachedTaskMetadataSuite extends munit.FunSuite {
 
   test("summarized builder preserves the cache version") {
     withProject { _ =>
-      def producer(version: Int) = CachedTaskBuilder.make[String]("producer")
+      def producer(version: Int) = CachedTaskBuilder
+        .make[String]("producer")
         .dependsOn(input)
         .withCacheVersion(version)
         .buildSummarized[MultiModuleResults[String]](_.inputsHash)
@@ -106,12 +100,14 @@ class CachedTaskMetadataSuite extends munit.FunSuite {
 
   test("producer version changes propagate through compile output identity to downstream cache") {
     withProject { _ =>
-      def producer(version: Int) = CachedTaskBuilder.make[CompileResult]("producer")
+      def producer(version: Int) = CachedTaskBuilder
+        .make[CompileResult]("producer")
         .withCacheVersion(version)
         .dependsOn(input)
         .build { ctx => CompileResult(DederPath(ctx.out / "classes"), 0, 0, 1, inputsHash = ctx.inputsHash) }
       var consumerExecutions = 0
-      val consumer = CachedTaskBuilder.make[String]("consumer")
+      val consumer = CachedTaskBuilder
+        .make[String]("consumer")
         .dependsOn(producer(1))
         .build { _ =>
           consumerExecutions += 1
@@ -139,7 +135,8 @@ class CachedTaskMetadataSuite extends munit.FunSuite {
       }
       execute(original)
       assert(os.exists(metadata(root)))
-      val interrupted = CachedTaskBuilder.make[String]("producer")
+      val interrupted = CachedTaskBuilder
+        .make[String]("producer")
         .withCacheVersion(1)
         .dependsOn(input)
         .build { ctx =>
@@ -149,12 +146,13 @@ class CachedTaskMetadataSuite extends munit.FunSuite {
         }
 
       // MUnit's intercept deliberately rethrows InterruptedException; catch this simulated cancellation directly.
-      val interruption = try {
-        execute(interrupted)
-        fail("Expected interrupted execution")
-      } catch {
-        case error: InterruptedException => error
-      }
+      val interruption =
+        try {
+          execute(interrupted)
+          fail("Expected interrupted execution")
+        } catch {
+          case error: InterruptedException => error
+        }
       assertEquals(interruption.getMessage, "Interrupted after modifying the artifact")
       assert(!os.exists(metadata(root)))
       assertEquals(os.read(metadata(root) / os.up / "artifact.txt"), "partial")
