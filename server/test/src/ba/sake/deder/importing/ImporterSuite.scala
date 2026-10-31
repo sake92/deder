@@ -1,18 +1,13 @@
 package ba.sake.deder.importing
 
 import munit.FunSuite
-import ba.sake.deder.DederGlobals
+import ba.sake.deder.ProjectContext
 import ba.sake.deder.cli.ImportBuildTool
 
 class ImporterSuite extends FunSuite {
 
   private val testProjectDir = os.temp.dir(prefix = "deder-import-test-")
-  private var originalProjectRootDir: String = scala.compiletime.uninitialized
-
-  override def beforeAll(): Unit = {
-    originalProjectRootDir = System.getProperty("DEDER_PROJECT_ROOT_DIR")
-    System.setProperty("DEDER_PROJECT_ROOT_DIR", testProjectDir.toString)
-  }
+  private def withProjectContext[T](f: => T): T = ProjectContext.run(ProjectContext(testProjectDir))(f)
 
   override def afterAll(): Unit = {
     try os.remove.all(testProjectDir)
@@ -34,50 +29,64 @@ class ImporterSuite extends FunSuite {
   // --- Autodetection tests ---
 
   test("detectBuildTool returns Some(sbt) when build.sbt exists") {
-    os.write(testProjectDir / "build.sbt", "")
-    assertEquals(ImportingUtils.detectBuildTool(), Some(ImportBuildTool.sbt))
+    withProjectContext {
+      os.write(testProjectDir / "build.sbt", "")
+      assertEquals(ImportingUtils.detectBuildTool(), Some(ImportBuildTool.sbt))
+    }
   }
 
   test("detectBuildTool returns None when no supported build files exist") {
-    // temp dir is empty by default, no build.sbt
-    assertEquals(ImportingUtils.detectBuildTool(), None)
+    withProjectContext {
+      // temp dir is empty by default, no build.sbt
+      assertEquals(ImportingUtils.detectBuildTool(), None)
+    }
   }
 
   // --- Backup path tests ---
 
   test("findNextBackupPath returns deder.pkl.bak1 when no backups exist") {
-    val backupPath = ImportingUtils.findNextBackupPath()
-    assertEquals(backupPath.last, "deder.pkl.bak1")
+    withProjectContext {
+      val backupPath = ImportingUtils.findNextBackupPath()
+      assertEquals(backupPath.last, "deder.pkl.bak1")
+    }
   }
 
   test("findNextBackupPath returns deder.pkl.bak2 when bak1 exists") {
-    os.write.over(testProjectDir / "deder.pkl.bak1", "dummy")
-    val backupPath = ImportingUtils.findNextBackupPath()
-    assertEquals(backupPath.last, "deder.pkl.bak2")
+    withProjectContext {
+      os.write.over(testProjectDir / "deder.pkl.bak1", "dummy")
+      val backupPath = ImportingUtils.findNextBackupPath()
+      assertEquals(backupPath.last, "deder.pkl.bak2")
+    }
   }
 
   test("findNextBackupPath returns deder.pkl.bak3 when bak1 and bak2 exist") {
-    os.write.over(testProjectDir / "deder.pkl.bak1", "dummy")
-    os.write.over(testProjectDir / "deder.pkl.bak2", "dummy")
-    val backupPath = ImportingUtils.findNextBackupPath()
-    assertEquals(backupPath.last, "deder.pkl.bak3")
+    withProjectContext {
+      os.write.over(testProjectDir / "deder.pkl.bak1", "dummy")
+      os.write.over(testProjectDir / "deder.pkl.bak2", "dummy")
+      val backupPath = ImportingUtils.findNextBackupPath()
+      assertEquals(backupPath.last, "deder.pkl.bak3")
+    }
   }
 
   // --- Orchestration tests ---
 
   test("Importer constructor and type safety for Option[ImportBuildTool]") {
-    // Verify that Importer.doImport accepts Option[ImportBuildTool]
-    val noopLogger = ba.sake.deder.ServerNotificationsLogger(_ => ())
-    val importer = new Importer(noopLogger)
-    // This is a compile-time check; if this compiles, the signature is correct
-    assert(importer != null)
+    withProjectContext {
+      // Verify that Importer.doImport accepts Option[ImportBuildTool]
+      val noopLogger = ba.sake.deder.ServerNotificationsLogger(_ => ())
+      val importer = new Importer(noopLogger)
+      // This is a compile-time check; if this compiles, the signature is correct
+      assert(importer != null)
+    }
   }
 
   test("explicit --from sbt overrides autodetection") {
-    // Even in a directory with no build.sbt, explicit --from sbt
-    // should not fall through to autodetection. We verify this by
-    // checking that ImportBuildTool.sbt is correctly identified.
-    assertEquals(ImportBuildTool.sbt.toString, "sbt")
+    withProjectContext {
+      // Even in a directory with no build.sbt, explicit --from sbt
+      // should not fall through to autodetection. We verify this by
+      // checking that ImportBuildTool.sbt is correctly identified.
+      assertEquals(ImportBuildTool.sbt.toString, "sbt")
+    }
   }
 
 }

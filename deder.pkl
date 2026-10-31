@@ -91,6 +91,7 @@ local const dederCommonModules =
       deps {
         "ba.sake::tupson:\(versions.tupson)"
         "com.lihaoyi::os-lib:\(versions.osLib)"
+        "com.softwaremill.ox::core:\(versions.ox)"
         "org.scala-sbt:test-interface:\(versions.testInterface)"
         "com.lihaoyi::fansi:\(versions.fansi)"
         "commons-codec:commons-codec:\(versions.commonsCodec)"

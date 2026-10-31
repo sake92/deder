@@ -14,7 +14,8 @@ class CliClientSocketReader(
     handler: CliClientMessageHandler,
     clientChannel: SocketChannel,
     clientId: String,
-    serverMessages: BlockingQueue[CliServerMessage]
+    serverMessages: BlockingQueue[CliServerMessage],
+    projectContext: ProjectContext
 ) extends Runnable,
       StrictLogging {
   override def run(): Unit = {
@@ -59,26 +60,28 @@ class CliClientSocketReader(
 
       // Track this client's request so we can cancel it on disconnect (Ctrl+C)
       message match
-        case _: CliClientMessage.Exec => DederGlobals.clientRequestMap.put(clientId, requestId)
+        case _: CliClientMessage.Exec   => DederGlobals.clientRequestMap.put(clientId, requestId)
         case _: CliClientMessage.Cancel => DederGlobals.clientRequestMap.remove(clientId)
-        case _ => ()
+        case _                          => ()
 
       Thread
         .ofVirtual()
         .start(() =>
-          supervised {
-            try {
-              RequestContext.current.supervisedWhere(ctx) {
-                handler.handle(message)
+          ProjectContext.run(projectContext) {
+            supervised {
+              try {
+                RequestContext.current.supervisedWhere(ctx) {
+                  handler.handle(message)
+                }
+              } catch {
+                case e: IOException =>
+                  // probably client disconnected... but log just in case..
+                  logger.error(s"IO error processing message from client $clientId, probably client disconnected", e)
+                case e: Throwable =>
+                  logger.error(s"Unhandled error processing message from client $clientId", e)
+                  serverMessages.put(CliServerMessage.Log(s"Internal error: ${e.getMessage}", LogLevel.ERROR))
+                  serverMessages.put(CliServerMessage.Exit(1))
               }
-            } catch {
-              case e: IOException =>
-                // probably client disconnected... but log just in case..
-                logger.error(s"IO error processing message from client $clientId, probably client disconnected", e)
-              case e: Throwable =>
-                logger.error(s"Unhandled error processing message from client $clientId", e)
-                serverMessages.put(CliServerMessage.Log(s"Internal error: ${e.getMessage}", LogLevel.ERROR))
-                serverMessages.put(CliServerMessage.Exit(1))
             }
           }
         )
