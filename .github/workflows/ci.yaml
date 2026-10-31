@@ -90,8 +90,13 @@ jobs:
             .deder/logs/server.log
 
   integration-tests:
+    name: Integration tests (${{ matrix.module }})
     runs-on: ubuntu-latest
     continue-on-error: true # allow flaky for now
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [jvm-integration-test, scalajs-integration-test, scalanative-integration-test, bsp-integration-test]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -119,23 +124,26 @@ jobs:
         run: brew install sake92/tap/deder
       # for testing importing from sbt
       - uses: sbt/setup-sbt@v1
+        if: matrix.module == 'jvm-integration-test'
         with:
           sbt-runner-version: 1.12.11
-      - name: Integration Test Suite
+      - name: Integration Test Suite (${{ matrix.module }})
         run: |
-          ./scripts/run-it-tests.sh
-      - name: Publish Test Report
+          ./scripts/run-it-tests.sh "${{ matrix.module }}"
+      - name: Publish Test Report (${{ matrix.module }})
         uses: mikepenz/action-junit-report@v6
         if: success() || failure() # always run even if the previous step fails
         with:
+          check_name: Integration tests (${{ matrix.module }})
           report_paths: '.deder/out/**/reports/junit/TEST-*.xml'
-      - name: Deder output
+      - name: Deder output (${{ matrix.module }})
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: deder-logs
+          name: deder-integration-${{ matrix.module }}
           path: |
             .deder/logs/server.log
+            .deder/out/**/reports/junit/TEST-*.xml
 
   windows-tests:
     continue-on-error: true # Report Windows failures without blocking CI or early-access.
