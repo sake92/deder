@@ -174,7 +174,7 @@ object ServerMain extends StrictLogging {
       internals.purgeCachesFn = () => projectState.purgeInMemoryCachesImpl()
       internals.projectState = Some(projectState)
 
-      debounceThread = Thread.ofVirtual().name("watch-debounce").start(() => ProjectContext.run(projectContext) {
+      debounceThread = Thread.ofVirtual().name("watch-debounce").start(ProjectContext.runnable {
         var running = true
         while (running) {
           // Wait for the quiet period (watchDebounceMs with no new changes) to expire
@@ -221,7 +221,7 @@ object ServerMain extends StrictLogging {
       })
 
       // Platform thread — Runtime shutdown hooks must execute reliably during JVM teardown
-      Runtime.getRuntime.addShutdownHook(new Thread(() => {
+      Runtime.getRuntime.addShutdownHook(new Thread(ProjectContext.runnable {
         logger.warn("JVM shutdown hook fired — best-effort BSP request cancellation")
         try projectState.notifyBspClientsShuttingDown()
         catch { case NonFatal(e) => logger.warn(s"Failed to notify BSP clients during shutdown hook: ${e.getMessage}") }
@@ -229,14 +229,14 @@ object ServerMain extends StrictLogging {
         catch { case _: InterruptedException => }
       }))
 
-      cliServer = DederCliServer(projectState, ProjectContext.requireCurrent)
+      cliServer = DederCliServer(projectState)
       // Keep the CLI accept loop in the startup scope. A raw Thread created from
       // this scope would inherit the virtual fork's daemon status and not keep the
       // server process alive after the startup body returns.
       forkUserDiscard { cliServer.nn.start() }
 
       if bspEnabled then {
-        bspProxyServer = DederBspProxyServer(coreTasks, runTasks, scalaJsTasks, scalaNativeTasks, projectState, ProjectContext.requireCurrent)
+        bspProxyServer = DederBspProxyServer(coreTasks, runTasks, scalaJsTasks, scalaNativeTasks, projectState)
         forkUserDiscard { bspProxyServer.nn.start() }
       }
 

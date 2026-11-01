@@ -21,4 +21,20 @@ class ProjectContextSuite extends munit.FunSuite {
     val error = intercept[IllegalStateException](DederGlobals.projectRootDir)
     assert(error.getMessage.contains("No project context is active"))
   }
+
+  test("captured project root binds across a raw thread boundary") {
+    val root = os.temp.dir()
+    val observed = new java.util.concurrent.atomic.AtomicReference[os.Path]()
+
+    ProjectContext.run(ProjectContext(root)) {
+      val thread = Thread.ofVirtual().start(ProjectContext.runnable {
+        observed.set(DederGlobals.projectRootDir)
+      })
+      thread.join()
+    }
+
+    assertEquals(observed.get(), root)
+    val error = intercept[IllegalStateException](DederGlobals.projectRootDir)
+    assert(error.getMessage.contains("No project context is active"))
+  }
 }

@@ -827,35 +827,32 @@ class DederProjectState(
       }
       if affected then {
         val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
-        val projectContext = ProjectContext.requireCurrent
         Thread
           .ofVirtual()
-          .start(() =>
+          .start(ProjectContext.runnable {
             try
-              ProjectContext.run(projectContext) {
-                RequestContext.current.supervisedWhere(ctx) {
-                  watchedTask.serverNotificationsLogger.add(
-                    ServerNotification.logInfo(
-                      s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-                      watchedTask.taskInstance.moduleId
-                    )
+              RequestContext.current.supervisedWhere(ctx) {
+                watchedTask.serverNotificationsLogger.add(
+                  ServerNotification.logInfo(
+                    s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                    watchedTask.taskInstance.moduleId
                   )
-                  executeTasks(
-                    ctx.requestId,
-                    CallerType.Cli,
-                    Seq(watchedTask.taskInstance.moduleId),
-                    watchedTask.taskInstance.task.name,
-                    watchedTask.args,
-                    true, // tell client we are in watch mode
-                    watchedTask.serverNotificationsLogger,
-                    watchedTask.useLastGood
-                  )
-                }
+                )
+                executeTasks(
+                  ctx.requestId,
+                  CallerType.Cli,
+                  Seq(watchedTask.taskInstance.moduleId),
+                  watchedTask.taskInstance.task.name,
+                  watchedTask.args,
+                  true, // tell client we are in watch mode
+                  watchedTask.serverNotificationsLogger,
+                  watchedTask.useLastGood
+                )
               }
             catch
               case NonFatal(e) =>
                 logger.warn(s"Watch rerun for ${watchedTask.taskInstance.id} failed: ${e.getMessage}")
-          )
+          })
       }
     }
   }
@@ -893,35 +890,32 @@ class DederProjectState(
           s"Config value dependencies of watched task ${watchedTask.taskInstance.id} have changed, re-executing..."
         )
         val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
-        val projectContext = ProjectContext.requireCurrent
         Thread
           .ofVirtual()
-          .start(() =>
+          .start(ProjectContext.runnable {
             try
-              ProjectContext.run(projectContext) {
-                RequestContext.current.supervisedWhere(ctx) {
-                  watchedTask.serverNotificationsLogger.add(
-                    ServerNotification.logInfo(
-                      s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-                      watchedTask.taskInstance.moduleId
-                    )
+              RequestContext.current.supervisedWhere(ctx) {
+                watchedTask.serverNotificationsLogger.add(
+                  ServerNotification.logInfo(
+                    s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                    watchedTask.taskInstance.moduleId
                   )
-                  executeCLI(
-                    Seq(watchedTask.taskInstance.moduleId),
-                    watchedTask.taskInstance.task.name,
-                    watchedTask.args,
-                    watchedTask.serverNotificationsLogger,
-                    watchedTask.useLastGood,
-                    startWatch = false,
-                    exitOnEnd = false,
-                    watch = true
-                  )
-                }
+                )
+                executeCLI(
+                  Seq(watchedTask.taskInstance.moduleId),
+                  watchedTask.taskInstance.task.name,
+                  watchedTask.args,
+                  watchedTask.serverNotificationsLogger,
+                  watchedTask.useLastGood,
+                  startWatch = false,
+                  exitOnEnd = false,
+                  watch = true
+                )
               }
             catch
               case NonFatal(e) =>
                 logger.warn(s"Watch rerun for ${watchedTask.taskInstance.id} failed: ${e.getMessage}")
-          )
+          })
       }
     }
   }

@@ -22,4 +22,10 @@ object ProjectContext {
   /** Runs code in a fresh Ox scope with the supplied project context. */
   def run[T](context: ProjectContext)(f: Ox ?=> T): T =
     current.supervisedWhere(Some(context))(f)
+
+  /** Adapts work for a raw thread or executor callback, capturing context before dispatch. */
+  def runnable(f: Ox ?=> Unit): Runnable = {
+    val context = requireCurrent
+    () => run(context)(f)
+  }
 }

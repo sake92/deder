@@ -19,12 +19,11 @@ import java.util.UUID
 import scala.util.Using
 import scala.compiletime.uninitialized
 
-class DederCliServer(projectState: DederProjectState, projectContext: ProjectContext) extends StrictLogging {
+class DederCliServer(projectState: DederProjectState) extends StrictLogging {
 
   private var serverChannel: ServerSocketChannel = uninitialized
 
   def start(): Unit = {
-
     val relativeSocketPath = ".deder/server-cli.sock"
     val socketPath = DederGlobals.projectRootDir / os.RelPath(relativeSocketPath)
     os.makeDir.all(socketPath / os.up)
@@ -44,16 +43,16 @@ class DederCliServer(projectState: DederProjectState, projectContext: ProjectCon
         val serverMessages = new LinkedBlockingQueue[CliServerMessage]()
         val handler = new CliClientMessageHandler(projectState, serverMessages, this)
         val clientReadRunner =
-          new CliClientSocketReader(projectState, handler, clientChannel, clientId, serverMessages, projectContext)
+          new CliClientSocketReader(projectState, handler, clientChannel, clientId, serverMessages)
         val clientWriteRunner = new CliClientSocketWriter(projectState, clientChannel, clientId, serverMessages)
         Thread
           .ofVirtual()
           .name(s"CliClientSocketWriter-${clientId}")
-          .start(() => ProjectContext.run(projectContext)(clientWriteRunner.run()))
+          .start(ProjectContext.runnable { clientWriteRunner.run() })
         Thread
           .ofVirtual()
           .name(s"CliClientSocketReader-${clientId}")
-          .start(() => ProjectContext.run(projectContext)(clientReadRunner.run()))
+          .start(ProjectContext.runnable { clientReadRunner.run() })
         // no join, just let them run
       }
     } catch {

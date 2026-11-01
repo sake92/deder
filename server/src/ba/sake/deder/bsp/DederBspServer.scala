@@ -27,8 +27,7 @@ class DederBspServer(
     scalaJsTasks: ScalaJsTasks,
     scalaNativeTasks: ScalaNativeTasks,
     projectState: DederProjectState,
-    onExit: () => Unit,
-    projectContext: ProjectContext
+    onExit: () => Unit
 ) extends BuildServer,
       JvmBuildServer,
       JavaBuildServer,
@@ -64,6 +63,9 @@ class DederBspServer(
       originId: String,
       resultFuture: CompletableFuture[CompileResult]
   )
+
+  // Java JSON-RPC callbacks and CompletableFuture workers do not inherit Ox fork locals.
+  private val projectContext = ProjectContext.requireCurrent
 
   override def cancelRequest(params: CancelRequestParams): Unit = {
     val originId: String = params.getId match {
@@ -211,7 +213,7 @@ class DederBspServer(
       ensureRunning()
       // Trigger silent background compilation so compile errors appear as diagnostics
       // in the IDE without showing compile progress in the Metals status bar.
-      CompletableFuture.runAsync { () => ProjectContext.run(projectContext) { compileAllModulesOnInit() } }
+      CompletableFuture.runAsync(ProjectContext.runnable { compileAllModulesOnInit() })
     }
   }
 

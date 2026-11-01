@@ -14,8 +14,7 @@ class CliClientSocketReader(
     handler: CliClientMessageHandler,
     clientChannel: SocketChannel,
     clientId: String,
-    serverMessages: BlockingQueue[CliServerMessage],
-    projectContext: ProjectContext
+    serverMessages: BlockingQueue[CliServerMessage]
 ) extends Runnable,
       StrictLogging {
   override def run(): Unit = {
@@ -66,25 +65,23 @@ class CliClientSocketReader(
 
       Thread
         .ofVirtual()
-        .start(() =>
-          ProjectContext.run(projectContext) {
-            supervised {
-              try {
-                RequestContext.current.supervisedWhere(ctx) {
-                  handler.handle(message)
-                }
-              } catch {
-                case e: IOException =>
-                  // probably client disconnected... but log just in case..
-                  logger.error(s"IO error processing message from client $clientId, probably client disconnected", e)
-                case e: Throwable =>
-                  logger.error(s"Unhandled error processing message from client $clientId", e)
-                  serverMessages.put(CliServerMessage.Log(s"Internal error: ${e.getMessage}", LogLevel.ERROR))
-                  serverMessages.put(CliServerMessage.Exit(1))
+        .start(ProjectContext.runnable {
+          supervised {
+            try {
+              RequestContext.current.supervisedWhere(ctx) {
+                handler.handle(message)
               }
+            } catch {
+              case e: IOException =>
+                // probably client disconnected... but log just in case..
+                logger.error(s"IO error processing message from client $clientId, probably client disconnected", e)
+              case e: Throwable =>
+                logger.error(s"Unhandled error processing message from client $clientId", e)
+                serverMessages.put(CliServerMessage.Log(s"Internal error: ${e.getMessage}", LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
             }
           }
-        )
+        })
       // run in another thread so we can cancel it if needed
     }
   }

@@ -23,8 +23,7 @@ class DederBspProxyServer(
     runTasks: RunTasks,
     scalaJsTasks: ScalaJsTasks,
     scalaNativeTasks: ScalaNativeTasks,
-    projectState: DederProjectState,
-    projectContext: ProjectContext
+    projectState: DederProjectState
 ) extends StrictLogging {
 
   private var serverChannel: ServerSocketChannel = uninitialized
@@ -52,8 +51,7 @@ class DederBspProxyServer(
             scalaJsTasks,
             scalaNativeTasks,
             projectState,
-            () => clientChannel.close(),
-            projectContext
+            () => clientChannel.close()
           )
           val os = Channels.newOutputStream(clientChannel)
           val is = Channels.newInputStream(clientChannel)
