@@ -168,7 +168,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
       execute = { ctx =>
         val (linkedBinaryPath, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
-          val testOptions = DederTestOptions(ctx.args)
+          val testOptions = DederTestOptions.fromArgs(ctx.args)
           val nativeModule = ctx.module.asInstanceOf[ScalaNativeTestModule]
           val runner = new ScalaNativeTestRunner(ctx.notifications, ctx.module.id)
           val results = runner.run(

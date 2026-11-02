@@ -5,8 +5,18 @@ import ba.sake.tupson.JsonRW
 import java.io.{PrintWriter, StringWriter}
 
 case class DederTestOptions(
-    testSelectors: Seq[String]
+    testSelectors: Seq[String],
+    frameworkArgs: Seq[String] = Seq.empty
 )
+
+object DederTestOptions {
+  /** Separates Deder's suite/test selectors from arguments passed unchanged to each test framework. */
+  def fromArgs(args: Seq[String]): DederTestOptions = {
+    val (testSelectors, separatorAndFrameworkArgs) = args.span(_ != "--")
+    val frameworkArgs = separatorAndFrameworkArgs.drop(1)
+    DederTestOptions(testSelectors, frameworkArgs)
+  }
+}
 
 enum DederTestStatus derives JsonRW {
   case Success, Failure, Error, Skipped

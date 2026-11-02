@@ -18,6 +18,27 @@ Use `test` (forked) for CI and when tests rely on isolation (static state, `Syst
 
 > ScalaJS and Scala Native only have `test` — they use their own runners and are unaffected by this split.
 
+## Framework arguments
+
+Test task arguments before a literal `--` select suites or tests. Arguments after it
+are passed unchanged to each test framework. For example, MUnit supports tag filters:
+
+```sh
+deder exec -t test -m app-test example.MySuite -- --exclude-tags=Slow
+```
+
+When selecting all suites, use two separators: `exec` consumes the first leading
+`--`, and the test task uses the second to begin framework arguments:
+
+```sh
+deder exec -t test -m app-test -- -- --include-tags=Slow
+```
+
+The same syntax applies to `testInMemory`, Scala.js and Scala Native test tasks.
+With no test-task separator, arguments retain their existing suite/test selector
+meaning. Framework arguments apply to every framework used by a module; the
+framework defines which options it accepts.
+
 ---
 
 ## JUnit XML reports
