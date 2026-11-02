@@ -1088,7 +1088,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
               (m.forkEnv.asScala.to(Map), resolve(m.testParallelism.toInt), resolve(m.maxTestForks.toInt))
             case _ => (Map.empty, cpus, cpus)
           }
-          val testOptions = DederTestOptions(ctx.args)
+          val testOptions = DederTestOptions.fromArgs(ctx.args)
           val clientEnv = RequestContext.current.get().envVars
           val mergedEnv = clientEnv ++ forkEnv // forkEnv wins on conflict
           val flushInterval = DederGlobals.forkTestFlushIntervalMs
@@ -1134,7 +1134,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
             case m: ScalaTestModule => resolve(m.testParallelism.toInt)
             case _                  => cpus
           }
-          val testOptions = DederTestOptions(ctx.args)
+          val testOptions = DederTestOptions.fromArgs(ctx.args)
           val results = inMemoryTestOrchestrator.run(
             discoveredTests = discoveredTests,
             runtimeClasspath = runClasspath,

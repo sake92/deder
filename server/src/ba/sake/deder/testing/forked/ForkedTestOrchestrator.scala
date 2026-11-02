@@ -364,6 +364,7 @@ object ForkedTestOrchestrator extends StrictLogging {
       forkId = forkId,
       discoveredTests = slice,
       testSelectors = testOptions.testSelectors,
+      frameworkArgs = testOptions.frameworkArgs,
       testParallelism = testParallelism,
       resultsFile = resultsFilePath.toString,
       flushIntervalMs = flushIntervalMs,

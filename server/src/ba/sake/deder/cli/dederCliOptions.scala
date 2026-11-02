@@ -88,6 +88,7 @@ case class DederCliExecOptions(
     watch: Flag,
     @arg(doc = "Disable terminal color output")
     noColor: Flag,
+    @arg(doc = "Task arguments; test tasks accept selectors followed by -- and framework arguments")
     args: Leftover[String]
 )
 

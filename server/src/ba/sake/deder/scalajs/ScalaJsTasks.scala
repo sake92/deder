@@ -161,7 +161,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
         val (linkedJsDir, discoveredTests) = ctx.depResults
         OutputCaptureContext.withCapture(ctx.notifications, ctx.module.id) {
           val jsModule = ctx.module.asInstanceOf[ScalaJsTestModule]
-          val testOptions = DederTestOptions(ctx.args)
+          val testOptions = DederTestOptions.fromArgs(ctx.args)
           val runner = new ScalaJsTestRunner(ctx.notifications, ctx.module.id)
           val results = runner.run(
             discoveredTests = discoveredTests,

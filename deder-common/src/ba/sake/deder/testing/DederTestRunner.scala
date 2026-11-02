@@ -49,7 +49,7 @@ class DederTestRunner(
             t.frameworkClassName,
             classLoader.loadClass(t.frameworkClassName).getDeclaredConstructor().newInstance().asInstanceOf[Framework]
           )
-          runFramework(framework, selectedTestClasses)
+          runFramework(framework, selectedTestClasses, options.frameworkArgs)
         }
       }
       DederTestResults.aggregate(allResults)
@@ -91,16 +91,16 @@ class DederTestRunner(
 
   private def runFramework(
       framework: Framework,
-      testClasses: Seq[(String, Fingerprint, Selector)]
+      testClasses: Seq[(String, Fingerprint, Selector)],
+      frameworkArgs: Seq[String]
   ): Seq[DederTestResult] = {
     logger.debug(s"Running tests with ${framework.name()}")
     if (testClasses.isEmpty) {
       logger.warn(s"No tests found for ${framework.name()}")
       return Seq.empty
     }
-    // TODO handle tags, framework specific..
     val runner = framework.runner(
-      Array.empty[String], // framework args
+      frameworkArgs.toArray,
       Array.empty[String], // remoteArgs
       classLoader
     )
