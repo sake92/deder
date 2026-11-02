@@ -58,8 +58,10 @@ This will build the server and client, and run the integration tests:
 
 The script forwards its arguments unchanged to Deder for both integration modules.
 `RelocationSuite` and `ConfigCacheIntegrationSuite` tag all their tests `Slow`.
-Daily CI at 03:17 UTC and manual workflow runs include these tests; regular CI
-excludes the tag. Without arguments, the local script runs everything.
+The separate `CI Full` workflow (`.github/workflows/ci-full.yaml`) runs daily at
+03:17 UTC and supports manual runs; it includes these tests. Regular CI in
+`.github/workflows/ci.yaml` excludes the tag. Without arguments, the local script
+runs everything.
 
 ---
 

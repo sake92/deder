@@ -33,5 +33,4 @@ deder shutdown && sleep 1
 deder exec -t publishLocal -m config -m plugin-api
 
 # Forward suite selectors and framework arguments unchanged to both test modules.
-deder exec -t test -m integration-test "$@"
-deder exec -t test -m bsp-integration-test "$@"
+deder exec -t test -m integration-test -m bsp-integration-test "$@"
