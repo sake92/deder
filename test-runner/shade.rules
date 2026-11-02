@@ -19,6 +19,11 @@ rule org.scalatools.** org.scalatools.@1
 rule ba.sake.tupson.** shaded.ba.sake.tupson.@1
 rule fansi.** shaded.fansi.@1
 rule geny.** shaded.geny.@1
+# Jarjar also rewrites class-like string literals. Preserve JVM property keys
+# before shading os-lib, so scala.util.Properties still detects the host OS.
+rule os.name os.name
+rule os.arch os.arch
+rule os.version os.version
 rule os.** shaded.os.@1
 rule sourcecode.** shaded.sourcecode.@1
 rule org.typelevel.** shaded.org.typelevel.@1

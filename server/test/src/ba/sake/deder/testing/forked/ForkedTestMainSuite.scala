@@ -2,6 +2,11 @@ package ba.sake.deder.testing.forked
 
 class ForkedTestMainSuite extends munit.FunSuite {
 
+  test("forked runtime preserves OS detection after shading") {
+    assertEquals(scala.util.Properties.osName, System.getProperty("os.name"))
+    assertEquals(scala.util.Properties.isWin, java.io.File.separatorChar == '\\')
+  }
+
   test("cancelFile existence check works correctly") {
     // ForkedTestMain uses: () => cancelFile.nonEmpty && os.exists(cancelFilePath)
     // Test the logic inline.
