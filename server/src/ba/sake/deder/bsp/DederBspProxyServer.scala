@@ -5,7 +5,7 @@ import ba.sake.deder.scalanative.ScalaNativeTasks
 
 import java.net.StandardProtocolFamily
 import java.net.UnixDomainSocketAddress
-import java.nio.channels.{ServerSocketChannel, SocketChannel}
+import java.nio.channels.{AsynchronousCloseException, ServerSocketChannel, SocketChannel}
 import java.nio.file.{Files, Path, Paths}
 import java.nio.channels.Channels
 import org.eclipse.lsp4j.jsonrpc.Launcher
@@ -72,6 +72,9 @@ class DederBspProxyServer(
           if clientChannel != null && clientChannel.isOpen then clientChannel.close()
         }
       }
+    } catch {
+      case _: AsynchronousCloseException if !serverChannel.isOpen =>
+        // stop closes the blocking accept socket during normal shutdown.
     } finally {
       stop()
     }

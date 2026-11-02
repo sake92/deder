@@ -59,13 +59,13 @@ class CliClientSocketReader(
 
       // Track this client's request so we can cancel it on disconnect (Ctrl+C)
       message match
-        case _: CliClientMessage.Exec => DederGlobals.clientRequestMap.put(clientId, requestId)
+        case _: CliClientMessage.Exec   => DederGlobals.clientRequestMap.put(clientId, requestId)
         case _: CliClientMessage.Cancel => DederGlobals.clientRequestMap.remove(clientId)
-        case _ => ()
+        case _                          => ()
 
       Thread
         .ofVirtual()
-        .start(() =>
+        .start(ProjectContext.runnable {
           supervised {
             try {
               RequestContext.current.supervisedWhere(ctx) {
@@ -81,7 +81,7 @@ class CliClientSocketReader(
                 serverMessages.put(CliServerMessage.Exit(1))
             }
           }
-        )
+        })
       // run in another thread so we can cancel it if needed
     }
   }

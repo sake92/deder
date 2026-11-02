@@ -23,6 +23,7 @@ import ba.sake.deder.scalajs.ScalaJsTasks
 import ba.sake.deder.scalanative.ScalaNativeTasks
 import ba.sake.deder.graalvm.GraalVmNativeImageTasks
 import ba.sake.deder.publish.PublishTasks
+import ox.*
 
 class DederProjectState(
     coreTasks: CoreTasks,
@@ -71,8 +72,10 @@ class DederProjectState(
 
   reloadProject()
 
-  scheduleInactiveShutdownChecker()
-  scheduleProjectRootChecker()
+  /** Start server-owned background workers in the startup project scope. */
+  def startBackgroundWorkers()(using Ox): Unit =
+    forkUserDiscard { runInactiveShutdownChecker() }
+    forkUserDiscard { runProjectRootChecker() }
 
   def readState(useLastGood: Boolean): Either[String, DederProjectStateData] =
     stateLock.synchronized {
@@ -136,8 +139,14 @@ class DederProjectState(
             val effectiveRegistry = TasksRegistry(baseTasks)
             val tasksRegistryApi = TasksRegistryApiAdapter(effectiveRegistry)
             val pluginLoader =
-              PluginLoader(coreTasksApi, scalaJsTasksApi, scalaNativeTasksApi, dependencyResolver, internals,
-                tasksRegistryApi)
+              PluginLoader(
+                coreTasksApi,
+                scalaJsTasksApi,
+                scalaNativeTasksApi,
+                dependencyResolver,
+                internals,
+                tasksRegistryApi
+              )
             val loadResult = pluginLoader.load(loadedPlugins, configFile, newConfig)
             loadedPlugins = loadResult.loadedPlugins
 
@@ -156,8 +165,7 @@ class DederProjectState(
             internals.setLoadedPlugins(allPluginInfo)
 
             // Add plugin tasks to the same registry the adapter points to
-            for task <- loadedPlugins.flatMap(_.tasks) do
-              effectiveRegistry.add(task.asInstanceOf[Task[?, ?, ?]])
+            for task <- loadedPlugins.flatMap(_.tasks) do effectiveRegistry.add(task.asInstanceOf[Task[?, ?, ?]])
 
             val tasksResolver = TasksResolver(newConfig, effectiveRegistry)
             val executionPlanner =
@@ -433,19 +441,21 @@ class DederProjectState(
           internals.updateLockBlocking(requestId, taskInstance.id)
           // fork a background thread that periodically reports "waiting for lock" to the CLI
           val cancelled = new AtomicBoolean(false)
-          val progressThread = Thread.ofVirtual().start(() => {
-            try {
-              Thread.sleep(10_000) // first message after 10 seconds
-              while (!cancelled.get()) {
-                serverNotificationsLogger.add(
-                  ServerNotification.logInfo(s"Waiting for lock on ${taskInstance.id}...")
-                )
-                Thread.sleep(10_000)
+          val progressThread = Thread
+            .ofVirtual()
+            .start(() => {
+              try {
+                Thread.sleep(10_000) // first message after 10 seconds
+                while (!cancelled.get()) {
+                  serverNotificationsLogger.add(
+                    ServerNotification.logInfo(s"Waiting for lock on ${taskInstance.id}...")
+                  )
+                  Thread.sleep(10_000)
+                }
+              } catch {
+                case _: InterruptedException => // stopped
               }
-            } catch {
-              case _: InterruptedException => // stopped
-            }
-          })
+            })
           try
             if taskLockTimeoutEnabled then
               val acquired = taskInstance.lock.tryLock(taskLockTimeoutSeconds.toLong, TimeUnit.SECONDS)
@@ -560,13 +570,16 @@ class DederProjectState(
               // Only fire if the request hasn't already completed cooperatively
               if DederGlobals.cancellationTokens.containsKey(requestId) then {
                 Option(DederGlobals.runningTaskThreads.get(requestId)).foreach { threads =>
-                  logger.info(s"Cancel grace period expired for $requestId, interrupting ${threads.size()} task threads")
+                  logger.info(
+                    s"Cancel grace period expired for $requestId, interrupting ${threads.size()} task threads"
+                  )
                   threads.forEach { t => t.interrupt() }
                 }
               }
             }
           },
-          cancelGracePeriodMs, TimeUnit.MILLISECONDS
+          cancelGracePeriodMs,
+          TimeUnit.MILLISECONDS
         )
         DederGlobals.interruptFutures.put(requestId, future)
       }
@@ -725,63 +738,52 @@ class DederProjectState(
       case (0, f)           => s"🔴 All $f ${item}s failed. $sizeStr freed"
       case (s, f)           => s"✅ Cleaned $s ${item}s, $f ${item}s failed. $sizeStr freed"
 
-  private def scheduleInactiveShutdownChecker(): Unit = {
-    Thread
-      .ofVirtual()
-      .name("inactivity-checker")
-      .start(() => {
-        var running = true
-        while (running && !shutdownStarted) {
-          try {
-            Thread.sleep(TimeUnit.MINUTES.toMillis(1))
-            if (inFlightRequests.get() == 0) {
-              val now = Instant.now()
-              val lastEnded = lastRequestEndedAt.get()
-              val inactiveDuration = Duration.between(lastEnded, now)
-              if (inactiveDuration.compareTo(maxInactiveDuration) > 0) {
-                logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
-                shutdown()
-                running = false
-              }
-            }
-          } catch {
-            case _: InterruptedException => running = false
-            case NonFatal(e) =>
-              logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
+  private def runInactiveShutdownChecker(): Unit = {
+    var running = true
+    while (running && !shutdownStarted) {
+      try {
+        Thread.sleep(TimeUnit.MINUTES.toMillis(1))
+        if (inFlightRequests.get() == 0) {
+          val now = Instant.now()
+          val lastEnded = lastRequestEndedAt.get()
+          val inactiveDuration = Duration.between(lastEnded, now)
+          if (inactiveDuration.compareTo(maxInactiveDuration) > 0) {
+            logger.info(s"No requests for ${inactiveDuration.toMinutes} minutes, shutting down server.")
+            shutdown()
+            running = false
           }
         }
-      })
+      } catch {
+        case _: InterruptedException => running = false
+        case NonFatal(e) =>
+          logger.error(s"Error during inactivity shutdown checker: ${e.getMessage}")
+      }
+    }
   }
 
-  /** Checks periodically whether the project root directory still exists (e.g. the folder
-    * was deleted, or a git worktree was removed). If it's gone, the server is useless —
-    * its sockets, lock file and watcher all live under the deleted root — so log the reason
-    * and shut down cleanly, instead of lingering until the idle timeout.
+  /** Checks periodically whether the project root directory still exists (e.g. the folder was deleted, or a git
+    * worktree was removed). If it's gone, the server is useless — its sockets, lock file and watcher all live under the
+    * deleted root — so log the reason and shut down cleanly, instead of lingering until the idle timeout.
     */
-  private def scheduleProjectRootChecker(): Unit = {
-    Thread
-      .ofVirtual()
-      .name("project-root-checker")
-      .start(() => {
-        var running = true
-        while (running && !shutdownStarted) {
-          try {
-            Thread.sleep(TimeUnit.SECONDS.toMillis(10))
-            val projectRoot = DederGlobals.projectRootDir
-            if !os.exists(projectRoot) then {
-              val msg = s"Project root directory '$projectRoot' was deleted or moved. Shutting down server."
-              logger.warn(msg)
-              System.err.println(msg)
-              shutdown()
-              running = false
-            }
-          } catch {
-            case _: InterruptedException => running = false
-            case NonFatal(e) =>
-              logger.error(s"Error during project root checker: ${e.getMessage}")
-          }
+  private def runProjectRootChecker(): Unit = {
+    var running = true
+    while (running && !shutdownStarted) {
+      try {
+        Thread.sleep(TimeUnit.SECONDS.toMillis(10))
+        val projectRoot = DederGlobals.projectRootDir
+        if !os.exists(projectRoot) then {
+          val msg = s"Project root directory '$projectRoot' was deleted or moved. Shutting down server."
+          logger.warn(msg)
+          System.err.println(msg)
+          shutdown()
+          running = false
         }
-      })
+      } catch {
+        case _: InterruptedException => running = false
+        case NonFatal(e) =>
+          logger.error(s"Error during project root checker: ${e.getMessage}")
+      }
+    }
   }
 
   def triggerFileWatchedTasks(changedPaths: Set[os.Path]): Unit = {
@@ -827,32 +829,30 @@ class DederProjectState(
         val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
         Thread
           .ofVirtual()
-          .start(() =>
+          .start(ProjectContext.runnable {
             try
-              ox.supervised {
-                RequestContext.current.supervisedWhere(ctx) {
-                  watchedTask.serverNotificationsLogger.add(
-                    ServerNotification.logInfo(
-                      s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-                      watchedTask.taskInstance.moduleId
-                    )
+              RequestContext.current.supervisedWhere(ctx) {
+                watchedTask.serverNotificationsLogger.add(
+                  ServerNotification.logInfo(
+                    s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                    watchedTask.taskInstance.moduleId
                   )
-                  executeTasks(
-                    ctx.requestId,
-                    CallerType.Cli,
-                    Seq(watchedTask.taskInstance.moduleId),
-                    watchedTask.taskInstance.task.name,
-                    watchedTask.args,
-                    true, // tell client we are in watch mode
-                    watchedTask.serverNotificationsLogger,
-                    watchedTask.useLastGood
-                  )
-                }
+                )
+                executeTasks(
+                  ctx.requestId,
+                  CallerType.Cli,
+                  Seq(watchedTask.taskInstance.moduleId),
+                  watchedTask.taskInstance.task.name,
+                  watchedTask.args,
+                  true, // tell client we are in watch mode
+                  watchedTask.serverNotificationsLogger,
+                  watchedTask.useLastGood
+                )
               }
             catch
               case NonFatal(e) =>
                 logger.warn(s"Watch rerun for ${watchedTask.taskInstance.id} failed: ${e.getMessage}")
-          )
+          })
       }
     }
   }
@@ -892,32 +892,30 @@ class DederProjectState(
         val ctx = watchedTask.ctx.copy(requestId = UUID.randomUUID().toString)
         Thread
           .ofVirtual()
-          .start(() =>
+          .start(ProjectContext.runnable {
             try
-              ox.supervised {
-                RequestContext.current.supervisedWhere(ctx) {
-                  watchedTask.serverNotificationsLogger.add(
-                    ServerNotification.logInfo(
-                      s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
-                      watchedTask.taskInstance.moduleId
-                    )
+              RequestContext.current.supervisedWhere(ctx) {
+                watchedTask.serverNotificationsLogger.add(
+                  ServerNotification.logInfo(
+                    s"⌚ Executing ${watchedTask.taskInstance.id} in watch mode...",
+                    watchedTask.taskInstance.moduleId
                   )
-                  executeCLI(
-                    Seq(watchedTask.taskInstance.moduleId),
-                    watchedTask.taskInstance.task.name,
-                    watchedTask.args,
-                    watchedTask.serverNotificationsLogger,
-                    watchedTask.useLastGood,
-                    startWatch = false,
-                    exitOnEnd = false,
-                    watch = true
-                  )
-                }
+                )
+                executeCLI(
+                  Seq(watchedTask.taskInstance.moduleId),
+                  watchedTask.taskInstance.task.name,
+                  watchedTask.args,
+                  watchedTask.serverNotificationsLogger,
+                  watchedTask.useLastGood,
+                  startWatch = false,
+                  exitOnEnd = false,
+                  watch = true
+                )
               }
             catch
               case NonFatal(e) =>
                 logger.warn(s"Watch rerun for ${watchedTask.taskInstance.id} failed: ${e.getMessage}")
-          )
+          })
       }
     }
   }
@@ -951,11 +949,9 @@ class DederProjectState(
   private[deder] def purgeInMemoryCachesImpl(): PurgeCachesResult = {
     // Wait for in-flight requests to drain (10s timeout, 100ms polling)
     val deadline = System.currentTimeMillis() + 10_000
-    while inFlightRequests.get() > 0 && System.currentTimeMillis() < deadline do
-      Thread.sleep(100)
+    while inFlightRequests.get() > 0 && System.currentTimeMillis() < deadline do Thread.sleep(100)
 
-    if inFlightRequests.get() > 0 then
-      PurgeCachesResult(0, 0, 0, false)
+    if inFlightRequests.get() > 0 then PurgeCachesResult(0, 0, 0, false)
     else
       val cachesCleared = internals.registry.invalidateAll()
       val bspEntriesRemoved = bspServers.asScala.map(_.cleanupCompletedInFlight()).sum

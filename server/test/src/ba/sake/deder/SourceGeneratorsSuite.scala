@@ -10,7 +10,8 @@ import io.opentelemetry.sdk.metrics.SdkMeterProvider
 class SourceGeneratorsSuite extends munit.FunSuite {
 
   private def noopInternals: DederProjectInternalsImpl =
-    val sdk = OpenTelemetrySdk.builder()
+    val sdk = OpenTelemetrySdk
+      .builder()
       .setMeterProvider(SdkMeterProvider.builder().build())
       .build()
     DederProjectInternalsImpl(sdk.getMeter("test"), CacheStatsRegistry())
@@ -26,7 +27,6 @@ class SourceGeneratorsSuite extends munit.FunSuite {
 
   override def beforeAll(): Unit = {
     testProjectDir = os.pwd / "server/test/resources/sample-projects/multi"
-    System.setProperty("DEDER_PROJECT_ROOT_DIR", testProjectDir.toString)
   }
 
   test("FanInTask reports its collectKind via dynamicDeps") {
@@ -124,7 +124,7 @@ class SourceGeneratorsSuite extends munit.FunSuite {
     val tasksRegistry = TasksRegistry(coreTasks.all ++ Seq(gen, fanIn))
     val pool = java.util.concurrent.Executors.newFixedThreadPool(4)
     try {
-      val state =
+      val state = ProjectContext.run(ProjectContext(testProjectDir)) {
         DederProjectState(
           coreTasks,
           runTasks,
@@ -140,21 +140,24 @@ class SourceGeneratorsSuite extends munit.FunSuite {
           configFile = testProjectDir / "deder.pkl",
           internals = noopInternals
         )
+      }
       val notif = new ServerNotificationsLogger(_ => ())
-      val results = state.executeTasks(
-        requestId = java.util.UUID.randomUUID().toString,
-        callerType = CallerType.Cli,
-        moduleIds = Seq("common"),
-        taskName = "syntheticFanIn",
-        args = Seq.empty,
-        watch = false,
-        serverNotificationsLogger = notif,
-        useLastGood = false
-      )
+      val results = ProjectContext.run(ProjectContext(testProjectDir)) {
+        state.executeTasks(
+          requestId = java.util.UUID.randomUUID().toString,
+          callerType = CallerType.Cli,
+          moduleIds = Seq("common"),
+          taskName = "syntheticFanIn",
+          args = Seq.empty,
+          watch = false,
+          serverNotificationsLogger = notif,
+          useLastGood = false
+        )
+      }
       assertEquals(results.size, 1)
       val collected = results.head match
         case TaskExecResult.Success(_, value, _, _) => value.asInstanceOf[Seq[os.Path]]
-        case _ => fail("expected Success")
+        case _                                      => fail("expected Success")
       assertEquals(collected.size, 1)
       assert(os.exists(collected.head / "marker.txt"))
     } finally pool.shutdownNow()

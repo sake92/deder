@@ -64,6 +64,9 @@ class DederBspServer(
       resultFuture: CompletableFuture[CompileResult]
   )
 
+  // Java JSON-RPC callbacks and CompletableFuture workers do not inherit Ox fork locals.
+  private val projectContext = ProjectContext.requireCurrent
+
   override def cancelRequest(params: CancelRequestParams): Unit = {
     val originId: String = params.getId match {
       case e if e.isLeft  => e.getLeft
@@ -204,12 +207,14 @@ class DederBspServer(
       result
     }
 
-  override def onBuildInitialized(): Unit = traced("onBuildInitialized") {
-    logger.debug(s"onBuildInitialized")
-    ensureRunning()
-    // Trigger silent background compilation so compile errors appear as diagnostics
-    // in the IDE without showing compile progress in the Metals status bar.
-    CompletableFuture.runAsync { () => compileAllModulesOnInit() }
+  override def onBuildInitialized(): Unit = ProjectContext.run(projectContext) {
+    traced("onBuildInitialized") {
+      logger.debug(s"onBuildInitialized")
+      ensureRunning()
+      // Trigger silent background compilation so compile errors appear as diagnostics
+      // in the IDE without showing compile progress in the Metals status bar.
+      CompletableFuture.runAsync(ProjectContext.runnable { compileAllModulesOnInit() })
+    }
   }
 
   override def workspaceReload(): CompletableFuture[Object] = javaFuture("workspaceReload") {
@@ -982,9 +987,11 @@ class DederBspServer(
     null.asInstanceOf[Object]
   }
 
-  override def onBuildExit(): Unit = traced("onBuildExit") {
-    logger.debug(s"onBuildExit")
-    onExit() // just closes the unix socket connection
+  override def onBuildExit(): Unit = ProjectContext.run(projectContext) {
+    traced("onBuildExit") {
+      logger.debug(s"onBuildExit")
+      onExit() // just closes the unix socket connection
+    }
   }
 
   /** Called by projectState when CLI shutdown is requested — gracefully ends the BSP session */
@@ -1233,8 +1240,8 @@ class DederBspServer(
   /** Render the complete diagnostics picture for a module from a CompileResult: publish each known source file with
     * reset=true. Clean files (empty list) thereby clear stale IDE markers; files with diagnostics set them. Files that
     * were published before but are no longer part of the picture (renamed/deleted) receive an explicit empty reset —
-    * without it the client never clears their stale markers. Used on cache hits and to finalize cache-miss compiles,
-    * so both converge on identical, complete state.
+    * without it the client never clears their stale markers. Used on cache hits and to finalize cache-miss compiles, so
+    * both converge on identical, complete state.
     */
   private def renderCompileResult(
       moduleId: String,
@@ -1288,10 +1295,12 @@ class DederBspServer(
     // Capture W3C traceparent on the dispatch thread (ThreadLocal is lost across supplyAsync)
     val capturedTraceparent = Option(RequestContext.traceparent.get())
     CompletableFuture.supplyAsync { () =>
-      // Propagate to the async worker thread so traced() can read it
-      capturedTraceparent.foreach(RequestContext.traceparent.set)
-      traced(spanName, originId) {
-        thunk
+      ProjectContext.run(projectContext) {
+        // Propagate to the async worker thread so traced() can read it
+        capturedTraceparent.foreach(RequestContext.traceparent.set)
+        traced(spanName, originId) {
+          thunk
+        }
       }
     }
   }
