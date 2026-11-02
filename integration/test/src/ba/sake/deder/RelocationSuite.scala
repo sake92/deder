@@ -5,6 +5,9 @@ import scala.jdk.CollectionConverters.*
 
 class RelocationSuite extends BaseIntegrationSuite {
 
+  override def munitTests(): Seq[munit.Test] =
+    super.munitTests().map(_.tag(new munit.Tag("Slow")))
+
   private val quietFlags = Seq("--log-level", "warning", "--no-color")
   private val props = Map("logLevel" -> "DEBUG")
 

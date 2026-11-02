@@ -91,6 +91,7 @@ local const dederCommonModules =
       deps {
         "ba.sake::tupson:\(versions.tupson)"
         "com.lihaoyi::os-lib:\(versions.osLib)"
+        "com.softwaremill.ox::core:\(versions.ox)"
         "org.scala-sbt:test-interface:\(versions.testInterface)"
         "com.lihaoyi::fansi:\(versions.fansi)"
         "commons-codec:commons-codec:\(versions.commonsCodec)"
@@ -252,9 +253,9 @@ local const bspIntegrationTest = new ScalaTestModule {
   deps {
     "org.scalameta::munit:\(versions.munit)"
   }
-  // BSP suites start real servers and use Unix sockets, so keep them isolated.
-  maxTestForks = 1
-  testParallelism = 1
+  // BSP suites start real servers and use Unix sockets; cap forks for CI resources.
+  maxTestForks = 4
+  testParallelism = 0
   junitXmlReport {
     enabled = true
   }

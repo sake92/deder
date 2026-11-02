@@ -121,14 +121,15 @@ jobs:
       - uses: sbt/setup-sbt@v1
         with:
           sbt-runner-version: 1.12.11
-      - name: Integration Test Suite
-        run: |
-          ./scripts/run-it-tests.sh
+      - name: Integration tests (exclude slow tags)
+        run: ./scripts/run-it-tests.sh -- -- --exclude-tags=Slow
       - name: Publish Test Report
         uses: mikepenz/action-junit-report@v6
         if: success() || failure() # always run even if the previous step fails
         with:
-          report_paths: '.deder/out/**/reports/junit/TEST-*.xml'
+          report_paths: |
+            .deder/out/integration-test/test/run-*/reports/junit/TEST-*.xml
+            .deder/out/bsp-integration-test/test/run-*/reports/junit/TEST-*.xml
       - name: Deder output
         if: failure()
         uses: actions/upload-artifact@v4

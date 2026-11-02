@@ -17,6 +17,8 @@ class DederTestRunner(
     classLoader: ClassLoader,
     logger: TestRunnerLogger,
     forkHooks: Option[ForkRunnerHooks] = None,
+    /** Wraps tasks submitted to a non-Ox executor; standalone runners use the identity wrapper. */
+    taskContext: Runnable => Runnable = identity,
     isCancelled: () => Boolean = () => false
 ) {
 
@@ -47,7 +49,7 @@ class DederTestRunner(
             t.frameworkClassName,
             classLoader.loadClass(t.frameworkClassName).getDeclaredConstructor().newInstance().asInstanceOf[Framework]
           )
-          runFramework(framework, selectedTestClasses)
+          runFramework(framework, selectedTestClasses, options.frameworkArgs)
         }
       }
       DederTestResults.aggregate(allResults)
@@ -89,16 +91,16 @@ class DederTestRunner(
 
   private def runFramework(
       framework: Framework,
-      testClasses: Seq[(String, Fingerprint, Selector)]
+      testClasses: Seq[(String, Fingerprint, Selector)],
+      frameworkArgs: Seq[String]
   ): Seq[DederTestResult] = {
     logger.debug(s"Running tests with ${framework.name()}")
     if (testClasses.isEmpty) {
       logger.warn(s"No tests found for ${framework.name()}")
       return Seq.empty
     }
-    // TODO handle tags, framework specific..
     val runner = framework.runner(
-      Array.empty[String], // framework args
+      frameworkArgs.toArray,
       Array.empty[String], // remoteArgs
       classLoader
     )
@@ -186,18 +188,18 @@ class DederTestRunner(
       val executor = Executors.newFixedThreadPool(testParallelism)
       try {
         val futures: Seq[JFuture[?]] = tasks.map { task =>
-          executor.submit((() => {
+          val taskRunnable = taskContext((() => {
             if (capturedNotificationsLogger != null) {
               OutputCaptureContext.currentNotificationsLogger.set(capturedNotificationsLogger)
               OutputCaptureContext.currentModuleId.set(capturedModuleId)
             }
-            // TODO Request id ?
             try runOne(task)
             finally {
               OutputCaptureContext.currentNotificationsLogger.remove()
               OutputCaptureContext.currentModuleId.remove()
             }
           }): Runnable)
+          executor.submit(taskRunnable)
         }
         try futures.foreach(_.get())
         catch {
@@ -218,6 +220,7 @@ class DederTestRunner(
 }
 
 class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) extends EventHandler {
+  private val stateLock = new AnyRef
   private val _results = mutable.ArrayBuffer[DederTestResult]()
   private val _classStats = mutable.Map[String, TestClassStats]()
 
@@ -266,7 +269,7 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
       }
     }
 
-    _results += DederTestResult(
+    val result = DederTestResult(
       name = testName,
       suiteName = suiteName,
       testCaseName = testCaseName,
@@ -274,23 +277,26 @@ class DederTestEventHandler(logger: TestRunnerLogger, frameworkName: String) ext
       duration = event.duration(),
       failure = failure
     )
-    val existing = _classStats.getOrElse(suiteName, TestClassStats(0L, "passed", 0L))
-    val newStatus =
-      if event.status() == Status.Failure || event.status() == Status.Error then "failed"
-      else existing.lastStatus
-    _classStats.update(
-      suiteName,
-      TestClassStats(
-        durationMs = existing.durationMs + event.duration(),
-        lastStatus = newStatus,
-        lastRunEpochMs = System.currentTimeMillis()
+    stateLock.synchronized {
+      _results += result
+      val existing = _classStats.getOrElse(suiteName, TestClassStats(0L, "passed", 0L))
+      val newStatus =
+        if event.status() == Status.Failure || event.status() == Status.Error then "failed"
+        else existing.lastStatus
+      _classStats.update(
+        suiteName,
+        TestClassStats(
+          durationMs = existing.durationMs + event.duration(),
+          lastStatus = newStatus,
+          lastRunEpochMs = System.currentTimeMillis()
+        )
       )
-    )
+    }
   }
 
-  def results: Seq[DederTestResult] = _results.toSeq
+  def results: Seq[DederTestResult] = stateLock.synchronized(_results.toVector)
 
-  def perClassStats: Map[String, TestClassStats] = _classStats.toMap
+  def perClassStats: Map[String, TestClassStats] = stateLock.synchronized(_classStats.toMap)
 
   private def shouldLogStackTrace(t: Throwable): Boolean =
     logger.showStackTraces && !isScalaJsMappedFailure(t)

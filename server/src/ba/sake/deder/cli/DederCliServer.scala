@@ -24,7 +24,6 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
   private var serverChannel: ServerSocketChannel = uninitialized
 
   def start(): Unit = {
-
     val relativeSocketPath = ".deder/server-cli.sock"
     val socketPath = DederGlobals.projectRootDir / os.RelPath(relativeSocketPath)
     os.makeDir.all(socketPath / os.up)
@@ -46,18 +45,27 @@ class DederCliServer(projectState: DederProjectState) extends StrictLogging {
         val clientReadRunner =
           new CliClientSocketReader(projectState, handler, clientChannel, clientId, serverMessages)
         val clientWriteRunner = new CliClientSocketWriter(projectState, clientChannel, clientId, serverMessages)
-        Thread.ofVirtual().name(s"CliClientSocketWriter-${clientId}").start(clientWriteRunner)
-        Thread.ofVirtual().name(s"CliClientSocketReader-${clientId}").start(clientReadRunner)
+        Thread
+          .ofVirtual()
+          .name(s"CliClientSocketWriter-${clientId}")
+          .start(ProjectContext.runnable { clientWriteRunner.run() })
+        Thread
+          .ofVirtual()
+          .name(s"CliClientSocketReader-${clientId}")
+          .start(ProjectContext.runnable { clientReadRunner.run() })
         // no join, just let them run
       }
+    } catch {
+      case _: AsynchronousCloseException if !serverChannel.isOpen =>
+        // stopAccepting/stop closes the blocking accept socket during normal shutdown.
     } finally {
       stop()
     }
   }
 
-  /** Close the accept socket immediately so no new clients can connect.
-    * Existing client channels are unaffected.
-    * Does NOT delete the socket file — that's done by start() of the next server. */
+  /** Close the accept socket immediately so no new clients can connect. Existing client channels are unaffected. Does
+    * NOT delete the socket file — that's done by start() of the next server.
+    */
   def stopAccepting(): Unit = {
     CloseUtils.quietly { if (serverChannel != null && serverChannel.isOpen()) serverChannel.close() }
   }

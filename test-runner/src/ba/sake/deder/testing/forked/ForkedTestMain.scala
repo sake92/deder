@@ -33,7 +33,12 @@ object ForkedTestMain {
         forkHooks = Some(ForkRunnerHooks(capture, reporter)),
         isCancelled = () => forkedArgs.cancelFile.nonEmpty && os.exists(cancelFilePath)
       )
-      val results = testRunner.run(DederTestOptions(forkedArgs.testSelectors))
+      val results = testRunner.run(
+        DederTestOptions(
+          testSelectors = forkedArgs.testSelectors,
+          frameworkArgs = forkedArgs.frameworkArgs
+        )
+      )
       val payload = ForkedTestResultsPayload(results, testRunner.perClassStats)
       os.write.over(os.Path(forkedArgs.resultsFile), payload.toJson(spaces = 0, sort = false), createFolders = true)
       reporter.emit(ForkedTestEnvelope.ForkCompleted(forkedArgs.forkId, results))

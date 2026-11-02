@@ -32,9 +32,10 @@ class DederGlobalsSuite extends munit.FunSuite {
   }
 
   test("allClassesDirs: own dir first, then deps in given order (no dedup — that's Classpath's job)") {
-    System.setProperty("DEDER_PROJECT_ROOT_DIR", os.pwd.toString)
-    // a -> {b, c}, b -> d, c -> d : tree flatten is [b, c, d], d is the shared foundation (last)
-    val dirs = DederGlobals.allClassesDirs("a", Seq("b", "c", "d"))
-    assertEquals(dirs, Seq("a", "b", "c", "d").map(DederGlobals.classesDir))
+    ProjectContext.run(ProjectContext(os.pwd)) {
+      // a -> {b, c}, b -> d, c -> d : tree flatten is [b, c, d], d is the shared foundation (last)
+      val dirs = DederGlobals.allClassesDirs("a", Seq("b", "c", "d"))
+      assertEquals(dirs, Seq("a", "b", "c", "d").map(DederGlobals.classesDir))
+    }
   }
 }

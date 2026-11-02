@@ -10,7 +10,8 @@ case class ForkedTestArgs(
     testParallelism: Int,
     resultsFile: String,
     flushIntervalMs: Long = 0,
-    cancelFile: String = ""
+    cancelFile: String = "",
+    frameworkArgs: Seq[String] = Seq.empty
 ) derives JsonRW
 
 case class ForkedTestResultsPayload(
