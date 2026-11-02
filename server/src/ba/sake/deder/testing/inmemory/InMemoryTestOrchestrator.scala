@@ -46,7 +46,26 @@ class InMemoryTestOrchestrator(cacheRegistry: CacheStatsRegistry):
           tok != null && tok.get()
         }
       }
-      val testRunner = DederTestRunner(testParallelism, discoveredTests, Map.empty, classLoader, logger, isCancelled = isCancelled)
+      // The runner's fixed executor is not an Ox scope, so capture server-owned
+      // context at this dispatch boundary and restore it for each worker task.
+      val projectContext = ProjectContext.requireCurrent
+      val requestContext = RequestContext.current.get()
+      val taskContext: Runnable => Runnable = task => () => {
+        ProjectContext.run(projectContext) {
+          RequestContext.current.supervisedWhere(requestContext) {
+            task.run()
+          }
+        }
+      }
+      val testRunner = DederTestRunner(
+        testParallelism,
+        discoveredTests,
+        Map.empty,
+        classLoader,
+        logger,
+        taskContext = taskContext,
+        isCancelled = isCancelled
+      )
       testRunner.run(testOptions)
     } finally {
       Thread.currentThread().setContextClassLoader(oldClassloader)
