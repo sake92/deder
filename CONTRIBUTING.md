@@ -48,9 +48,18 @@ This will build the server and client, and run the integration tests:
 ```shell
 # run all
 ./scripts/run-it-tests.sh
-# or just one
-./scripts/run-it-tests.sh ba.sake.deder.bsp.BspIntegrationSuite
+# run the regular-CI subset (exclude tests tagged Slow)
+./scripts/run-it-tests.sh -- -- --exclude-tags=Slow
+# run only tests tagged Slow
+./scripts/run-it-tests.sh -- -- --include-tags=Slow
+# or select a suite from either integration module
+./scripts/run-it-tests.sh ba.sake.deder.PluginIntegrationSuite
 ```
+
+The script forwards its arguments unchanged to Deder for both integration modules.
+`RelocationSuite` and `ConfigCacheIntegrationSuite` tag all their tests `Slow`.
+Daily CI at 03:17 UTC and manual workflow runs include these tests; regular CI
+excludes the tag. Without arguments, the local script runs everything.
 
 ---
 

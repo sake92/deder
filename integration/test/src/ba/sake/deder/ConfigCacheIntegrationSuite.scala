@@ -8,6 +8,9 @@ import ba.sake.tupson.*
 
 class ConfigCacheIntegrationSuite extends BaseIntegrationSuite {
 
+  override def munitTests(): Seq[munit.Test] =
+    super.munitTests().map(_.tag(new munit.Tag("Slow")))
+
   private case class CacheMetadata(inputsHash: String, cachedAt: Instant) derives JsonRW
   private case class ListedTask(name: String) derives JsonRW
 
