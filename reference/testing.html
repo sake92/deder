@@ -46,6 +46,7 @@ for (const link of document.querySelectorAll('body > header > nav > div > a')) {
         <li><a href="#testing">Testing</a>
          <ul>
           <li><a href="#tasks">Tasks</a></li>
+          <li><a href="#framework-arguments">Framework arguments</a></li>
           <li><a href="#junit-xml-reports">JUnit XML reports</a></li>
           <li><a href="#execution-modes">Execution modes</a>
            <ul>
@@ -102,6 +103,14 @@ for (const link of document.querySelectorAll('body > header > nav > div > a')) {
    <blockquote>
     <p>ScalaJS and Scala Native only have <code>test</code> — they use their own runners and are unaffected by this split.</p>
    </blockquote>
+   <h2 id="framework-arguments">Framework arguments<a href="#framework-arguments" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Test task arguments before a literal <code>--</code> select suites or tests. Arguments after it are passed unchanged to each test framework. For example, MUnit supports tag filters:</p>
+   <pre><code class="language-sh hljs language-bash" data-highlighted="yes">deder <span class="hljs-built_in">exec</span> -t <span class="hljs-built_in">test</span> -m app-test example.MySuite -- --exclude-tags=Slow
+</code></pre>
+   <p>When selecting all suites, use two separators: <code>exec</code> consumes the first leading <code>--</code>, and the test task uses the second to begin framework arguments:</p>
+   <pre><code class="language-sh hljs language-bash" data-highlighted="yes">deder <span class="hljs-built_in">exec</span> -t <span class="hljs-built_in">test</span> -m app-test -- -- --include-tags=Slow
+</code></pre>
+   <p>The same syntax applies to <code>testInMemory</code>, Scala.js and Scala Native test tasks. With no test-task separator, arguments retain their existing suite/test selector meaning. Framework arguments apply to every framework used by a module; the framework defines which options it accepts.</p>
    <hr>
    <h2 id="junit-xml-reports">JUnit XML reports<a href="#junit-xml-reports" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Deder can emit standard JUnit XML reports for any test module. Reports are opt-in and use the common CI-friendly layout of <strong>one file per executed suite/class</strong>:</p>
