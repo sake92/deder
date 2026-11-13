@@ -32,3 +32,6 @@ and run it:
 ./.deder/out/cli/nativeLink/cli
 ```
 
+To build the executable in Alpine and ship it in a small container, see
+[Build a Scala Native app in Alpine](/howtos/alpine-containers.html).
+

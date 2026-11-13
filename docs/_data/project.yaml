@@ -36,6 +36,8 @@ references:
     url: "/reference/testing.html"
 
 howtos:
+  - label: "Alpine Scala Native image"
+    url: "/howtos/alpine-containers.html"
   - label: "Adding dependencies"
     url: "/howtos/dependencies.html"
   - label: "Environment variables and JVM options"
