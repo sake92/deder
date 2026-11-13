@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Build a Scala Native app in Alpine | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav aria-label="Main navigation">
+    <a href="https://sake92.github.io/deder/">Deder Documentation</a>
+    <div>
+     <a href="https://sake92.github.io/deder/tutorials">Tutorials</a> <a href="https://sake92.github.io/deder/howtos">How-Tos</a> <a href="https://sake92.github.io/deder/reference">Reference</a> <a href="https://sake92.github.io/deder/philosophy">Philosophy</a>
+    </div>
+    <form action="https://sake92.github.io/deder/search/results.html" method="get" role="search">
+     <input name="q" type="search" placeholder="Search" aria-label="Search this site">
+    </form>
+   </nav>
+  </header>
+  <script>
+for (const link of document.querySelectorAll('body > header > nav > div > a')) {
+    const path = new URL(link.href).pathname.replace(/\/$/, '');
+    const current = window.location.pathname;
+    if (current === path || current.startsWith(path + '/')) link.setAttribute('aria-current', 'page');
+}
+</script>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details open>
+      <summary>On this page</summary>
+      <nav aria-label="Table of contents">
+       <ul>
+        <li><a href="#build-a-scala-native-app-in-alpine">Build a Scala Native app in Alpine</a></li>
+       </ul>
+      </nav>
+     </details>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="build-a-scala-native-app-in-alpine">Build a Scala Native app in Alpine<a href="#build-a-scala-native-app-in-alpine" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Use a multi-stage Docker build when you want Deder to run in Alpine and ship a small image containing only the Scala Native executable.</p>
+   <ol>
+    <li>
+     <p>Install Alpine's clang and GCC packages in the build stage:</p>
+     <pre><code class="language-dockerfile hljs" data-highlighted="yes"><span class="hljs-keyword">FROM</span> eclipse-temurin:<span class="hljs-number">21</span>-jdk-alpine AS build
+<span class="hljs-keyword">RUN</span><span class="language-bash"> apk add --no-cache clang gcc curl</span>
+</code></pre>
+     <p>Temurin provides the JDK 21 required by Deder's server. <code>gcc</code> supplies <code>crtbeginS.o</code>, <code>libgcc</code>, and <code>libgcc_s</code>, which Scala Native's link step requires on Alpine.</p>
+    </li>
+    <li>
+     <p>Run Deder from <code>deder-client.jar</code>:</p>
+     <pre><code class="language-dockerfile hljs" data-highlighted="yes"><span class="hljs-keyword">RUN</span><span class="language-bash"> java -jar /opt/deder/deder-client.jar <span class="hljs-built_in">exec</span> \
+      --log-level warning \
+      --no-color \
+      -t nativeLink \
+      -m app</span>
+</code></pre>
+     <p>The released native Deder client is glibc-linked, so use the JAR client in the Alpine build stage. Deder reads the server version from the active <code>amends</code> URL in <code>deder.pkl</code>, then downloads the matching server and test-runner artifacts. No <code>server.properties</code> version override is needed.</p>
+    </li>
+    <li>
+     <p>Copy the linked executable into the runtime stage:</p>
+     <pre><code class="language-dockerfile hljs" data-highlighted="yes"><span class="hljs-keyword">FROM</span> alpine:<span class="hljs-number">3.23</span>
+<span class="hljs-keyword">COPY</span><span class="language-bash"> --from=build /src/.deder/out/app/nativeLink/app /usr/local/bin/app</span>
+<span class="hljs-keyword">ENTRYPOINT</span><span class="language-bash"> [<span class="hljs-string">"app"</span>]</span>
+</code></pre>
+    </li>
+   </ol>
+   <p>The <a href="https://github.com/sake92/deder/blob/main/examples/scalanative/Dockerfile">Scala Native example Dockerfile</a> combines these stages for the <code>cli</code> module:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">cd examples/scalanative
+docker build -t deder-scalanative-example .
+docker run --rm deder-scalanative-example
+</code></pre>
+   <p>The example uses the <code>early-access</code> Deder release by default by rewriting its repository-local config import to the versioned public URL. Select a tagged release for a reproducible build:</p>
+   <pre><code class="language-shell hljs" data-highlighted="yes">docker build \
+  --build-arg DEDER_VERSION=v0.22.2 \
+  -t deder-scalanative-example .
+</code></pre>
+   <p>The final image in this example is approximately 15 MB. If your application uses additional native libraries, install those libraries in the runtime stage as well.</p>
+   <div role="group">
+    <span></span> <span></span> <a role="button" href="https://sake92.github.io/deder/howtos/dependencies.html">Adding dependencies ➡️</a>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+  <script src="https://context7.com/widget.js" data-library="/sake92/deder" async></script>
+ </body>
+</html>
