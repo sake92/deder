@@ -2,24 +2,24 @@
 
 FROM eclipse-temurin:21-jdk-alpine AS build
 
-ARG DEDER_VERSION=early-access
-
 # Alpine's clang package does not include the GCC link runtime files.
 RUN apk add --no-cache clang gcc curl
 
-RUN mkdir -p /opt/deder \
-    && curl -fsSL -o /opt/deder/deder-client.jar \
-      "https://github.com/sake92/deder/releases/download/${DEDER_VERSION}/deder-client.jar"
+ARG DEDER_VERSION
 
 WORKDIR /src/examples/scalanative
 
 COPY . .
 
-# Use the release selected above instead of this example's repository-local config.
-RUN sed -i \
-      "s#^amends .*DederProject[.]pkl.*#amends \"https://sake92.github.io/deder/config/${DEDER_VERSION}/DederProject.pkl\"#" \
-      deder.pkl \
-    && grep -Fq "/config/${DEDER_VERSION}/DederProject.pkl" deder.pkl
+RUN mkdir -p /opt/deder \
+    && version="${DEDER_VERSION:-$(sed -n 's#^amends "https://sake92.github.io/deder/config/\([^/]*\)/DederProject.pkl"#\1#p' deder.pkl)}" \
+    && test -n "${version}" \
+    && if [ -n "${DEDER_VERSION}" ]; then \
+         mkdir -p .deder \
+         && printf 'version=%s\n' "${DEDER_VERSION}" > .deder/server.properties; \
+       fi \
+    && curl -fsSL -o /opt/deder/deder-client.jar \
+      "https://github.com/sake92/deder/releases/download/${version}/deder-client.jar"
 
 RUN java -jar /opt/deder/deder-client.jar exec \
       --log-level warning \

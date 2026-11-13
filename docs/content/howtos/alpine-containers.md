@@ -32,7 +32,7 @@ small image containing only the Scala Native executable.
    The released native Deder client is glibc-linked, so use the JAR client in
    the Alpine build stage. Deder reads the server version from the active
    `amends` URL in `deder.pkl`, then downloads the matching server and
-   test-runner artifacts. No `server.properties` version override is needed.
+   test-runner artifacts.
 
 3. Copy the linked executable into the runtime stage:
 
@@ -51,9 +51,9 @@ docker build -t deder-scalanative-example .
 docker run --rm deder-scalanative-example
 ```
 
-The example uses the `early-access` Deder release by default by rewriting its
-repository-local config import to the versioned public URL. Select a tagged
-release for a reproducible build:
+The example uses the version from its `deder.pkl` config URL by default. To
+override both the client and server versions, set `DEDER_VERSION`. The
+Dockerfile then writes that version to `.deder/server.properties`:
 
 ```shell
 docker build \
