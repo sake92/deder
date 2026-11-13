@@ -69,7 +69,7 @@ for (const link of document.querySelectorAll('body > header > nav > div > a')) {
       -t nativeLink \
       -m app</span>
 </code></pre>
-     <p>The released native Deder client is glibc-linked, so use the JAR client in the Alpine build stage. Deder reads the server version from the active <code>amends</code> URL in <code>deder.pkl</code>, then downloads the matching server and test-runner artifacts. No <code>server.properties</code> version override is needed.</p>
+     <p>The released native Deder client is glibc-linked, so use the JAR client in the Alpine build stage. Deder reads the server version from the active <code>amends</code> URL in <code>deder.pkl</code>, then downloads the matching server and test-runner artifacts.</p>
     </li>
     <li>
      <p>Copy the linked executable into the runtime stage:</p>
@@ -84,7 +84,7 @@ for (const link of document.querySelectorAll('body > header > nav > div > a')) {
 docker build -t deder-scalanative-example .
 docker run --rm deder-scalanative-example
 </code></pre>
-   <p>The example uses the <code>early-access</code> Deder release by default by rewriting its repository-local config import to the versioned public URL. Select a tagged release for a reproducible build:</p>
+   <p>The example uses the version from its <code>deder.pkl</code> config URL by default. To override both the client and server versions, set <code>DEDER_VERSION</code>. The Dockerfile then writes that version to <code>.deder/server.properties</code>:</p>
    <pre><code class="language-shell hljs" data-highlighted="yes">docker build \
   --build-arg DEDER_VERSION=v0.22.2 \
   -t deder-scalanative-example .
