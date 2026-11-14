@@ -24,6 +24,34 @@ class PublishValidatorSuite extends munit.FunSuite {
     PublishValidator.validateForSonatypeCentral("my-module", validPomSettings(), "1.0.0")
   }
 
+  test("stable dependency versions should not throw") {
+    val dependencies = Seq(mavenDependency("org.example", "stable-lib", "2.0.0"))
+    PublishValidator.validateForSonatypeCentral("my-module", validPomSettings(), "1.0.0", dependencies)
+  }
+
+  test("snapshot dependency version should fail") {
+    val dependencies = Seq(mavenDependency("org.example", "snapshot-lib", "2.0.0-SNAPSHOT"))
+    val ex = intercept[RuntimeException] {
+      PublishValidator.validateForSonatypeCentral("my-module", validPomSettings(), "1.0.0", dependencies)
+    }
+    assert(ex.getMessage.contains("org.example:snapshot-lib:2.0.0-SNAPSHOT"))
+    assert(ex.getMessage.contains("Dependencies to SNAPSHOT versions not allowed"))
+  }
+
+  test("all snapshot dependencies should be listed") {
+    val dependencies = Seq(
+      mavenDependency("org.example", "snapshot-a", "1.0.0-SNAPSHOT"),
+      mavenDependency("org.example", "stable", "1.0.0"),
+      mavenDependency("org.example", "snapshot-b", "2.0.0-SNAPSHOT")
+    )
+    val ex = intercept[RuntimeException] {
+      PublishValidator.validateForSonatypeCentral("my-module", validPomSettings(), "1.0.0", dependencies)
+    }
+    assert(ex.getMessage.contains("org.example:snapshot-a:1.0.0-SNAPSHOT"))
+    assert(ex.getMessage.contains("org.example:snapshot-b:2.0.0-SNAPSHOT"))
+    assert(!ex.getMessage.contains("org.example:stable:1.0.0"))
+  }
+
   test("null pomSettings") {
     val ex = intercept[RuntimeException] {
       PublishValidator.validateForSonatypeCentral("my-module", null, "1.0.0")
@@ -180,5 +208,17 @@ class PublishValidatorSuite extends munit.FunSuite {
     assert(msg.contains("developers"))
     assert(msg.contains("scm.url"))
     assert(msg.contains("scm.connection"))
+  }
+
+  private def mavenDependency(
+      groupId: String,
+      artifactId: String,
+      version: String
+  ): org.apache.maven.model.Dependency = {
+    val dependency = new org.apache.maven.model.Dependency()
+    dependency.setGroupId(groupId)
+    dependency.setArtifactId(artifactId)
+    dependency.setVersion(version)
+    dependency
   }
 }
