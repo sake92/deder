@@ -142,6 +142,20 @@ class PublishIntegrationSuite extends BaseIntegrationSuite {
     }
   }
 
+  test("stable publish for Sonatype Central should reject a snapshot dependency before upload") {
+    withTestProject("sample-projects/publish-sonatype-snapshot-dependency") { projectPath =>
+      val result = executeDederCommand(projectPath, "exec", "-m", "stable-lib", "-t", "publish")
+      assert(result.exitCode != 0, s"Expected non-zero exit code, got ${result.exitCode}")
+      val err = result.err.text()
+      assert(
+        err.contains("Dependencies to SNAPSHOT versions not allowed") &&
+          err.contains("'com.example:snapshot-dependency_3:1.0.0-SNAPSHOT'"),
+        s"Error should identify the snapshot dependency, got: $err"
+      )
+      assert(!err.contains("Missing credentials"), s"Validation should run before credential resolution, got: $err")
+    }
+  }
+
   private def expectedPublishLocalFiles(baseName: String): Seq[String] =
     for { art <- Seq(".jar", "-sources.jar", "-javadoc.jar", ".pom")
           suf <- Seq("", ".md5", ".sha1")

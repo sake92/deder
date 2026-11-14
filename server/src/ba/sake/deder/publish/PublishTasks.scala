@@ -485,7 +485,15 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
         // validate POM settings for Sonatype Central before attempting credentials
         publishTo match {
           case _: SonatypeCentralRepo =>
-            PublishValidator.validateForSonatypeCentral(ctx.module.id, javaModule.pomSettings, pom.version)
+            val pomFile = os.list(publishArtifactsRes.outDir).find(_.ext == "pom").getOrElse {
+              throw RuntimeException(s"Generated POM for module '${ctx.module.id}' was not found")
+            }
+            PublishValidator.validateForSonatypeCentral(
+              ctx.module.id,
+              javaModule.pomSettings,
+              pom.version,
+              pomFile
+            )
           case _ =>
         }
 
