@@ -1,0 +1,51 @@
+amends "../../../../../config/DederProject.pkl"
+
+local const basePomSettings = new PomSettings {
+  groupId = "com.example"
+  artifactId = "stable-lib"
+  version = "1.0.0"
+  name = "Stable Library"
+  description = "Stable library"
+  url = "https://example.com"
+  licenses {
+    new PomLicense {
+      name = "MIT"
+      url = "https://opensource.org/licenses/MIT"
+    }
+  }
+  developers {
+    new PomDeveloper {
+      id = "dev"
+      name = "Developer"
+      email = "dev@example.com"
+    }
+  }
+  scm {
+    url = "https://github.com/example/repo"
+    connection = "scm:git:github.com:example/repo.git"
+  }
+}
+
+local const snapshotDependency = new ScalaModule {
+  id = "snapshot-dependency"
+  scalaVersion = "3.7.1"
+  publish = false
+  pomSettings = new PomSettings {
+    groupId = "com.example"
+    artifactId = "snapshot-dependency"
+    version = "1.0.0-SNAPSHOT"
+  }
+}
+
+local const stableLib = new ScalaModule {
+  id = "stable-lib"
+  scalaVersion = "3.7.1"
+  moduleDeps { snapshotDependency }
+  publish = true
+  pomSettings = basePomSettings
+}
+
+modules {
+  snapshotDependency
+  stableLib
+}
