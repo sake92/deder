@@ -3,8 +3,6 @@
 
 Config based, concurrent-first, client-server JVM build tool.
 
-:construction: Work in progress, expect some rough edges and breaking changes.
-
 Feedback and [contributions](CONTRIBUTING.md) are very welcome! :heart:
 
 ## Demos
