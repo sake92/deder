@@ -12,7 +12,7 @@ class DederZincLogger(notifications: ServerNotificationsLogger, moduleId: String
     notifications.add(ServerNotification.logWarning(msg.get(), Some(moduleId), source = Some("zinc")))
 
   override def info(msg: Supplier[String]): Unit =
-    notifications.add(ServerNotification.logInfo(msg.get(), Some(moduleId), source = Some("zinc")))
+    notifications.add(ServerNotification.logInfo(msg.get().capitalize, Some(moduleId), source = Some("zinc")))
 
   override def debug(msg: Supplier[String]): Unit =
     notifications.add(ServerNotification.logDebug(msg.get(), Some(moduleId), source = Some("zinc")))
