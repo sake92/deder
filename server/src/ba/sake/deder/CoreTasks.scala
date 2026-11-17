@@ -54,6 +54,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       name = "sourceFiles",
       category = "Configuration"
     )
+    .withDescription("Source files tracked by the module")
     .dependsOn(sourcesTask)
     .build { ctx =>
       val sourceDirs = ctx.depResults._1
@@ -129,6 +130,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       }
       resources.map(s => DederPath(os.SubPath(s"${ctx.module.root}/${s}")))
     },
+    description = "Resource folders of the module",
     category = "Configuration"
   )
 
@@ -140,6 +142,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _             => None
       }
     },
+    description = "Configured JDK home for compilation and execution",
     category = "Configuration"
   )
 
@@ -151,6 +154,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _             => None
       }
     },
+    description = "Configured Java release target",
     category = "Configuration"
   )
 
@@ -168,6 +172,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _             => Seq.empty
       }
     },
+    description = "Java compiler options",
     category = "Configuration"
   )
 
@@ -179,6 +184,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _              => Seq.empty
       }
     },
+    description = "Scala compiler options",
     category = "Configuration"
   )
 
@@ -190,6 +196,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _              => "2.13.17" // dummy default scala version
       }
     },
+    description = "Scala version used by the module",
     category = "Configuration"
   )
 
@@ -201,6 +208,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _             => Seq.empty
       }
     },
+    description = "Declared module dependencies",
     category = "Dependencies"
   )
 
@@ -217,6 +225,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         else repoList += "Maven Central + Ivy2 local (defaults, no custom repos configured)"
       repoList.result()
     },
+    description = "Effective Maven and Ivy repositories",
     category = "Dependencies"
   )
 
@@ -229,6 +238,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _             => Seq.empty
       }
     },
+    description = "Compile-only dependency declarations",
     category = "Dependencies"
   )
 
@@ -306,6 +316,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       name = "depsTree",
       category = "Dependency Management"
     )
+    .withDescription("Resolved dependency tree with sizes and version conflicts")
     .dependsOn(allDependenciesTask)
     .build { ctx =>
       val allResolved = ctx.depResults._1
@@ -491,6 +502,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       name = "compileClasspath",
       category = "Dependencies"
     )
+    .withDescription("Classpath used to compile the module")
     .dependsOn(scalaVersionTask)
     .dependsOn(mandatoryDependenciesTask)
     .dependsOn(allDependenciesTask)
@@ -518,6 +530,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _             => "0.11.1"
       }
     },
+    description = "semanticdb-javac version",
     category = "Configuration"
   )
 
@@ -526,6 +539,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       name = "scalaSemanticdbVersion",
       category = "Configuration"
     )
+    .withDescription("semanticdb-scalac version")
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val scalaVersion = ctx.depResults._1
@@ -560,6 +574,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _             => false
       }
     },
+    description = "Whether SemanticDB generation is enabled",
     category = "Configuration"
   )
 
@@ -571,6 +586,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _             => Seq.empty
       }
     },
+    description = "Java annotation-processor declarations",
     category = "Dependencies"
   )
 
@@ -579,6 +595,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       name = "javacAnnotationProcessors",
       category = "Dependencies"
     )
+    .withDescription("Resolved Java annotation-processor JARs")
     .dependsOn(scalaVersionTask)
     .dependsOn(javacAnnotationProcessorDepsTask)
     .build { ctx =>
@@ -598,6 +615,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _              => Seq.empty
       }
     },
+    description = "Scala compiler-plugin declarations",
     category = "Dependencies"
   )
 
@@ -606,6 +624,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       name = "scalacPlugins",
       category = "Dependencies"
     )
+    .withDescription("Resolved Scala compiler-plugin JARs")
     .dependsOn(scalaVersionTask)
     .dependsOn(scalacPluginDepsTask)
     .build { ctx =>
@@ -654,6 +673,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       name = "compilerDeps",
       category = "Dependencies"
     )
+    .withDescription("Compiler dependencies for the configured Scala version")
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val scalaVersion = ctx.depResults._1
@@ -698,6 +718,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       transitive = true,
       category = "Build"
     )
+    .withDescription("Compile Scala and Java sources with Zinc")
     .dependsOn(sourceFilesTask)
     // NOT generatedSourcesTask: that's THIS module's javac-annotation-processing output dir,
     // which compile creates and writes — content-hashing it as an input is self-referential
@@ -910,6 +931,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _             => Seq.empty
       }
     },
+    description = "JVM options used for run and test processes",
     category = "Configuration"
   )
 
@@ -920,6 +942,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       transitive = true,
       category = "Run"
     )
+    .withDescription("Runtime classpath for the module")
     .dependsOn(compileTask)
     .dependsOn(compileClasspathTask)
     .dependsOn(resourcesTask)
@@ -937,6 +960,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       name = "mainClasses",
       category = "Run"
     )
+    .withDescription("Discovered main classes")
     .dependsOn(compileTask)
     .build { ctx =>
       val classesDir = DederPath(DederGlobals.classesDir(ctx.module.id))
@@ -951,6 +975,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
         case _             => None
       }
     },
+    description = "Configured main class",
     category = "Run"
   )
 
@@ -959,6 +984,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       name = "finalMainClass",
       category = "Run"
     )
+    .withDescription("Main class selected for run and package tasks")
     .dependsOn(mainClassTask)
     .dependsOn(mainClassesTask)
     .build { ctx =>
@@ -999,6 +1025,10 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
     )
     TaskBuilder
       .make[Seq[String]](name = name, supportedModuleTypes = supportedModuleTypes, category = "Verification")
+      .withDescription(
+        if name == "fix" then "Apply Scalafix rewrites"
+        else "Check Scalafix rewrites without modifying sources"
+      )
       .dependsOn(sourcesTask)
       .dependsOn(scalaVersionTask)
       .dependsOn(scalacOptionsTask)
@@ -1040,6 +1070,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       ),
       category = "Verification"
     )
+    .withDescription("Discover test classes and frameworks")
     .dependsOn(compileTask)
     .dependsOn(runClasspathTask)
     .build { ctx =>
@@ -1071,6 +1102,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       supportedModuleTypes = Set(ModuleType.JAVA_TEST, ModuleType.SCALA_TEST),
       category = "Verification"
     )
+    .withDescription("Run tests in isolated forked JVMs")
     .dependsOn(runClasspathTask)
     .dependsOn(jvmOptionsTask)
     .dependsOn(javaHomeTask)
@@ -1121,6 +1153,7 @@ class CoreTasks(cacheStatsRegistry: CacheStatsRegistry = CacheStatsRegistry()) e
       supportedModuleTypes = Set(ModuleType.JAVA_TEST, ModuleType.SCALA_TEST),
       category = "Verification"
     )
+    .withDescription("Run tests in the Deder server JVM")
     .dependsOn(runClasspathTask)
     .dependsOn(testClassesTask)
     .buildSummarized[TestResultsSummary](

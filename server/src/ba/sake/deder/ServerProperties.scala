@@ -8,6 +8,7 @@ final case class ServerProperties(
     taskLockTimeoutSeconds: Int,
     cancelGracePeriodMs: Long,
     forkTestFlushIntervalMs: Long,
+    compileProgressIntervalMs: Long,
     watchDebounceMillis: Int,
     logRolloverPattern: String,
     logMaxHistory: Int,
@@ -15,6 +16,7 @@ final case class ServerProperties(
 ) {
   require(taskLockTimeoutSeconds > 0, "taskLockTimeoutSeconds must be > 0")
   require(cancelGracePeriodMs >= 0, "cancelGracePeriodMs must be >= 0")
+  require(compileProgressIntervalMs >= 0, "compileProgressIntervalMs must be >= 0")
   require(logMaxHistory >= 0, "logMaxHistory must be >= 0")
 }
 
@@ -25,6 +27,7 @@ object ServerProperties {
     val taskLockTimeoutSeconds = props.getProperty("taskLockTimeoutSeconds", "600").toInt
     val cancelGracePeriodMs = props.getProperty("cancelGracePeriodMs", "1500").toLong
     val forkTestFlushIntervalMs = props.getProperty("forkTestFlushIntervalMs", "1000").toLong
+    val compileProgressIntervalMs = props.getProperty("compileProgressIntervalMs", "500").toLong
     val watchDebounceMillis = props.getProperty("watchDebounceMillis", "300").toInt
     val logRolloverPattern = props.getProperty("logRolloverPattern", "%d{yyyy-MM-dd-HH}")
     val logMaxHistory = props.getProperty("logMaxHistory", "7").toInt
@@ -35,6 +38,7 @@ object ServerProperties {
       taskLockTimeoutSeconds,
       cancelGracePeriodMs,
       forkTestFlushIntervalMs,
+      compileProgressIntervalMs,
       watchDebounceMillis,
       logRolloverPattern,
       logMaxHistory,

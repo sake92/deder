@@ -19,7 +19,12 @@ import ba.sake.deder.deps.Dependency
 import org.jgrapht.Graph
 import org.jgrapht.graph.DefaultEdge
 
-private case class TaskInfo(name: String, features: Seq[String]) derives JsonRW
+private case class TaskInfo(
+    name: String,
+    description: String,
+    category: String,
+    features: Seq[String]
+) derives JsonRW
 
 class CliClientMessageHandler(
     projectState: DederProjectState,
@@ -203,7 +208,7 @@ class CliClientMessageHandler(
           }
       }
 
-  private def handleTasks(m: CliClientMessage.Tasks): Unit =
+  private def handleTasks(m: CliClientMessage.Tasks): Unit = boundary {
     if !ifHelpThenShow(m.args, mainargs.Parser[DederCliTasksOptions].helpText()) then
       mainargs.Parser[DederCliTasksOptions].constructEither(m.args, autoPrintHelpAndExit = None) match {
         case Left(error) =>
@@ -214,7 +219,7 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          withCliSpan("tasks", _.pipe(b => cliOptions.module.fold(b)(m => b.setAttribute("cli.module", m)))) { span =>
+          withCliSpan("tasks", _.setAttribute("cli.modules", cliOptions.modules.mkString(","))) { span =>
             projectState.readState(useLastGood = true) match {
               case Left(error) =>
                 span.setStatus(StatusCode.ERROR)
@@ -222,17 +227,46 @@ class CliClientMessageHandler(
                 serverMessages.put(CliServerMessage.Log(error, LogLevel.ERROR))
                 serverMessages.put(CliServerMessage.Exit(1))
               case Right(state) =>
+                val allModuleIds = state.tasksResolver.allModules.map(_.id)
+                val selectedModuleIds =
+                  if cliOptions.modules.isEmpty then allModuleIds
+                  else
+                    WildcardUtils.getMatchesOrRecommendations(allModuleIds, cliOptions.modules) match {
+                      case Left(recommendations) =>
+                        val msg =
+                          if recommendations.isEmpty then
+                            s"No modules found for selectors: ${cliOptions.modules.mkString(", ")}"
+                          else s"No modules found, did you mean: ${recommendations.mkString(", ")} ?"
+                        span.setStatus(StatusCode.ERROR)
+                        span.setAttribute("error", msg)
+                        serverMessages.put(CliServerMessage.Log(msg, LogLevel.ERROR))
+                        serverMessages.put(CliServerMessage.Exit(1))
+                        boundary.break()
+                      case Right(ids) => ids
+                    }
+                val selectedModuleSet = selectedModuleIds.toSet
                 val taskInfosPerModule = state.tasksResolver.publicTaskInstancesPerModule.map {
                   case (moduleId, tasks) =>
                     moduleId -> tasks.map { ti =>
-                      TaskInfo(ti.task.name, ti.task.featureTags.map(_.jsonKey).toSeq)
+                      TaskInfo(
+                        ti.task.name,
+                        ti.task.description,
+                        ti.task.category,
+                        ti.task.featureTags.map(_.jsonKey).toSeq
+                      )
                     }
-                }
+                }.filter { case (moduleId, _) => selectedModuleSet.contains(moduleId) }
+                val groups = state.tasksResolver.publicTaskInstancesPerModule
+                  .filter { case (moduleId, _) => selectedModuleSet.contains(moduleId) }
+                val selectedVertices = groups.values.flatten.toSet.asJava
+                val graph = new org.jgrapht.graph.AsSubgraph(
+                  state.tasksResolver.publicTaskInstancesGraph,
+                  selectedVertices
+                )
                 val tasksOutput = TasksOutput(
                   taskInfosPerModule,
-                  state.tasksResolver.publicTaskInstancesGraph,
-                  state.tasksResolver.publicTaskInstancesPerModule,
-                  cliOptions.module
+                  graph,
+                  groups
                 )
                 val output = OutputFormat.render(tasksOutput, cliOptions.format)
                 serverMessages.put(CliServerMessage.Output(output))
@@ -240,6 +274,7 @@ class CliClientMessageHandler(
             }
           }
       }
+  }
 
   private def handlePlugins(m: CliClientMessage.Plugins): Unit =
     if !ifHelpThenShow(m.args, mainargs.Parser[DederCliPluginsOptions].helpText()) then
@@ -252,17 +287,19 @@ class CliClientMessageHandler(
             serverMessages.put(CliServerMessage.Exit(1))
           }
         case Right(cliOptions) =>
-          withCliSpan("plugins") { _ =>
-            val debug = RequestContext.current.get().logLevel.ordinal >= LogLevel.DEBUG.ordinal
+          withCliSpan("plugins") { span =>
             cliOptions.format match
               case OutputFormat.Dot | OutputFormat.Mermaid =>
+                span.setStatus(StatusCode.ERROR)
+                span.setAttribute("error", "unsupported output format")
                 serverMessages.put(CliServerMessage.Log("Format not supported for plugins (try plain, json, or densejson)", LogLevel.ERROR))
+                serverMessages.put(CliServerMessage.Exit(1))
               case _ =>
                 val output = projectState.readState(useLastGood = true) match {
                   case Left(_) =>
                     // Can't read project config, fall back to just loaded plugins
                     val plugins = projectState.internals.loadedPlugins
-                    OutputFormat.render(PluginsOutput(plugins, debug), cliOptions.format)
+                    OutputFormat.render(PluginsOutput(plugins), cliOptions.format)
                   case Right(state) =>
                     // Show ALL configured plugins, cross-referenced with loaded+error info
                     val configuredIds = state.projectConfig.plugins.asScala.map(_.id).toSeq
@@ -270,10 +307,10 @@ class CliClientMessageHandler(
                     val allPlugins = configuredIds.map { id =>
                       loadedMap.getOrElse(id, LoadedPluginInfo(id, Seq.empty, Some("Not loaded")))
                     }
-                    OutputFormat.render(PluginsOutput(allPlugins, debug), cliOptions.format)
+                    OutputFormat.render(PluginsOutput(allPlugins), cliOptions.format)
                 }
                 serverMessages.put(CliServerMessage.Output(output))
-            serverMessages.put(CliServerMessage.Exit(0))
+                serverMessages.put(CliServerMessage.Exit(0))
           }
       }
 
@@ -365,13 +402,28 @@ class CliClientMessageHandler(
               .setAttribute("cli.watch", cliOptions.watch.value)
               .setAttribute("cli.format", ctx.outputFormat.toString)) { _ =>
             val heartbeat = new CliExecHeartbeat(emit = serverMessages.put)
+            val compileProgressEnabled =
+              DederGlobals.compileProgressIntervalMs > 0L &&
+                cliOptions.logLevel.ordinal >= LogLevel.INFO.ordinal
+            val compileProgressInterval =
+              if compileProgressEnabled then DederGlobals.compileProgressIntervalMs else 0L
+            val compileProgress = new CliCompileProgress(
+              intervalMs = compileProgressInterval,
+              emit = message => {
+                heartbeat.recordActivity()
+                serverMessages.put(message)
+              }
+            )
             try
               val notificationCallback: ServerNotification => Unit = {
                 case logMsg: ServerNotification.Log if logMsg.level.ordinal > cliOptions.logLevel.ordinal =>
                 // skip
                 case sn =>
-                  heartbeat.recordServerNotification(sn)
-                  CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
+                  val handledByCompileProgress = compileProgress.handle(sn)
+                  if !handledByCompileProgress then {
+                    heartbeat.recordServerNotification(sn)
+                    CliServerMessage.fromServerNotification(sn).foreach(serverMessages.put)
+                  }
               }
               val serverNotificationsLogger = ServerNotificationsLogger(notificationCallback)
               val argss =
@@ -626,8 +678,7 @@ private object ModulesOutput:
 private case class TasksOutput(
     taskInfosPerModule: Map[String, Seq[TaskInfo]],
     graph: Graph[TaskInstance, DefaultEdge],
-    groups: Map[String, Seq[TaskInstance]],
-    moduleFilter: Option[String]
+    groups: Map[String, Seq[TaskInstance]]
 )
 private object TasksOutput:
   given JsonRW[TasksOutput] with
@@ -637,24 +688,30 @@ private object TasksOutput:
 
   given PlainTextWritable[TasksOutput] with
     def write(value: TasksOutput): String =
-      val filteredGroups = value.moduleFilter match
-        case Some(moduleId) => value.groups.filter(_._1 == moduleId)
-        case None           => value.groups
-      val sortedGroupIds = filteredGroups.keys.toSeq.sorted
+      val sortedGroupIds = value.groups.keys.toSeq.sorted
       val categoryOrder = Seq(
         "Build", "Configuration", "Dependencies", "Verification",
         "Run", "Publishing", "REPL", "Scala.js", "Scala Native", "GraalVM"
       )
       val modulesWithTasks = sortedGroupIds.map { groupId =>
-        val moduleTasks = filteredGroups(groupId).map(_.task)
+        val moduleTasks = value.groups(groupId).map(_.task)
         val grouped = moduleTasks.groupBy(t => if t.category.isEmpty then "Other" else t.category)
         val sortedCategories = categoryOrder.filter(grouped.contains) ++
           grouped.keys.filterNot(categoryOrder.contains).toSeq.sorted
         val categoryLines = sortedCategories.flatMap { cat =>
-          val taskNames = grouped(cat).toSeq.sortBy(_.name).map { task =>
+          val sortedTasks = grouped(cat).toSeq.sortBy(_.name)
+          val taskNameWidth = sortedTasks.map(_.name.length).maxOption.getOrElse(0)
+          val taskNames = sortedTasks.map { task =>
             val tags = task.featureTags.map(_.emoji).mkString(" ")
-            val suffix = if tags.nonEmpty then s"  $tags" else ""
-            s"    ${task.name}$suffix"
+            val description = task.description.trim
+            val detailParts = Seq(description, tags).filter(_.nonEmpty)
+            val paddedName =
+              if detailParts.nonEmpty then task.name.padTo(taskNameWidth, ' ')
+              else task.name
+            val suffix =
+              if detailParts.nonEmpty then s"  ${detailParts.mkString("  ")}"
+              else ""
+            s"    $paddedName$suffix"
           }
           Seq(s"  ${cat}:") ++ taskNames
         }
@@ -674,8 +731,8 @@ private object TasksOutput:
         v => v.id, v => v.task.name
       )
 
-private case class PluginsOutput(plugins: Seq[LoadedPluginInfo], debug: Boolean = false)
-private object PluginsOutput:
+private[cli] case class PluginsOutput(plugins: Seq[LoadedPluginInfo])
+private[cli] object PluginsOutput:
   given JsonRW[PluginsOutput] with
     def write(value: PluginsOutput): JValue =
       val map = value.plugins.map(p => p.id -> p).toMap
@@ -687,7 +744,9 @@ private object PluginsOutput:
     def write(value: PluginsOutput): String =
       if value.plugins.isEmpty then "No plugins configured."
       else value.plugins.map { p =>
-        val taskStr = if value.debug && p.taskNames.nonEmpty then s" (${p.taskNames.mkString(", ")})" else ""
+        val taskStr =
+          if p.taskNames.nonEmpty then s" (${p.taskNames.sorted.mkString(", ")})"
+          else ""
         val errorStr = p.error.fold("") { err =>
           val lines = err.split('\n')
           val truncated = if lines.length <= 3 then err else lines.take(3).mkString("\n") + "\n..."

@@ -43,7 +43,9 @@ class DederTestRunner(
           Seq.empty
         } else {
           val testClassNames = t.testClasses.map(_.className)
-          val selectedTestClasses: Seq[(String, Fingerprint, Selector)] =
+          val selectedTestClasses: Seq[
+            (className: String, fingerprint: Fingerprint, selector: Selector, explicitlySpecified: Boolean)
+          ] =
             filterClasses(t.testClasses, options.testSelectors)
           val framework = frameworkOverrides.getOrElse(
             t.frameworkClassName,
@@ -60,19 +62,37 @@ class DederTestRunner(
   private def filterClasses(
       testClasses: Seq[DiscoveredFrameworkTest],
       testSelectors: Seq[String]
-  ): Seq[(String, Fingerprint, Selector)] = {
+  ): Seq[(className: String, fingerprint: Fingerprint, selector: Selector, explicitlySpecified: Boolean)] = {
     val testClassNames = testClasses.map(_.className)
     if testSelectors.isEmpty then
-      testClasses.map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
+      testClasses.map(tc =>
+        (
+          className = tc.className,
+          fingerprint = tc.fingerprint.toSbtFingerprint,
+          selector = new SuiteSelector,
+          explicitlySpecified = false
+        )
+      )
     else {
       // Separate class-only selectors (no #) to handle negation via multi-matcher
       val (classOnlySelectors, methodSelectors) = testSelectors.partition(!_.contains("#"))
 
       // Class-only selectors: use multi-matcher with negation support
-      val matchedClassNames = WildcardUtils.getMatches(testClassNames, classOnlySelectors).toSet
-      val resultsFromClassOnly = matchedClassNames.toSeq
-        .flatMap { n => testClasses.find(_.className == n) }
-        .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new SuiteSelector))
+      val resultsFromClassOnly =
+        if classOnlySelectors.isEmpty then Seq.empty
+        else {
+          val matchedClassNames = WildcardUtils.getMatches(testClassNames, classOnlySelectors).toSet
+          matchedClassNames.toSeq
+            .flatMap(name => testClasses.find(_.className == name))
+            .map(tc =>
+              (
+                className = tc.className,
+                fingerprint = tc.fingerprint.toSbtFingerprint,
+                selector = new SuiteSelector,
+                explicitlySpecified = true
+              )
+            )
+        }
 
       // #method selectors: processed individually (negation not supported for #method)
       val resultsFromMethod = methodSelectors.flatMap { ts =>
@@ -81,7 +101,14 @@ class DederTestRunner(
             val mcn = WildcardUtils.getMatches(testClassNames, classNameSelector)
             mcn
               .flatMap { n => testClasses.find(_.className == n) }
-              .map(tc => (tc.className, tc.fingerprint.toSbtFingerprint, new TestSelector(testSelector)))
+              .map(tc =>
+                (
+                  className = tc.className,
+                  fingerprint = tc.fingerprint.toSbtFingerprint,
+                  selector = new TestSelector(testSelector),
+                  explicitlySpecified = true
+                )
+              )
           case _ => Seq.empty
         }
       }
@@ -91,7 +118,7 @@ class DederTestRunner(
 
   private def runFramework(
       framework: Framework,
-      testClasses: Seq[(String, Fingerprint, Selector)],
+      testClasses: Seq[(className: String, fingerprint: Fingerprint, selector: Selector, explicitlySpecified: Boolean)],
       frameworkArgs: Seq[String]
   ): Seq[DederTestResult] = {
     logger.debug(s"Running tests with ${framework.name()}")
@@ -104,21 +131,23 @@ class DederTestRunner(
       Array.empty[String], // remoteArgs
       classLoader
     )
-    val tasks = testClasses.flatMap { case (className, fingerprint, selector) =>
+    val tasks = testClasses.flatMap { selectedTest =>
       // Per sbt test interface spec, for module classes the framework expects the
       // class name WITHOUT trailing "$". The discovery step already strips it, but
       // this is a safety net in case a framework uses isModule = true.
-      val fpIsModule = fingerprint match {
+      val fpIsModule = selectedTest.fingerprint match {
         case sub: SubclassFingerprint  => sub.isModule
         case ann: AnnotatedFingerprint => ann.isModule
         case _                         => false
       }
-      val tweakedClassName = if fpIsModule then className.stripSuffix("$") else className
+      val tweakedClassName =
+        if fpIsModule then selectedTest.className.stripSuffix("$")
+        else selectedTest.className
       val taskDef = new TaskDef(
         tweakedClassName,
-        fingerprint,
-        false, // explicitly specified
-        Array(selector)
+        selectedTest.fingerprint,
+        selectedTest.explicitlySpecified,
+        Array(selectedTest.selector)
       )
       runner.tasks(Array(taskDef))
     }

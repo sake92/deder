@@ -26,6 +26,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
       supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST),
       category = "Scala.js"
     )
+    .withDescription("Link Scala.js output with fast-development settings")
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(moduleKindTask)
@@ -62,6 +63,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
       supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST),
       category = "Scala.js"
     )
+    .withDescription("Link a fully optimized Scala.js bundle")
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(moduleKindTask)
@@ -96,6 +98,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
       supportedModuleTypes = Set(ModuleType.SCALA_JS, ModuleType.SCALA_JS_TEST),
       category = "Scala.js"
     )
+    .withDescription("Link Scala.js output using configured linker settings")
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(moduleKindTask)
@@ -132,6 +135,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
       supportedModuleTypes = Set(ModuleType.SCALA_JS),
       category = "Scala.js"
     )
+    .withDescription("Run the linked Scala.js module with Node.js")
     .dependsOn(fastLinkJsTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .build { ctx =>
@@ -154,6 +158,7 @@ class ScalaJsTasks(coreTasks: CoreTasks) {
       supportedModuleTypes = Set(ModuleType.SCALA_JS_TEST),
       category = "Scala.js"
     )
+    .withDescription("Run Scala.js tests")
     .dependsOn(fastLinkJsTask)
     .dependsOn(coreTasks.testClassesTask)
     .buildSummarized[TestResultsSummary](

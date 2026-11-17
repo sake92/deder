@@ -1,0 +1,14 @@
+amends "../../../../../config/DederProject.pkl"
+
+modules {
+  new ScalaTestModule {
+    id = "app-test"
+    root = "."
+    scalaVersion = "3.10.1"
+    testParallelism = 1
+    maxTestForks = 1
+    deps {
+      "org.scalameta::munit:1.3.6"
+    }
+  }
+}

@@ -18,6 +18,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
 
   val versionTask = TaskBuilder
     .make[String](name = "version", category = "Publishing")
+    .withDescription("Resolve the module version from POM settings or Git tags")
     .build { ctx =>
       ctx.module match {
         case jm: JavaModule =>
@@ -39,7 +40,8 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
           )
         case _ => ManifestEntries.Empty
       }
-    }
+    },
+    description = "JAR manifest entries from module configuration"
   )
 
   val pomSettingsTask = ConfigValueTask[Option[PomSettings]](
@@ -72,11 +74,13 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
           }
         case other => throw RuntimeException(s"POM settings cannot be applied to $other")
       }
-    }
+    },
+    description = "Resolved Maven publication coordinates"
   )
 
   val finalManifestSettingsTask = CachedTaskBuilder
     .make[ManifestEntries](name = "finalManifest", category = "Publishing")
+    .withDescription("Merge manifest, main-class, and publication metadata")
     .dependsOn(manifestSettingsTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(pomSettingsTask)
@@ -110,6 +114,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
 
   val jarTask = CachedTaskBuilder
     .make[DederPath](name = "jar", category = "Publishing")
+    .withDescription("Package compiled classes and resources as a JAR")
     .dependsOn(coreTasks.compileTask)
     .dependsOn(coreTasks.resourcesTask)
     .dependsOn(coreTasks.allGeneratedResourcesTask)
@@ -133,6 +138,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       transitive = true,
       category = "Publishing"
     )
+    .withDescription("JARs for the module and its transitive module dependencies")
     .dependsOn(jarTask)
     .build { ctx =>
       val jar = ctx.depResults._1
@@ -155,6 +161,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST),
       category = "Publishing"
     )
+    .withDescription("Merge dependency JARs for an assembly")
     .dependsOn(coreTasks.scalaVersionTask)
     .dependsOn(coreTasks.mandatoryDependenciesTask)
     .dependsOn(coreTasks.allDependenciesTask)
@@ -194,6 +201,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.JAVA_TEST, ModuleType.SCALA, ModuleType.SCALA_TEST),
       category = "Publishing"
     )
+    .withDescription("Build an executable JAR containing module dependencies")
     .dependsOn(finalManifestSettingsTask)
     .dependsOn(assemblyDepsTask)
     .dependsOn(allJarsTask)
@@ -232,6 +240,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       transitive = true,
       category = "Publishing"
     )
+    .withDescription("Publication coordinates for direct module dependencies")
     .dependsOn(pomSettingsTask)
     .build { ctx =>
       val pom: Option[PomSettings] = ctx.depResults._1
@@ -246,6 +255,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
 
   val sourcesJarTask = CachedTaskBuilder
     .make[Option[DederPath]](name = "sourcesJar", category = "Publishing")
+    .withDescription("Package module sources as a JAR")
     .dependsOn(pomSettingsTask)
     .dependsOn(coreTasks.sourcesTask)
     .build { ctx =>
@@ -261,6 +271,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
 
   val javadocJarTask = CachedTaskBuilder
     .make[Option[DederPath]](name = "javadocJar", category = "Publishing")
+    .withDescription("Generate and package API documentation")
     .dependsOn(coreTasks.scalaVersionTask)
     .dependsOn(pomSettingsTask)
     .dependsOn(coreTasks.sourcesTask)
@@ -361,6 +372,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       name = "publishArtifacts",
       category = "Publishing"
     )
+    .withDescription("Assemble JAR, source, javadoc, and POM publication artifacts")
     .dependsOn(coreTasks.scalaVersionTask)
     .dependsOn(pomSettingsTask)
     .dependsOn(moduleDepsPomSettingsTask)
@@ -415,6 +427,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       category = "Publishing",
       transitive = true
     )
+    .withDescription("Publish artifacts to the local Maven repository")
     .dependsOn(publishArtifactsTask)
     .build { ctx =>
       val publishArtifactsResOpt = ctx.depResults._1
@@ -458,6 +471,7 @@ class PublishTasks(coreTasks: CoreTasks) extends StrictLogging {
       category = "Publishing",
       transitive = true
     )
+    .withDescription("Publish artifacts to the configured remote repository")
     .dependsOn(publishArtifactsTask)
     .build { ctx =>
       val publishArtifactsResOpt = ctx.depResults._1

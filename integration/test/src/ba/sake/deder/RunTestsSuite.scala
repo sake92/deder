@@ -57,6 +57,21 @@ class RunTestsSuite extends BaseIntegrationSuite {
     assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")
   }
 
+  test("deder should show a rerun command for failed tests") {
+    val res = executeDederCommand(projectPath, "exec", "-m", "failing-munit", "-t", "test")
+    val output = res.out.text() + res.err.text()
+
+    assertEquals(res.exitCode, 1, output)
+    assert(output.contains("🔴 FAILED failing-munit"), output)
+    assert(output.contains("failingtest.FailingSuite#fails with guidance"), output)
+    assert(
+      output.contains(
+        """deder exec -t test -m failing-munit "failingtest.FailingSuite#fails with guidance""""
+      ),
+      output
+    )
+  }
+
   test("deder should generate JUnit XML reports for in-memory tests") {
     val res = executeDederCommand(projectPath, "exec", "-m", "munit", "-t", "testInMemory")
     assertEquals(res.exitCode, 0, s"Expected exit code 0, got ${res.exitCode}")

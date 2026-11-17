@@ -26,7 +26,10 @@ final class CliExecHeartbeat(
 
   def recordServerNotification(notification: ServerNotification): Unit =
     if CliServerMessage.fromServerNotification(notification).nonEmpty then
-      lastVisibleActivityAt.set(now())
+      recordActivity()
+
+  def recordActivity(): Unit =
+    lastVisibleActivityAt.set(now())
 
   override def close(): Unit =
     if closed.compareAndSet(false, true) then

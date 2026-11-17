@@ -26,7 +26,9 @@ object JdkUtils {
     JdkCompat(11, "3.3.0"),
     JdkCompat(21, "3.3.1"),
     JdkCompat(25, "3.3.7"),
-    JdkCompat(26, "3.3.8")
+    JdkCompat(26, "3.3.8"),
+    JdkCompat(27, "3.10.0"),
+    JdkCompat(28, "3.10.1")
   ).sortBy(-_.jdkVersion)
 
   def getVersion(javaSpecVersion: String): Int = {

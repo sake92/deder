@@ -48,6 +48,7 @@ Deder has 2 components: server and client.
 Client automatically downloads correct server from [Github releases](https://github.com/sake92/deder/releases) (version is based on `amends` in your `deder.pkl` build definition).
 
 Deder server requires **JDK 21**+ (using virtual threads).
+CI also verifies Scala 3.10.1 projects on JDK 21, 25, 26, 27, and 28-ea.
 
 So you only have to install the CLI client.  
 We provide **native executables** (built with GraalVM) as a brew package on macOS/Linux and as scoop package on Windows.  

@@ -12,6 +12,9 @@ class JdkUtilsSuite extends munit.FunSuite {
     assertEquals(JdkUtils.getVersion("17"), 17)
     assertEquals(JdkUtils.getVersion("21"), 21)
     assertEquals(JdkUtils.getVersion("25"), 25)
+    assertEquals(JdkUtils.getVersion("26"), 26)
+    assertEquals(JdkUtils.getVersion("27"), 27)
+    assertEquals(JdkUtils.getVersion("28"), 28)
   }
 
   test("checkCompat allows exact minimum version") {
@@ -128,6 +131,22 @@ class JdkUtilsSuite extends munit.FunSuite {
       JdkUtils.checkCompat(17, "2.13.0")
     }
     assert(clue(ex.getMessage).contains("2.13.6"))
+  }
+
+  test("checkCompat enforces Scala 3.10 minimums for JDK 27 and 28") {
+    JdkUtils.checkCompat(27, "3.10.0")
+    JdkUtils.checkCompat(27, "3.10.1")
+    JdkUtils.checkCompat(28, "3.10.1")
+
+    val jdk27Error = intercept[RuntimeException] {
+      JdkUtils.checkCompat(27, "3.9.0")
+    }
+    assert(clue(jdk27Error.getMessage).contains("3.10.0"))
+
+    val jdk28Error = intercept[RuntimeException] {
+      JdkUtils.checkCompat(28, "3.10.0")
+    }
+    assert(clue(jdk28Error.getMessage).contains("3.10.1"))
   }
 
   test("checkCompat error message includes docs URL") {

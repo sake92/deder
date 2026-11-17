@@ -19,6 +19,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
   val graalvmHomeTask = ConfigValueTask[Option[os.Path]](
     name = "graalvmHome",
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+    description = "GraalVM home used by native-image",
     category = "GraalVM",
     execute = { ctx =>
       ctx.module match {
@@ -34,6 +35,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
   val nativeImageOptionsTask = ConfigValueTask[Seq[String]](
     name = "nativeImageOptions",
     supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
+    description = "Extra native-image options",
     category = "GraalVM",
     execute = { ctx =>
       ctx.module match {
@@ -49,6 +51,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
       category = "GraalVM"
     )
+    .withDescription("native-image resource inclusion options")
     .dependsOn(coreTasks.resourcesTask)
     .build { ctx =>
       val resourceDirs = ctx.depResults._1
@@ -77,6 +80,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
       category = "GraalVM"
     )
+    .withDescription("Reachability metadata options for dependencies")
     .dependsOn(coreTasks.allDependenciesTask)
     .build { ctx =>
       val allDeps = ctx.depResults._1
@@ -155,6 +159,7 @@ class GraalVmNativeImageTasks(coreTasks: CoreTasks) extends StrictLogging {
       supportedModuleTypes = Set(ModuleType.JAVA, ModuleType.SCALA),
       category = "GraalVM"
     )
+    .withDescription("Build a GraalVM native executable")
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(graalvmHomeTask)

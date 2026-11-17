@@ -103,4 +103,14 @@ object DederGlobals {
     _forkTestFlushIntervalMs = math.max(0L, ms)
 
   def forkTestFlushIntervalMs: Long = _forkTestFlushIntervalMs
+
+  /** Minimum time between CLI compile-progress lines across all modules. Server-wide to avoid multiplying output for
+    * concurrent compilations. Zero disables compile-progress output.
+    */
+  @volatile private var _compileProgressIntervalMs: Long = 500L
+
+  def setCompileProgressIntervalMs(ms: Long): Unit =
+    _compileProgressIntervalMs = math.max(0L, ms)
+
+  def compileProgressIntervalMs: Long = _compileProgressIntervalMs
 }

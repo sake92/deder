@@ -78,6 +78,7 @@ object ServerMain extends StrictLogging {
 
       val cfg = ServerProperties.from(props)
       DederGlobals.setForkTestFlushIntervalMs(cfg.forkTestFlushIntervalMs)
+      DederGlobals.setCompileProgressIntervalMs(cfg.compileProgressIntervalMs)
       LoggingUtils.configureLogging(cfg)
 
       val watchDebounceMs = cfg.watchDebounceMillis

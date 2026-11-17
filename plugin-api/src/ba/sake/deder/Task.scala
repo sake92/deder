@@ -23,12 +23,16 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType],
     enabled: PartialFunction[DederModule, Boolean],
+    description: String,
     category: String,
     kind: TaskKind,
     internal: Boolean
 )(using ev: TaskDeps[Deps] =:= true, summarizable: Summarizable[T, S]) {
   def dependsOn[T2](t: AbstractTask[T2]): TaskBuilder[T, Deps :* AbstractTask[T2], S] =
-    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, enabled, category, kind, internal)
+    TaskBuilder(name, taskDeps :* t, transitive, singleton, supportedModuleTypes, enabled, description, category, kind, internal)
+
+  def withDescription(value: String): TaskBuilder[T, Deps, S] =
+    copy(description = value)
 
   def build(execute: TaskExecContext[T, Deps] => T): Task[T, Deps, S] =
     TaskImpl(
@@ -39,6 +43,7 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       singleton,
       supportedModuleTypes,
       enabled = enabled,
+      description = description,
       category = category,
       kind = kind,
       internal = internal
@@ -56,6 +61,7 @@ case class TaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       singleton,
       supportedModuleTypes,
       enabled = enabled,
+      description = description,
       category = category,
       kind = kind,
       isResultSuccessful = isResultSuccessful,
@@ -82,6 +88,7 @@ object TaskBuilder {
       singleton,
       supportedModuleTypes,
       enabled,
+      "",
       category,
       kind,
       internal
@@ -97,6 +104,7 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
     singleton: Boolean,
     supportedModuleTypes: Set[ModuleType],
     enabled: PartialFunction[DederModule, Boolean],
+    description: String,
     category: String,
     kind: TaskKind,
     internal: Boolean,
@@ -111,6 +119,7 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       singleton,
       supportedModuleTypes,
       enabled,
+      description,
       category,
       kind,
       internal,
@@ -126,12 +135,16 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       singleton,
       supportedModuleTypes,
       enabled,
+      description,
       category,
       kind,
       internal,
       cliReplayFn = Some(f),
       cacheVersion = cacheVersion
     )
+
+  def withDescription(value: String): CachedTaskBuilder[T, Deps, S] =
+    copy(description = value)
 
   /** Bump when changed task behavior makes previously cached results unsuitable for reuse.
     * Version 0 preserves the original cache key; Deder upgrades alone do not invalidate caches.
@@ -151,6 +164,7 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       singleton,
       supportedModuleTypes,
       enabled = enabled,
+      description = description,
       category = category,
       kind = kind,
       internal = internal,
@@ -174,6 +188,7 @@ case class CachedTaskBuilder[T: JsonRW: Hashable, Deps <: Tuple, S] private (
       singleton,
       supportedModuleTypes,
       enabled = enabled,
+      description = description,
       category = category,
       kind = kind,
       isResultSuccessful = isResultSuccessful,
@@ -202,6 +217,7 @@ object CachedTaskBuilder {
       singleton,
       supportedModuleTypes,
       enabled,
+      "",
       category,
       kind,
       internal

@@ -119,6 +119,23 @@ class DederTestRunnerSuite extends munit.FunSuite {
     assertEquals(stats("fake.Shared").lastStatus, "failed")
   }
 
+  test("method selector does not also run the entire suite") {
+    val executed = new AtomicInteger(0)
+    val framework = FakeFramework(
+      taskCount = 2,
+      onExecute = () => {
+        executed.incrementAndGet()
+      }
+    )
+    val runner = buildRunner(framework, testParallelism = 1)
+
+    val results = runner.run(DederTestOptions(testSelectors = Seq("fake.Task0#selectedTest")))
+
+    assertEquals(executed.get(), 1)
+    assertEquals(results.total, 1)
+    assertEquals(results.suites.map(_.name), Seq("fake.Task0"))
+  }
+
   // TODO move to "bootstrapped" tests? build test-runner and then do these tests
   test("runner preserves suite data for JUnit XML reporting") {
     val runner = buildRunner(FakeFramework(taskCount = 2, onExecute = () => ()), testParallelism = 1)

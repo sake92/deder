@@ -122,4 +122,22 @@ class InternalTaskSuite extends munit.FunSuite {
     assert(!completions.contains("hiddenHelper"), "internal task 'hiddenHelper' should not appear in tab completions")
     assert(completions.contains("compile"), "public task 'compile' should still appear in tab completions")
   }
+
+  test("task builders preserve descriptions through dependency chaining") {
+    val coreTasks = CoreTasks()
+    val describedTask = TaskBuilder
+      .make[String]("describedTask", category = "Build")
+      .withDescription("A task with a useful description")
+      .dependsOn(coreTasks.scalaVersionTask)
+      .build { ctx => ctx.depResults._1 }
+
+    assertEquals(describedTask.description, "A task with a useful description")
+
+    val describedCachedTask = CachedTaskBuilder
+      .make[String]("describedCachedTask", category = "Build")
+      .withDescription("A cached task description")
+      .dependsOn(coreTasks.scalaVersionTask)
+      .build { ctx => ctx.depResults._1 }
+    assertEquals(describedCachedTask.description, "A cached task description")
+  }
 }

@@ -98,6 +98,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
       name = "fastNativeLink",
       supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST)
     )
+    .withDescription("Link a Scala Native binary with fast-development settings")
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(linkerConfigTask)
@@ -114,6 +115,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
       name = "fullNativeLink",
       supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST)
     )
+    .withDescription("Link a fully optimized Scala Native binary")
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(linkerConfigTask)
@@ -131,6 +133,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
       supportedModuleTypes = Set(ModuleType.SCALA_NATIVE, ModuleType.SCALA_NATIVE_TEST),
       category = "Scala Native"
     )
+    .withDescription("Link Scala Native output using configured linker settings")
     .dependsOn(coreTasks.runClasspathTask)
     .dependsOn(coreTasks.finalMainClassTask)
     .dependsOn(linkerConfigTask)
@@ -148,6 +151,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
       singleton = true,
       supportedModuleTypes = Set(ModuleType.SCALA_NATIVE)
     )
+    .withDescription("Run the linked Scala Native binary")
     .dependsOn(fastNativeLinkTask)
     .build { ctx =>
       val linkedBinaryPath = ctx.depResults._1
@@ -162,6 +166,7 @@ class ScalaNativeTasks(coreTasks: CoreTasks) {
       supportedModuleTypes = Set(ModuleType.SCALA_NATIVE_TEST),
       category = "Scala Native"
     )
+    .withDescription("Run Scala Native tests")
     .dependsOn(fastNativeLinkTask)
     .dependsOn(coreTasks.testClassesTask)
     .buildSummarized[TestResultsSummary](

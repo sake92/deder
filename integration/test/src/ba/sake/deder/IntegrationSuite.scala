@@ -7,6 +7,13 @@ import ba.sake.tupson.*
 
 class IntegrationSuite extends BaseIntegrationSuite {
 
+  private case class TaskMetadata(
+      name: String,
+      description: String,
+      category: String,
+      features: Seq[String]
+  ) derives JsonRW
+
   test("deder should work with multimodule project") {
     withTestProject("sample-projects/multi") { projectPath =>
       // deder version
@@ -49,6 +56,10 @@ class IntegrationSuite extends BaseIntegrationSuite {
         assert(dederOutput.contains("⚡"), "output should contain cached emoji")
         assert(dederOutput.contains("📁"), "output should contain source-aware emoji")
         assert(dederOutput.contains("⚡ = cached"), "legend should include cached description")
+        assert(
+          dederOutput.contains("Compile Scala and Java sources with Zinc"),
+          "task descriptions should be visible by default"
+        )
       }
       locally {
         val dederRes = executeDederCommand(projectPath, "tasks", "-m", "uber-test")
@@ -65,6 +76,11 @@ class IntegrationSuite extends BaseIntegrationSuite {
         assert(dederOutput.contains("\"features\":"), "JSON tasks output should contain features array")
         assert(dederOutput.contains("\"source-aware\""), "at least one task should have source-aware feature")
         assert(dederOutput.contains("\"cached\""), "at least one task should have cached feature")
+        val modules = dederOutput.parseJson[Map[String, Seq[TaskMetadata]]]
+        assertEquals(modules.keySet, Set("common"))
+        val compileTask = modules("common").find(_.name == "compile").getOrElse(fail("compile task missing"))
+        assertEquals(compileTask.category, "Build")
+        assertEquals(compileTask.description, "Compile Scala and Java sources with Zinc")
       }
       // deder tasks --format densejson
       locally {
@@ -284,6 +300,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
     // Use debug log level so colored prefixes are generated (INFO body is plain)
     // Test 1: NO_COLOR env var — colors should be suppressed even at debug level
     locally {
+      executeDederCommand(projectPath, "clean", "-m", "backend", "-t", "compile")
       val cmd = Seq("java", "-jar", dederClientPath, "exec", "-t", "compile", "-m", "backend", "-l", "debug")
       val res = os.proc(cmd).call(
         cwd = projectPath,
@@ -296,6 +313,7 @@ class IntegrationSuite extends BaseIntegrationSuite {
     }
     // Test 2: --no-color flag — colors should be suppressed even at debug level
     locally {
+      executeDederCommand(projectPath, "clean", "-m", "backend", "-t", "compile")
       val cmd = Seq("java", "-jar", dederClientPath, "exec", "-t", "compile", "-m", "backend", "-l", "debug", "--no-color")
       val res = os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe, check = false)
       val output = res.out.text() + res.err.text()
@@ -303,11 +321,59 @@ class IntegrationSuite extends BaseIntegrationSuite {
     }
     // Test 3: Without flag or env var, colors should be present at debug level (sanity check)
     locally {
+      executeDederCommand(projectPath, "clean", "-m", "backend", "-t", "compile")
       val cmd = Seq("java", "-jar", dederClientPath, "exec", "-t", "compile", "-m", "backend", "-l", "debug")
       val res = os.proc(cmd).call(cwd = projectPath, stderr = os.Pipe, check = false)
       val output = res.out.text() + res.err.text()
-      assert(output.contains("\u001b["), s"output should contain ANSI escapes by default")
+      if !sys.env.contains("NO_COLOR") then
+        assert(output.contains("\u001b["), s"output should contain ANSI escapes by default")
     }
+    }
+  }
+
+  test("deder exec should report CLI compile progress on stderr") {
+    withTestProject("sample-projects/multi") { projectPath =>
+      val res = executeDederCommand(projectPath, "exec", "--no-color", "-t", "compile", "-m", "common")
+      val stderr = res.err.text()
+
+      assertEquals(res.exitCode, 0, stderr + res.out.text())
+      assert(stderr.contains("[common] Compiling 1 source..."), stderr)
+      assert(stderr.contains("[common] Compiled in "), stderr)
+      assert(!res.out.text().contains("Compile progress:"), res.out.text())
+    }
+  }
+
+  test("deder plugins should reject unsupported graph formats") {
+    withTestProject("sample-projects/multi") { projectPath =>
+      val res = executeDederCommand(projectPath, "plugins", "-f", "dot")
+      val stderr = res.err.text()
+
+      assertEquals(res.exitCode, 1, stderr + res.out.text())
+      assert(stderr.contains("Format not supported for plugins"), stderr)
+    }
+  }
+
+  test("deder tasks should apply include/exclude module selectors consistently") {
+    withTestProject("sample-projects/multi") { projectPath =>
+      val plainRes = executeDederCommand(projectPath, "tasks", "-m", "%", "-m", "~common")
+      val plainOutput = plainRes.out.text()
+      assertEquals(plainRes.exitCode, 0, plainRes.err.text())
+      assert(plainOutput.contains("backend:"), plainOutput)
+      assert(!plainOutput.contains("common:"), plainOutput)
+
+      val jsonRes = executeDederCommand(projectPath, "tasks", "-m", "common", "-f", "json")
+      val jsonModules = jsonRes.out.text().parseJson[Map[String, Seq[TaskMetadata]]]
+      assertEquals(jsonModules.keySet, Set("common"))
+    }
+  }
+
+  test("deder tasks should reject unknown module selectors") {
+    withTestProject("sample-projects/multi") { projectPath =>
+      val res = executeDederCommand(projectPath, "tasks", "-m", "commn")
+      val stderr = res.err.text()
+
+      assertEquals(res.exitCode, 1, stderr + res.out.text())
+      assert(stderr.contains("did you mean: common"), stderr)
     }
   }
 }

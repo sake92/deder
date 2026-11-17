@@ -51,6 +51,14 @@ class PluginIntegrationSuite extends BaseIntegrationSuite {
       )
       val out = res.out.text() + res.err.text()
       assert(out.contains("Hello from typed config!"), s"Expected typed greeting in output, got: $out")
+
+      val pluginsRes = executeDederCommand(consumerPath, "plugins")
+      assertEquals(
+        pluginsRes.exitCode,
+        0,
+        s"plugins failed: exit=${pluginsRes.exitCode}\nstderr=${pluginsRes.err.text()}\nstdout=${pluginsRes.out.text()}"
+      )
+      assert(pluginsRes.out.text().contains("hello (generatedResource, hello)"), pluginsRes.out.text())
     } finally {
       executeDederCommand(pluginPath, "shutdown")
       executeDederCommand(consumerPath, "shutdown")

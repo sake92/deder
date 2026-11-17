@@ -50,6 +50,12 @@ local const munit = (scalaTestModule("munit")) {
   }
 }
 
+local const failingMunit = (scalaTestModule("failing-munit")) {
+  deps {
+    "org.scalameta::munit:1.2.1"
+  }
+}
+
 local const utest = (scalaTestModule("utest")) {
   deps {
     "com.lihaoyi::utest:0.10.0-RC1"
@@ -81,6 +87,7 @@ modules {
   scalatest
   specs2
   munit
+  failingMunit
   utest
   weaver
   ztest

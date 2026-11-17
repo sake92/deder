@@ -28,6 +28,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       singleton = true,
       category = "Run"
     )
+    .withDescription("Run the module's configured or discovered main class")
     .dependsOn(runClasspathTask)
     .dependsOn(mainClassesTask)
     .dependsOn(finalMainClassTask)
@@ -62,6 +63,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       singleton = true,
       category = "Run"
     )
+    .withDescription("Run a selected main class from the module")
     .dependsOn(runClasspathTask)
     .dependsOn(mainClassesTask)
     .dependsOn(jvmOptionsTask)
@@ -99,6 +101,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       name = "runMvnApp",
       category = "Run"
     )
+    .withDescription("Run a configured Maven-style application tool")
     .dependsOn(sourcesTask)
     .dependsOn(scalaVersionTask)
     .dependsOn(jvmOptionsTask)
@@ -160,6 +163,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       name = "replDeps",
       category = "REPL"
     )
+    .withDescription("Dependencies needed by the module REPL")
     .dependsOn(scalaVersionTask)
     .build { ctx =>
       val scalaVersion = ctx.depResults._1
@@ -184,6 +188,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       name = "replJars",
       category = "REPL"
     )
+    .withDescription("Resolved REPL classpath JARs")
     .dependsOn(replDepsTask)
     .build { ctx =>
       val replDeps = ctx.depResults._1
@@ -203,6 +208,7 @@ class RunTasks(coreTasks: CoreTasks) extends StrictLogging {
       ),
       category = "REPL"
     )
+    .withDescription("Start a Scala REPL or JShell for the module")
     .dependsOn(runClasspathTask)
     .dependsOn(scalaVersionTask)
     .dependsOn(jvmOptionsTask)

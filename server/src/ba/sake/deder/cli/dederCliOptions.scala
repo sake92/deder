@@ -42,7 +42,7 @@ case class DederCliModulesOptions(
     format: OutputFormat = OutputFormat.PlainText
 )
 
-@main("plugins command", "List configured plugins and their tasks (tasks only shown with --log-level debug)")
+@main("plugins command", "List configured plugins and their tasks")
 case class DederCliPluginsOptions(
     @arg(doc = "Output format: plain, json, densejson", short = 'f') 
     format: OutputFormat = OutputFormat.PlainText
@@ -50,8 +50,8 @@ case class DederCliPluginsOptions(
 
 @main("tasks command", "List tasks per module")
 case class DederCliTasksOptions(
-    @arg(doc = "Filter tasks by Module ID", short = 'm')
-    module: Option[String],
+    @arg(doc = "Filter tasks by Module ID(s); supports % wildcards and ~ exclusions", short = 'm')
+    modules: Seq[String],
     @arg(doc = "Output format: plain, json, densejson, dot, or mermaid", short = 'f')
     format: OutputFormat = OutputFormat.PlainText
 )
