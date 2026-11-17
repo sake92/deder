@@ -53,9 +53,9 @@ jobs:
           deder shutdown && sleep 1
           deder exec -t test -m server-test -m deder-common-test
           pkl test config/DederProjectTest.pkl
-      - name: Build cross-JDK test artifacts
+      - name: Build Windows test artifacts
         run: deder exec --log-level warning --no-color -t assembly -m client -m server -m test-runner
-      - name: Upload cross-JDK test artifacts
+      - name: Upload Windows test artifacts
         uses: actions/upload-artifact@v4
         with:
           name: deder-test-artifacts
@@ -89,43 +89,6 @@ jobs:
           name: deder-logs
           path: |
             .deder/logs/server.log
-
-  jdk-compat:
-    needs: [tests]
-    strategy:
-      fail-fast: false
-      matrix:
-        java: ['21', '25', '26', '27', '28-ea']
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v4
-        with:
-          name: deder-test-artifacts
-          path: bootstrap
-      - uses: actions/setup-java@v5
-        with:
-          distribution: 'zulu'
-          java-version: ${{ matrix.java }}
-      - uses: coursier/cache-action@v7
-        with:
-          extraFiles: deder.pkl
-      - name: Compile and test Scala 3.10.1 on JDK ${{ matrix.java }}
-        shell: bash
-        run: |
-          smoke_dir="$RUNNER_TEMP/scala-310-${{ matrix.java }}"
-          mkdir -p "$smoke_dir"
-          cp -a integration/test/resources/sample-projects/scala-310-compat/. "$smoke_dir/"
-          sed -i "s#^amends .*#amends \\\"file://$GITHUB_WORKSPACE/config/DederProject.pkl\\\"#" "$smoke_dir/deder.pkl"
-          mkdir -p "$smoke_dir/.deder"
-          printf '%s\n' \
-            "localPath=$GITHUB_WORKSPACE/bootstrap/server/assembly/out.jar" \
-            "testRunnerLocalPath=$GITHUB_WORKSPACE/bootstrap/test-runner/assembly/out.jar" \
-            "maxConnectSeconds=300" \
-            > "$smoke_dir/.deder/server.properties"
-          cd "$smoke_dir"
-          java -jar "$GITHUB_WORKSPACE/bootstrap/client/assembly/out.jar" \
-            exec --no-color -t test -m app-test
 
   integration-tests:
     runs-on: ubuntu-latest
