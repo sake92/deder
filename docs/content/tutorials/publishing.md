@@ -65,6 +65,8 @@ Deder will automatically set the version based on the latest semver-based git ta
 - `1.0.0` with uncommitted changes -> `1.0.1-SNAPSHOT`
 - `1.0.0` with a few committed changes -> `1.0.1-SNAPSHOT`
 
+To keep this version consistent across CI jobs, see [Publish with Git-driven versioning](/howtos/publish-git-versions.html).
+
 ## Publish to Local Maven Repository
 
 To publish to your local `.m2` repository, run the following command:

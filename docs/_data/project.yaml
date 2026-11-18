@@ -48,6 +48,8 @@ howtos:
     url: "/howtos/otel.html"
   - label: "Plugins"
     url: "/howtos/plugins.html"
+  - label: "Publish with Git-driven versioning"
+    url: "/howtos/publish-git-versions.html"
 
 philosophies:
   - label: "Design Philosophy"
