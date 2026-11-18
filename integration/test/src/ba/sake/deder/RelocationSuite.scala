@@ -172,9 +172,9 @@ class RelocationSuite extends BaseIntegrationSuite {
       assertEquals(res.exitCode, 0, res.err.text())
 
       // Byte equality alone cannot distinguish a skipped compile from identical re-emitted bytes.
-      val compiling = serverLog(relocated).drop(offset).filter(_.contains("] compiling "))
+      val compiling = serverLog(relocated).drop(offset).filter(_.contains("] Compiling "))
       assertEquals(compiling.size, 1, compiling.mkString("\n"))
-      assert(compiling.head.contains("[common] compiling 1 Scala source to "), compiling.head)
+      assert(compiling.head.contains("[common] Compiling 1 Scala source to "), compiling.head)
 
       val after = modules.map(m => m -> classBytes(m)).toMap
       assertNotEquals(after("common"), before("common"), "common should have been recompiled")
@@ -273,9 +273,9 @@ class RelocationSuite extends BaseIntegrationSuite {
       edit(relocated, "common/src/JHelper.java", "java1", "java2")
       val offset = serverLog(relocated).size
       compileSuccessfully(relocated)
-      val compiling = serverLog(relocated).drop(offset).filter(_.contains("] compiling "))
+      val compiling = serverLog(relocated).drop(offset).filter(_.contains("] Compiling "))
       assertEquals(compiling.size, 1, compiling.mkString("\n"))
-      assert(compiling.head.contains("[common] compiling 1 Java source to "), compiling.head)
+      assert(compiling.head.contains("[common] Compiling 1 Java source to "), compiling.head)
       assertRuntime(relocated, "komon1", javaValue = "java2")
       assertNoop(relocated)
     } finally cleanup(original, relocated)

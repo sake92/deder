@@ -52,16 +52,16 @@ class EncodingSuite extends BaseIntegrationSuite {
       val log = project / ".deder/logs/server.log"
       val scalaOffset = os.read.lines(log).size
       compile()
-      val scalaCompiles = os.read.lines(log).drop(scalaOffset).filter(_.contains("] compiling "))
+      val scalaCompiles = os.read.lines(log).drop(scalaOffset).filter(_.contains("] Compiling "))
       assertEquals(scalaCompiles.size, 1, scalaCompiles.mkString("\n"))
-      assert(scalaCompiles.head.contains("[common] compiling 1 Scala source to "), scalaCompiles.head)
+      assert(scalaCompiles.head.contains("[common] Compiling 1 Scala source to "), scalaCompiles.head)
       restart()
       os.write.over(javaSource, os.read(javaSource).replace("java1", "ascii-java"))
       val javaOffset = os.read.lines(log).size
       compile()
-      val javaCompiles = os.read.lines(log).drop(javaOffset).filter(_.contains("] compiling "))
+      val javaCompiles = os.read.lines(log).drop(javaOffset).filter(_.contains("] Compiling "))
       assertEquals(javaCompiles.size, 1, javaCompiles.mkString("\n"))
-      assert(javaCompiles.head.contains("[common] compiling 1 Java source to "), javaCompiles.head)
+      assert(javaCompiles.head.contains("[common] Compiling 1 Java source to "), javaCompiles.head)
       val runtime = executeAscii(project, (Seq("exec", "-m", "uber", "-t", "run") ++ quietFlags)*)
       assertEquals(runtime.exitCode, 0, runtime.err.text())
       val lines = runtime.out.text().linesIterator.toSet

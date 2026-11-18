@@ -111,20 +111,20 @@ class IntegrationSuite extends BaseIntegrationSuite {
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
         assert(dederOutput.contains("Executing 'compile' task on modules: backend, common, frontend, uber, uber-test"))
-        val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
+        val compilingCount = dederOutput.linesIterator.count(_.matches(".*Compiling .* source to .*"))
         assertEquals(compilingCount, 5)
       }
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
         assert(dederOutput.contains("Executing 'compile' task on modules: backend, common, frontend, uber, uber-test"))
-        val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
+        val compilingCount = dederOutput.linesIterator.count(_.matches(".*Compiling .* source to .*"))
         assertEquals(compilingCount, 0) // all compiled already
       }
       locally {
         os.write.append(projectPath / "common/src/Common.scala", "\n// some change to trigger recompilation\n")
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
         assert(dederOutput.contains("Executing 'compile' task on modules: backend, common, frontend, uber, uber-test"))
-        val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
+        val compilingCount = dederOutput.linesIterator.count(_.matches(".*Compiling .* source to .*"))
         assertEquals(compilingCount, 1)
       }
     }

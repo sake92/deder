@@ -12,7 +12,7 @@ class ScalaNativeIntegrationSuite extends BaseIntegrationSuite {
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
         assert(dederOutput.contains("Executing 'compile' task on module"))
-        val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
+        val compilingCount = dederOutput.linesIterator.count(_.matches(".*Compiling .* source to .*"))
         assert(compilingCount >= 1)
       }
     }

@@ -19,7 +19,7 @@ class CliPluginsOutputSuite extends munit.FunSuite {
       rendered,
       """second-plugin (aTask, zTask)
         |first-plugin (onlyTask)
-        |broken-plugin (error: failed to load)""".stripMargin
+        |broken-plugin (error: failed to load)""".stripMargin.replace("\r\n", "\n")
     )
   }
 

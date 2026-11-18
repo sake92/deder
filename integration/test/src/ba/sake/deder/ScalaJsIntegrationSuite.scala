@@ -24,7 +24,7 @@ class ScalaJsIntegrationSuite extends BaseIntegrationSuite {
       locally {
         val dederOutput = executeDederCommand(projectPath, "exec").err.text()
         assert(dederOutput.contains("Executing 'compile' task on modules: frontend, frontend-test"))
-        val compilingCount = dederOutput.linesIterator.count(_.matches(".*compiling .* source to .*"))
+        val compilingCount = dederOutput.linesIterator.count(_.matches(".*Compiling .* source to .*"))
         assertEquals(compilingCount, 1)
       }
     }
