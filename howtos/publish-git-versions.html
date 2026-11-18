@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="">
+  <title> Publish with Git-driven versioning | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav aria-label="Main navigation">
+    <a href="https://sake92.github.io/deder/">Deder Documentation</a>
+    <div>
+     <a href="https://sake92.github.io/deder/tutorials">Tutorials</a> <a href="https://sake92.github.io/deder/howtos">How-Tos</a> <a href="https://sake92.github.io/deder/reference">Reference</a> <a href="https://sake92.github.io/deder/philosophy">Philosophy</a>
+    </div>
+    <form action="https://sake92.github.io/deder/search/results.html" method="get" role="search">
+     <input name="q" type="search" placeholder="Search" aria-label="Search this site">
+    </form>
+   </nav>
+  </header>
+  <script>
+for (const link of document.querySelectorAll('body > header > nav > div > a')) {
+    const path = new URL(link.href).pathname.replace(/\/$/, '');
+    const current = window.location.pathname;
+    if (current === path || current.startsWith(path + '/')) link.setAttribute('aria-current', 'page');
+}
+</script>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details open>
+      <summary>On this page</summary>
+      <nav aria-label="Table of contents">
+       <ul>
+        <li><a href="#publish-with-git-driven-versioning">Publish with Git-driven versioning</a>
+         <ul>
+          <li><a href="#configure-the-shared-module-template">Configure the shared module template</a></li>
+          <li><a href="#resolve-and-pass-the-version">Resolve and pass the version</a></li>
+         </ul></li>
+       </ul>
+      </nav>
+     </details>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="publish-with-git-driven-versioning">Publish with Git-driven versioning<a href="#publish-with-git-driven-versioning" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <p>Resolve the Git version once and pass it to every CI job that builds or publishes artifacts. This prevents a snapshot workflow from switching to a stable release version when a tag is pushed before its publish job checks out the repository.</p>
+   <p>This example publishes snapshots from <code>main</code> and releases from tags using GitHub Actions and Sonatype. It assumes your publishable modules share one version, have publishing and POM metadata configured, and use a shared module template. See the <a href="https://sake92.github.io/deder/tutorials/publishing.html">publishing tutorial</a> for the initial setup.</p>
+   <p>Use <code>-SNAPSHOT</code> versions to test changes and integrations during development, and publish stable versions when they are ready for release. This also helps avoid unnecessary stable releases: <a href="https://central.sonatype.org/publish/maven-central-publishing-limits/">Maven Central publishing limits</a> track release count, file count, and release size. Check Sonatype's current guidance and your organization's usage for the limits that apply.</p>
+   <h2 id="configure-the-shared-module-template">Configure the shared module template<a href="#configure-the-shared-module-template" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>Set the version and repository on the template used by every publishable module. When the environment variable is absent, Deder derives the version from Git as usual.</p>
+   <pre><code class="language-pkl hljs" data-highlighted="yes"><span class="hljs-keyword">local</span> <span class="hljs-keyword">const</span> <span class="hljs-property">publishRepo</span> = <span class="hljs-keyword">if</span> (<span class="hljs-keyword">read</span>?(<span class="hljs-string">"env:DEDER_PUBLISH_SNAPSHOT"</span>) == <span class="hljs-string">"true"</span>)
+  <span class="hljs-keyword">new</span> <span class="hljs-property">SonatypeSnapshotRepo</span> { <span class="hljs-property">id</span> = <span class="hljs-string">"sonatype"</span> }
+<span class="hljs-keyword">else</span>
+  <span class="hljs-keyword">new</span> <span class="hljs-property">SonatypeCentralRepo</span> { <span class="hljs-property">id</span> = <span class="hljs-string">"sonatype"</span> }
+
+<span class="hljs-comment">// Add these settings to your existing shared module template.</span>
+<span class="hljs-comment">// Keep the other required POM settings, such as groupId and artifactId.</span>
+<span class="hljs-property">publishTo</span> = publishRepo
+<span class="hljs-property">pomSettings</span> {
+  <span class="hljs-property">version</span> = <span class="hljs-keyword">read</span>?(<span class="hljs-string">"env:RELEASE_VERSION"</span>)
+}
+</code></pre>
+   <h2 id="resolve-and-pass-the-version">Resolve and pass the version<a href="#resolve-and-pass-the-version" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
+   <p>In the first job, check out full Git history and tags, resolve the version from a publishable module, and expose it as a job output. Set the environment variables for subsequent steps, then restart Deder so its server inherits them. The publish job receives the same values before starting Deder.</p>
+   <p>Replace <code>mylib</code> with a publishable module ID and adjust the publish selector for your project. Configure the four Sonatype secrets shown below in your repository. Add your existing compile and test steps after the version step; they will use the locked version.</p>
+   <pre><code class="language-yaml hljs" data-highlighted="yes"><span class="hljs-attr">name:</span> <span class="hljs-string">Publish</span>
+<span class="hljs-attr">on:</span>
+  <span class="hljs-attr">push:</span>
+    <span class="hljs-attr">branches:</span> [<span class="hljs-string">main</span>]
+    <span class="hljs-attr">tags:</span> [<span class="hljs-string">'*'</span>]
+
+<span class="hljs-attr">jobs:</span>
+  <span class="hljs-attr">build:</span>
+    <span class="hljs-attr">runs-on:</span> <span class="hljs-string">ubuntu-latest</span>
+    <span class="hljs-attr">outputs:</span>
+      <span class="hljs-attr">version:</span> <span class="hljs-string">$</span>
+      <span class="hljs-attr">snapshot:</span> <span class="hljs-string">$</span>
+    <span class="hljs-attr">steps:</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">uses:</span> <span class="hljs-string">actions/checkout@v5</span>
+        <span class="hljs-attr">with:</span>
+          <span class="hljs-attr">fetch-depth:</span> <span class="hljs-number">0</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">uses:</span> <span class="hljs-string">actions/setup-java@v3</span>
+        <span class="hljs-attr">with:</span>
+          <span class="hljs-attr">distribution:</span> <span class="hljs-string">temurin</span>
+          <span class="hljs-attr">java-version:</span> <span class="hljs-number">21</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">uses:</span> <span class="hljs-string">Homebrew/actions/setup-homebrew@main</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">run:</span> <span class="hljs-string">brew</span> <span class="hljs-string">install</span> <span class="hljs-string">sake92/tap/deder</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">name:</span> <span class="hljs-string">Resolve</span> <span class="hljs-string">version</span>
+        <span class="hljs-attr">id:</span> <span class="hljs-string">version</span>
+        <span class="hljs-attr">shell:</span> <span class="hljs-string">bash</span>
+        <span class="hljs-attr">run:</span> <span class="hljs-string">|
+          set -euo pipefail
+          result=$(deder exec -t version -m mylib --format=json)
+          version=$(jq -er '
+            if (.failures | length) &gt; 0 then error("Version task failed") else . end
+            | [.results[]] | unique
+            | if length == 1 and (.[0] | type == "string") then .[0]
+              else error("Expected one version") end
+          ' &lt;&lt;&lt; "$result")
+          # Restrict this example to stable X.Y.Z tags and Deder snapshots.
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-SNAPSHOT)?$ ]]
+          snapshot=false
+          [[ "$version" == *-SNAPSHOT ]] &amp;&amp; snapshot=true
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            tag_version="${GITHUB_REF_NAME#v}"
+            [[ "$snapshot" == false &amp;&amp; "$version" == "$tag_version" ]]
+          fi
+          echo "version=$version" &gt;&gt; "$GITHUB_OUTPUT"
+          echo "snapshot=$snapshot" &gt;&gt; "$GITHUB_OUTPUT"
+          echo "RELEASE_VERSION=$version" &gt;&gt; "$GITHUB_ENV"
+          echo "DEDER_PUBLISH_SNAPSHOT=$snapshot" &gt;&gt; "$GITHUB_ENV"
+          deder shutdown
+</span>      <span class="hljs-bullet">-</span> <span class="hljs-attr">run:</span> <span class="hljs-string">deder</span> <span class="hljs-string">exec</span> <span class="hljs-string">-t</span> <span class="hljs-string">compile</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">run:</span> <span class="hljs-string">deder</span> <span class="hljs-string">exec</span> <span class="hljs-string">-t</span> <span class="hljs-string">test</span>
+
+  <span class="hljs-attr">publish:</span>
+    <span class="hljs-attr">needs:</span> <span class="hljs-string">build</span>
+    <span class="hljs-attr">if:</span> <span class="hljs-string">github.ref_type</span> <span class="hljs-string">==</span> <span class="hljs-string">'tag'</span> <span class="hljs-string">||</span> <span class="hljs-string">needs.build.outputs.snapshot</span> <span class="hljs-string">==</span> <span class="hljs-string">'true'</span>
+    <span class="hljs-attr">runs-on:</span> <span class="hljs-string">ubuntu-latest</span>
+    <span class="hljs-attr">env:</span>
+      <span class="hljs-attr">RELEASE_VERSION:</span> <span class="hljs-string">$</span>
+      <span class="hljs-attr">DEDER_PUBLISH_SNAPSHOT:</span> <span class="hljs-string">$</span>
+      <span class="hljs-attr">DEDER_SONATYPE_USERNAME:</span> <span class="hljs-string">$</span>
+      <span class="hljs-attr">DEDER_SONATYPE_PASSWORD:</span> <span class="hljs-string">$</span>
+      <span class="hljs-attr">DEDER_SONATYPE_PGP_SECRET:</span> <span class="hljs-string">$</span>
+      <span class="hljs-attr">DEDER_SONATYPE_PGP_PASSPHRASE:</span> <span class="hljs-string">$</span>
+    <span class="hljs-attr">steps:</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">uses:</span> <span class="hljs-string">actions/checkout@v5</span>
+        <span class="hljs-attr">with:</span>
+          <span class="hljs-attr">fetch-depth:</span> <span class="hljs-number">0</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">uses:</span> <span class="hljs-string">actions/setup-java@v3</span>
+        <span class="hljs-attr">with:</span>
+          <span class="hljs-attr">distribution:</span> <span class="hljs-string">temurin</span>
+          <span class="hljs-attr">java-version:</span> <span class="hljs-number">21</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">uses:</span> <span class="hljs-string">Homebrew/actions/setup-homebrew@main</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">run:</span> <span class="hljs-string">brew</span> <span class="hljs-string">install</span> <span class="hljs-string">sake92/tap/deder</span>
+      <span class="hljs-bullet">-</span> <span class="hljs-attr">run:</span> <span class="hljs-string">deder</span> <span class="hljs-string">exec</span> <span class="hljs-string">-t</span> <span class="hljs-string">publish</span> <span class="hljs-string">-m</span> <span class="hljs-string">mylib</span>
+</code></pre>
+   <p>For example, after tag <code>0.1.0</code>, a new commit on <code>main</code> resolves to <code>0.1.1-SNAPSHOT</code>. If that version is resolved before the same commit is tagged <code>0.1.1</code>, the main workflow still publishes <code>0.1.1-SNAPSHOT</code>, and the tag workflow publishes <code>0.1.1</code>. If the tag is already present at the first checkout, the main workflow resolves <code>0.1.1</code> and skips its snapshot publication; the tag workflow publishes the release. A later commit on <code>main</code> resolves to <code>0.1.2-SNAPSHOT</code>.</p>
+   <p>The lock preserves the version resolved by the first job, not the tag state at push time. A rerun can therefore resolve a different version if tags have changed. Also, separate main workflows can publish the same snapshot version out of order; add CI coordination if your project requires the snapshot to always represent the newest commit.</p>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/howtos/dependencies.html">⬅️ Adding dependencies</a> <span></span> <a role="button" href="https://sake92.github.io/deder/howtos/env-vars.html">Environment variables and JVM options ➡️</a>
+   </div>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+  <script src="https://context7.com/widget.js" data-library="/sake92/deder" async></script>
+ </body>
+</html>

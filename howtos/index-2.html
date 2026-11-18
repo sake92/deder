@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Deder How Tos">
+  <title> How Tos | Deder Documentation </title>
+  <link rel="shortcut icon" href="https://sake92.github.io/deder/images/favicon.png" type="image/png">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-dark.min.css" media="(prefers-color-scheme: dark)" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/a11y-light.min.css" media="(prefers-color-scheme: light), (prefers-color-scheme: no-preference)" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.conditional.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/default.css">
+  <link rel="stylesheet" href="https://sake92.github.io/deder/styles/main.css">
+ </head>
+ <body>
+  <header class="pico container">
+   <nav aria-label="Main navigation">
+    <a href="https://sake92.github.io/deder/">Deder Documentation</a>
+    <div>
+     <a href="https://sake92.github.io/deder/tutorials">Tutorials</a> <a href="https://sake92.github.io/deder/howtos">How-Tos</a> <a href="https://sake92.github.io/deder/reference">Reference</a> <a href="https://sake92.github.io/deder/philosophy">Philosophy</a>
+    </div>
+    <form action="https://sake92.github.io/deder/search/results.html" method="get" role="search">
+     <input name="q" type="search" placeholder="Search" aria-label="Search this site">
+    </form>
+   </nav>
+  </header>
+  <script>
+for (const link of document.querySelectorAll('body > header > nav > div > a')) {
+    const path = new URL(link.href).pathname.replace(/\/$/, '');
+    const current = window.location.pathname;
+    if (current === path || current.startsWith(path + '/')) link.setAttribute('aria-current', 'page');
+}
+</script>
+  <main class="pico container">
+   <div class="grid">
+    <div>
+     <details open>
+      <summary>On this page</summary>
+      <nav aria-label="Table of contents">
+       <ul>
+        <li><a href="#how-tos">How Tos</a></li>
+       </ul>
+      </nav>
+     </details>
+    </div>
+    <div></div>
+    <div></div>
+   </div>
+   <h1 id="how-tos">How Tos<a href="#how-tos" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h1>
+   <blockquote>
+    <p><strong>Use this section</strong> when you already have Deder set up and want a focused recipe for a specific task. For first-time setup, see <a href="https://sake92.github.io/deder/tutorials">Tutorials</a>. For full command and config details, see <a href="https://sake92.github.io/deder/reference">Reference</a>.</p>
+   </blockquote>
+   <ul>
+    <li><a href="https://sake92.github.io/deder/howtos/dependencies.html">Adding dependencies</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/publish-git-versions.html">Publish with Git-driven versioning</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/env-vars.html">Environment variables and JVM options</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/scalafmt.html">Format Scala code with Scalafmt</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/scalafix.html">Rewrite Scala code with Scalafix</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/mvn-apps.html">Run applications from Maven repositories</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/parallel-tests.html">Running tests in parallel</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/clean-output.html">Clean output artifacts</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/plugins.html">Plugins</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/alpine-containers.html">Alpine Scala Native image</a></li>
+    <li><a href="https://sake92.github.io/deder/howtos/otel.html">OTEL tracing/logging/metrics</a></li>
+   </ul>
+  </main>
+  <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
+  <script src="https://context7.com/widget.js" data-library="/sake92/deder" async></script>
+ </body>
+</html>

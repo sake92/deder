@@ -89,6 +89,9 @@ for (const link of document.querySelectorAll('body > header > nav > div > a')) {
    </ul>
    <h2 id="trade-offs-vs-multi-process-parallelism">Trade-offs vs. multi-process parallelism<a href="#trade-offs-vs-multi-process-parallelism" class="flatmark-anchor" aria-label="Anchor"> 🔗</a></h2>
    <p>Intra-JVM parallelism only shares one JVM's warm-up cost. For larger test suites where you want process-level isolation too (like Mill's <code>testParallel</code> workers), that's tracked as future work in Deder.</p>
+   <div role="group">
+    <a role="button" href="https://sake92.github.io/deder/howtos/mvn-apps.html">⬅️ Run applications from Maven repositories</a> <span></span> <a role="button" href="https://sake92.github.io/deder/howtos/clean-output.html">Clean output artifacts ➡️</a>
+   </div>
   </main>
   <footer class="pico container">Deder Documentation | Deder Build Tool Documentation</footer>
   <script src="https://context7.com/widget.js" data-library="/sake92/deder" async></script>
