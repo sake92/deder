@@ -25,7 +25,8 @@ const fuse = new Fuse(entries, {
         { name: 'text' }
     ],
     includeMatches: true,
-    
+    ignoreLocation: true,
+    threshold: 0.2,
 });
 
 const searchRes = fuse.search(qParam);
