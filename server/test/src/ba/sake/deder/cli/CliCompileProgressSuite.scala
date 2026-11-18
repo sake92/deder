@@ -19,7 +19,7 @@ class CliCompileProgressSuite extends munit.FunSuite {
       progress.handle(ServerNotification.TaskProgress("common", "compile", progress = 2L, total = 4L))
       assertEquals(
         progressTexts(emitted),
-        Seq("[common] Compiling 4 sources...", "[common] Compile progress: 2/4")
+        Seq("[common] Compiling 4 sources...", "[common] Compile progress: 50%")
       )
 
       clock.advanceMillis(100L)
@@ -31,7 +31,7 @@ class CliCompileProgressSuite extends munit.FunSuite {
       assertEquals(progressTexts(emitted).size, 2)
 
       progress.handle(ServerNotification.TaskProgress("common", "compile", progress = 4L, total = 4L))
-      assertEquals(progressTexts(emitted).last, "[common] Compile progress: 4/4")
+      assertEquals(progressTexts(emitted).last, "[common] Compile progress: 100%")
 
       clock.advanceMillis(1000L)
       progress.handle(ServerNotification.CompileFinished("common", errors = 0, warnings = 0))
@@ -52,7 +52,7 @@ class CliCompileProgressSuite extends munit.FunSuite {
 
       val texts = progressTexts(emitted)
       assertEquals(texts.count(_.contains("Compile progress:")), 1)
-      assert(texts.exists(_.startsWith("[common] Compile progress: 2/10")))
+      assert(texts.exists(_.startsWith("[common] Compile progress: 20%")))
     }
   }
 

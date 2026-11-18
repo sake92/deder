@@ -75,7 +75,8 @@ final class CliCompileProgress(
     val intervalElapsed = lastProgressAtNanos.forall(last => now - last >= intervalNanos)
     if total > 0 && intervalElapsed && progressChanged then {
       lastProgressAtNanos = Some(now)
-      emitInfo(moduleId, s"Compile progress: $current/$total")
+      val percentage = (current.toDouble / total * 100).toLong
+      emitInfo(moduleId, s"Compile progress: $percentage%")
     }
   }
 
