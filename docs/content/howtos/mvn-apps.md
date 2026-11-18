@@ -1,6 +1,6 @@
 ---
 layout: howto.html
-title: Invoking Maven applications
+title: Run applications from Maven repositories
 ---
 
 # {{page.title}}
