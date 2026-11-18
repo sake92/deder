@@ -701,17 +701,15 @@ private object TasksOutput:
         val categoryLines = sortedCategories.flatMap { cat =>
           val sortedTasks = grouped(cat).toSeq.sortBy(_.name)
           val taskNameWidth = sortedTasks.map(_.name.length).maxOption.getOrElse(0)
+          val tagCount = sortedTasks.map(_.featureTags.size).maxOption.getOrElse(0)
           val taskNames = sortedTasks.map { task =>
             val tags = task.featureTags.map(_.emoji).mkString(" ")
+            val tagPadding = "   " * (tagCount - task.featureTags.size)
+            val tagPrefix = if tags.nonEmpty then s"$tags " else ""
             val description = task.description.trim
-            val detailParts = Seq(description, tags).filter(_.nonEmpty)
-            val paddedName =
-              if detailParts.nonEmpty then task.name.padTo(taskNameWidth, ' ')
-              else task.name
-            val suffix =
-              if detailParts.nonEmpty then s"  ${detailParts.mkString("  ")}"
-              else ""
-            s"    $paddedName$suffix"
+            val paddedName = if description.nonEmpty then task.name.padTo(taskNameWidth, ' ') else task.name
+            val suffix = if description.nonEmpty then s"  $description" else ""
+            s"    $tagPrefix$tagPadding$paddedName$suffix"
           }
           Seq(s"  ${cat}:") ++ taskNames
         }
