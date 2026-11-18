@@ -33,11 +33,12 @@ object DependencyDedup {
         val mod = kept.applied.module
         val coordinate = s"${mod.organization}:${mod.name}"
         deduped += kept
-        conflictInfos += DedupConflict(
-          coordinate = coordinate,
-          versions = versions,
-          keptVersion = kept.applied.version
-        )
+        if versions.distinct.size > 1 then
+          conflictInfos += DedupConflict(
+            coordinate = coordinate,
+            versions = versions,
+            keptVersion = kept.applied.version
+          )
     }
     DedupResult(
       deduplicated = deduped.result(),

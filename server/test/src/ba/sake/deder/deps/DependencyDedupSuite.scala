@@ -84,7 +84,7 @@ class DependencyDedupSuite extends munit.FunSuite {
     assertEquals(result.conflicts.head.versions, Seq("1.0", "2.0"))
   }
 
-  test("exact duplicates: keep one, warn") {
+  test("exact duplicates: keep one without a conflict") {
     val deps = Seq(
       dep("org.scalameta::munit:1.0.2"),
       dep("org.scalameta::munit:1.0.2")
@@ -92,8 +92,7 @@ class DependencyDedupSuite extends munit.FunSuite {
     val result = DependencyDedup.deduplicate(deps)
     assertEquals(result.deduplicated.length, 1)
     assertEquals(result.deduplicated.head.applied.version, "1.0.2")
-    assertEquals(result.conflicts.length, 1)
-    assertEquals(result.conflicts.head.versions, Seq("1.0.2", "1.0.2"))
+    assertEquals(result.conflicts.length, 0)
   }
 
   test("empty list") {
