@@ -3,7 +3,7 @@ layout: reference.html
 title: Custom Repositories
 ---
 
-# {{page.title}}
+# Custom Repositories
 
 By default, Deder resolves dependencies from Maven Central, the local Maven
 repository (`~/.m2/repository`), and the local Ivy2 cache. To pull artifacts

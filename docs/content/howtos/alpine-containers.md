@@ -3,7 +3,7 @@ layout: howto.html
 title: Build a Scala Native app in Alpine
 ---
 
-# {{page.title}}
+# Build a Scala Native app in Alpine
 
 Use a multi-stage Docker build when you want Deder to run in Alpine and ship a
 small image containing only the Scala Native executable.

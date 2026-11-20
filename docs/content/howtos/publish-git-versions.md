@@ -3,7 +3,7 @@ layout: howto.html
 title: Publish with Git-driven versioning
 ---
 
-# {{page.title}}
+# Publish with Git-driven versioning
 
 Resolve the Git version once and pass it to every CI job that builds or publishes artifacts. This prevents a snapshot workflow from switching to a stable release version when a tag is pushed before its publish job checks out the repository.
 

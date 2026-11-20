@@ -3,7 +3,7 @@ layout: reference.html
 title: Server Properties File
 ---
 
-# {{page.title}}
+# Server Properties File
 
 You can use `.deder/server.properties` to specify server properties when the client starts it.
 Example:

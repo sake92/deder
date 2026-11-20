@@ -3,7 +3,7 @@ layout: howto.html
 title: Running tests in parallel
 ---
 
-# {{ page.title }}
+# Running tests in parallel
 
 By default, Deder runs test classes **serially** within a single test JVM. This matches sbt (`Test / testForkedParallel = false`) and Mill (`testForked`), and avoids flakiness caused by tests that share mutable state (static fields, `System.setProperty`, security providers, etc.).
 

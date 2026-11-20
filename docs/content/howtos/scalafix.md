@@ -3,7 +3,7 @@ layout: howto.html
 title: Rewrite Scala code with Scalafix
 ---
 
-# {{ page.title }}
+# Rewrite Scala code with Scalafix
 
 Create `.scalafix.conf` in the project root and select the rules to run. For example:
 

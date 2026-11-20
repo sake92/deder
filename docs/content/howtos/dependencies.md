@@ -3,7 +3,7 @@ layout: howto.html
 title: Dependencies
 ---
 
-# {{page.title}}
+# Dependencies
 
 Dependencies are written using Coursier's Dependency syntax.
 See https://github.com/coursier/dependency for more details.

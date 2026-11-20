@@ -3,7 +3,7 @@ layout: reference.html
 title: Cheatsheet
 ---
 
-# {{page.title}}
+# Cheatsheet
 
 > For the full task inventory with descriptions, see the [Task Reference](/reference/tasks.html).
 

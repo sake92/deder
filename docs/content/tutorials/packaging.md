@@ -5,7 +5,7 @@ description: Deder Packaging Tutorial
 ---
 
 
-# {{page.title}}
+# Packaging Tutorial
 
 Create this `deder.pkl` file:
 

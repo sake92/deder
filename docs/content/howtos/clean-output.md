@@ -3,7 +3,7 @@ layout: howto.html
 title: Clean output artifacts
 ---
 
-# {{ page.title }}
+# Clean output artifacts
 
 Clean all modules: `deder clean`
 

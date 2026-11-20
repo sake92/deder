@@ -3,7 +3,7 @@ layout: howto.html
 title: Format Scala code with Scalafmt
 ---
 
-# {{ page.title }}
+# Format Scala code with Scalafmt
 
 Create `.scalafmt.conf` in the project root. For example, for Scala 3:
 

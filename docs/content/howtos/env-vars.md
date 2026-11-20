@@ -3,7 +3,7 @@ layout: howto.html
 title: Environment Variables and JVM options
 ---
 
-# {{page.title}}
+# Environment Variables and JVM options
 
 ## How to pass environment variables to run/test
 

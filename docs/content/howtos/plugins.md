@@ -3,7 +3,7 @@ layout: howto.html
 title: Plugins
 ---
 
-# {{page.title}}
+# Plugins
 
 > **Plugin support is still evolving.** The API surface and configuration schema may change between releases.
 > Watch release notes for breaking changes.

@@ -3,7 +3,7 @@ layout: howto.html
 title: Run applications from Maven repositories
 ---
 
-# {{page.title}}
+# Run applications from Maven repositories
 
 Deder provides a convenient way to invoke JARs from Maven as part of your build.  
 This can be useful for checking formatting, generating code etc.
