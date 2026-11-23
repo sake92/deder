@@ -211,7 +211,12 @@ local const client = new JavaModule {
     nativeImageOptions {
       "-H:+UnlockExperimentalVMOptions"
       "--no-fallback"
-      "-H:+StaticExecutableWithDynamicLibC"
+      when (read?("env:DEDER_CLIENT_MUSL") == "true") {
+        "--static"
+        "--libc=musl"
+      } else {
+        "-H:+StaticExecutableWithDynamicLibC"
+      }
     }
   }
 }
