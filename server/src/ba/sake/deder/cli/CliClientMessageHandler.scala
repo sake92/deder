@@ -553,11 +553,6 @@ class CliClientMessageHandler(
       // connecting to this dying server during the flush sleep below
       cliServer.stopAccepting()
 
-      // Release the server lock BEFORE BSP flush sleep so a new server process can
-      // start immediately (the client's reconnection loop spawns a server only once)
-      projectState.releaseServerLock()
-
-      // Notify BSP clients — they now have time to disconnect while the new server starts
       projectState.notifyBspClientsShuttingDown()
       Thread.sleep(500) // flush window for BSP clients to process disconnect
       projectState.shutdown()

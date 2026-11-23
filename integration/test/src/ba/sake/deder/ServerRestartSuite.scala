@@ -4,6 +4,36 @@ import scala.concurrent.duration.*
 
 class ServerRestartSuite extends BaseIntegrationSuite {
 
+  test("empty PID in a held lock cannot admit a second server") {
+    withTestProject("sample-projects/multi") { root =>
+      assertEquals(executeDederCommand(root, "version").exitCode, 0)
+      val lock = root / ".deder/server.lock"
+      val owner = os.read(lock)
+      try {
+        os.write.over(lock, "")
+        val contender = os.proc("java", "-cp", dederServerPath, "ba.sake.deder.ServerMain",
+          "--root-dir", root.toString).call(cwd = root, check = false, timeout = 10000)
+        assertEquals(contender.exitCode, 1)
+        assertEquals(os.read(lock), "")
+        assertEquals(executeDederCommand(root, "version").exitCode, 0)
+      } finally os.write.over(lock, owner)
+    }
+  }
+
+  test("shutdown terminates the project server when its CLI socket is unreachable") {
+    withTestProject("sample-projects/multi") { root =>
+      assertEquals(executeDederCommand(root, "version").exitCode, 0)
+      val owner = ProcessHandle.of(os.read(root / ".deder/server.lock").trim.toLong).orElseThrow()
+      val socket = root / ".deder/server-cli.sock"
+      val moved = root / ".deder/unreachable.sock"
+      os.move(socket, moved)
+      try {
+        assertEquals(executeDederCommand(root, "shutdown").exitCode, 0)
+        assert(!owner.isAlive)
+      } finally if owner.isAlive then os.move(moved, socket)
+    }
+  }
+
   test("rapid restart loop — deder shutdown then deder version should not hang") {
     withTestProject("sample-projects/multi") { projectPath =>
       for (i <- 1 to 5) {

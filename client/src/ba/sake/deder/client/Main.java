@@ -82,8 +82,7 @@ public class Main {
             client.start();
         } catch (Exception e) {
             if (args.length == 1 && args[0].equals("shutdown")) {
-                log("Deder server not running. No need to shutdown.");
-                System.err.println("Deder server not running. No need to shutdown.");
+                shutdownDisconnectedServer();
                 return;
             }
             startServer(isBspClient, serverProps);
@@ -112,6 +111,32 @@ public class Main {
                 System.exit(1);
             }
         }
+    }
+
+    private void shutdownDisconnectedServer() throws Exception {
+        var lock = Path.of(".deder/server.lock");
+        if (!Files.exists(lock)) {
+            System.err.println("No server lock for this project.");
+            return;
+        }
+        var pid = Long.parseLong(Files.readString(lock).trim());
+        var process = ProcessHandle.of(pid);
+        if (process.isEmpty()) {
+            System.err.println("Recorded Deder server has exited.");
+            return;
+        }
+        var server = process.get();
+        var args = server.info().arguments().orElse(new String[0]);
+        int n = args.length;
+        if (n < 5 || !args[n-5].equals("-cp") || !args[n-4].equals(".deder/server.jar")
+                || !args[n-3].equals("ba.sake.deder.ServerMain") || !args[n-2].equals("--root-dir")
+                || !Path.of(args[n-1]).isAbsolute() || !Files.isSameFile(Path.of(args[n-1]), Path.of("."))) {
+            throw new IOException("Cannot verify that PID " + pid + " is this project's Deder server.");
+        }
+        if (!server.destroy() && server.isAlive()) {
+            throw new IOException("Failed to terminate Deder server " + pid);
+        }
+        server.onExit().get(30, TimeUnit.SECONDS);
     }
 
     private Properties loadServerProperties() {

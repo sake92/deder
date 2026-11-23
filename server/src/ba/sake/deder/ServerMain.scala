@@ -2,7 +2,6 @@ package ba.sake.deder
 
 import java.io.RandomAccessFile
 import java.nio.channels.FileLock
-import java.nio.channels.OverlappingFileLockException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 
@@ -122,16 +121,11 @@ object ServerMain extends StrictLogging {
       val onShutdown: () => Unit = () => {
         logger.info("Deder server is shutting down...")
 
-        // 1. Stop file watcher and debounce scheduler (prevents events during shutdown)
+        // Stop file watcher and debounce scheduler (prevents events during shutdown)
         stopFileWatcher()
         stopDebounceScheduler()
 
-        // 2. Release server lock (may already be released via early callback — idempotent)
-        logger.info("Releasing server lock...")
-        CloseUtils.quietly(serverFileLock.release())
-        CloseUtils.quietly(serverLockHandle.close())
-
-        // 3. Close sockets so new connections go to the new server process
+        // Close sockets so new connections go to the new server process
         if (cliServer != null) cliServer.nn.stop()
         if bspProxyServer != null then bspProxyServer.stop()
 
@@ -213,12 +207,6 @@ object ServerMain extends StrictLogging {
             }
           }
         }
-      })
-
-      // Wire up early lock release for fast shutdown+restart
-      projectState.setReleaseServerLock(() => {
-        CloseUtils.quietly(serverFileLock.release())
-        CloseUtils.quietly(serverLockHandle.close())
       })
 
       // Platform thread — Runtime shutdown hooks must execute reliably during JVM teardown
@@ -318,67 +306,16 @@ object ServerMain extends StrictLogging {
     val serverLockFile = projectRoot / ".deder/server.lock"
     os.makeDir.all(serverLockFile / os.up)
 
-    val attemptLock = () => {
-      val handle = new RandomAccessFile(serverLockFile.toIO, "rw")
-      val lock = handle.getChannel.tryLock()
-      if lock != null then {
-        val pid = ProcessHandle.current().pid().toString()
-        handle.setLength(0) // truncate any existing content
-        handle.seek(0)
-        handle.write(pid.getBytes(StandardCharsets.UTF_8))
-      }
-      (handle, lock)
+    // Keep this descriptor open until JVM exit, including socket cleanup in shutdown hooks.
+    serverLockHandle = new RandomAccessFile(serverLockFile.toIO, "rw")
+    serverFileLock = serverLockHandle.getChannel.tryLock()
+    if serverFileLock == null then {
+      serverLockHandle.close()
+      System.err.println("ERROR: Another server process is already running for this project")
+      sys.exit(1)
     }
-
-    val (handle, lock) = attemptLock()
-    if lock == null then {
-      val existingPidOpt =
-        try {
-          val content = os.read(serverLockFile).trim
-          if content.nonEmpty then Some(content.toLong) else None
-        } catch { case _: Exception => None }
-
-      val isStale = existingPidOpt match {
-        case Some(pid) =>
-          val alive = ProcessHandle.of(pid).isPresent && ProcessHandle.of(pid).get().isAlive
-          !alive
-        case None => true
-      }
-
-      if isStale then {
-        logger.warn(
-          s"Found stale server lock (PID: ${existingPidOpt.getOrElse("unknown")}). Breaking lock and retrying..."
-        )
-        handle.close()
-        os.remove.all(serverLockFile)
-        val (handle2, lock2) = attemptLock()
-        if lock2 == null then {
-          val msg = "ERROR: Could not acquire server lock - another server process is already running for this project"
-          logger.error(msg)
-          System.err.println(msg)
-          handle2.close()
-          sys.exit(1)
-        }
-        serverLockHandle = handle2
-        serverFileLock = lock2
-      } else {
-        val msg = "ERROR: Could not acquire server lock - another server process is already running for this project"
-        logger.error(msg)
-        System.err.println(msg)
-        handle.close()
-        sys.exit(1)
-      }
-    } else {
-      serverLockHandle = handle
-      serverFileLock = lock
-    }
-
-    // Platform thread — Runtime shutdown hooks must execute reliably during JVM teardown
-    Runtime.getRuntime.addShutdownHook(new Thread(() => {
-      logger.warn("JVM shutdown hook fired (unexpected exit) — releasing lock as safety net")
-      CloseUtils.quietly(serverFileLock.release())
-      CloseUtils.quietly(serverLockHandle.close())
-    }))
+    serverLockHandle.setLength(0)
+    serverLockHandle.write(ProcessHandle.current().pid().toString.getBytes(StandardCharsets.UTF_8))
   }
 
   private def isServerConfigFile(p: os.Path): Boolean =
