@@ -1,7 +1,8 @@
 package ba.sake.deder.deps
 
 import java.net.URI
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{CompletableFuture, ConcurrentHashMap}
+import scala.annotation.tailrec
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -33,6 +34,8 @@ class DependencyResolver(
       .build()
 
   cacheRegistry.register("dep-resolver", fetchFilesCache)
+
+  private val inFlightFetches = new ConcurrentHashMap[String, CompletableFuture[Unit]]()
 
   def doFetch(
       coursierDependencies: Seq[CoursierDependency],
@@ -68,17 +71,38 @@ class DependencyResolver(
     else {
       val coursierDeps = dependencies.map(_.applied.toCs)
       val key = DependencyResolver.depsCacheKey(coursierDeps)
-      fetchFilesCache.get(
-        key,
-        _ => {
-          val span = OTEL.TRACER
-            .spanBuilder("DependencyResolver.fetchFiles")
-            .setAttribute("deps.count", dependencies.size.toLong)
-            .startSpan()
-          try doFetch(coursierDeps, notifications).getFiles.asScala.map(f => os.Path(f.toPath)).toSeq
-          finally span.end()
-        }
-      )
+
+      @tailrec
+      def fetchOrWait(): Seq[os.Path] = fetchFilesCache.getIfPresent(key) match {
+        case Some(files) => files
+        case None =>
+          // Waiting inside Caffeine's mapping function pins a carrier on Java 21.
+          val finished = new CompletableFuture[Unit]()
+          val inFlight = inFlightFetches.putIfAbsent(key, finished)
+          if inFlight != null then
+            inFlight.get()
+            fetchOrWait()
+          else {
+            try {
+              // A previous fetch may have filled the cache before we claimed the key.
+              fetchFilesCache.asMap().get(key).getOrElse {
+                val span = OTEL.TRACER
+                  .spanBuilder("DependencyResolver.fetchFiles")
+                  .setAttribute("deps.count", dependencies.size.toLong)
+                  .startSpan()
+                val files =
+                  try doFetch(coursierDeps, notifications).getFiles.asScala.map(f => os.Path(f.toPath)).toSeq
+                  finally span.end()
+                fetchFilesCache.put(key, files)
+                files
+              }
+            } finally {
+              inFlightFetches.remove(key, finished)
+              finished.complete(())
+            }
+          }
+      }
+      fetchOrWait()
     }
   }
 
