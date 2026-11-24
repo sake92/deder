@@ -1,7 +1,10 @@
 package ba.sake.deder.deps
 
-import ba.sake.deder.CacheStatsRegistry
-import ba.sake.deder.deps.Dependency
+import java.time.Duration
+import java.util.concurrent.{CountDownLatch, ExecutionException, FutureTask, TimeUnit, TimeoutException}
+import java.util.concurrent.atomic.AtomicInteger
+import ba.sake.deder.{CacheStatsRegistry, ServerNotificationsLogger}
+import coursierapi.{Artifact, Dependency as CoursierDependency, FetchResult}
 
 class DependencyResolverCacheSuite extends munit.FunSuite {
 
@@ -19,6 +22,53 @@ class DependencyResolverCacheSuite extends munit.FunSuite {
     val resolver = new DependencyResolver(Seq.empty, CacheStatsRegistry())
     val result = resolver.fetchFiles(Seq.empty)
     assertEquals(result, Seq.empty)
+  }
+
+  test("interrupting a caller waiting for the same dependency leaves the active fetch running") {
+    val fetchStarted = new CountDownLatch(1)
+    val releaseFetch = new CountDownLatch(1)
+    val fetchCount = new AtomicInteger()
+    val jar = os.pwd / "test-dependency.jar"
+    val artifact = Artifact.of(jar.toNIO.toUri.toString)
+    val fetchResult = FetchResult.of(java.util.List.of(java.util.Map.entry(artifact, jar.toIO)))
+    val resolver = new DependencyResolver(Seq.empty, CacheStatsRegistry()) {
+      override def doFetch(
+          dependencies: Seq[CoursierDependency],
+          notifications: Option[ServerNotificationsLogger]
+      ): FetchResult = {
+        fetchCount.incrementAndGet()
+        fetchStarted.countDown()
+        if !releaseFetch.await(15, TimeUnit.SECONDS) then
+          throw new TimeoutException("fetch should be released by the test")
+        fetchResult
+      }
+    }
+    val dependencies = Seq(Dependency.make("example:test-dependency:1.0", "3.9.0"))
+    val activeFetch = new FutureTask[Seq[os.Path]](() => resolver.fetchFiles(dependencies))
+    val waitingFetch = new FutureTask[Seq[os.Path]](() => resolver.fetchFiles(dependencies))
+    val owner = Thread.ofVirtual().unstarted(activeFetch)
+    val waiter = Thread.ofVirtual().unstarted(waitingFetch)
+
+    try {
+      owner.start()
+      assert(fetchStarted.await(5, TimeUnit.SECONDS), "the first caller should start the fetch")
+
+      waiter.start()
+      waiter.interrupt()
+      val failure = intercept[ExecutionException](waitingFetch.get(5, TimeUnit.SECONDS))
+      assert(failure.getCause.isInstanceOf[InterruptedException])
+      assert(!activeFetch.isDone, "the active fetch should continue")
+
+      releaseFetch.countDown()
+      assertEquals(activeFetch.get(5, TimeUnit.SECONDS), Seq(jar))
+      assertEquals(resolver.fetchFiles(dependencies), Seq(jar))
+      assertEquals(fetchCount.get(), 1)
+    } finally {
+      releaseFetch.countDown()
+      val cleanupTimeout = Duration.ofSeconds(5)
+      assert(owner.join(cleanupTimeout), "the active caller should exit")
+      assert(waiter.join(cleanupTimeout), "the waiting caller should exit")
+    }
   }
 
   test("buildDepTree detects requested version clashes even after resolution picks one winner") {
