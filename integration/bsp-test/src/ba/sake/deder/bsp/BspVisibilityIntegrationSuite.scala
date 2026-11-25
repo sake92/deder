@@ -93,7 +93,7 @@ class BspVisibilityIntegrationSuite extends BaseIntegrationSuite {
 
       val scalacResult = buildServer
         .buildTargetScalacOptions(new ScalacOptionsParams(List(targetId(baseUri, "frontend")).asJava))
-        .get(30, TimeUnit.SECONDS)
+        .get(bspRequestTimeoutMinutes, TimeUnit.MINUTES)
       val classpath = scalacResult.getItems.asScala.head.getClasspath.asScala
       assert(classpath.exists(_.contains("/common/")), s"frontend should still compile against hidden common: $classpath")
 

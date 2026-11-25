@@ -311,7 +311,7 @@ object ServerMain extends StrictLogging {
     serverFileLock = serverLockHandle.getChannel.tryLock()
     if serverFileLock == null then {
       serverLockHandle.close()
-      System.err.println("ERROR: Another server process is already running for this project")
+      System.err.println("ERROR: Could not acquire server lock - another server process is already running for this project")
       sys.exit(1)
     }
     serverLockHandle.setLength(0)
