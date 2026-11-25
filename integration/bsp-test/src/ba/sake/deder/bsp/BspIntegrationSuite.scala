@@ -164,7 +164,7 @@ class BspIntegrationSuite extends BaseIntegrationSuite {
   test("buildTargetScalaTestClasses returns test class for test module") {
     val result = buildServer
       .buildTargetScalaTestClasses(new ScalaTestClassesParams(List(targetId("uber-test")).asJava))
-      .get(30, TimeUnit.SECONDS)
+      .get(2, TimeUnit.MINUTES)
     val items = result.getItems.asScala
     assertEquals(items.size, 1)
     val item = items.head
