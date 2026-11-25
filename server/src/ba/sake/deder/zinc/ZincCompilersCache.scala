@@ -20,14 +20,15 @@ class ZincCompilersCache(cacheRegistry: CacheStatsRegistry):
   cacheRegistry.register("zinc-compilers", zincCache)
 
   def get(scalaVersion: String, dependencyResolver: DependencyResolverApi): ZincCompiler =
-    zincCache.get(scalaVersion, _ => makeZincCompiler(scalaVersion, dependencyResolver))
+    zincCache.getIfPresent(scalaVersion).getOrElse {
+      // Dependency resolution coalesces concurrent fetches without holding the Zinc cache's monitor.
+      val compilerBridgeJar = resolveCompilerBridge(scalaVersion, dependencyResolver)
+      zincCache.get(scalaVersion, _ => ZincCompiler(compilerBridgeJar, cacheRegistry, scalaVersion))
+    }
 
-  private def makeZincCompiler(scalaVersion: String, dependencyResolver: DependencyResolverApi) = {
+  private def resolveCompilerBridge(scalaVersion: String, dependencyResolver: DependencyResolverApi): os.Path = {
     val dep =
       if scalaVersion.startsWith("3.") then s"org.scala-lang:scala3-sbt-bridge:${scalaVersion}"
       else "org.scala-sbt::compiler-bridge:1.11.0"
-    val compilerBridgeJar = dependencyResolver.fetchFile(
-      Dependency.make(dep, scalaVersion)
-    )
-    ZincCompiler(compilerBridgeJar, cacheRegistry, scalaVersion)
+    dependencyResolver.fetchFile(Dependency.make(dep, scalaVersion))
   }
